@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xerus Area Selection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.3);
+            cursor: crosshair;
+            user-select: none;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Glass overlay effect */
+        .glass-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(2px);
+            -webkit-backdrop-filter: blur(2px);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* Selection rectangle */
+        .selection-rectangle {
+            position: absolute;
+            border: 2px solid #007AFF;
+            background: rgba(0, 122, 255, 0.1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 8px;
+            pointer-events: none;
+            z-index: 10;
+            
+            /* Glass morphism effect */
+            box-shadow: 
+                0 8px 32px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                0 0 0 1px rgba(255, 255, 255, 0.05);
+            
+            /* Animated border */
+            animation: pulseGlow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes pulseGlow {
+            0% {
+                box-shadow: 
+                    0 8px 32px rgba(0, 0, 0, 0.3),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                    0 0 0 1px rgba(255, 255, 255, 0.05),
+                    0 0 20px rgba(0, 122, 255, 0.3);
+            }
+            100% {
+                box-shadow: 
+                    0 8px 32px rgba(0, 0, 0, 0.3),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                    0 0 0 1px rgba(255, 255, 255, 0.05),
+                    0 0 30px rgba(0, 122, 255, 0.5);
+            }
+        }
+
+        /* Selection info display */
+        .selection-info {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 12px;
+            z-index: 20;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+            transform: translate(-50%, -100%);
+            margin-top: -10px;
+            white-space: nowrap;
+        }
+
+        /* Help text */
+        .help-text {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 14px;
+            text-align: center;
+            z-index: 30;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
+        /* Cancel button */
+        .cancel-button {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 59, 48, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 12px;
+            cursor: pointer;
+            z-index: 30;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s ease;
+        }
+
+        .cancel-button:hover {
+            background: rgba(255, 59, 48, 0.9);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        .cancel-button:active {
+            transform: translateY(0);
+        }
+
+        /* Crosshair cursor enhancement */
+        .crosshair {
+            cursor: crosshair;
+        }
+
+        /* Grid overlay for precision */
+        .grid-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            opacity: 0.1;
+            z-index: 5;
+            background-image: 
+                linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+            background-size: 20px 20px;
+            display: none;
+        }
+
+        .grid-overlay.show {
+            display: block;
+        }
+
+        /* Screen edge indicators */
+        .screen-edge {
+            position: absolute;
+            background: rgba(0, 122, 255, 0.3);
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .screen-edge.top {
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+        }
+
+        .screen-edge.bottom {
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+        }
+
+        .screen-edge.left {
+            top: 0;
+            left: 0;
+            width: 2px;
+            height: 100%;
+        }
+
+        .screen-edge.right {
+            top: 0;
+            right: 0;
+            width: 2px;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="glass-overlay"></div>
+    <div class="grid-overlay" id="gridOverlay"></div>
+    
+    <!-- Screen edge indicators -->
+    <div class="screen-edge top"></div>
+    <div class="screen-edge bottom"></div>
+    <div class="screen-edge left"></div>
+    <div class="screen-edge right"></div>
+    
+    <!-- Help text -->
+    <div class="help-text" id="helpText">
+        Drag to select area • Press <strong>Escape</strong> to cancel • Hold <strong>Shift</strong> for precision grid
+    </div>
+    
+    <!-- Cancel button -->
+    <button class="cancel-button" id="cancelButton">Cancel</button>
+    
+    <!-- Selection rectangle (created dynamically) -->
+    <div class="selection-rectangle" id="selectionRect" style="display: none;"></div>
+    
+    <!-- Selection info (created dynamically) -->
+    <div class="selection-info" id="selectionInfo" style="display: none;"></div>
+
+    <script>
+        class AreaSelector {
+            constructor() {
+                this.isSelecting = false;
+                this.startX = 0;
+                this.startY = 0;
+                this.currentX = 0;
+                this.currentY = 0;
+                this.displayInfo = null;
+                
+                this.selectionRect = document.getElementById('selectionRect');
+                this.selectionInfo = document.getElementById('selectionInfo');
+                this.helpText = document.getElementById('helpText');
+                this.cancelButton = document.getElementById('cancelButton');
+                this.gridOverlay = document.getElementById('gridOverlay');
+                
+                this.setupEventListeners();
+            }
+
+            setupEventListeners() {
+                // Mouse events
+                document.addEventListener('mousedown', this.onMouseDown.bind(this));
+                document.addEventListener('mousemove', this.onMouseMove.bind(this));
+                document.addEventListener('mouseup', this.onMouseUp.bind(this));
+                
+                // Keyboard events
+                document.addEventListener('keydown', this.onKeyDown.bind(this));
+                document.addEventListener('keyup', this.onKeyUp.bind(this));
+                
+                // Cancel button
+                this.cancelButton.addEventListener('click', this.cancelSelection.bind(this));
+                
+                // IPC for display info
+                window.api?.on?.('display-info', (event, data) => {
+                    this.displayInfo = data;
+                    console.log('Display info received:', data);
+                });
+                
+                // Prevent context menu
+                document.addEventListener('contextmenu', (e) => e.preventDefault());
+            }
+
+            onMouseDown(e) {
+                if (e.button !== 0) return; // Only left click
+                
+                this.isSelecting = true;
+                this.startX = e.clientX;
+                this.startY = e.clientY;
+                this.currentX = e.clientX;
+                this.currentY = e.clientY;
+                
+                this.selectionRect.style.display = 'block';
+                this.selectionInfo.style.display = 'block';
+                
+                this.updateSelection();
+                
+                // Hide help text
+                this.helpText.style.opacity = '0.3';
+                
+                e.preventDefault();
+            }
+
+            onMouseMove(e) {
+                if (!this.isSelecting) return;
+                
+                this.currentX = e.clientX;
+                this.currentY = e.clientY;
+                
+                this.updateSelection();
+            }
+
+            onMouseUp(e) {
+                if (!this.isSelecting || e.button !== 0) return;
+                
+                this.isSelecting = false;
+                
+                const selection = this.getSelectionData();
+                
+                // Only proceed if selection has minimum size
+                if (selection.width > 10 && selection.height > 10) {
+                    this.completeSelection(selection);
+                } else {
+                    this.resetSelection();
+                }
+            }
+
+            onKeyDown(e) {
+                if (e.key === 'Escape') {
+                    this.cancelSelection();
+                } else if (e.key === 'Shift') {
+                    this.gridOverlay.classList.add('show');
+                }
+            }
+
+            onKeyUp(e) {
+                if (e.key === 'Shift') {
+                    this.gridOverlay.classList.remove('show');
+                }
+            }
+
+            updateSelection() {
+                const minX = Math.min(this.startX, this.currentX);
+                const minY = Math.min(this.startY, this.currentY);
+                const maxX = Math.max(this.startX, this.currentX);
+                const maxY = Math.max(this.startY, this.currentY);
+                
+                const width = maxX - minX;
+                const height = maxY - minY;
+                
+                // Update selection rectangle
+                this.selectionRect.style.left = minX + 'px';
+                this.selectionRect.style.top = minY + 'px';
+                this.selectionRect.style.width = width + 'px';
+                this.selectionRect.style.height = height + 'px';
+                
+                // Update selection info
+                this.selectionInfo.style.left = (minX + width / 2) + 'px';
+                this.selectionInfo.style.top = minY + 'px';
+                this.selectionInfo.textContent = `${width} × ${height}`;
+                
+                // Position info box to avoid screen edges
+                const infoRect = this.selectionInfo.getBoundingClientRect();
+                if (minY < infoRect.height + 20) {
+                    this.selectionInfo.style.top = (minY + height + 10) + 'px';
+                    this.selectionInfo.style.transform = 'translate(-50%, 0)';
+                }
+            }
+
+            getSelectionData() {
+                const minX = Math.min(this.startX, this.currentX);
+                const minY = Math.min(this.startY, this.currentY);
+                const width = Math.abs(this.currentX - this.startX);
+                const height = Math.abs(this.currentY - this.startY);
+                
+                return {
+                    x: minX,
+                    y: minY,
+                    width: width,
+                    height: height,
+                    scaleFactor: this.displayInfo?.display?.scaleFactor || 1
+                };
+            }
+
+            completeSelection(selection) {
+                console.log('Area selected:', selection);
+                
+                // Send selection to main process
+                window.api?.send?.('area-selected', selection);
+                
+                // Visual feedback
+                this.selectionRect.style.borderColor = '#34C759';
+                this.selectionRect.style.background = 'rgba(52, 199, 89, 0.1)';
+                
+                // Close after short delay
+                setTimeout(() => {
+                    window.close();
+                }, 500);
+            }
+
+            resetSelection() {
+                this.isSelecting = false;
+                this.selectionRect.style.display = 'none';
+                this.selectionInfo.style.display = 'none';
+                this.helpText.style.opacity = '1';
+            }
+
+            cancelSelection() {
+                console.log('Selection cancelled');
+                
+                // Send cancellation to main process
+                window.api?.send?.('selection-cancelled');
+                
+                // Close immediately
+                window.close();
+            }
+        }
+
+        // Initialize area selector when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            new AreaSelector();
+        });
+    </script>
+</body>
+</html>

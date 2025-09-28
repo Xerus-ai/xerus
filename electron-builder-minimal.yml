@@ -1,0 +1,42 @@
+appId: com.xerus.app
+productName: Xerus
+
+directories:
+  output: dist
+
+files:
+  - "src/**/*"
+  - "package.json"
+  - "public/build/**/*"
+  - "xerus_web/out/**/*"
+  - "!node_modules/**/*"
+  - "!**/node_modules/**/*"
+
+asar: true
+asarUnpack:
+  - "src/ui/assets/SystemAudioDump"
+
+extraResources:
+  - from: "src/ui/assets/SystemAudioDump"
+    to: "SystemAudioDump"
+
+win:
+  icon: "src/ui/assets/logo.ico"
+  target: 
+    - target: "nsis"
+      arch: "x64"
+  requestedExecutionLevel: "asInvoker"
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: "Xerus"
+
+mac:
+  category: "public.app-category.productivity"
+  icon: "src/ui/assets/logo.icns"
+  target:
+    - target: "dmg"
+      arch: "universal"

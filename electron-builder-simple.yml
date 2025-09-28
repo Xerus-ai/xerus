@@ -1,0 +1,53 @@
+# Simplified electron-builder configuration for Windows build
+appId: com.xerus.app
+productName: Xerus
+
+# Build directories
+directories:
+  output: "dist"
+  buildResources: "build"
+
+# Files to include
+files:
+  - "src/**/*"
+  - "package.json"
+  - "public/build/**/*"
+  - "!**/node_modules/electron/**"
+  - "!**/node_modules/.bin/**"
+
+# Disable node_modules parsing workaround
+nodeGypRebuild: false
+npmRebuild: false
+
+# Additional resources
+extraResources:
+  - from: "src/ui/assets/SystemAudioDump"
+    to: "SystemAudioDump"
+  - from: "xerus_web/out"
+    to: "web"
+
+# Windows configuration
+win:
+  icon: "src/ui/assets/logo.ico"
+  target:
+    - target: "nsis"
+      arch: "x64"
+  requestedExecutionLevel: "asInvoker"
+
+# NSIS installer configuration
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: "Xerus"
+
+# macOS configuration
+mac:
+  category: "public.app-category.productivity"
+  icon: "src/ui/assets/logo.icns"
+  minimumSystemVersion: "11.0"
+  target:
+    - target: "dmg"
+      arch: "universal"

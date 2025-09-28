@@ -1,0 +1,124 @@
+# Xerus Electron Builder - SIGNED Configuration
+# Use this configuration once you have a code signing certificate
+
+appId: com.xerus.app
+productName: Xerus
+
+# Basic directories
+directories:
+  output: dist
+  buildResources: build
+
+# Files to include (optimized for production)
+files:
+  - "src/**/*"
+  - "package.json"
+  - "public/build/**/*"
+  - "xerus_web/out/**/*"
+  - "!node_modules/**/*"
+  - "!**/node_modules/**/*"
+  - "!.git/**/*"
+  - "!docs/**/*"
+  - "!aec/**/*"
+  - "!*.md"
+  - "!test*"
+  - "!*.test.*"
+
+# Enable asar for better performance and security
+asar: true
+
+# Files to keep unpackaged (native modules, etc.)
+asarUnpack:
+  - "src/ui/assets/SystemAudioDump"
+  - "**/node_modules/better-sqlite3/**/*"
+  - "**/node_modules/keytar/**/*"
+
+# Extra resources
+extraResources:
+  - from: "src/ui/assets/SystemAudioDump"
+    to: "SystemAudioDump"
+
+# Windows configuration with CODE SIGNING
+win:
+  icon: "src/ui/assets/logo.ico"
+  target:
+    - target: "nsis"
+      arch: "x64"
+    - target: "portable"
+      arch: "x64"
+  requestedExecutionLevel: asInvoker
+  
+  # CODE SIGNING CONFIGURATION
+  signAndEditExecutable: true
+  verifyUpdateCodeSignature: false
+  
+  # Certificate from Windows certificate store
+  certificateSubjectName: "Glass Dev Code Signing"
+  
+  # Alternative: Certificate from file (PFX format) 
+  # certificateFile: "certificates/xerus-codesign.pfx"
+  # certificatePassword: "${env.CSC_KEY_PASSWORD}"
+  
+  # Signing options
+  signtoolOptions:
+    signingHashAlgorithms: ["sha256"]
+    additionalCertificateFile: null
+    
+  # Publishers info (will be displayed in installer)
+  publisherName: "Xerus Team"
+
+# NSIS installer options
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: "Xerus"
+  displayLanguageSelector: false
+  installerIcon: "src/ui/assets/logo.ico"
+  uninstallerIcon: "src/ui/assets/logo.ico"
+  installerHeader: "src/ui/assets/logo.ico"
+  guid: "12345678-1234-1234-1234-123456789012"
+
+# macOS configuration with CODE SIGNING
+mac:
+  category: "public.app-category.productivity"
+  icon: "src/ui/assets/logo.icns"
+  target:
+    - target: "dmg"
+      arch: "universal"
+    - target: "zip"
+      arch: "universal"
+  
+  # macOS Code Signing (requires Apple Developer account)
+  hardenedRuntime: true
+  entitlements: "entitlements.plist"
+  entitlementsInherit: "entitlements.plist"
+  
+  # Apple code signing identity
+  identity: "Developer ID Application: Your Company Name (TEAM_ID)"
+  
+  # Notarization (required for macOS 10.15+)
+  notarize:
+    teamId: "${env.APPLE_TEAM_ID}"
+
+# DMG options for macOS
+dmg:
+  sign: true
+  contents:
+    - x: 410
+      y: 150
+      type: link
+      path: "/Applications"
+    - x: 130
+      y: 150
+      type: file
+
+# Publishing configuration for auto-updates
+publish:
+  provider: github
+  owner: xerus-team
+  repo: xerus
+  releaseType: release 

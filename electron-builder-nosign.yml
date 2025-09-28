@@ -1,0 +1,67 @@
+# Electron Builder Configuration - No Code Signing (for testing)
+appId: com.xerus.app
+productName: Xerus
+
+# Basic directories
+directories:
+  output: dist
+  buildResources: build
+
+# Files to include (simplified)
+files:
+  - "src/**/*"
+  - "package.json"
+  - "public/build/**/*"
+  - "xerus_web/out/**/*"
+  - "!node_modules/**/*"
+  - "!**/node_modules/**/*"
+  - "!.git/**/*"
+  - "!docs/**/*"
+  - "!aec/**/*"
+
+# Enable asar for better performance
+asar: true
+
+# Files to keep unpackaged
+asarUnpack:
+  - "src/ui/assets/SystemAudioDump"
+
+# Extra resources
+extraResources:
+  - from: "src/ui/assets/SystemAudioDump"
+    to: "SystemAudioDump"
+
+# Windows configuration (COMPLETELY DISABLE SIGNING)
+win:
+  icon: "src/ui/assets/logo.ico"
+  target: 
+    - target: "nsis"
+      arch: "x64"
+  requestedExecutionLevel: asInvoker
+  # Completely disable signing
+  signAndEditExecutable: false
+  verifyUpdateCodeSignature: false
+
+# NSIS installer options
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: "Xerus"
+  displayLanguageSelector: false
+
+# Mac configuration (for future)
+mac:
+  category: "public.app-category.productivity"
+  icon: "src/ui/assets/logo.icns"
+  target:
+    - target: "dmg"
+      arch: "universal"
+  # Disable code signing
+  hardenedRuntime: false
+
+# Publishing (disabled for local builds)
+publish: null 

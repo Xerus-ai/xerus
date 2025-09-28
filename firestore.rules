@@ -1,0 +1,145 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // AI messages are stored with uid field, so we need to check ownership
+    match /sessions/{sessionId}/ai_messages/{messageId} {
+      // For reading: check if the message belongs to the authenticated user
+      allow read: if request.auth != null && 
+                  request.auth.uid == resource.data.uid;
+      
+      // For creating: check if the user is trying to create a message with their own uid
+      allow create: if request.auth != null && 
+                    request.auth.uid == request.resource.data.uid;
+      
+      // For updating: check both current and new data belong to the user
+      allow update: if request.auth != null && 
+                    request.auth.uid == resource.data.uid &&
+                    request.auth.uid == request.resource.data.uid;
+      
+      // For deleting: check if the message belongs to the user
+      allow delete: if request.auth != null && 
+                    request.auth.uid == resource.data.uid;
+    }
+
+    // Allow transcripts with uid-based ownership
+    match /sessions/{sessionId}/transcripts/{transcriptId} {
+      allow read: if request.auth != null && 
+                  request.auth.uid == resource.data.uid;
+      allow create: if request.auth != null && 
+                    request.auth.uid == request.resource.data.uid;
+      allow update: if request.auth != null && 
+                    request.auth.uid == resource.data.uid &&
+                    request.auth.uid == request.resource.data.uid;
+      allow delete: if request.auth != null && 
+                    request.auth.uid == resource.data.uid;
+    }
+
+    // Allow session summaries with uid-based ownership
+    match /sessions/{sessionId}/summary/{summaryId} {
+      allow read: if request.auth != null && 
+                  request.auth.uid == resource.data.uid;
+      allow create: if request.auth != null && 
+                    request.auth.uid == request.resource.data.uid;
+      allow update: if request.auth != null && 
+                    request.auth.uid == resource.data.uid &&
+                    request.auth.uid == request.resource.data.uid;
+      allow delete: if request.auth != null && 
+                    request.auth.uid == resource.data.uid;
+    }
+
+    // Allow users to read/write session metadata (sessions themselves)
+    match /sessions/{sessionId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Allow users to manage their own user data
+    match /users/{userId} {
+      allow read, write: if request.auth != null && 
+                          request.auth.uid == userId;
+      
+      // Allow nested collections under users (web dashboard structure)
+      match /sessions/{sessionId} {
+        allow read, write: if request.auth != null && 
+                            request.auth.uid == userId;
+        
+        match /transcripts/{transcriptId} {
+          allow read, write: if request.auth != null && 
+                              request.auth.uid == userId;
+        }
+        
+        match /aiMessages/{messageId} {
+          allow read, write: if request.auth != null && 
+                              request.auth.uid == userId;
+        }
+      }
+      
+      match /promptPresets/{presetId} {
+        allow read, write: if request.auth != null && 
+                            request.auth.uid == userId;
+      }
+    }
+
+    // Allow users to read/write their own profile data
+    match /user_profiles/{userId} {
+      allow read, write: if request.auth != null && 
+                          request.auth.uid == userId;
+    }
+    
+    // Allow authenticated users to access prompt presets they own
+    match /prompt_presets/{presetId} {
+      // For reading: check if the preset belongs to the authenticated user
+      allow read: if request.auth != null && 
+                  request.auth.uid == resource.data.uid;
+      
+      // For creating: check if the user is trying to create a preset with their own uid
+      allow create: if request.auth != null && 
+                    request.auth.uid == request.resource.data.uid;
+      
+      // For updating: check both current and new data belong to the user
+      allow update: if request.auth != null && 
+                    request.auth.uid == resource.data.uid &&
+                    request.auth.uid == request.resource.data.uid;
+      
+      // For deleting: check if the preset belongs to the user
+      allow delete: if request.auth != null && 
+                    request.auth.uid == resource.data.uid;
+    }
+    
+    // Allow authenticated users to access user model selections they own
+    match /user_model_selections/{selectionId} {
+      allow read: if request.auth != null && 
+                  request.auth.uid == resource.data.uid;
+      allow create: if request.auth != null && 
+                    request.auth.uid == request.resource.data.uid;
+      allow update: if request.auth != null && 
+                    request.auth.uid == resource.data.uid &&
+                    request.auth.uid == request.resource.data.uid;
+      allow delete: if request.auth != null && 
+                    request.auth.uid == resource.data.uid;
+    }
+    
+    // Allow authenticated users to access provider settings they own
+    match /provider_settings/{settingId} {
+      allow read: if request.auth != null && 
+                  request.auth.uid == resource.data.uid;
+      allow create: if request.auth != null && 
+                    request.auth.uid == request.resource.data.uid;
+      allow update: if request.auth != null && 
+                    request.auth.uid == resource.data.uid &&
+                    request.auth.uid == request.resource.data.uid;
+      allow delete: if request.auth != null && 
+                    request.auth.uid == resource.data.uid;
+    }
+    
+    // Allow authenticated users to read default preset templates
+    match /defaults/v1/prompt_presets/{presetId} {
+      allow read: if request.auth != null;
+    }
+    
+    // Deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
