@@ -9,7 +9,7 @@
 **A platform for creating and running custom AI agents as digital teammates.**
 
 🌐 **Website:** [xerus.ai](https://xerus.ai)
-💬 **Discord:** [Join our community](https://discord.gg/BRRnWf4p)
+💬 **Discord:** [Join our community](https://discord.gg/xW39NNu4m6)
 📺 **Demo:** [Watch on YouTube](https://youtu.be/SvP8mM4KVOA)
 
 ---
@@ -175,7 +175,7 @@ We're actively working on improving Xerus. Here are the current known issues:
 4. **Fix Master Prompt Orchestrator** - Enhancing system prompt management and coordination
 5. **Add More Connectors/Integrations** - Expanding MCP tool ecosystem
 
-Want to help? Check out our [GitHub Issues](https://github.com/xerus-org/xerus/issues) or join our [Discord](https://discord.gg/BRRnWf4p) to contribute!
+Want to help? Check out our [GitHub Issues](https://github.com/xerus-org/xerus/issues) or join our [Discord](https://discord.gg/xW39NNu4m6) to contribute!
 
 ---
 
@@ -187,7 +187,7 @@ Want to help? Check out our [GitHub Issues](https://github.com/xerus-org/xerus/i
 
 ## 🤝 Community & Support
 
-- **Discord:** [Join our community](https://discord.gg/BRRnWf4p) - Get help and share tips
+- **Discord:** [Join our community](https://discord.gg/xW39NNu4m6) - Get help and share tips
 - **GitHub Issues:** [Report bugs and request features](https://github.com/xerus-org/xerus/issues)
 - **Documentation:** [Complete guides and tutorials](https://xerus.ai/docs)
 
