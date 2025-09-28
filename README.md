@@ -204,6 +204,7 @@ We're actively working on improving Xerus. Here are the current known issues:
 4. **Fix Master Prompt Orchestrator** - Enhancing system prompt management and coordination
 5. **Add More Connectors/Integrations** - Expanding MCP tool ecosystem
 
+
 Want to help? Check out our [GitHub Issues](https://github.com/Xerus-ai/xerus/issues) or join our [Discord](https://discord.gg/xW39NNu4m6) to contribute!
 
 ---
@@ -217,7 +218,9 @@ Want to help? Check out our [GitHub Issues](https://github.com/Xerus-ai/xerus/is
 ## 🤝 Community & Support
 
 - **Discord:** [Join our community](https://discord.gg/xW39NNu4m6) - Get help and share tips
+
 - **GitHub Issues:** [Report bugs and request features](https://github.com/Xerus-ai/xerus/issues)
+
 - **Documentation:** [Complete guides and tutorials](https://xerus.ai/docs)
 
 ---
