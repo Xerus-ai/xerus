@@ -7,6 +7,22 @@
 
 require('dotenv').config();
 
+// COMPREHENSIVE error handlers (CRITICAL FIX)
+process.on('unhandledRejection', (reason, promise) => {
+    console.log('[UNHANDLED-REJECTION] Caught unhandled promise rejection:', reason);
+    console.log('[UNHANDLED-REJECTION] Promise:', promise);
+    // Don't exit - just log and continue
+});
+
+process.on('uncaughtException', (error) => {
+    console.log('[UNCAUGHT-EXCEPTION] Caught uncaught exception:', error.message);
+    console.log('[UNCAUGHT-EXCEPTION] Stack:', error.stack);
+    // Don't exit - just log and continue
+    return true;
+});
+
+console.log('[STARTUP] ✅ Comprehensive error handlers installed');
+
 if (require('electron-squirrel-startup')) {
     process.exit(0);
 }
@@ -211,10 +227,36 @@ if (startupProtocolUrl) {
     pendingDeepLinkUrl = startupProtocolUrl;
 }
 
+// Check for force start flag in development
+const forceStart = process.argv.includes('--force-start') || process.env.XERUS_FORCE_START === 'true';
+
+console.log('[STARTUP] 🔒 Requesting single instance lock...');
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
-    app.quit();
-    process.exit(0);
+    console.log('[STARTUP] ❌ CRITICAL: Single instance lock failed!');
+    console.log('[STARTUP] ❌ Another Xerus instance is already running.');
+
+    if (forceStart) {
+        console.log('[STARTUP] ⚠️ WARNING: Force start enabled - bypassing single instance lock');
+        console.log('[STARTUP] ⚠️ This may cause issues if another instance is actually running');
+        logger && logger.warn('[SingleInstance] Force start enabled - bypassing single instance lock');
+    } else {
+        console.log('[STARTUP] ❌ This instance will now exit.');
+        logger && logger.error('[SingleInstance] Failed to acquire single instance lock - another instance is running');
+
+        // Check if we're in development mode and provide helpful guidance
+        if (process.env.NODE_ENV === 'development' || !app.isPackaged) {
+            console.log('[STARTUP] 💡 TIP: In development, make sure no other npm start processes are running');
+            console.log('[STARTUP] 💡 TIP: You can kill all Electron processes with: taskkill /f /im electron.exe');
+            console.log('[STARTUP] 💡 TIP: Or use force start: npm start -- --force-start');
+            console.log('[STARTUP] 💡 TIP: Or set environment: XERUS_FORCE_START=true npm start');
+        }
+
+        app.quit();
+        process.exit(1); // Use exit code 1 to indicate error, not normal exit
+    }
+} else {
+    console.log('[STARTUP] ✅ Single instance lock acquired successfully');
 }
 
 // setup protocol after single instance lock
@@ -254,8 +296,13 @@ app.whenReady().then(async () => {
         // sessionRepository.endAllActiveSessions();
 
         logger.info('[Index] DEBUG: About to initialize authService...');
-        await authService.initialize();
-        logger.info('[Index] DEBUG: authService.initialize() completed');
+        try {
+            await authService.initialize();
+            logger.info('[Index] DEBUG: authService.initialize() completed');
+        } catch (error) {
+            logger.error('[Index] ERROR: authService.initialize() failed:', error.message);
+            logger.info('[Index] Continuing with limited functionality...');
+        }
 
         //////// after_modelStateService ////////
         logger.info('[Index] DEBUG: About to initialize modelStateService...');
@@ -762,7 +809,7 @@ async function startWebStack() {
 
   const staticDir = app.isPackaged
     ? path.join(process.resourcesPath, 'out')
-    : path.join(__dirname, '..', 'xerus_web', 'out');
+    : path.resolve(__dirname, '..', 'xerus_web', 'out');
 
   const fs = require('fs');
 

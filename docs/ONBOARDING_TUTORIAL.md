@@ -365,8 +365,8 @@ Congratulations! You've completed the Xerus Glass onboarding tutorial. You now k
    - Experiment with voice commands and audio features
 
 2. **Join the Community**:
-   - [Discord](https://discord.gg/UCZH5B5Hpd): Get help and share tips
-   - [GitHub](https://github.com/xerus-org/xerus): Report issues and contribute
+   - [Discord](https://discord.gg/xW39NNu4m6): Get help and share tips
+   - [GitHub](https://github.com/Xerus-ai/xerus): Report issues and contribute
    - Share your productivity workflows with other users
 
 3. **Stay Updated**:
@@ -410,8 +410,8 @@ If you get stuck or have questions:
    - [API Documentation](./API_DOCUMENTATION.md) - Technical details
 
 2. **Community support**:
-   - [Discord](https://discord.gg/UCZH5B5Hpd) - Real-time help
-   - [GitHub Issues](https://github.com/xerus-org/xerus/issues) - Bug reports
+   - [Discord](https://discord.gg/xW39NNu4m6) - Real-time help
+   - [GitHub Issues](https://github.com/Xerus-ai/xerus/issues) - Bug reports
 
 3. **Common resources**:
    - FAQ section in our Discord

@@ -1,4 +1,4 @@
-> This project is a fork of [CheatingDaddy](https://github.com/sohzm/cheating-daddy) with modifications and enhancements. Thanks to [Soham](https://x.com/soham_btw) and all the open-source contributors who made this possible!
+> This project is a fork of [CheatingDaddy](https://github.com/sohzm/cheating-daddy) and [Glass](https://github.com/dev-pickle/glass) with modifications and enhancements. Thanks to [Soham](https://x.com/soham_btw) and all the open-source contributors who made this possible!
 
 <div align="center">
   <img src="product_images/logo.png" alt="Xerus Logo" width="200"/>
@@ -9,7 +9,7 @@
 **A platform for creating and running custom AI agents as digital teammates.**
 
 🌐 **Website:** [xerus.ai](https://xerus.ai)
-💬 **Discord:** [Join our community](https://discord.gg/BRRnWf4p)
+💬 **Discord:** [Join our community](https://discord.gg/xW39NNu4m6)
 📺 **Demo:** [Watch on YouTube](https://youtu.be/SvP8mM4KVOA)
 
 ---
@@ -72,7 +72,7 @@ With Xerus, you don't get just one assistant — you build a team of specialists
 
 ```bash
 # Clone the repository
-git clone https://github.com/xerus-org/xerus.git
+git clone https://github.com/Xerus-ai/xerus.git
 cd xerus/glass
 
 # Install main dependencies
@@ -94,6 +94,9 @@ cd ..
 ```bash
 # Terminal 1: Start Electron + Desktop App
 npm start
+
+# If you encounter single instance lock issues in development:
+npm start -- --force-start
 
 # Terminal 2: Start Backend API Server
 cd backend
@@ -163,6 +166,32 @@ Xerus includes 8 specialized AI agents:
 - **Deepseek** - DeepSeek models
 - **Ollama** - Local LLM hosting
 
+## 🛠️ Troubleshooting
+
+### Common Development Issues
+
+**Single Instance Lock Error:**
+If you see "Single instance lock failed" during development:
+
+```bash
+# Use force start to bypass the lock
+npm start -- --force-start
+
+# Or set environment variable
+XERUS_FORCE_START=true npm start
+```
+
+**Port Conflicts:**
+- Backend runs on port 5001 by default
+- Frontend gets an available port automatically
+- Make sure no other services are using port 5001
+
+**Missing Dependencies:**
+```bash
+# Reinstall all dependencies
+npm run clean:install
+```
+
 ---
 
 ## 🐛 Known Issues
@@ -175,7 +204,7 @@ We're actively working on improving Xerus. Here are the current known issues:
 4. **Fix Master Prompt Orchestrator** - Enhancing system prompt management and coordination
 5. **Add More Connectors/Integrations** - Expanding MCP tool ecosystem
 
-Want to help? Check out our [GitHub Issues](https://github.com/xerus-org/xerus/issues) or join our [Discord](https://discord.gg/BRRnWf4p) to contribute!
+Want to help? Check out our [GitHub Issues](https://github.com/Xerus-ai/xerus/issues) or join our [Discord](https://discord.gg/xW39NNu4m6) to contribute!
 
 ---
 
@@ -187,8 +216,8 @@ Want to help? Check out our [GitHub Issues](https://github.com/xerus-org/xerus/i
 
 ## 🤝 Community & Support
 
-- **Discord:** [Join our community](https://discord.gg/BRRnWf4p) - Get help and share tips
-- **GitHub Issues:** [Report bugs and request features](https://github.com/xerus-org/xerus/issues)
+- **Discord:** [Join our community](https://discord.gg/xW39NNu4m6) - Get help and share tips
+- **GitHub Issues:** [Report bugs and request features](https://github.com/Xerus-ai/xerus/issues)
 - **Documentation:** [Complete guides and tutorials](https://xerus.ai/docs)
 
 ---

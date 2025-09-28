@@ -73,31 +73,45 @@ let firebaseApp = null;
 let firebaseAuth = null;
 let firestoreInstance = null; // To hold the specific DB instance
 
-function initializeFirebase() {
+async function initializeFirebase() {
     if (firebaseApp) {
         logger.info('[FirebaseClient] Firebase already initialized.');
         return;
     }
-    try {
-        firebaseApp = initializeApp(firebaseConfig);
-        
-        // Build a *class* persistence provider and hand it to Firebase.
-        const ElectronStorePersistence = createElectronStorePersistence('firebase-auth-session');
 
-        firebaseAuth = initializeAuth(firebaseApp, {
-            // `initializeAuth` accepts a single class or an array – we pass an array for future
-            // extensibility and to match Firebase examples.
-            persistence: [ElectronStorePersistence],
-        });
+    return new Promise((resolve) => {
+        // Add timeout to prevent hanging
+        const timeoutId = setTimeout(() => {
+            logger.warn('[FirebaseClient] Firebase initialization timeout - continuing without Firebase');
+            resolve();
+        }, 5000); // 5 second timeout
 
-        // Initialize Firestore with the default database (matches project name)
-        firestoreInstance = getFirestore(firebaseApp);
+        try {
+            firebaseApp = initializeApp(firebaseConfig);
 
-        logger.info('[FirebaseClient] Firebase initialized successfully with class-based electron-store persistence.');
-        logger.info('[FirebaseClient] Firestore instance is targeting the default database.');
-    } catch (error) {
-        logger.error('Firebase initialization failed:', { error });
-    }
+            // Build a *class* persistence provider and hand it to Firebase.
+            const ElectronStorePersistence = createElectronStorePersistence('firebase-auth-session');
+
+            firebaseAuth = initializeAuth(firebaseApp, {
+                // `initializeAuth` accepts a single class or an array – we pass an array for future
+                // extensibility and to match Firebase examples.
+                persistence: [ElectronStorePersistence],
+            });
+
+            // Initialize Firestore with the default database (matches project name)
+            firestoreInstance = getFirestore(firebaseApp);
+
+            logger.info('[FirebaseClient] Firebase initialized successfully with class-based electron-store persistence.');
+            logger.info('[FirebaseClient] Firestore instance is targeting the default database.');
+
+            clearTimeout(timeoutId);
+            resolve();
+        } catch (error) {
+            logger.error('Firebase initialization failed:', { error });
+            clearTimeout(timeoutId);
+            resolve();
+        }
+    });
 }
 
 function getFirebaseAuth() {

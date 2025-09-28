@@ -1,7 +1,7 @@
 <!-- _sidebar.md -->
 
 * **Getting Started**
-  * [Home](README.md)
+  * [Documentation Index](DOCUMENTATION_INDEX.md)
   * [Installation](INSTALLATION.md)
   * [User Guide](USER_GUIDE.md)
   * [Onboarding Tutorial](ONBOARDING_TUTORIAL.md)

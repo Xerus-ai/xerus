@@ -23,7 +23,7 @@ Xerus is a cross-platform AI assistant that provides real-time contextual help t
 ## Installation Methods
 
 ### Method 1: Pre-built Release (Recommended)
-1. Visit the [Xerus Glass Releases](https://github.com/xerus-org/xerus/releases) page
+1. Visit the [Xerus Glass Releases](https://github.com/Xerus-ai/xerus/releases) page
 2. Download the latest release for your platform:
    - Windows: `Xerus-Setup-x.x.x.exe`
    - macOS: `Xerus-x.x.x.dmg`
@@ -46,7 +46,7 @@ Xerus is a cross-platform AI assistant that provides real-time contextual help t
 
 2. **Clone Repository**:
    ```bash
-   git clone https://github.com/xerus-org/xerus.git
+   git clone https://github.com/Xerus-ai/xerus.git
    cd xerus/glass
    ```
 
@@ -80,7 +80,7 @@ Xerus is a cross-platform AI assistant that provides real-time contextual help t
 
 2. **Clone Repository**:
    ```bash
-   git clone https://github.com/xerus-org/xerus.git
+   git clone https://github.com/Xerus-ai/xerus.git
    cd xerus/glass
    ```
 
@@ -277,9 +277,9 @@ Configure keyboard shortcuts in settings:
 ## Support
 
 ### Getting Help
-- **Documentation**: [Xerus Glass Wiki](https://github.com/xerus-org/xerus/wiki)
-- **Issues**: [GitHub Issues](https://github.com/xerus-org/xerus/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/xerus-org/xerus/discussions)
+- **Documentation**: [Xerus Glass Wiki](https://github.com/Xerus-ai/xerus/wiki)
+- **Issues**: [GitHub Issues](https://github.com/Xerus-ai/xerus/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/Xerus-ai/xerus/discussions)
 
 ### Logs and Debugging
 - **Windows**: `%APPDATA%\Xerus\logs\`

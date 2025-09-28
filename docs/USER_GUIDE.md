@@ -139,29 +139,33 @@ Each agent displays capability indicators:
 - **Credit System**: Guest users (10 credits), Authenticated users (50 credits), Admins (unlimited)
 - **No Permission Restrictions**: Same interface and capabilities regardless of login status
 
-### 4. **Tool Integration System**
+### 4. **MCP Tools Integration System**
 
-Glass includes a powerful tool system for enhanced capabilities:
+Xerus features a powerful Model Context Protocol (MCP) tools system for enhanced capabilities:
 
-#### Web Search
-- **Real-time Information**: Search current web content
-- **Smart Results**: AI-curated and summarized findings
-- **Source Attribution**: Clear citations for all information
+#### Available MCP Tools
+- **🌐 Web Search**: Real-time internet information and research
+- **📊 Perplexity Integration**: Advanced search with source attribution
+- **🔥 Firecrawl**: Website content extraction and analysis
+- **⏰ Time & Date**: Current time, scheduling, and calendar assistance
+- **🧮 Calculator**: Built-in mathematical calculations
+- **📁 File Operations**: Document processing and analysis
+- **🔧 System Tools**: Hardware stats and performance metrics
 
-#### Document Processing
-- **Local RAG**: Search through your documents
-- **Content Analysis**: Understand document structure
-- **Smart Extraction**: Pull key information automatically
-
-#### System Integration
-- **Time & Calendar**: Current time, scheduling assistance
-- **System Info**: Hardware stats, performance metrics
-- **Calculations**: Built-in calculator for quick math
+#### MCP Server Management
+Tools are managed through MCP (Model Context Protocol) servers that provide:
+- **Dynamic Loading**: Tools activate automatically when needed
+- **Secure Execution**: Sandboxed tool execution environment
+- **Real-time Updates**: Tools can be added/updated without app restart
+- **Error Handling**: Graceful fallbacks when tools are unavailable
 
 #### Usage Example:
 ```
 You: "What's the weather like in Tokyo?"
-Glass: [Uses web search tool] "Current weather in Tokyo: 22°C, partly cloudy with 60% humidity. High of 25°C expected today."
+Xerus: [Uses web search MCP tool] "Current weather in Tokyo: 22°C, partly cloudy with 60% humidity. High of 25°C expected today."
+
+You: "Calculate the ROI for this investment"
+Xerus: [Uses calculator MCP tool] "Based on the figures: Initial investment $10,000, returns $12,500 over 2 years = 25% ROI"
 ```
 
 ### 5. **Meeting & Audio Features**
@@ -185,21 +189,21 @@ Glass: [Uses web search tool] "Current weather in Tokyo: 22°C, partly cloudy wi
 
 ## 🎨 Interface & Customization
 
-### Glass UI Effects
+### Xerus Interface Design
 
-Glass features a modern, translucent interface inspired by Apple's design language:
+Xerus features a modern, clean interface designed for productivity:
 
-#### Visual Effects
-- **Glassmorphism**: Frosted glass appearance with blur effects
-- **Dynamic Transparency**: Adjusts based on background content
+#### Visual Design
+- **Modern UI**: Clean, minimalist interface design
+- **Responsive Layout**: Adapts to different screen sizes and resolutions
 - **Smooth Animations**: Fluid transitions and interactions
 - **Dark/Light Mode**: Automatic or manual theme switching
 
 #### Customization Options
-- **Opacity Control**: Adjust transparency (20% - 95%)
-- **Blur Strength**: Configure background blur intensity
 - **Position**: Drag to any screen position
 - **Size**: Resize interface to your preference
+- **Shortcuts**: Customize all keyboard shortcuts
+- **Themes**: Switch between light and dark modes
 
 ### Window Behavior
 - **Always on Top**: Stays above other applications
@@ -282,7 +286,7 @@ All keyboard shortcuts can be customized:
 **Solution:**
 1. Go to System Preferences → Security & Privacy → Privacy
 2. Select "Screen Recording" from the left sidebar
-3. Check the box next to "Xerus Glass"
+3. Check the box next to "Xerus"
 4. Restart the application
 
 #### "AI Provider Not Responding"
@@ -410,8 +414,8 @@ Xerus: [Reviews calendar] → [Pulls client history] → [Suggests talking point
 - **Developer Guide**: [docs/CONTRIBUTING.md](../CONTRIBUTING.md)
 
 ### Community
-- **Discord**: [Join our community](https://discord.gg/BRRnWf4p)
-- **GitHub**: [Report issues](https://github.com/xerus-org/xerus/issues)
+- **Discord**: [Join our community](https://discord.gg/xW39NNu4m6)
+- **GitHub**: [Report issues](https://github.com/Xerus-ai/xerus/issues)
 - **Website**: [xerus.ai](https://xerus.ai)
 
 ### Support
@@ -423,13 +427,13 @@ Xerus: [Reviews calendar] → [Pulls client history] → [Suggests talking point
 
 ## 🔄 Updates & Changelog
 
-Glass automatically checks for updates and notifies you when new versions are available.
+Xerus automatically checks for updates and notifies you when new versions are available.
 
 ### Recent Updates
-- **v0.2.4**: Enhanced tool integration, improved performance
-- **v0.2.3**: Added area selection, privacy controls
-- **v0.2.2**: Liquid glass UI effects, multi-monitor support
-- **v0.2.1**: Local model support, better audio processing
+- **v1.0.0**: Production release with MCP tools integration, 8 AI agents, enhanced authentication
+- **v0.9.5**: Enhanced tool integration with MCP servers, improved performance
+- **v0.9.0**: Added area selection, privacy controls, agent management system
+- **v0.8.5**: Multi-monitor support, improved audio processing with AEC
 
 ### Update Process
 1. Notification appears when update is available
@@ -439,4 +443,4 @@ Glass automatically checks for updates and notifies you when new versions are av
 
 ---
 
-*This guide covers the core features of Xerus Glass. For technical implementation details, see the [API Documentation](./API_DOCUMENTATION.md) and [Tool Integration Guide](./TOOL_INTEGRATION.md).*
+*This guide covers the core features of Xerus. For technical implementation details, see the [API Documentation](./API_DOCUMENTATION.md) and [MCP Implementation Guide](./MCP_IMPLEMENTATION.md).*
