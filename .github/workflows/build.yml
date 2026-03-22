@@ -75,10 +75,13 @@ jobs:
           username: root
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
-            cd /opt/xerus/xerus_backend
-            git pull origin main
-            npm ci --production
+            cd /opt/xerus
+            git fetch origin main
+            git reset --hard origin/main
+            cd xerus_backend
+            npm ci
             npm run build
+            npm prune --production
             pm2 restart xerus-backend
             sleep 8
             curl -sf http://localhost:5001/health && echo "DEPLOY OK" || echo "HEALTH CHECK PENDING (server may still be starting)"
