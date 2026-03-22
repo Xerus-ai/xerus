@@ -1,3 +1,7 @@
 bash.exe.stackdump
 
 .vercel
+
+# Override parent .gitignore: .env.production contains only public Firebase config
+# (Firebase web config is not secret — it's embedded in every client bundle)
+!.env.production

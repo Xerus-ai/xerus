@@ -15,6 +15,9 @@ coverage/
 .env.*
 !.env.example
 !.env.*.example
+# Firebase web config is public (embedded in client bundle, not a secret).
+# Needed for Vercel production builds.
+!xerus_web/.env.production
 *.pem
 *.key
 *.cert

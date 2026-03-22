@@ -25,10 +25,11 @@ const requiredEnvVars = [
 
 const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
 if (missingVars.length > 0) {
-  console.warn(`Missing Firebase environment variables: ${missingVars.join(', ')}. Firebase features will be unavailable.`);
+  throw new Error(
+    `Missing required Firebase environment variables: ${missingVars.join(', ')}. ` +
+    `Set these in your .env.local (dev) or Vercel project settings (production).`
+  );
 }
-
-// Firebase configuration validation completed
 
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
