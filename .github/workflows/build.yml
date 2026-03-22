@@ -1,4 +1,4 @@
-name: Build & Verify
+name: Build & Deploy
 
 on:
   push:
@@ -7,39 +7,78 @@ on:
     branches: [main]
 
 jobs:
-  backend:
-    name: Backend
+  # Detect which paths changed
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'xerus_backend/**'
+            frontend:
+              - 'xerus_web/**'
+
+  backend-ci:
+    name: Backend CI
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./xerus_backend
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
           cache-dependency-path: xerus_backend/package-lock.json
-
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
 
-  frontend:
-    name: Frontend
+  frontend-ci:
+    name: Frontend CI
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./xerus_web
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
           cache-dependency-path: xerus_web/package-lock.json
-
-      - run: npm ci
+      - run: npm ci --force
       - run: npm run build
+
+  deploy-backend:
+    name: Deploy Backend
+    needs: [changes, backend-ci]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: root
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd /opt/xerus/xerus_backend
+            git pull origin main
+            npm ci --production
+            npm run build
+            pm2 restart xerus-backend
+            sleep 3
+            curl -sf http://localhost:5001/health && echo "DEPLOY OK" || (pm2 logs xerus-backend --lines 20 --nostream && exit 1)
