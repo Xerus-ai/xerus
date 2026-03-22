@@ -53,12 +53,15 @@ export function shutdownSseAuth(): void {
 export function sseAuth(req: AuthenticatedRequest, _res: Response, next: NextFunction): void {
     const queryToken = req.query.token as string | undefined;
     if (!queryToken) {
+        console.warn('[SSE Auth] Token missing from query params');
         next(new UnauthorizedError('SSE token required'));
         return;
     }
 
+    const tokenPrefix = queryToken.slice(0, 8);
     const entry = sseTokenStore.get(queryToken);
     if (!entry) {
+        console.warn(`[SSE Auth] Token ${tokenPrefix}... not found in store (store size: ${sseTokenStore.size}). Likely consumed on prior request or lost on server restart.`);
         next(new UnauthorizedError('Invalid SSE token'));
         return;
     }
@@ -66,6 +69,7 @@ export function sseAuth(req: AuthenticatedRequest, _res: Response, next: NextFun
     // Check expiry before consuming the token
     if (entry.expires <= Date.now()) {
         sseTokenStore.delete(queryToken);
+        console.warn(`[SSE Auth] Token ${tokenPrefix}... expired (age: ${Date.now() - (entry.expires - SSE_TOKEN_TTL_MS)}ms)`);
         next(new UnauthorizedError('SSE token expired'));
         return;
     }

@@ -99,6 +99,8 @@ router.get('/conversations/:id/stream', sseAuth, async (req: AuthenticatedReques
         const stream = new StreamingResponse(res);
         sseRegistry.register(req.user.uid, conversationId, stream);
 
+        console.log(`[SSE] Stream opened for user=${req.user.uid} conv=${conversationId}`);
+
         // Send initial meta event so frontend knows connection is live
         stream.send('meta', { conversationId });
 
@@ -115,11 +117,17 @@ router.get('/conversations/:id/stream', sseAuth, async (req: AuthenticatedReques
         // the active one. A newer connectStream call may have replaced it in the
         // registry; blindly unregistering would delete the replacement stream.
         res.on('close', () => {
+            console.log(`[SSE] Stream closed for user=${req.user!.uid} conv=${conversationId} (was open ${Math.round((Date.now() - (res.locals.startTime || Date.now())) / 1000)}s)`);
             clearInterval(heartbeatInterval);
             const current = sseRegistry.get(req.user!.uid, conversationId);
             if (current === stream) {
                 sseRegistry.unregister(req.user!.uid, conversationId);
             }
+        });
+
+        // Log if the underlying socket errors or closes unexpectedly
+        req.socket.once('error', (err) => {
+            console.error(`[SSE] Socket error for conv=${conversationId}:`, err.message);
         });
 
         // Do NOT call next() or end the response — stream stays open

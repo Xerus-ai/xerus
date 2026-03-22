@@ -124,6 +124,12 @@ async function startServer(): Promise<void> {
         console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
     });
 
+    // SSE streams are long-lived — disable default Node.js request/keep-alive timeouts
+    // that would otherwise kill connections after a few seconds.
+    server.keepAliveTimeout = 0;
+    server.headersTimeout = 0;
+    server.requestTimeout = 0;
+
     // Graceful shutdown: clean up SSE sweep timer and close server
     process.on('SIGTERM', () => {
         console.log('[Shutdown] SIGTERM received, cleaning up...');
