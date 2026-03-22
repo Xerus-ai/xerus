@@ -145,11 +145,14 @@ export async function routeEventToBackend(
 function handleAgentOutput(d: Record<string, unknown>, ctx: PipelineContext): void {
     const text = extractTextFromAgentOutput(d);
     if (text.length > 0) {
-        ctx.responseChunks.push(text);
-        // Forward as token event so the frontend receives streaming text.
-        // The runner's process-manager may not emit sse_forward token events
-        // (depends on SDK stream_event availability), so this is the reliable path.
-        ctx.stream.send('token' as StreamEventType, { text, tokenCount: 0 });
+        // Only emit if no sse_forward token events were already received for this text.
+        // The runner's process-manager emits both sse_forward tokens (from stream_event
+        // deltas or result messages) AND agent_output events for the same response text.
+        // Emitting from both paths causes duplicate tokens on the frontend.
+        if (ctx.responseChunks.length === 0) {
+            ctx.responseChunks.push(text);
+            ctx.stream.send('token' as StreamEventType, { text, tokenCount: 0 });
+        }
     }
     logEvent('agent_output', d);
 }

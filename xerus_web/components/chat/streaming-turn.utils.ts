@@ -32,7 +32,11 @@ export function finalizeTurnParts(parts: TurnPart[], finalText?: string): TurnPa
     .map((part) => part.text)
     .join('')
   const toolParts = parts.filter((part): part is Extract<TurnPart, { type: 'tool' }> => part.type === 'tool')
+  const statusParts = parts.filter((part) => part.type === 'status')
   const stableParts: TurnPart[] = []
+
+  // Status parts (progress events) appear first as context
+  stableParts.push(...statusParts)
 
   if (reasoningText) {
     stableParts.push(createFinalReasoningPart(reasoningText))
@@ -40,6 +44,8 @@ export function finalizeTurnParts(parts: TurnPart[], finalText?: string): TurnPa
 
   stableParts.push(...toolParts)
 
+  // Use canonicalText as the single source of truth for text content.
+  // This replaces any streamed text parts to avoid duplication.
   if (canonicalText) {
     stableParts.push(createFinalTextPart(canonicalText))
   }
