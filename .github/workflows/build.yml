@@ -42,7 +42,7 @@ jobs:
           cache-dependency-path: xerus_backend/package-lock.json
       - run: npm ci
       - run: npm run lint
-      - run: npm run typecheck
+      - run: npm run build
 
   frontend-ci:
     name: Frontend CI
