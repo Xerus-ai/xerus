@@ -76,6 +76,7 @@ export function useExecutionStream(
   const connectedConvRef = useRef<string | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stabilityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const connectingPromiseRef = useRef<Promise<void> | null>(null);
   const reconnectAttemptRef = useRef(0);
   const MAX_RECONNECT_ATTEMPTS = 5;
   const RECONNECT_BASE_DELAY_MS = 2000;
@@ -241,13 +242,13 @@ export function useExecutionStream(
         };
 
         es.onerror = () => {
-          // Cancel stability timer — connection wasn't stable
+          es.close();
+          // Guard: only act if WE are still the current EventSource
+          if (eventSourceRef.current !== es) return;
           if (stabilityTimerRef.current) {
             clearTimeout(stabilityTimerRef.current);
             stabilityTimerRef.current = null;
           }
-          // Always close to prevent native auto-reconnect with stale token
-          es.close();
           eventSourceRef.current = null;
           connectedConvRef.current = null;
           scheduleReconnect(conversationId);
@@ -266,6 +267,16 @@ export function useExecutionStream(
       return;
     }
 
+    // If another connectStream is in progress for the same conversation, wait for it
+    // instead of creating a competing connection (prevents race condition)
+    if (connectingPromiseRef.current) {
+      await connectingPromiseRef.current.catch(() => {});
+      // After the prior attempt finishes, check if we're now connected
+      if (connectedConvRef.current === conversationId && eventSourceRef.current?.readyState === EventSource.OPEN) {
+        return;
+      }
+    }
+
     // Close any existing connection and cancel pending reconnects
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
@@ -281,60 +292,70 @@ export function useExecutionStream(
     setError(null);
     setConnectionState('connecting');
 
-    try {
-      const es = await createEventSource(conversationId);
+    const connectPromise = (async () => {
+      try {
+        const es = await createEventSource(conversationId);
 
-      // Await actual connection before resolving — prevents race with sendMessage
-      await new Promise<void>((resolve, reject) => {
-        es.onopen = () => {
-          reconnectAttemptRef.current = 0;
-          connectedConvRef.current = conversationId;
-          setConnectionState('connected');
-          callbacksRef.current.onConnectionChange?.(true);
-          resolve();
-        };
+        // Await actual connection before resolving — prevents race with sendMessage
+        await new Promise<void>((resolve, reject) => {
+          es.onopen = () => {
+            reconnectAttemptRef.current = 0;
+            connectedConvRef.current = conversationId;
+            setConnectionState('connected');
+            callbacksRef.current.onConnectionChange?.(true);
+            resolve();
+          };
 
+          es.onerror = () => {
+            es.close();
+            // Guard: only wipe refs if WE are still the current EventSource.
+            // A concurrent connectStream call may have replaced us already.
+            if (eventSourceRef.current === es) {
+              eventSourceRef.current = null;
+              connectedConvRef.current = null;
+              setConnectionState('disconnected');
+              callbacksRef.current.onConnectionChange?.(false);
+            }
+            reject(new Error('SSE connection failed'));
+          };
+        });
+
+        // Start stability timer — reset reconnect counter if connection stays open
+        if (stabilityTimerRef.current) clearTimeout(stabilityTimerRef.current);
+        stabilityTimerRef.current = setTimeout(() => {
+          stabilityTimerRef.current = null;
+          if (eventSourceRef.current === es && es.readyState === EventSource.OPEN) {
+            reconnectAttemptRef.current = 0;
+          }
+        }, STABLE_CONNECTION_MS);
+
+        // After initial connection, switch to reconnect-capable error handler
         es.onerror = () => {
-          // Always close to prevent native auto-reconnect with stale token
           es.close();
+          // Guard: only act if WE are still the current EventSource
+          if (eventSourceRef.current !== es) return;
+          if (stabilityTimerRef.current) {
+            clearTimeout(stabilityTimerRef.current);
+            stabilityTimerRef.current = null;
+          }
           eventSourceRef.current = null;
           connectedConvRef.current = null;
-          setConnectionState('disconnected');
-          callbacksRef.current.onConnectionChange?.(false);
-          reject(new Error('SSE connection failed'));
+          // Schedule reconnect with fresh token and exponential backoff
+          scheduleReconnect(conversationId);
         };
-      });
+      } catch (err) {
+        const streamError = err instanceof Error ? err : new Error(String(err));
+        setError(streamError);
+        setConnectionState('disconnected');
+        callbacksRef.current.onError?.(streamError);
+        callbacksRef.current.onConnectionChange?.(false);
+      } finally {
+        connectingPromiseRef.current = null;
+      }
+    })();
 
-      // Start stability timer — reset reconnect counter if connection stays open
-      if (stabilityTimerRef.current) clearTimeout(stabilityTimerRef.current);
-      stabilityTimerRef.current = setTimeout(() => {
-        stabilityTimerRef.current = null;
-        if (eventSourceRef.current === es && es.readyState === EventSource.OPEN) {
-          reconnectAttemptRef.current = 0;
-        }
-      }, STABLE_CONNECTION_MS);
-
-      // After initial connection, switch to reconnect-capable error handler
-      es.onerror = () => {
-        // Cancel stability timer — connection wasn't stable
-        if (stabilityTimerRef.current) {
-          clearTimeout(stabilityTimerRef.current);
-          stabilityTimerRef.current = null;
-        }
-        // Close immediately to prevent native auto-reconnect with consumed token
-        es.close();
-        eventSourceRef.current = null;
-        connectedConvRef.current = null;
-        // Schedule reconnect with fresh token and exponential backoff
-        scheduleReconnect(conversationId);
-      };
-    } catch (err) {
-      const streamError = err instanceof Error ? err : new Error(String(err));
-      setError(streamError);
-      setConnectionState('disconnected');
-      callbacksRef.current.onError?.(streamError);
-      callbacksRef.current.onConnectionChange?.(false);
-    }
+    connectingPromiseRef.current = connectPromise;
+    await connectPromise;
   }, [createEventSource, scheduleReconnect]);
 
   // Send a message via POST (fire-and-forget, events arrive on the SSE stream)
