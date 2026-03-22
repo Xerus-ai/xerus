@@ -201,6 +201,9 @@ export class ProcessManager extends EventEmitter {
                             { text: msg.result, tokenCount: 0 },
                         );
                     }
+                    // Reset for next turn — allows text emission in multi-turn flows
+                    // (tool call then final text response)
+                    streamedTextLength = 0;
                     continue;
                 }
 
@@ -209,6 +212,8 @@ export class ProcessManager extends EventEmitter {
                     if (Array.isArray(blocks)) {
                         for (const block of blocks) {
                             if (block.type === 'text' && typeof block.text === 'string' && block.text.length > 0 && streamedTextLength === 0) {
+                                // Mark as streamed so result message doesn't re-emit
+                                streamedTextLength += block.text.length;
                                 this.emitter.sseForward(
                                     config.agent_slug, sessionId, 'token',
                                     { text: block.text, tokenCount: 0 },
@@ -216,13 +221,16 @@ export class ProcessManager extends EventEmitter {
                             }
                             if (block.type === 'tool_use' && block.id && block.name) {
                                 const callId = String(block.id);
-                                const toolName = String(block.name);
-                                const input = (block.input ?? {}) as Record<string, unknown>;
-                                pendingToolCalls.set(callId, toolName);
-                                this.emitter.sseForward(
-                                    config.agent_slug, sessionId, 'tool_call',
-                                    { toolName, arguments: input, callId },
-                                );
+                                // Skip if already emitted via stream_event content_block_start
+                                if (!pendingToolCalls.has(callId)) {
+                                    const toolName = String(block.name);
+                                    const input = (block.input ?? {}) as Record<string, unknown>;
+                                    pendingToolCalls.set(callId, toolName);
+                                    this.emitter.sseForward(
+                                        config.agent_slug, sessionId, 'tool_call',
+                                        { toolName, arguments: input, callId },
+                                    );
+                                }
                             }
                         }
                     }

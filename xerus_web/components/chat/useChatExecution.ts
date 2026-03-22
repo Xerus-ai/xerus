@@ -24,6 +24,7 @@ import type {
   NotificationEventContent,
   ToolAuthRequiredEventContent,
   GuidanceEventContent,
+  StopEventContent,
 } from '@/hooks/useExecutionStream'
 import type { ChatState } from './types'
 import type { ChatMessageExtended } from './chat-message.types'
@@ -307,6 +308,12 @@ export function useChatExecution({ setState }: UseChatExecutionOptions) {
       const content = event.content as DoneEventContent
       const finalText = content.finalResponse ?? rawTextRef.current
 
+      // Clear refs immediately after capturing finalText to prevent stale late-arriving tokens
+      rawTextRef.current = ''
+      respondingAgentRef.current = {}
+      toolStartTimesRef.current.clear()
+      pendingStatusLabelsRef.current = []
+
       setState(prev => {
         const turn = prev.streamingTurn
         const metadata = {
@@ -321,8 +328,8 @@ export function useChatExecution({ setState }: UseChatExecutionOptions) {
           id: committedTurn?.id ?? `msg_${Date.now()}_assistant`,
           role: 'assistant',
           content: committedTurn ? extractTextFromParts(committedTurn.parts) : finalText,
-          agentSlug: respondingAgentRef.current.agentSlug,
-          agentName: respondingAgentRef.current.agentName,
+          agentSlug: prev.streamingTurn?.agentSlug,
+          agentName: prev.streamingTurn?.agentName,
           timestamp: committedTurn?.timestamp ?? Date.now(),
           parts: committedTurn?.parts,
           metadata,
@@ -341,13 +348,55 @@ export function useChatExecution({ setState }: UseChatExecutionOptions) {
         }
         return { ...prev, ...updates }
       })
+    }, [setState]),
+    onStop: useCallback((event: StreamEvent<'stop'>) => {
+      const content = event.content as StopEventContent
+      const finalText = rawTextRef.current || undefined
 
       rawTextRef.current = ''
       respondingAgentRef.current = {}
       toolStartTimesRef.current.clear()
+      pendingStatusLabelsRef.current = []
+
+      setState(prev => {
+        const turn = prev.streamingTurn
+        const committedTurn = turn ? commitTurn(turn, finalText) : null
+        const updates: Partial<ChatState> = {
+          isLoading: false,
+          executionState: null,
+          streamingTurn: null,
+          pendingToolAuth: null,
+          pendingGuidance: null,
+        }
+        // Preserve any partial response the agent sent before stopping
+        if (committedTurn && committedTurn.parts.length > 0) {
+          const msg: ChatMessageExtended = {
+            id: committedTurn.id,
+            role: 'assistant',
+            content: extractTextFromParts(committedTurn.parts),
+            agentSlug: prev.streamingTurn?.agentSlug,
+            agentName: prev.streamingTurn?.agentName,
+            timestamp: committedTurn.timestamp,
+            parts: committedTurn.parts,
+          }
+          updates.messages = [...prev.messages, msg]
+        }
+        if (content.reason !== 'complete') {
+          updates.error = content.reason === 'timeout'
+            ? 'Agent timed out. Please try again.'
+            : content.reason === 'user_cancel'
+              ? 'Execution cancelled.'
+              : 'Execution stopped unexpectedly.'
+        }
+        return { ...prev, ...updates }
+      })
     }, [setState]),
     onError: useCallback((error: Error) => {
       console.error('Execution stream error:', error)
+      rawTextRef.current = ''
+      respondingAgentRef.current = {}
+      toolStartTimesRef.current.clear()
+      pendingStatusLabelsRef.current = []
       setState(prev => ({
         ...prev,
         isLoading: false,
@@ -357,9 +406,6 @@ export function useChatExecution({ setState }: UseChatExecutionOptions) {
         pendingGuidance: null,
         streamingTurn: null,
       }))
-      rawTextRef.current = ''
-      respondingAgentRef.current = {}
-      toolStartTimesRef.current.clear()
       toast.error(error.message)
     }, [setState]),
     onConnectionChange: useCallback((connected: boolean) => {
@@ -376,6 +422,10 @@ export function useChatExecution({ setState }: UseChatExecutionOptions) {
       if (!disconnectTimerRef.current) {
         disconnectTimerRef.current = setTimeout(() => {
           disconnectTimerRef.current = null
+          rawTextRef.current = ''
+          respondingAgentRef.current = {}
+          toolStartTimesRef.current.clear()
+          pendingStatusLabelsRef.current = []
           setState(prev => {
             if (!prev.isLoading) return prev
             return {

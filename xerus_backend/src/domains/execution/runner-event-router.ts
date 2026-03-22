@@ -261,7 +261,9 @@ async function handleSessionCompleted(
     const status = (d.status as string) || 'unknown';
     const summary = d.summary as string || '';
     ctx.status = 'completed';
-    if (!ctx.responseText && summary) {
+    // Only use summary as responseText if no streamed tokens were received.
+    // Otherwise streamed chunks take precedence (joined in updateSessionRecord).
+    if (!ctx.responseText && ctx.responseChunks.length === 0 && summary) {
         ctx.responseText = summary;
     }
     if (ctx.sessionId) {
@@ -302,13 +304,17 @@ function handleSseForward(d: Record<string, unknown>, ctx: PipelineContext): voi
         // Track tool calls and results for metrics (these arrive as sse_forward,
         // not as raw 'tool_call'/'tool_result' event types)
         if (sseEvent === 'tool_call' && payload) {
-            ctx.toolCallCount++;
-            ctx.toolCallDetails.push({
-                call_id: (payload.callId || payload.call_id) as string || `tc-${ctx.toolCallCount}`,
-                tool_name: (payload.toolName || payload.tool_name) as string || 'unknown',
-                arguments: payload.arguments as Record<string, unknown> | undefined,
-                started_at: Date.now(),
-            });
+            const callId = (payload.callId || payload.call_id) as string || `tc-${ctx.toolCallCount + 1}`;
+            // Deduplicate: stream_event + assistant message can both emit tool_call for same callId
+            if (!ctx.toolCallDetails.some(tc => tc.call_id === callId)) {
+                ctx.toolCallCount++;
+                ctx.toolCallDetails.push({
+                    call_id: callId,
+                    tool_name: (payload.toolName || payload.tool_name) as string || 'unknown',
+                    arguments: payload.arguments as Record<string, unknown> | undefined,
+                    started_at: Date.now(),
+                });
+            }
         }
         if (sseEvent === 'tool_result' && payload) {
             const callId = (payload.callId || payload.call_id) as string | undefined;

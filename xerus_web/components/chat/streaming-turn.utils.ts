@@ -2,7 +2,7 @@ import type { TurnPart } from './streaming-turn.types'
 
 function createFinalTextPart(text: string): TurnPart {
   return {
-    id: `part-final-text-${Date.now()}`,
+    id: `part-final-text-${crypto.randomUUID()}`,
     type: 'text',
     text,
   }
@@ -10,7 +10,7 @@ function createFinalTextPart(text: string): TurnPart {
 
 function createFinalReasoningPart(text: string): TurnPart {
   return {
-    id: `part-final-reasoning-${Date.now()}`,
+    id: `part-final-reasoning-${crypto.randomUUID()}`,
     type: 'reasoning',
     text,
   }

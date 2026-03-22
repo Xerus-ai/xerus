@@ -68,7 +68,7 @@ export function MessageList({
   const allMessages: ChatMessageExtended[] = [...messages]
   if (streamingTurn) {
     allMessages.push({
-      id: 'streaming',
+      id: streamingTurn.id,
       role: 'assistant',
       content: '',
       agentSlug: streamingTurn.agentSlug,
