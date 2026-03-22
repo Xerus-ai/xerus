@@ -1,0 +1,365 @@
+// Tools Domain Service
+// Business logic for Pipedream Connect integration
+
+import { getPipedreamClient } from '../../shared/clients/pipedream';
+import { toolsRepository } from './repository';
+import { toolValidator } from './validators';
+import { toolsCache } from '../../shared/cache/tools-cache';
+import { ToolNotConnectedError, ToolExecutionError, UnauthorizedAccessError } from './errors';
+import { NotFoundError } from '../../utils/errors';
+import type {
+    ListAppsInput,
+    ListAppsResponse,
+    ListAppsFromDBInput,
+    ListAppsFromDBResponse,
+    StartConnectionInput,
+    StartConnectionResponse,
+    GetConnectedAccountsInput,
+    DisconnectAccountInput,
+    ListActionsInput,
+    ListActionsResponse,
+    GetActionInput,
+    ExecuteActionInput,
+    ExecuteActionResponse,
+    GetActionOptionsInput,
+    ConnectedAccount,
+    PipedreamAction,
+    PipedreamApp,
+} from './types';
+
+export class ToolsService {
+    private pipedream = getPipedreamClient();
+
+    async listApps(input?: ListAppsInput): Promise<ListAppsResponse> {
+        const validated = input ? toolValidator.validateListApps(input) : {};
+
+        const page = validated.page || 1;
+        const limit = validated.limit || 50;
+
+        const allApps = await this.fetchPaginatedApps(validated.query);
+
+        const totalApps = allApps.length;
+        const startIndex = (page - 1) * limit;
+        const endIndex = startIndex + limit;
+        const paginatedApps = allApps.slice(startIndex, endIndex);
+        const totalPages = Math.ceil(totalApps / limit);
+
+        return {
+            apps: paginatedApps,
+            pagination: {
+                total: totalApps,
+                page,
+                limit,
+                total_pages: totalPages,
+                has_more: page < totalPages,
+            },
+        };
+    }
+
+    async listAppsFromDB(input: ListAppsFromDBInput): Promise<ListAppsFromDBResponse> {
+        const validated = toolValidator.validateListAppsFromDB(input);
+
+        return await toolsRepository.listAppsFromDB(validated);
+    }
+
+    async getAppBySlug(appSlug: string): Promise<PipedreamApp> {
+        const app = await toolsRepository.getAppBySlug(appSlug);
+        if (!app) {
+            throw new NotFoundError('Tool');
+        }
+        return app;
+    }
+
+    async startConnection(input: StartConnectionInput): Promise<StartConnectionResponse> {
+        const validated = toolValidator.validateStartConnection(input);
+
+        try {
+            // Build params object - only include webhook_uri if provided
+            const connectTokenParams: {
+                external_user_id: string;
+                allowed_origins?: string[];
+                webhook_uri?: string;
+            } = {
+                external_user_id: validated.user_id,
+                allowed_origins: validated.allowed_origins,
+            };
+
+            if (validated.webhook_url) {
+                connectTokenParams.webhook_uri = validated.webhook_url;
+            }
+
+            const token = await this.pipedream.createConnectToken(connectTokenParams);
+
+            // Verify we got a valid token
+            if (!token.token || !token.connect_link_url) {
+                throw new Error('Invalid token response from Pipedream');
+            }
+
+            return {
+                connect_url: token.connect_link_url,
+                expires_at: token.expires_at,
+                token: token.token,
+            };
+        } catch (error) {
+            console.error('Failed to create connect token:', error);
+            throw error;
+        }
+    }
+
+    async getConnectedAccounts(input: GetConnectedAccountsInput): Promise<ConnectedAccount[]> {
+        const validated = toolValidator.validateGetConnectedAccounts(input);
+
+        const connections = await toolsRepository.getConnections(validated.user_id);
+
+        if (validated.app_slug) {
+            return connections.filter(c => c.app_slug === validated.app_slug);
+        }
+
+        return connections;
+    }
+
+    async disconnectAccount(input: DisconnectAccountInput): Promise<void> {
+        const validated = toolValidator.validateDisconnectAccount(input);
+
+        const connection = await toolsRepository.getConnectionByPipedreamId(validated.pipedream_account_id);
+
+        if (connection) {
+            if (connection.user_id !== validated.user_id) {
+                throw new UnauthorizedAccessError(
+                    `account ${validated.pipedream_account_id}`,
+                    validated.user_id,
+                    'You do not have permission to disconnect this account'
+                );
+            }
+        }
+
+        try {
+            await this.pipedream.deleteAccount(validated.pipedream_account_id);
+        } catch (error) {
+            console.error('Failed to delete from Pipedream:', error);
+            throw new Error('Failed to disconnect account from Pipedream. Please try again.');
+        }
+
+        if (connection) {
+            await toolsRepository.removeConnection(validated.pipedream_account_id);
+        }
+    }
+
+    async listActions(input: ListActionsInput): Promise<ListActionsResponse> {
+        const validated = toolValidator.validateListActions(input);
+
+        const cacheKey = `${validated.app_slug}:${validated.query || ''}:${validated.limit || ''}`;
+        const cached = toolsCache.getActions(cacheKey);
+        if (cached) {
+            console.log(`[Cache HIT] Actions for ${validated.app_slug}`);
+            return {
+                actions: cached,
+                total: cached.length,
+            };
+        }
+
+        console.log(`[Cache MISS] Fetching actions for ${validated.app_slug}`);
+        const response = await this.pipedream.getComponents({
+            app: validated.app_slug,
+            componentType: 'action',
+            q: validated.query,
+        });
+
+        toolsCache.setActions(cacheKey, response.data);
+
+        return {
+            actions: response.data,
+            total: response.data.length,
+        };
+    }
+
+    async listTriggers(input: ListActionsInput): Promise<ListActionsResponse> {
+        const validated = toolValidator.validateListActions(input);
+
+        const cacheKey = `${validated.app_slug}:${validated.query || ''}:${validated.limit || ''}`;
+        const cached = toolsCache.getTriggers(cacheKey);
+        if (cached) {
+            console.log(`[Cache HIT] Triggers for ${validated.app_slug}`);
+            return {
+                actions: cached,
+                total: cached.length,
+            };
+        }
+
+        console.log(`[Cache MISS] Fetching triggers for ${validated.app_slug}`);
+        const response = await this.pipedream.getComponents({
+            app: validated.app_slug,
+            componentType: 'trigger',
+            q: validated.query,
+        });
+
+        toolsCache.setTriggers(cacheKey, response.data);
+
+        return {
+            actions: response.data,
+            total: response.data.length,
+        };
+    }
+
+    async getAction(input: GetActionInput): Promise<PipedreamAction> {
+        const validated = toolValidator.validateGetAction(input);
+
+        const response = await this.pipedream.getComponent({
+            key: validated.action_key,
+        });
+
+        return response.data;
+    }
+
+    async executeAction(input: ExecuteActionInput): Promise<ExecuteActionResponse> {
+        const validated = toolValidator.validateExecuteAction(input);
+
+        const connection = await toolsRepository.getConnectionByPipedreamId(validated.pipedream_account_id);
+        if (!connection) {
+            throw new ToolNotConnectedError(validated.pipedream_account_id, validated.user_id);
+        }
+
+        const app_slug = validated.action_key.split('-')[0];
+        const startTime = Date.now();
+
+        try {
+            const configuredProps = {
+                [app_slug]: { authProvisionId: validated.pipedream_account_id },
+                ...validated.params,
+            };
+
+            const result = await this.pipedream.runAction({
+                externalUserId: validated.user_id,
+                actionId: { key: validated.action_key },
+                configuredProps,
+            });
+
+            const duration_ms = Date.now() - startTime;
+
+            await toolsRepository.updateLastUsed(validated.pipedream_account_id);
+
+            await toolsRepository.logExecution({
+                agent_id: null,
+                app_slug,
+                action_key: validated.action_key,
+                input: validated.params,
+                output: result.ret as Record<string, unknown>,
+                success: true,
+                duration_ms,
+            });
+
+            return {
+                success: true,
+                data: result.ret,
+                logs: result.os as string[],
+            };
+        } catch (error) {
+            const duration_ms = Date.now() - startTime;
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+            await toolsRepository.logExecution({
+                agent_id: null,
+                app_slug,
+                action_key: validated.action_key,
+                input: validated.params,
+                output: null,
+                success: false,
+                error: errorMessage,
+                duration_ms,
+            });
+
+            throw new ToolExecutionError(validated.action_key, error as Error);
+        }
+    }
+
+    async getActionOptions(input: GetActionOptionsInput) {
+        const validated = toolValidator.validateGetActionOptions(input);
+
+        const response = await this.pipedream.configureComponent({
+            externalUserId: validated.user_id,
+            componentId: { key: validated.action_key },
+            propName: validated.prop_name,
+            configuredProps: validated.configured_props,
+        });
+
+        return response.options;
+    }
+
+    async getToolStats(user_id: string, app_slug: string) {
+        return await toolsRepository.getToolStats(user_id, app_slug);
+    }
+
+    private async fetchPaginatedApps(query?: string): Promise<PipedreamApp[]> {
+        const allApps: PipedreamApp[] = [];
+        let after: string | undefined;
+        const MAX_PAGES = 500;
+        let page = 0;
+        do {
+            const response = await this.pipedream.getApps({ q: query, after, limit: 100 });
+            const data = response.data || [];
+            allApps.push(...data);
+            after = data.length > 0 ? response.page_info?.end_cursor : undefined;
+            page++;
+        } while (after && page < MAX_PAGES);
+        return allApps;
+    }
+
+    async syncPipedreamApps(): Promise<{ synced: number; failed: number; duration_ms: number }> {
+        const startTime = Date.now();
+        let syncedCount = 0;
+        let failedCount = 0;
+
+        try {
+            const currentSync = await toolsRepository.getSyncMetadata();
+            if (currentSync.sync_status === 'syncing') {
+                const staleCutoff = Date.now() - 30 * 60 * 1000;
+                const lastSyncTime = currentSync.last_sync_at ? new Date(currentSync.last_sync_at).getTime() : 0;
+                if (lastSyncTime > staleCutoff) {
+                    throw new Error('Sync already in progress');
+                }
+                console.log('[Sync] Detected stale sync (>30min), resetting before new sync');
+                await toolsRepository.updateSyncMetadata('failed', undefined, 'Stale sync reset');
+            }
+            await toolsRepository.updateSyncMetadata('syncing');
+            console.log('[Sync] Starting Pipedream apps sync...');
+
+            const allApps = await this.fetchPaginatedApps();
+            console.log(`[Sync] Fetched ${allApps.length} apps from Pipedream`);
+
+            for (const app of allApps) {
+                try {
+                    await toolsRepository.upsertApp(app);
+                    syncedCount++;
+                } catch (error) {
+                    console.error(`[Sync] Failed to upsert app ${app.name_slug}:`, error);
+                    failedCount++;
+                }
+            }
+
+            await toolsRepository.updateSyncMetadata('success', syncedCount);
+            const duration_ms = Date.now() - startTime;
+            console.log(`[Sync] Completed. Synced: ${syncedCount}, Failed: ${failedCount}, Duration: ${duration_ms}ms`);
+
+            return { synced: syncedCount, failed: failedCount, duration_ms };
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            await toolsRepository.updateSyncMetadata('failed', undefined, errorMessage);
+            console.error('[Sync] Failed to sync Pipedream apps:', error);
+            throw error;
+        }
+    }
+
+    async hideApp(name_slug: string): Promise<void> {
+        await toolsRepository.setAppVisibility(name_slug, true);
+    }
+
+    async showApp(name_slug: string): Promise<void> {
+        await toolsRepository.setAppVisibility(name_slug, false);
+    }
+
+    async getHiddenApps(): Promise<Array<{ name_slug: string; name: string }>> {
+        return await toolsRepository.getHiddenApps();
+    }
+}
+
+export const toolsService = new ToolsService();

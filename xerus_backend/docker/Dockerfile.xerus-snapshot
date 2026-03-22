@@ -1,0 +1,60 @@
+# Xerus Custom Daytona Snapshot
+# Extends the standard daytona sandbox image with:
+# - Node.js 22 LTS (via nodesource)
+# - sqlite3 (company.db, beads task boards)
+# - @beads/bd CLI (task tracking across sessions)
+# - @anthropic-ai/claude-agent-sdk (TypeScript Agent SDK)
+# - @modelcontextprotocol/sdk (Platform MCP server)
+# - Pre-created runner directory structure
+#
+# Build: npm run snapshot:create
+# This Dockerfile is used by scripts/create-snapshot.ts
+
+FROM mcr.microsoft.com/devcontainers/python:3.14
+
+# System dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    sudo \
+    python3-pip \
+    python3-venv \
+    ripgrep \
+    jq \
+    git \
+    sqlite3 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create daytona user
+RUN useradd -m daytona && echo "daytona ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/91-daytona
+
+# Install Node.js 22 LTS via nodesource (reliable, adds to system PATH)
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# Verify Node.js installation (fail-fast if broken)
+RUN node --version && npm --version
+
+# Install global Node.js tools
+RUN npm install -g ts-node@10.9.2 typescript@5.9.3 @beads/bd
+
+# Install Python claude-agent-sdk (for Python-based agents)
+RUN python3 -m pip install --no-cache-dir claude-agent-sdk==0.1.22
+
+# --- Xerus-specific additions ---
+
+ENV XERUS_WORKSPACE_ROOT=/home/daytona \
+    LANG=en_US.UTF-8 \
+    LC_ALL=en_US.UTF-8
+
+# Pre-create runner directory and install npm deps
+RUN mkdir -p "$XERUS_WORKSPACE_ROOT/.xerus/runner" && chown -R daytona:daytona "$XERUS_WORKSPACE_ROOT/.xerus"
+
+COPY runner-package.json "$XERUS_WORKSPACE_ROOT/.xerus/runner/package.json"
+RUN cd "$XERUS_WORKSPACE_ROOT/.xerus/runner" && npm install --production --no-audit --no-fund \
+    && chown -R daytona:daytona "$XERUS_WORKSPACE_ROOT/.xerus"
+
+USER daytona
+RUN touch ~/.zshrc
+
+ENTRYPOINT [ "sleep", "infinity" ]

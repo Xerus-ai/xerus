@@ -1,0 +1,254 @@
+/**
+ * useExecutionStream Type Definitions
+ *
+ * All 12 event type interfaces, StreamEvent union type, ConnectionState,
+ * callback types, and configuration types for the SSE client hook.
+ * Mirrors backend execution/types.ts event definitions.
+ */
+
+// ---------------------------------------------------------------------------
+// Stream Event Types (mirrors backend execution/types.ts)
+// ---------------------------------------------------------------------------
+
+export const STREAM_EVENT_TYPES = [
+  'meta',
+  'progress',
+  'token',
+  'tool_call',
+  'tool_result',
+  'reasoning',
+  'memory_update',
+  'kb_query',
+  'self_moderation',
+  'context_warning',
+  'done',
+  'stop',
+  'notification',
+  'tool_auth_required',
+  'guidance',
+  // Team coordination events
+  'subagent_start',
+  'subagent_stop',
+  'delegation',
+] as const;
+
+export type StreamEventType = (typeof STREAM_EVENT_TYPES)[number];
+
+export interface MetaEventContent {
+  conversationId: string;
+  model?: string;
+  agentSlug?: string;
+  agentName?: string;
+  startedAt?: string;
+  runId?: string;
+}
+
+export interface ProgressEventContent {
+  phase: string;
+  message: string;
+  percent: number;
+}
+
+export interface TokenEventContent {
+  text: string;
+  tokenCount: number;
+}
+
+export interface ToolCallEventContent {
+  toolName: string;
+  arguments: Record<string, unknown>;
+  callId: string;
+}
+
+export interface ToolResultEventContent {
+  callId: string;
+  result: unknown;
+  durationMs: number;
+  success: boolean;
+}
+
+export interface ReasoningEventContent {
+  thought: string;
+  confidence?: number;
+}
+
+export interface MemoryUpdateEventContent {
+  operation: 'save' | 'update' | 'delete';
+  scope: 'company' | 'project' | 'channel' | 'agent' | 'user' | 'entity' | 'topic';
+  path: string;
+  category?: string;
+}
+
+export interface KbQueryEventContent {
+  query: string;
+  resultsCount: number;
+  kbIds: string[];
+}
+
+export interface SelfModerationEventContent {
+  checklist: string[];
+  qualityScore: number;
+  passed: boolean;
+}
+
+export interface ContextWarningEventContent {
+  warningType: 'approaching_limit' | 'at_limit' | 'overflow';
+  currentUsage: number;
+  maxBudget: number;
+  percentUsed: number;
+}
+
+export interface ExecutionSummary {
+  totalTokens: number;
+  durationMs: number;
+  toolCalls: number;
+  agentsUsed: number;
+  artifacts?: string[];
+}
+
+export interface ExecutionErrorInfo {
+  message: string;
+  code: string;
+  type: string;
+}
+
+export interface DoneEventContent {
+  finalResponse?: string;
+  summary: ExecutionSummary;
+  error?: ExecutionErrorInfo;
+  databaseUpdated: boolean;
+  conversationId?: string;
+}
+
+export interface StopEventContent {
+  reason: 'user_cancel' | 'timeout' | 'error' | 'complete';
+  task_title?: string;
+  has_unsaved_memory?: boolean;
+}
+
+export interface ToolAuthRequiredEventContent {
+  app_slug: string;
+  agent_slug: string;
+}
+
+export interface SubagentStartEventContent {
+  parentAgent: string;
+  subagentType: string;
+  taskDescription: string;
+}
+
+export interface SubagentStopEventContent {
+  parentAgent: string;
+  subagentType: string;
+  success: boolean;
+  durationMs: number;
+  error?: string;
+}
+
+export interface DelegationEventContent {
+  fromAgent: string;
+  toAgent: string;
+  task: string;
+}
+
+export interface NotificationEventContent {
+  notification_type: string;
+  message: string;
+  priority: string;
+  action_required: boolean;
+  agent_slug: string;
+}
+
+export type UIHint = 'browser' | 'approval' | 'form' | 'preview' | 'terminal';
+
+export interface GuidanceEventContent {
+  question: string;
+  options?: string[];
+  timeout_seconds: number;
+  pause_id: string;
+  scenario: string;
+  tool_name: string;
+  agent_slug: string;
+  requires_auth: boolean;
+  execution_id: string;
+  ui_hint?: UIHint;
+  browser_url?: string;
+  preview_url?: string;
+  artifact_path?: string;
+}
+
+// Map from event type string to its content type
+export interface StreamEventContentMap {
+  meta: MetaEventContent;
+  progress: ProgressEventContent;
+  token: TokenEventContent;
+  tool_call: ToolCallEventContent;
+  tool_result: ToolResultEventContent;
+  reasoning: ReasoningEventContent;
+  memory_update: MemoryUpdateEventContent;
+  kb_query: KbQueryEventContent;
+  self_moderation: SelfModerationEventContent;
+  context_warning: ContextWarningEventContent;
+  done: DoneEventContent;
+  stop: StopEventContent;
+  tool_auth_required: ToolAuthRequiredEventContent;
+  guidance: GuidanceEventContent;
+  subagent_start: SubagentStartEventContent;
+  subagent_stop: SubagentStopEventContent;
+  delegation: DelegationEventContent;
+  notification: NotificationEventContent;
+}
+
+export interface StreamEvent<T extends StreamEventType = StreamEventType> {
+  type: T;
+  success?: boolean;
+  execution_id: string;
+  content?: T extends keyof StreamEventContentMap ? StreamEventContentMap[T] : unknown;
+  meta?: unknown;
+  timestamp?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Hook Options & Return Types
+// ---------------------------------------------------------------------------
+
+export type StreamEventCallback<T extends StreamEventType = StreamEventType> =
+  (event: StreamEvent<T>) => void;
+
+export interface UseExecutionStreamOptions {
+  sessionId: string | null;
+  autoConnect?: boolean;
+  maxReconnectAttempts?: number;
+  onEvent?: StreamEventCallback;
+  onMeta?: StreamEventCallback<'meta'>;
+  onProgress?: StreamEventCallback<'progress'>;
+  onToken?: StreamEventCallback<'token'>;
+  onToolCall?: StreamEventCallback<'tool_call'>;
+  onToolResult?: StreamEventCallback<'tool_result'>;
+  onReasoning?: StreamEventCallback<'reasoning'>;
+  onMemoryUpdate?: StreamEventCallback<'memory_update'>;
+  onKbQuery?: StreamEventCallback<'kb_query'>;
+  onSelfModeration?: StreamEventCallback<'self_moderation'>;
+  onContextWarning?: StreamEventCallback<'context_warning'>;
+  onDone?: StreamEventCallback<'done'>;
+  onStop?: StreamEventCallback<'stop'>;
+  onToolAuthRequired?: StreamEventCallback<'tool_auth_required'>;
+  onGuidance?: StreamEventCallback<'guidance'>;
+  onSubagentStart?: StreamEventCallback<'subagent_start'>;
+  onSubagentStop?: StreamEventCallback<'subagent_stop'>;
+  onDelegation?: StreamEventCallback<'delegation'>;
+  onNotification?: StreamEventCallback<'notification'>;
+  onError?: (error: Error) => void;
+  onConnectionChange?: (connected: boolean) => void;
+}
+
+export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
+
+export interface UseExecutionStreamReturn {
+  isConnected: boolean;
+  connectionState: ConnectionState;
+  lastEvent: StreamEvent | null;
+  events: StreamEvent[];
+  error: Error | null;
+  close: () => void;
+}

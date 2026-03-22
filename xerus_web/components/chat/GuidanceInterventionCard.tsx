@@ -1,0 +1,208 @@
+'use client'
+
+import { useState, useEffect, useCallback } from 'react'
+import { cn } from '@/lib/utils'
+import {
+  Shield,
+  MonitorSmartphone,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Globe,
+  Eye,
+  Terminal,
+  FileText,
+} from 'lucide-react'
+import type { UIHint } from '@/hooks/useExecutionStream.types'
+
+interface GuidanceInterventionCardProps {
+  question: string
+  options?: string[]
+  timeout_seconds: number
+  scenario: string
+  tool_name: string
+  agent_slug: string
+  ui_hint?: UIHint
+  browser_url?: string
+  preview_url?: string
+  onRespond: (accepted: boolean, feedback?: string) => void
+}
+
+function getHintConfig(uiHint?: UIHint, scenario?: string) {
+  if (uiHint === 'browser' || scenario?.startsWith('browser_')) {
+    return { Icon: MonitorSmartphone, label: 'Browser Action Required' }
+  }
+  if (uiHint === 'terminal') {
+    return { Icon: Terminal, label: 'Terminal Action' }
+  }
+  if (uiHint === 'preview') {
+    return { Icon: Eye, label: 'Preview Review' }
+  }
+  if (uiHint === 'form') {
+    return { Icon: FileText, label: 'Input Required' }
+  }
+  return { Icon: Shield, label: 'Approval Required' }
+}
+
+export function GuidanceInterventionCard({
+  question,
+  options,
+  timeout_seconds,
+  scenario,
+  tool_name,
+  agent_slug,
+  ui_hint,
+  browser_url,
+  preview_url,
+  onRespond,
+}: GuidanceInterventionCardProps) {
+  const [secondsLeft, setSecondsLeft] = useState(timeout_seconds)
+  const [feedbackText, setFeedbackText] = useState('')
+  const { Icon, label } = getHintConfig(ui_hint, scenario)
+
+  // Countdown timer — auto-deny when expired (backend owns true timeout, this is UX feedback)
+  useEffect(() => {
+    if (secondsLeft <= 0) {
+      onRespond(false, 'Timed out')
+      return
+    }
+    const timer = setInterval(() => {
+      setSecondsLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(timer)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [secondsLeft, onRespond])
+
+  const handleApprove = useCallback(() => {
+    onRespond(true, feedbackText || undefined)
+  }, [onRespond, feedbackText])
+
+  const handleDeny = useCallback(() => {
+    onRespond(false, feedbackText || undefined)
+  }, [onRespond, feedbackText])
+
+  return (
+    <div className="mx-4 mb-2 rounded-2xl border border-[#FF6600]/20 bg-[#FF6600]/5 px-4 py-3">
+      <div className="flex items-start gap-3">
+        {/* Left: Icon + Content */}
+        <div className="flex-1 min-w-0">
+          {/* Label row */}
+          <div className="flex items-center gap-2 mb-1.5">
+            <div className="w-7 h-7 rounded-xl flex items-center justify-center bg-[#FF6600]/15 shrink-0">
+              <Icon className="w-3.5 h-3.5 text-[#FF6600]" />
+            </div>
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">
+              {label}
+            </span>
+            {secondsLeft > 0 && (
+              <span className="ml-auto flex items-center gap-1 text-[11px] text-text-muted">
+                <Clock className="w-3 h-3" />
+                {secondsLeft}s
+              </span>
+            )}
+          </div>
+
+          {/* Question */}
+          <p className="text-sm font-medium text-text">
+            {question}
+          </p>
+
+          {/* Context row: tool + agent + URLs */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5">
+            {tool_name && (
+              <span className="text-xs text-text-muted">
+                Tool: <span className="font-medium text-text-secondary">{tool_name}</span>
+              </span>
+            )}
+            {agent_slug && (
+              <span className="text-xs text-text-muted">
+                Agent: <span className="font-medium text-text-secondary">{agent_slug}</span>
+              </span>
+            )}
+            {browser_url && (
+              <a
+                href={browser_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-[#FF6600] hover:text-[#E65C00] font-medium transition-colors"
+              >
+                <Globe className="w-3 h-3" />
+                View in browser
+              </a>
+            )}
+            {preview_url && (
+              <a
+                href={preview_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-[#FF6600] hover:text-[#E65C00] font-medium transition-colors"
+              >
+                <Eye className="w-3 h-3" />
+                Preview
+              </a>
+            )}
+          </div>
+
+          {/* Options (if provided) */}
+          {options && options.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {options.map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => onRespond(true, opt)}
+                  className={cn(
+                    'px-2.5 py-1 text-xs rounded-lg border transition-colors',
+                    'border-surface-active text-text-secondary hover:text-text hover:bg-surface-hover',
+                  )}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Feedback input — always available for rejection notes */}
+          {ui_hint !== 'browser' && (
+            <input
+              type="text"
+              value={feedbackText}
+              onChange={(e) => setFeedbackText(e.target.value)}
+              placeholder="Add a note (optional)..."
+              className={cn(
+                'mt-2 w-full px-2.5 py-1.5 text-xs rounded-lg border',
+                'border-surface-active bg-surface-alt text-text placeholder:text-text-muted',
+                'focus:outline-none focus:border-[#FF6600]/30',
+              )}
+            />
+          )}
+        </div>
+
+        {/* Right: Action buttons */}
+        <div className="flex flex-col gap-1.5 shrink-0 pt-6">
+          <button
+            type="button"
+            onClick={handleApprove}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[#FF6600] hover:bg-[#E65C00] text-white transition-colors"
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            Approve
+          </button>
+          <button
+            type="button"
+            onClick={handleDeny}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-surface-active text-text-muted hover:text-text hover:bg-surface-hover transition-colors"
+          >
+            <XCircle className="w-3.5 h-3.5" />
+            Deny
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}

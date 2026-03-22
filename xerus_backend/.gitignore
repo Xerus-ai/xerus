@@ -1,0 +1,19 @@
+bash.exe.stackdump
+
+# Test artifacts
+TEST_DATA.md
+sandboxes_tmp.json
+*_tmp.json
+*.tmp.json
+_test_token.txt
+auth_err.txt
+
+# Windows artifacts
+bash.exe.stackdump
+
+# Firebase credentials (already covered by pattern but be explicit)
+*-firebase-adminsdk-*.json
+
+# Internal test scripts with credentials
+scripts/get-token.js
+scripts/test-workspace-lifecycle.ts
