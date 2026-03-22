@@ -165,7 +165,7 @@ function buildBootstrap(ctx: SoulFileContext): string {
         : '### Connected Tools\nNone connected yet. You can connect tools (Gmail, Slack, LinkedIn, etc.) via the Tools page or ask Xerus to wire them up for me.';
 
     const channelSection = channel
-        ? `I am assigned to the **${channel}** channel. I will read tasks from this channel\'s board and post my work there.`
+        ? `I am assigned to the **${channel}** channel. I will read tasks from this channel's board and post my work there.`
         : `I am not assigned to a channel yet. Ask Xerus to create a channel and assign me, or I can suggest one based on what you need.`;
 
     return `# Getting Started with ${name}

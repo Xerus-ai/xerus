@@ -47,29 +47,9 @@ export function getWebUrl(): string {
 }
 
 /**
- * Get API URL with runtime config support (async version)
- * Attempts to load from runtime-config.json first, then falls back to getAPIUrl.
- * Caches the result to avoid repeated fetch attempts.
+ * Async version of getAPIUrl for backward compatibility.
+ * Resolves from environment variables only.
  */
-let cachedApiUrl: string | null = null;
-let fetchAttempted = false;
-
 export async function getApiUrlAsync(): Promise<string> {
-  if (cachedApiUrl) return cachedApiUrl;
-  if (fetchAttempted) return getAPIUrl();
-  fetchAttempted = true;
-  try {
-    const response = await fetch('/runtime-config.json');
-    if (response.ok) {
-      const config = await response.json();
-      const url = (config.API_URL as string | undefined) || getAPIUrl();
-      cachedApiUrl = url;
-      return url;
-    }
-  } catch {
-    // Runtime config not available, use environment-based URL
-  }
-  const fallback = getAPIUrl();
-  cachedApiUrl = fallback;
-  return fallback;
+  return getAPIUrl();
 }

@@ -1,21 +1,35 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { usePathname } from 'next/navigation'
-import { LoginOverlay } from '@/components/LoginOverlay'
-import { AuthProvider } from '@/utils/AuthContext'
+import { usePathname, useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
+import { AuthProvider, useAuth } from '@/utils/AuthContext'
 import { SWRProvider } from '@/lib/swr-config'
 import { LayoutProvider, useLayout } from '@/components/layout/LayoutContext'
 import { WorkspaceSectionProvider } from '@/components/layout/WorkspaceSectionContext'
 import { SidebarSlotProvider } from '@/components/layout/SidebarSlotContext'
 import { AppSidebar } from '@/components/navigation/AppSidebar'
-// SubSidebar content is now integrated into AppSidebar
 import { MobileBottomBar } from '@/components/navigation/MobileBottomBar'
 import { MotionConfig } from 'framer-motion'
-import { cn } from '@/lib/utils'
+
+// Code-split: only loaded on /login route
+const LoginOverlay = dynamic(
+  () => import('@/components/LoginOverlay').then(mod => ({ default: mod.LoginOverlay })),
+  { ssr: false }
+)
+
+// Hoisted static skeleton — reused during SSR hydration and auth loading
+const LayoutSkeleton = (
+  <div className="flex h-screen overflow-hidden bg-surface-alt relative">
+    <div className="flex-none w-[280px] h-full bg-surface border-r border-surface-active hidden md:block" />
+    <main className="flex-1 relative h-screen overflow-y-auto" />
+  </div>
+)
 
 function LayoutShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const router = useRouter()
+  const { user, isAuthReady } = useAuth()
   const {
     isRightPanelOpen,
     rightPanelContent,
@@ -23,6 +37,23 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
   } = useLayout()
 
   const isLoginPage = pathname === '/login'
+
+  // Redirect unauthenticated users to login
+  useEffect(() => {
+    if (isAuthReady && !user && !isLoginPage) {
+      router.push('/login')
+    }
+  }, [isAuthReady, user, isLoginPage, router])
+
+  // Show skeleton while auth state is loading (prevents content flash)
+  if (!isAuthReady) {
+    return LayoutSkeleton
+  }
+
+  // Not authenticated and not on login page — render nothing while redirect fires
+  if (!user && !isLoginPage) {
+    return null
+  }
 
   // Login page: no sidebar, overlay
   if (isLoginPage) {
@@ -104,12 +135,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => { setIsMounted(true) }, [])
 
   if (!isMounted) {
-    return (
-      <div className="flex h-screen overflow-hidden bg-surface-alt relative">
-        <div className="flex-none w-[280px] h-full bg-surface border-r border-surface-active" />
-        <main className="flex-1 relative h-screen overflow-y-auto">{children}</main>
-      </div>
-    )
+    return LayoutSkeleton
   }
 
   return (

@@ -1,10 +1,42 @@
 import './globals.css'
+import type { Metadata, Viewport } from 'next'
+import { Playfair_Display } from 'next/font/google'
 import AppLayout from '@/components/layout/AppLayout'
 import { Toaster } from 'sonner'
 
-export const metadata = {
+const playfair = Playfair_Display({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  display: 'swap',
+  variable: '--font-playfair',
+})
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  themeColor: '#FF6600',
+}
+
+export const metadata: Metadata = {
   title: 'Xerus - AI Agents',
-  description: 'Personalized AI Agents for various contexts',
+  description: 'Build your own AI workforce. Personalized AI agents that work together in your workspace.',
+  icons: {
+    icon: '/logo/xerus.svg',
+    apple: '/logo/xerus.svg',
+  },
+  openGraph: {
+    title: 'Xerus - AI Agents',
+    description: 'Build your own AI workforce. Personalized AI agents that work together in your workspace.',
+    url: 'https://app.xerus.ai',
+    siteName: 'Xerus',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Xerus - AI Agents',
+    description: 'Build your own AI workforce. Personalized AI agents that work together in your workspace.',
+  },
+  metadataBase: new URL('https://app.xerus.ai'),
 }
 
 export default function RootLayout({
@@ -13,14 +45,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
-      <head>
-        {/* Playfair Display from Google Fonts (serif headings) */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet" />
-        {/* Other fonts (Inter, Lora) loaded via self-hosted WOFF files in globals.css */}
-      </head>
+    <html lang="en" className={playfair.variable}>
       <body>
         <AppLayout>
           {children}

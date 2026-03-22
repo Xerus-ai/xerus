@@ -89,21 +89,14 @@ export function LoginOverlay() {
           </button>
         </div>
 
-        <button
-          onClick={() => router.push('/')}
-          className="mt-6 text-text-secondary text-sm font-medium hover:text-text transition-colors font-sans"
-        >
-          Continue without signing in
-        </button>
-
         <div className="mt-8 text-center">
           <p className="text-xs text-[#9CA3AF] font-sans">
             By signing in, you agree to our{' '}
-            <a href="/settings/privacy" className="text-[#FF6600] hover:text-[#E65C00] transition-colors hover:underline">
+            <a href="https://www.xerus.ai/terms-of-service" target="_blank" rel="noopener noreferrer" className="text-[#FF6600] hover:text-[#E65C00] transition-colors hover:underline">
               Terms of Service
             </a>
             {' '}and{' '}
-            <a href="/settings/privacy" className="text-[#FF6600] hover:text-[#E65C00] transition-colors hover:underline">
+            <a href="https://www.xerus.ai/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-[#FF6600] hover:text-[#E65C00] transition-colors hover:underline">
               Privacy Policy
             </a>
           </p>

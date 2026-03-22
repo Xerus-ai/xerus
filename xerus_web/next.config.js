@@ -3,12 +3,22 @@
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
-  // Server-side rendering for standalone deployment
-  images: {
-    domains: ['localhost', 'api.xerus.ai', 'app.xerus.ai', 'xerus.ai'],
+
+  // Strip console.log/warn from production builds (keep console.error for critical failures)
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production'
+      ? { exclude: ['error'] }
+      : false,
   },
 
-  // Headers for Firebase Auth popup support
+  images: {
+    remotePatterns: [
+      { protocol: 'http', hostname: 'localhost' },
+      { protocol: 'https', hostname: '**.xerus.ai' },
+    ],
+  },
+
+  // Security + CORS headers
   async headers() {
     return [
       {
@@ -17,6 +27,30 @@ const nextConfig = {
           {
             key: 'Cross-Origin-Opener-Policy',
             value: 'same-origin-allow-popups',
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+          {
+            key: 'X-XSS-Protection',
+            value: '1; mode=block',
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
+          },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=()',
+          },
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=31536000; includeSubDomains',
           },
         ],
       },

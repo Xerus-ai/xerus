@@ -15,6 +15,9 @@ coverage/
 .env.*
 !.env.example
 !.env.*.example
+# Firebase web config is public (embedded in client bundle, not a secret).
+# Needed for Vercel production builds.
+!xerus_web/.env.production
 *.pem
 *.key
 *.cert
@@ -37,8 +40,8 @@ xerus_backend/INSTRUCTIONS.md
 xerus_backend/PROJECT_SETUP.md
 xerus_backend/PROMPT.md
 
-# ─── Database (excluded for now — clean schema coming later) ─────────────────
-xerus_backend/src/database/
+# ─── Database migrations (keep connection.ts tracked, ignore migration artifacts) ─────
+# xerus_backend/src/database/  # REMOVED — connection.ts must be in repo for CI to work
 
 # ─── Test Data & Artifacts ───────────────────────────────────────────────────
 xerus_backend/TEST_DATA.md
