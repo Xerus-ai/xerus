@@ -18,13 +18,22 @@ const LoginOverlay = dynamic(
   { ssr: false }
 )
 
-// Hoisted static skeleton — reused during SSR hydration and auth loading
-const LayoutSkeleton = (
-  <div className="flex h-screen overflow-hidden bg-surface-alt relative">
-    <div className="flex-none w-[280px] h-full bg-surface border-r border-surface-active hidden md:block" />
-    <main className="flex-1 relative h-screen overflow-y-auto" />
-  </div>
-)
+// Loading screen shown during auth check and initial hydration
+function LoadingScreen() {
+  return (
+    <div className="flex h-screen items-center justify-center bg-surface-alt">
+      <div className="flex flex-col items-center gap-6">
+        <img src="/logo/xerus.svg" alt="Xerus" className="w-14 h-14 animate-pulse" />
+        <div className="flex flex-col items-center gap-2">
+          <p className="text-sm font-medium text-text">Getting your workspace ready</p>
+          <div className="w-48 h-1 bg-surface-active rounded-full overflow-hidden">
+            <div className="h-full bg-[#FF6600] rounded-full animate-[loading_1.5s_ease-in-out_infinite]" />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function LayoutShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -45,14 +54,14 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
     }
   }, [isAuthReady, user, isLoginPage, router])
 
-  // Show skeleton while auth state is loading (prevents content flash)
+  // Show loading screen while auth state is resolving
   if (!isAuthReady) {
-    return LayoutSkeleton
+    return <LoadingScreen />
   }
 
-  // Not authenticated and not on login page — render nothing while redirect fires
+  // Not authenticated — show loading while redirect to /login fires
   if (!user && !isLoginPage) {
-    return null
+    return <LoadingScreen />
   }
 
   // Login page: no sidebar, overlay
@@ -135,7 +144,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => { setIsMounted(true) }, [])
 
   if (!isMounted) {
-    return LayoutSkeleton
+    return <LoadingScreen />
   }
 
   return (
