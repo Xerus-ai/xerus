@@ -124,11 +124,22 @@ async function startServer(): Promise<void> {
         console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
     });
 
-    // SSE streams are long-lived — disable default Node.js request/keep-alive timeouts
-    // that would otherwise kill connections after a few seconds.
+    // SSE streams are long-lived — disable Node.js timeouts that kill idle connections.
+    // keepAliveTimeout=0 prevents Node from closing SSE streams after 5s of no data.
+    // headersTimeout must be >= keepAliveTimeout.
     server.keepAliveTimeout = 0;
     server.headersTimeout = 0;
-    server.requestTimeout = 0;
+
+    // Crash diagnostics — capture unhandled rejections before they kill the process
+    process.on('unhandledRejection', (reason, promise) => {
+        console.error('[CRASH] Unhandled promise rejection:', reason);
+        console.error('[CRASH] Promise:', promise);
+    });
+
+    process.on('uncaughtException', (err) => {
+        console.error('[CRASH] Uncaught exception:', err.message, err.stack);
+        process.exit(1);
+    });
 
     // Graceful shutdown: clean up SSE sweep timer and close server
     process.on('SIGTERM', () => {
