@@ -131,10 +131,10 @@ export function startSandboxCleanupJob(provider?: SandboxProvider): void {
         },
         userLookup: {
             async getActiveUserIds() {
-                const result = await query<{ firebase_uid: string }>(
-                    `SELECT firebase_uid FROM users WHERE status = 'active'`
+                const result = await query<{ user_id: string }>(
+                    `SELECT user_id FROM users WHERE is_active = true`
                 );
-                return result.rows.map((r: { firebase_uid: string }) => r.firebase_uid);
+                return result.rows.map((r: { user_id: string }) => r.user_id);
             },
         },
     });
