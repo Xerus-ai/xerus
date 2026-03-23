@@ -5,11 +5,14 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { CompanyBoard } from './CompanyBoard'
 import { OfficeCanvas } from './OfficeCanvas'
 import { AgentAvatarWithModel } from '@/components/agents/AgentAvatar'
+import Link from 'next/link'
 import {
   Building2,
   FolderOpen,
   Clock,
   Zap,
+  MessageSquare,
+  Bot,
 } from 'lucide-react'
 import { useOfficePolling } from '@/hooks/useOfficePolling'
 import { XerusLoader } from '@/components/common/XerusLoader'
@@ -101,8 +104,24 @@ function AgentStatus({ agents }: { agents: OfficeAgent[] }) {
       {active.length === 0 && scheduled.length === 0 && (
         <div className="flex flex-col items-center justify-center py-4 text-center">
           <span className="text-2xl mb-2">&#9749;</span>
-          <p className="text-sm font-medium text-text-secondary">All agents on break</p>
-          <p className="text-xs text-text-muted mt-1">No active tasks or upcoming schedules</p>
+          <p className="text-sm font-medium text-text-secondary">All quiet</p>
+          <p className="text-xs text-text-muted mt-1 mb-4">No active tasks or upcoming schedules</p>
+          <div className="flex flex-col gap-2 w-full">
+            <Link
+              href="/chat"
+              className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-text-secondary hover:bg-surface-hover hover:text-text transition-colors"
+            >
+              <MessageSquare className="w-4 h-4 text-[#FF6600]" />
+              Chat with Xerus
+            </Link>
+            <Link
+              href="/workspace"
+              className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-text-secondary hover:bg-surface-hover hover:text-text transition-colors"
+            >
+              <Bot className="w-4 h-4 text-emerald-500" />
+              Browse agents
+            </Link>
+          </div>
         </div>
       )}
     </div>
@@ -126,8 +145,6 @@ function ActivityTicker({ agents }: { agents: OfficeAgent[] }) {
     return items
   }, [agents])
 
-  if (activities.length === 0) return null
-
   return (
     <div className="bg-surface rounded-[32px] p-6 shadow-sm">
       <div className="flex items-center gap-2 mb-3">
@@ -136,15 +153,19 @@ function ActivityTicker({ agents }: { agents: OfficeAgent[] }) {
           Recent Activity
         </span>
       </div>
-      <div className="space-y-2">
-        {activities.map((activity, i) => (
-          <div key={i} className="flex items-center gap-2.5">
-            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${activity.dot}`} />
-            <span className="text-sm text-text font-medium">{activity.agent}</span>
-            <span className="text-sm text-text-muted truncate">{activity.text}</span>
-          </div>
-        ))}
-      </div>
+      {activities.length > 0 ? (
+        <div className="space-y-2">
+          {activities.map((activity, i) => (
+            <div key={i} className="flex items-center gap-2.5">
+              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${activity.dot}`} />
+              <span className="text-sm text-text font-medium">{activity.agent}</span>
+              <span className="text-sm text-text-muted truncate">{activity.text}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-text-muted">Activity from your agents will show up here.</p>
+      )}
     </div>
   )
 }
