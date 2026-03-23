@@ -5,16 +5,11 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { CompanyBoard } from './CompanyBoard'
 import { OfficeCanvas } from './OfficeCanvas'
 import { AgentAvatarWithModel } from '@/components/agents/AgentAvatar'
-import Link from 'next/link'
 import {
   Building2,
   FolderOpen,
   Clock,
   Zap,
-  MessageSquare,
-  Bot,
-  Sparkles,
-  ArrowRight,
 } from 'lucide-react'
 import { useOfficePolling } from '@/hooks/useOfficePolling'
 import { XerusLoader } from '@/components/common/XerusLoader'
@@ -154,83 +149,6 @@ function ActivityTicker({ agents }: { agents: OfficeAgent[] }) {
   )
 }
 
-// --- Empty State (first thing a new user sees) ---
-
-const QUICK_START = [
-  {
-    icon: MessageSquare,
-    title: 'Chat with Xerus',
-    description: 'Ask anything — Xerus can help you get started, answer questions, or build something new.',
-    href: '/chat',
-    color: 'text-[#FF6600]',
-    bg: 'bg-[#FF6600]/8',
-  },
-  {
-    icon: Bot,
-    title: 'Browse Agents',
-    description: 'Discover pre-built AI agents for marketing, engineering, research, and more.',
-    href: '/workspace',
-    color: 'text-emerald-600',
-    bg: 'bg-emerald-50',
-  },
-  {
-    icon: Sparkles,
-    title: 'Create an Agent',
-    description: 'Build a custom agent with its own personality, tools, and skills.',
-    href: '/ai-agents/create',
-    color: 'text-indigo-600',
-    bg: 'bg-indigo-50',
-  },
-]
-
-function OfficeEmptyState() {
-  return (
-    <div className="flex flex-col items-center text-center max-w-2xl mx-auto">
-      {/* Warm glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-[radial-gradient(ellipse_at_center,_rgba(255,102,0,0.06)_0%,_transparent_70%)] pointer-events-none" />
-
-      {/* Welcome */}
-      <div className="relative mb-10 mt-4">
-        <h2 className="font-serif text-[28px] leading-[1.3] font-medium text-text tracking-[-0.01em]">
-          Your office is ready
-        </h2>
-        <p className="text-sm text-text-secondary mt-2 max-w-md mx-auto">
-          This is where you'll see your AI agents working, their tasks, schedules, and activity. Let's get started.
-        </p>
-      </div>
-
-      {/* Quick start cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full mb-10">
-        {QUICK_START.map((item) => (
-          <Link
-            key={item.title}
-            href={item.href}
-            className="group flex flex-col items-start gap-3 p-5 rounded-2xl border border-surface-active bg-surface shadow-sm hover:shadow-md hover:border-[#FF6600]/20 transition-all text-left"
-          >
-            <div className={`w-10 h-10 rounded-xl ${item.bg} flex items-center justify-center`}>
-              <item.icon className={`w-5 h-5 ${item.color}`} />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-text group-hover:text-[#FF6600] transition-colors flex items-center gap-1.5">
-                {item.title}
-                <ArrowRight className="w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
-              </p>
-              <p className="text-xs text-text-muted mt-1 leading-relaxed">
-                {item.description}
-              </p>
-            </div>
-          </Link>
-        ))}
-      </div>
-
-      {/* Subtle hint */}
-      <p className="text-[11px] text-text-muted">
-        Once you create or clone agents, they'll appear here with live status updates.
-      </p>
-    </div>
-  )
-}
-
 // --- Main Dashboard ---
 
 export function OfficeDashboard() {
@@ -286,8 +204,6 @@ export function OfficeDashboard() {
           <div className="flex items-center justify-center py-20">
             <p className="text-sm text-text-secondary">{error}</p>
           </div>
-        ) : agents.length === 0 ? (
-          <OfficeEmptyState />
         ) : (
           <Tabs defaultValue="office" className="space-y-6">
             <TabsList className="bg-surface p-[0.325rem] rounded-full inline-flex h-auto w-auto border-none">
