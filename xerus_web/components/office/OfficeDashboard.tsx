@@ -13,6 +13,9 @@ import {
   Zap,
   MessageSquare,
   Bot,
+  ArrowRight,
+  Sparkles,
+  Users,
 } from 'lucide-react'
 import { useOfficePolling } from '@/hooks/useOfficePolling'
 import { XerusLoader } from '@/components/common/XerusLoader'
@@ -102,34 +105,38 @@ function AgentStatus({ agents }: { agents: OfficeAgent[] }) {
       )}
 
       {active.length === 0 && scheduled.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-3 text-center">
-          <span className="text-2xl mb-2">&#9749;</span>
-          <p className="text-sm font-medium text-text-secondary">All quiet</p>
-          <p className="text-xs text-text-muted mt-1 mb-5">No active tasks or upcoming schedules</p>
-          <div className="flex flex-col gap-2.5 w-full">
+        <div className="flex flex-col items-center justify-center py-6 text-center">
+          <div className="w-12 h-12 rounded-2xl bg-surface-hover flex items-center justify-center mb-4">
+            <Sparkles className="w-5 h-5 text-text-muted" />
+          </div>
+          <p className="text-sm font-medium text-text">Your office is ready</p>
+          <p className="text-xs text-text-muted mt-1 mb-6 max-w-[220px]">Start a conversation or hire agents to get things moving</p>
+          <div className="flex flex-col gap-3 w-full">
             <Link
               href="/chat"
-              className="group flex items-center gap-3 p-3 rounded-2xl bg-surface-alt/80 shadow-[0_1px_8px_rgba(255,102,0,0.08)] hover:shadow-[0_2px_16px_rgba(255,102,0,0.15)] transition-all"
+              className="group relative flex items-center gap-4 p-4 rounded-2xl border border-[#FF6600]/20 bg-gradient-to-r from-[#FF6600]/[0.04] to-transparent hover:border-[#FF6600]/40 hover:from-[#FF6600]/[0.08] transition-all duration-200"
             >
-              <div className="w-8 h-8 rounded-xl bg-[#FF6600]/8 flex items-center justify-center shrink-0">
-                <MessageSquare className="w-4 h-4 text-[#FF6600]" />
+              <div className="w-10 h-10 rounded-xl bg-[#FF6600]/10 flex items-center justify-center shrink-0 group-hover:bg-[#FF6600]/15 transition-colors">
+                <MessageSquare className="w-[18px] h-[18px] text-[#FF6600]" />
               </div>
-              <div className="text-left min-w-0">
-                <p className="text-[13px] font-semibold text-text group-hover:text-[#FF6600] transition-colors">Chat with Xerus</p>
-                <p className="text-[11px] text-text-muted truncate">Ask anything to get started</p>
+              <div className="text-left min-w-0 flex-1">
+                <p className="text-[13px] font-semibold text-text">Chat with Xerus</p>
+                <p className="text-[11px] text-text-muted mt-0.5">Ask anything to get started</p>
               </div>
+              <ArrowRight className="w-4 h-4 text-text-muted group-hover:text-[#FF6600] group-hover:translate-x-0.5 transition-all shrink-0" />
             </Link>
             <Link
               href="/workspace"
-              className="group flex items-center gap-3 p-3 rounded-2xl bg-surface-alt/80 shadow-[0_1px_8px_rgba(255,102,0,0.08)] hover:shadow-[0_2px_16px_rgba(255,102,0,0.15)] transition-all"
+              className="group relative flex items-center gap-4 p-4 rounded-2xl border border-surface-active bg-surface-alt hover:border-[#FF6600]/30 hover:shadow-sm transition-all duration-200"
             >
-              <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
-                <Bot className="w-4 h-4 text-emerald-600" />
+              <div className="w-10 h-10 rounded-xl bg-surface-hover flex items-center justify-center shrink-0 group-hover:bg-[#FF6600]/10 transition-colors">
+                <Users className="w-[18px] h-[18px] text-text-secondary group-hover:text-[#FF6600] transition-colors" />
               </div>
-              <div className="text-left min-w-0">
-                <p className="text-[13px] font-semibold text-text group-hover:text-[#FF6600] transition-colors">Browse agents</p>
-                <p className="text-[11px] text-text-muted truncate">Find one for your team</p>
+              <div className="text-left min-w-0 flex-1">
+                <p className="text-[13px] font-semibold text-text">Agent Marketplace</p>
+                <p className="text-[11px] text-text-muted mt-0.5">Find and hire agents for your team</p>
               </div>
+              <ArrowRight className="w-4 h-4 text-text-muted group-hover:text-[#FF6600] group-hover:translate-x-0.5 transition-all shrink-0" />
             </Link>
           </div>
         </div>

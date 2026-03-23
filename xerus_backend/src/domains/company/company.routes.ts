@@ -11,7 +11,11 @@ import { query } from '../../database/connection';
 import { SANDBOX_CONFIG } from '../execution';
 import type { SandboxService, DaytonaProvider } from '../execution';
 import { shellEscape, shellEscapePath } from '../../utils/shell-safety';
-import { sanitizeSlug } from '../../shared/slugify';
+import { slugify, sanitizeSlug } from '../../shared/slugify';
+import { strictRateLimit } from '../../middleware/rate-limit';
+
+const MAX_NAME_LENGTH = 100;
+const MAX_DESCRIPTION_LENGTH = 500;
 
 const router = Router();
 const auth = authenticateFirebaseToken;
@@ -96,6 +100,137 @@ router.get('/domains', auth, async (req: AuthenticatedRequest, res: Response, ne
         );
 
         sendResponse(res, 200, { workspace, domains: domainsResult.rows }, startTime);
+    } catch (err) {
+        next(err);
+    }
+});
+
+// -------------------------------------------------------------------------
+// POST /api/v1/company/domains - Create a new project (domain)
+// Body: { name: string, description?: string }
+// -------------------------------------------------------------------------
+
+router.post('/domains', auth, strictRateLimit, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const startTime = res.locals.startTime || Date.now();
+    try {
+        const userId = req.user?.uid;
+        if (!userId) {
+            res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
+            return;
+        }
+
+        const name = (req.body.name as string || '').trim();
+        if (!name) {
+            res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'name is required' } });
+            return;
+        }
+        if (name.length > MAX_NAME_LENGTH) {
+            res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: `name must be ${MAX_NAME_LENGTH} characters or fewer` } });
+            return;
+        }
+
+        const wsResult = await query('SELECT id::text FROM workspaces WHERE user_id = $1 LIMIT 1', [userId]);
+        if (wsResult.rows.length === 0) {
+            res.status(400).json({ success: false, error: { code: 'NO_WORKSPACE', message: 'Complete onboarding first' } });
+            return;
+        }
+        const workspaceId = wsResult.rows[0].id;
+        const slug = slugify(name);
+        if (!slug) {
+            res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'name must contain at least one alphanumeric character' } });
+            return;
+        }
+        const description = ((req.body.description as string || '').trim() || `${name} department`).slice(0, MAX_DESCRIPTION_LENGTH);
+
+        const result = await query(
+            `INSERT INTO domains (user_id, workspace_id, slug, name, description)
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (workspace_id, slug) DO NOTHING
+             RETURNING id::text, slug, name, description`,
+            [userId, workspaceId, slug, name, description],
+        );
+
+        if (result.rows.length === 0) {
+            res.status(409).json({ success: false, error: { code: 'CONFLICT', message: 'A project with this name already exists' } });
+            return;
+        }
+
+        const domain = result.rows[0];
+
+        // Auto-create #general channel in the new project
+        const chResult = await query(
+            `INSERT INTO channels (domain_id, user_id, slug, name, description)
+             VALUES ($1, $2, 'general', 'General', 'Default channel')
+             ON CONFLICT (domain_id, slug) DO NOTHING
+             RETURNING id::text, slug, name`,
+            [domain.id, userId],
+        );
+
+        sendResponse(res, 201, {
+            domain,
+            channel: chResult.rows[0] || null,
+        }, startTime);
+    } catch (err) {
+        next(err);
+    }
+});
+
+// -------------------------------------------------------------------------
+// POST /api/v1/company/domains/:domainId/channels - Create a new channel
+// Body: { name: string, description?: string }
+// -------------------------------------------------------------------------
+
+router.post('/domains/:domainId/channels', auth, strictRateLimit, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const startTime = res.locals.startTime || Date.now();
+    try {
+        const userId = req.user?.uid;
+        if (!userId) {
+            res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
+            return;
+        }
+
+        const { domainId } = req.params;
+        const name = (req.body.name as string || '').trim();
+        if (!name) {
+            res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'name is required' } });
+            return;
+        }
+        if (name.length > MAX_NAME_LENGTH) {
+            res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: `name must be ${MAX_NAME_LENGTH} characters or fewer` } });
+            return;
+        }
+
+        // Verify domain ownership
+        const domainCheck = await query(
+            'SELECT id::text FROM domains WHERE id::text = $1 AND user_id = $2',
+            [domainId, userId],
+        );
+        if (domainCheck.rows.length === 0) {
+            res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Project not found' } });
+            return;
+        }
+
+        const slug = slugify(name);
+        if (!slug) {
+            res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'name must contain at least one alphanumeric character' } });
+            return;
+        }
+        const description = (req.body.description as string || '').trim().slice(0, MAX_DESCRIPTION_LENGTH);
+
+        const result = await query(
+            `INSERT INTO channels (domain_id, user_id, slug, name, description)
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (domain_id, slug) DO NOTHING
+             RETURNING id::text, slug, name, description`,
+            [domainId, userId, slug, name, description],
+        );
+
+        if (result.rows.length === 0) {
+            res.status(409).json({ success: false, error: { code: 'CONFLICT', message: 'A channel with this name already exists in this project' } });
+            return;
+        }
+
+        sendResponse(res, 201, { channel: result.rows[0] }, startTime);
     } catch (err) {
         next(err);
     }

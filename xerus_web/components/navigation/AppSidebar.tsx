@@ -6,12 +6,11 @@ import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import useSWR from 'swr'
 import {
-  MessageSquare, Inbox,
-  Bot, Puzzle, Unplug, FileText, Files, Settings, FolderClosed,
+  MessageSquare, Inbox, Home,
+  Bot, Puzzle, Unplug, FileText, Files, Settings,
   PanelLeftClose, PanelLeftOpen,
   Plus, Hash, ChevronDown, ChevronRight, FolderOpen, Folder, FolderPlus,
 } from 'lucide-react'
-import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { apiCall } from '@/lib/api/client'
 import { UserMenu } from '@/components/UserMenu'
@@ -24,7 +23,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { getWorkspaceOverview, type WorkspaceOverview } from '@/lib/api/workspace'
 
 const TABS = [
-  { name: 'Workspace', href: '/workspace', icon: FolderClosed },
+  { name: 'Home', href: '/workspace', icon: Home },
   { name: 'Chat', href: '/chat', icon: MessageSquare },
   { name: 'Inbox', href: '/inbox', icon: Inbox },
 ]
@@ -42,7 +41,7 @@ export function AppSidebar() {
   const activeTab = pathname === '/' ? null // Office dashboard — logo is the indicator, no tab active
     : pathname.startsWith('/chat') ? 'chat'
     : pathname.startsWith('/inbox') ? 'inbox'
-    : 'workspace' // /workspace, /ai-agents, /skills, /settings etc.
+    : 'home' // /workspace, /ai-agents, /skills, /settings etc.
 
   const isOnWorkspace = pathname === '/workspace'
 
@@ -141,7 +140,7 @@ export function AppSidebar() {
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto scrollbar-thin min-h-0">
-        {(activeTab === 'workspace' || activeTab === null) ? (
+        {(activeTab === 'home' || activeTab === null) ? (
           <HomeSidebarBody
             activeSection={activeSection}
             isOnWorkspace={isOnWorkspace}
@@ -243,10 +242,10 @@ function HomeSidebarBody({ activeSection, isOnWorkspace, onSectionClick, onPathC
         )
       }) : null}
 
-      {/* Drive — documents from shared/knowledge */}
+      {/* Workspace — documents from shared/knowledge */}
       {overview?.documents && overview.documents.length > 0 ? (
         <div>
-          <p className="text-xs font-semibold text-text-secondary/60 mb-1.5 px-3 tracking-wide">Drive</p>
+          <p className="text-xs font-semibold text-text-secondary/60 mb-1.5 px-3 tracking-wide">Workspace</p>
           <div className="space-y-0.5">
             {overview.documents.map(doc => (
               <button
@@ -422,7 +421,6 @@ function CreateProjectInline({ onCreated }: { onCreated: () => Promise<void> }) 
         method: 'POST',
         body: JSON.stringify({ name: trimmed }),
       })
-      toast.success(`${trimmed} created`)
       setName('')
       setIsOpen(false)
       await onCreated()

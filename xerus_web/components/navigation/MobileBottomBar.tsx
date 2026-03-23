@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  FolderClosed,
+  Home,
   MessageSquare,
   Inbox,
   LucideIcon,
@@ -17,7 +17,7 @@ interface MobileNavItem {
 }
 
 const MOBILE_NAV_ITEMS: MobileNavItem[] = [
-  { name: 'Workspace', href: '/workspace', icon: FolderClosed },
+  { name: 'Home', href: '/workspace', icon: Home },
   { name: 'Chat', href: '/chat', icon: MessageSquare },
   { name: 'Inbox', href: '/inbox', icon: Inbox },
 ]

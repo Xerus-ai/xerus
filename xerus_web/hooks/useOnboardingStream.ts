@@ -76,15 +76,18 @@ export function useOnboardingStream({ userId, onWorkspaceCreated }: UseOnboardin
 
   const createWorkspace = useCallback(async (workspace: string, project: string): Promise<OnboardingHandoffResult | null> => {
     try {
-      const baseUrl = await getApiBaseUrl()
-      const headers = await getApiHeaders()
+      const [baseUrl, headers] = await Promise.all([getApiBaseUrl(), getApiHeaders()])
       const res = await fetch(`${baseUrl}/onboarding/handoff`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ workspace, project }),
       })
 
-      if (!res.ok) return null
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        const message = errData?.error?.message || `Workspace creation failed (${res.status})`
+        throw new Error(message)
+      }
 
       const data = await res.json()
       const result = data.data
