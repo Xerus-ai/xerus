@@ -79,6 +79,7 @@ export const getUserProfile = async (): Promise<{
     uid: userData.user_id,
     display_name: userData.display_name || userData.email?.split('@')[0] || 'User',
     email: userData.email || '',
+    has_workspace: !!userData.has_workspace,
     plan_type: userData.plan_type,
     created_at: userData.created_at,
   };
