@@ -217,7 +217,7 @@ function MobileInboxNav({ onClose }: { onClose: () => void }) {
         <FolderPlus className="w-8 h-8 text-text-muted" />
         <p className="text-sm text-text-secondary text-center">No projects yet</p>
         <button
-          onClick={() => { router.push('/chat?prompt=Create+a+new+project'); onClose() }}
+          onClick={() => { router.push('/chat?q=Create+a+new+project+for+me'); onClose() }}
           className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white bg-[#FF6600] hover:bg-[#E65C00] transition-colors"
         >
           <Plus className="w-4 h-4" /> Create project

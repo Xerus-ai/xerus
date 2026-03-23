@@ -24,7 +24,7 @@ function toOfficeAgent(a: Assistant): OfficeAgent {
     slug: a.name.toLowerCase().replace(/\s+/g, '-'),
     avatar_url: a.avatarUrl ?? undefined,
     status,
-    current_task: undefined,
+    current_task: a.status === 'active' ? 'Working...' : undefined,
     next_wake: undefined,
     domain: a.category || 'general',
   }

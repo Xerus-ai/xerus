@@ -90,7 +90,6 @@ export default function SkillDetailPage() {
                         toast.success('Skill deleted');
                         router.push('/skills');
                     } catch (error) {
-                        console.error('Failed to delete skill:', error);
                         toast.error("Couldn't remove this skill");
                     } finally {
                         setDeleting(false);

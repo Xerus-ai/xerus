@@ -30,7 +30,6 @@ export function RunHistory({ agent }: RunHistoryProps) {
                 const data = await getAgentHistory(agent.slug ?? String(agent.id))
                 if (!cancelled) setRuns(data)
             } catch (err) {
-                console.error('Failed to fetch run history:', err)
                 if (!cancelled) {
                     toast.error("Couldn't load run history")
                     setRuns([])
@@ -41,7 +40,7 @@ export function RunHistory({ agent }: RunHistoryProps) {
         }
         fetchHistory()
         return () => { cancelled = true }
-    }, [agent.id])
+    }, [agent.id, agent.slug])
 
     const filteredRuns = useMemo(() => {
         if (activeTab === 'all') return runs

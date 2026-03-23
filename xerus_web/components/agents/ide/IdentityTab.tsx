@@ -242,7 +242,6 @@ export function IdentityTab({
         setTempPrompt(result.system_prompt)
       }
     } catch (error) {
-      console.error('Failed to format:', error)
       toast.error("Couldn't format the prompt", { description: 'Please try again.' })
     } finally {
       setIsFormatting(false)
@@ -259,7 +258,6 @@ export function IdentityTab({
         router.push(`/ai-agents/${result.agent.id}/${slugify(result.agent.name || '')}`)
       }
     } catch (error) {
-      console.error('Failed to clone agent:', error)
       toast.error("Couldn't copy this agent", { description: 'Please try again.' })
     } finally {
       setIsCloning(false)
@@ -277,7 +275,6 @@ export function IdentityTab({
       await addToolToAgent(Number(agent.id), toolSlug)
       if (onRefresh) await onRefresh()
     } catch (error) {
-      console.error('Failed to add tool:', error)
       toast.error("Couldn't add this tool", { description: 'Please try again.' })
     } finally {
       setToolLoading(null)
@@ -290,7 +287,6 @@ export function IdentityTab({
       await removeToolFromAgent(Number(agent.id), toolSlug)
       if (onRefresh) await onRefresh()
     } catch (error) {
-      console.error('Failed to remove tool:', error)
       toast.error("Couldn't remove this tool", { description: 'Please try again.' })
     } finally {
       setToolLoading(null)

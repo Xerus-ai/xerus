@@ -80,7 +80,7 @@ export default function ToolDetailPage() {
                     setStats(data.data)
                 }
             } catch (error) {
-                console.error('Failed to fetch tool stats:', error)
+                void error /* tool stats fetch failed — non-critical */
             }
         }
 

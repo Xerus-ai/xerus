@@ -142,7 +142,6 @@ export function ChannelActivity({ channelId, className }: ChannelActivityProps) 
       })
       .catch((err) => {
         if (cancelled) return
-        console.error('Failed to load channel agents:', err)
         setAgentError('Failed to load agents for this channel')
       })
     return () => { cancelled = true }

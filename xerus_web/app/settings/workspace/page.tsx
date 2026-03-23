@@ -291,7 +291,7 @@ export default function WorkspaceOverviewPage() {
 
           {/* Skill Marketplace */}
           <Link
-            href="/ai-agents"
+            href="/skills"
             className="flex items-center w-full px-5 py-4 hover:bg-surface-hover/40 transition-colors text-left group"
           >
             <div className="w-8 h-8 rounded-lg bg-surface-hover flex items-center justify-center mr-3 shrink-0">

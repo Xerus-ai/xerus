@@ -100,10 +100,12 @@ export function OnboardingChat() {
     if (saved === 'template' || saved === 'live') return saved as Phase
     return 'logo'
   })
-  const setPhase = useCallback((p: Phase) => {
+  // Wrapper that persists phase to sessionStorage (stable identity via ref)
+  const setPhaseRef = useRef((p: Phase) => {
     setPhaseRaw(p)
     sessionStorage.setItem('xerus_onboarding_phase', p)
-  }, [])
+  })
+  const setPhase = setPhaseRef.current
   const [messages, setMessages] = useState<OnboardingMessage[]>([])
   const [templateIndex, setTemplateIndex] = useState(0)
   const [templateTypingDone, setTemplateTypingDone] = useState(-1)

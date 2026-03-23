@@ -201,137 +201,15 @@ function DeliverablePreview({
 // Main component
 // ---------------------------------------------------------------------------
 
-export function ChannelDeliverables({ channelId, className }: ChannelDeliverablesProps) {
-  const [selectedDeliverable, setSelectedDeliverable] = useState<Deliverable | null>(null)
-  const { deliverables, isLoading, error } = useChannelDeliverables(channelId)
-
-  const handleSelect = useCallback((deliverable: Deliverable) => {
-    setSelectedDeliverable((prev) => (prev?.id === deliverable.id ? null : deliverable))
-  }, [])
-
-  if (isLoading) {
-    return (
-      <div className={cn('flex flex-col h-full items-center justify-center', className)}>
-        <Loader2 className="w-5 h-5 text-text-muted animate-spin" />
-        <p className="text-sm text-text-muted mt-2">Loading deliverables...</p>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className={cn('flex flex-col h-full items-center justify-center', className)}>
-        <p className="text-sm text-text-secondary">{error}</p>
-      </div>
-    )
-  }
-
+export function ChannelDeliverables({ className }: ChannelDeliverablesProps) {
+  // Backend endpoint for deliverables is not yet implemented
   return (
-    <div className={cn('flex flex-col h-full', className)}>
-      <div className="flex items-center justify-between mb-4 px-1">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">
-          Deliverables
-        </p>
-        <button
-          type="button"
-          aria-label={`Upload reference document to channel ${channelId}`}
-          className={cn(
-            'inline-flex items-center gap-1.5',
-            'bg-surface-hover hover:bg-surface-pressed text-text font-medium py-2 px-4 rounded-xl text-sm',
-            'transition-colors active:scale-95',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600] focus-visible:ring-offset-2'
-          )}
-        >
-          <Upload className="w-4 h-4" />
-          Upload
-        </button>
-      </div>
-
-      <ScrollArea className="flex-1">
-        <div className="space-y-2">
-          {deliverables.map((deliverable) => {
-            const IconComponent = getFileIcon(deliverable.file_type)
-            const iconColor = getFileIconColor(deliverable.file_type)
-            const isSelected = selectedDeliverable?.id === deliverable.id
-
-            return (
-              <button
-                key={deliverable.id}
-                type="button"
-                onClick={() => handleSelect(deliverable)}
-                aria-label={`${deliverable.filename} by ${deliverable.author_slug}`}
-                aria-expanded={isSelected}
-                className={cn(
-                  'w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left',
-                  'bg-white border border-surface-active shadow-sm',
-                  'hover:border-[#FF6600]/30 transition-all duration-200',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600] focus-visible:ring-offset-2',
-                  isSelected && 'border-[#FF6600]/40 bg-[#FFF4E6]/30'
-                )}
-              >
-                <div className={cn('flex-shrink-0', iconColor)}>
-                  <IconComponent className="w-5 h-5" />
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-text truncate">
-                    {deliverable.filename}
-                  </p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <Avatar className="w-4 h-4">
-                      <AvatarFallback className="text-[8px] text-text-secondary bg-surface-hover">
-                        {getInitials(deliverable.author_slug)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-xs text-text-muted">
-                      {deliverable.author_slug}
-                    </span>
-                    <span className="text-xs text-text-muted" aria-hidden="true">
-                      &middot;
-                    </span>
-                    <span className="text-xs text-text-muted">
-                      {formatDate(deliverable.created_at)}
-                    </span>
-                    <span className="text-xs text-text-muted" aria-hidden="true">
-                      &middot;
-                    </span>
-                    <span className="text-xs text-text-muted">
-                      {formatFileSize(deliverable.file_size_bytes)}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <span
-                    role="button"
-                    tabIndex={-1}
-                    aria-label={`Download ${deliverable.filename}`}
-                    className="p-1.5 rounded-lg hover:bg-surface-hover transition-colors"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Download className="w-4 h-4 text-text-muted" />
-                  </span>
-                  <ChevronRight
-                    className={cn(
-                      'w-4 h-4 text-text-muted transition-transform duration-200',
-                      isSelected && 'rotate-90'
-                    )}
-                  />
-                </div>
-              </button>
-            )
-          })}
-        </div>
-      </ScrollArea>
-
-      {selectedDeliverable && (
-        <div className="mt-4">
-          <DeliverablePreview
-            deliverable={selectedDeliverable}
-            onClose={() => setSelectedDeliverable(null)}
-          />
-        </div>
-      )}
+    <div className={cn('flex flex-col h-full items-center justify-center gap-3', className)}>
+      <FileText className="w-10 h-10 text-text-secondary/50" />
+      <p className="text-sm font-medium text-text-secondary">Deliverables coming soon</p>
+      <p className="text-xs text-text-muted text-center max-w-[240px]">
+        Agents will be able to share files, reports, and other deliverables here.
+      </p>
     </div>
   )
 }

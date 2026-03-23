@@ -358,7 +358,7 @@ function InboxSidebarBody({ counts, markRead }: {
       <div className="flex flex-col items-center justify-center px-5 py-16 gap-4">
         <FolderPlus className="w-10 h-10 text-text-secondary/50" />
         <p className="text-sm text-text-secondary text-center">No projects yet</p>
-        <button onClick={() => router.push('/chat?prompt=Create+a+new+project')} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white bg-[#FF6600] hover:bg-[#E65C00] transition-colors">
+        <button onClick={() => router.push('/chat?q=Create+a+new+project+for+me')} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white bg-[#FF6600] hover:bg-[#E65C00] transition-colors">
           <Plus className="w-4 h-4" /> Create project
         </button>
       </div>

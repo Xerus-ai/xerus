@@ -110,11 +110,11 @@ export function AgentDropdown({
   const [searchQuery, setSearchQuery] = useState('')
 
   const PINNED_AGENTS = [XERUS_AGENT, CTO_AGENT]
-  const PINNED_SLUGS = new Set([XERUS_MASTER_SLUG, XERUS_CTO_SLUG])
 
   // Filter agents by search, excluding pinned agents from the grouped list
   const filteredAgents = useMemo(() => {
-    const nonPinned = agents.filter(a => !PINNED_SLUGS.has(a.slug ?? ''))
+    const pinnedSlugs = new Set([XERUS_MASTER_SLUG, XERUS_CTO_SLUG])
+    const nonPinned = agents.filter(a => !pinnedSlugs.has(a.slug ?? ''))
     if (!searchQuery) return nonPinned
     return nonPinned.filter(agent =>
       agent.name.toLowerCase().includes(searchQuery.toLowerCase()) ||

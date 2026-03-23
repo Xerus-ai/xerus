@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { Plus, Loader2 } from 'lucide-react'
 import { KanbanBoard } from '@/components/common/KanbanBoard'
 import type { KanbanTask } from '@/components/common/TaskCard'
@@ -17,6 +18,7 @@ interface ChannelTasksProps {
 // ---------------------------------------------------------------------------
 
 export function ChannelTasks({ channelId, className }: ChannelTasksProps) {
+  const router = useRouter()
   const { tasks, isLoading, error, updateTaskStatus } = useChannelTasks(channelId)
 
   const handleDragEnd = useCallback((taskId: string, newStatus: string) => {
@@ -52,6 +54,7 @@ export function ChannelTasks({ channelId, className }: ChannelTasksProps) {
         </p>
         <button
           type="button"
+          onClick={() => router.push(`/chat?q=Create+a+new+task+in+this+channel`)}
           aria-label={`Create new task in channel ${channelId}`}
           className={cn(
             'inline-flex items-center gap-1.5',

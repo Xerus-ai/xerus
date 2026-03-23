@@ -46,7 +46,6 @@ export function MemoryTab({ agent }: MemoryTabProps) {
                 const data = await getAgentMemories(Number(agent.id))
                 if (!cancelled) setMemories(data)
             } catch (err) {
-                console.error('Failed to fetch agent memories:', err)
                 if (!cancelled) {
                     toast.error("Couldn't load agent memories")
                     setMemories([])

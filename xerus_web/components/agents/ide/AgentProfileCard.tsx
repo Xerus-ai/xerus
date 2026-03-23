@@ -57,7 +57,7 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
         let cancelled = false
         getFeaturedModels()
             .then(data => { if (!cancelled) setModels(data) })
-            .catch(err => console.error('Failed to load models:', err))
+            .catch(() => { /* models fetch failed — fallback list used */ })
             .finally(() => { if (!cancelled) setIsLoadingModels(false) })
         return () => { cancelled = true }
     }, [])
