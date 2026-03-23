@@ -9,7 +9,7 @@ import { MascotAvatar } from '../MascotAvatar'
 import { useAuth } from '@/utils/AuthContext'
 import { canEditAgent } from '@/utils/agentLabels'
 import { formatModelName } from '@/utils/models'
-import { getFeaturedModels, type ModelEntry } from '@/lib/api'
+import { getFeaturedModels, type ModelEntry } from '@/lib/api/models'
 
 interface Agent {
     id: number

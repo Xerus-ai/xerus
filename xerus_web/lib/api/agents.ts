@@ -282,8 +282,8 @@ export const cloneAgent = async (
 
   const result = await response.json();
   const data = result.data || result;
-  toast.success('Agent cloned', {
-    description: 'You can now customize it.',
+  toast.success('Agent copied', {
+    description: 'You can now make it your own.',
   });
 
   return {

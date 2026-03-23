@@ -20,10 +20,10 @@ export function LoginOverlay() {
         router.push('/')
       }
     } catch (error) {
-      console.error('Google login failed:', error)
+      console.error('Google login failed:', (error as { code?: string }).code)
       const firebaseError = error as { code?: string }
       if (firebaseError.code !== 'auth/popup-closed-by-user') {
-        toast.error('An error occurred during login. Please try again.')
+        toast.error("Couldn't sign you in", { description: 'Please try again.' })
       }
     } finally {
       setIsSigningIn(false)
@@ -90,7 +90,7 @@ export function LoginOverlay() {
         </div>
 
         <div className="mt-8 text-center">
-          <p className="text-xs text-[#9CA3AF] font-sans">
+          <p className="text-xs text-text-muted font-sans">
             By signing in, you agree to our{' '}
             <a href="https://www.xerus.ai/terms-of-service" target="_blank" rel="noopener noreferrer" className="text-[#FF6600] hover:text-[#E65C00] transition-colors hover:underline">
               Terms of Service

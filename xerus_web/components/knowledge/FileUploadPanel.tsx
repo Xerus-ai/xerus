@@ -156,7 +156,7 @@ export function FileUploadPanel({ isOpen, onClose, folders, currentFolderId, upl
             } catch (error) {
                 console.error("Upload failed", error)
                 setFiles(prev => prev.map(f =>
-                    f.id === fileItem.id ? { ...f, status: 'error', message: 'Failed' } : f
+                    f.id === fileItem.id ? { ...f, status: 'error', message: 'Upload failed — please try again' } : f
                 ))
             }
         }

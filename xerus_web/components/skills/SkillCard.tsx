@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import type { Skill, Assistant } from '@/lib/api';
+import type { Skill, Assistant } from '@/lib/api/types';
 import { InstallOverlay } from './InstallButton';
 import { Download, Settings } from 'lucide-react';
 

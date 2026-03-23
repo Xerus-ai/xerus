@@ -1,39 +1,46 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import type { FlyingTaskData } from '@/components/office/office-types'
 
 const MAX_CONCURRENT = 2
 
+interface AnimationState {
+  queue: FlyingTaskData[]
+  active: FlyingTaskData[]
+}
+
 export function useAnimationQueue() {
-  const [queue, setQueue] = useState<FlyingTaskData[]>([])
-  const [active, setActive] = useState<FlyingTaskData[]>([])
+  const [state, setState] = useState<AnimationState>({ queue: [], active: [] })
 
   const enqueue = useCallback((task: FlyingTaskData) => {
-    setActive(prev => {
-      if (prev.length < MAX_CONCURRENT) {
-        return [...prev, task]
+    setState(prev => {
+      if (prev.active.length < MAX_CONCURRENT) {
+        return { ...prev, active: [...prev.active, task] }
       }
-      setQueue(q => [...q, task])
-      return prev
+      return { ...prev, queue: [...prev.queue, task] }
     })
   }, [])
 
   const dequeue = useCallback((id: string) => {
-    setActive(prev => {
-      const next = prev.filter(t => t.id !== id)
-      // Promote from queue if space available
-      setQueue(q => {
-        if (q.length > 0 && next.length < MAX_CONCURRENT) {
-          const [promoted, ...rest] = q
-          next.push(promoted)
-          return rest
-        }
-        return q
-      })
-      return next
+    setState(prev => {
+      const remaining = prev.active.filter(t => t.id !== id)
+      const promoted: FlyingTaskData[] = []
+      let newQueue = prev.queue
+
+      // Promote from queue to fill available slots
+      while (remaining.length + promoted.length < MAX_CONCURRENT && newQueue.length > 0) {
+        const [next, ...rest] = newQueue
+        promoted.push(next)
+        newQueue = rest
+      }
+
+      return {
+        queue: newQueue,
+        active: [...remaining, ...promoted],
+      }
     })
   }, [])
 
-  return { active, enqueue, dequeue }
+  return { active: state.active, enqueue, dequeue }
 }

@@ -406,7 +406,7 @@ export function useChatExecution({ setState }: UseChatExecutionOptions) {
         pendingGuidance: null,
         streamingTurn: null,
       }))
-      toast.error(error.message)
+      toast.error("Something went wrong", { description: 'Please try sending your message again.' })
     }, [setState]),
     onConnectionChange: useCallback((connected: boolean) => {
       if (connected) {

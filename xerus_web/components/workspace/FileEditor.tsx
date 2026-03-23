@@ -77,7 +77,7 @@ export function FileEditor({ path, name, size, onDirtyChange, className }: FileE
       setOriginalContent(currentContent)
       toast.success('File saved')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to save file')
+      toast.error("Couldn't save this file", { description: 'Please try again.' })
     } finally {
       setSaving(false)
     }

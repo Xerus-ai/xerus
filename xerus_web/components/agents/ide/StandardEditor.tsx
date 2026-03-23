@@ -18,7 +18,9 @@ import { FloatingPanel } from "@/components/common/FloatingPanel"
 import { cn } from '@/lib/utils'
 import { useAuth } from "@/utils/AuthContext"
 import { canEditAgent } from "@/utils/agentLabels"
-import { formatPrompt, cloneAgent, addToolToAgent, removeToolFromAgent, addAgentKnowledgeBase, removeAgentKnowledgeBase } from "@/lib/api"
+import { formatPrompt, cloneAgent } from '@/lib/api/agents'
+import { addToolToAgent, removeToolFromAgent } from '@/lib/api/tools'
+import { addAgentKnowledgeBase, removeAgentKnowledgeBase } from '@/lib/api/agent-kb'
 import { slugify } from "@/utils/slugify"
 import { useSearchableTools, useToolLookup } from "@/hooks/useTools"
 import { useToolAuth } from "@/hooks/useToolAuth"
@@ -94,6 +96,7 @@ export function StandardEditor({
             setTempPrompt(result.system_prompt)
         } catch (error) {
             console.error('Failed to format prompt:', error)
+            toast.error("Couldn't format the prompt", { description: 'Please try again.' })
         } finally {
             setIsFormatting(false)
         }
@@ -110,6 +113,7 @@ export function StandardEditor({
             }
         } catch (error) {
             console.error('Failed to clone agent:', error)
+            toast.error("Couldn't copy this agent", { description: 'Please try again.' })
         } finally {
             setIsCloning(false)
         }
@@ -126,6 +130,7 @@ export function StandardEditor({
             if (onRefresh) await onRefresh()
         } catch (error) {
             console.error('Failed to add tool:', error)
+            toast.error("Couldn't add this tool", { description: 'Please try again.' })
         } finally {
             setToolLoading(null)
         }
@@ -138,6 +143,7 @@ export function StandardEditor({
             if (onRefresh) await onRefresh()
         } catch (error) {
             console.error('Failed to remove tool:', error)
+            toast.error("Couldn't remove this tool", { description: 'Please try again.' })
         } finally {
             setToolLoading(null)
         }

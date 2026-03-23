@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import useSWR from 'swr'
-import { getUserAgents } from '@/lib/api'
-import type { Assistant } from '@/lib/api'
+import { getUserAgents } from '@/lib/api/agents'
+import type { Assistant } from '@/lib/api/types'
 import type { OfficeAgent } from '@/hooks/useOfficeData'
 import type { StatusTransition } from '@/components/office/office-types'
 

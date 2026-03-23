@@ -4,7 +4,9 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { apiCall } from '@/lib/api/client'
 import { batchReadAgentFiles } from '@/lib/api/workspace'
-import { formatPrompt, cloneAgent, addToolToAgent, removeToolFromAgent, addAgentKnowledgeBase, removeAgentKnowledgeBase } from "@/lib/api"
+import { formatPrompt, cloneAgent } from '@/lib/api/agents'
+import { addToolToAgent, removeToolFromAgent } from '@/lib/api/tools'
+import { addAgentKnowledgeBase, removeAgentKnowledgeBase } from '@/lib/api/agent-kb'
 import { slugify } from "@/utils/slugify"
 import { useAuth } from "@/utils/AuthContext"
 import { useSearchableTools, useToolLookup } from "@/hooks/useTools"
@@ -196,7 +198,7 @@ export function IdentityTab({
   const handleSave = async () => {
     if (!activeFile) return
     if (isAgentRunning) {
-      toast.warning('Agent is running. Changes may be overwritten during execution.')
+      toast.warning('Your agent is currently running', { description: 'Changes may be overwritten until it finishes.' })
     }
 
     setIsSaving(true)
@@ -241,6 +243,7 @@ export function IdentityTab({
       }
     } catch (error) {
       console.error('Failed to format:', error)
+      toast.error("Couldn't format the prompt", { description: 'Please try again.' })
     } finally {
       setIsFormatting(false)
     }
@@ -257,6 +260,7 @@ export function IdentityTab({
       }
     } catch (error) {
       console.error('Failed to clone agent:', error)
+      toast.error("Couldn't copy this agent", { description: 'Please try again.' })
     } finally {
       setIsCloning(false)
     }
@@ -274,6 +278,7 @@ export function IdentityTab({
       if (onRefresh) await onRefresh()
     } catch (error) {
       console.error('Failed to add tool:', error)
+      toast.error("Couldn't add this tool", { description: 'Please try again.' })
     } finally {
       setToolLoading(null)
     }
@@ -286,6 +291,7 @@ export function IdentityTab({
       if (onRefresh) await onRefresh()
     } catch (error) {
       console.error('Failed to remove tool:', error)
+      toast.error("Couldn't remove this tool", { description: 'Please try again.' })
     } finally {
       setToolLoading(null)
     }

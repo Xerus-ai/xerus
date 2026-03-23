@@ -7,23 +7,16 @@ import {
   publishAgent,
   unpublishAgent,
   deleteAssistant,
-} from '@/lib/api'
+} from '@/lib/api/agents'
 import { slugify } from '@/utils/slugify'
 import { toast } from 'sonner'
-
-interface NotificationState {
-  show: boolean
-  type: 'info' | 'success' | 'warning' | 'error'
-  title: string
-  message?: string
-}
 
 interface UseAgentActionsArgs {
   agent: any
   setAgent: (agent: any) => void
 }
 
-function formatPublishError(errorMsg: string): { title: string; message: string } {
+function formatPublishError(errorMsg: string): { title: string; description: string } {
   if (errorMsg.includes('requirements not met')) {
     const hints: string[] = []
     if (errorMsg.includes('execution_count')) hints.push('run it at least 10 times')
@@ -34,15 +27,15 @@ function formatPublishError(errorMsg: string): { title: string; message: string 
 
     return {
       title: 'Not ready to publish yet',
-      message: hints.length > 0
+      description: hints.length > 0
         ? `To publish, ${hints.join(', ')}.`
         : 'Your agent needs more usage before it can be published.',
     }
   }
   if (errorMsg.includes('already public')) {
-    return { title: 'Already published', message: 'This agent is already in the marketplace.' }
+    return { title: 'Already published', description: 'This agent is already in the marketplace.' }
   }
-  return { title: 'Could not publish', message: 'Something went wrong. Please try again.' }
+  return { title: "Couldn't publish", description: 'Something went wrong. Please try again.' }
 }
 
 export function useAgentActions({ agent, setAgent }: UseAgentActionsArgs) {
@@ -50,15 +43,11 @@ export function useAgentActions({ agent, setAgent }: UseAgentActionsArgs) {
   const [isCloning, setIsCloning] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [notification, setNotification] = useState<NotificationState>({
-    show: false, type: 'info', title: '',
-  })
 
   const handleClone = useCallback(async () => {
     if (!agent?.id) return
     setIsCloning(true)
     try {
-      // Use slug for marketplace agents (id is synthetic -1), numeric id for user agents
       const identifier = agent.slug || agent.id
       const result = await cloneAgent(identifier)
       if (result.success && result.agent) {
@@ -66,6 +55,7 @@ export function useAgentActions({ agent, setAgent }: UseAgentActionsArgs) {
       }
     } catch (error) {
       console.error('Failed to clone agent:', error)
+      toast.error("Couldn't copy this agent", { description: 'Please try again in a moment.' })
     } finally {
       setIsCloning(false)
     }
@@ -76,17 +66,14 @@ export function useAgentActions({ agent, setAgent }: UseAgentActionsArgs) {
     setIsPublishing(true)
     try {
       const updatedAgent = await publishAgent(agent.id)
-      setNotification({
-        show: true,
-        type: 'success',
-        title: 'Published to marketplace',
-        message: 'Your agent is now available for others to discover and clone.',
+      toast.success('Published to marketplace', {
+        description: 'Your agent is now available for others to discover.',
       })
       setAgent({ ...agent, ...updatedAgent })
     } catch (error: any) {
       console.error('Failed to publish agent:', error)
       const friendly = formatPublishError(error?.message || '')
-      setNotification({ show: true, type: 'error', ...friendly })
+      toast.error(friendly.title, { description: friendly.description })
     } finally {
       setIsPublishing(false)
     }
@@ -97,21 +84,13 @@ export function useAgentActions({ agent, setAgent }: UseAgentActionsArgs) {
     setIsPublishing(true)
     try {
       const updatedAgent = await unpublishAgent(agent.id)
-      setNotification({
-        show: true,
-        type: 'success',
-        title: 'Removed from marketplace',
-        message: 'Your agent is now private. Only you can access it.',
+      toast.success('Removed from marketplace', {
+        description: 'Your agent is now private. Only you can access it.',
       })
       setAgent({ ...agent, ...updatedAgent })
     } catch (error: any) {
       console.error('Failed to unpublish agent:', error)
-      setNotification({
-        show: true,
-        type: 'error',
-        title: 'Could not unpublish',
-        message: 'Something went wrong. Please try again.',
-      })
+      toast.error("Couldn't unpublish", { description: 'Something went wrong. Please try again.' })
     } finally {
       setIsPublishing(false)
     }
@@ -119,9 +98,9 @@ export function useAgentActions({ agent, setAgent }: UseAgentActionsArgs) {
 
   const handleDelete = useCallback(async () => {
     if (!agent?.id) return
-    toast('Delete this agent?', {
+    toast('This agent will be permanently removed.', {
       action: {
-        label: 'Confirm Delete',
+        label: 'Yes, delete',
         onClick: async () => {
           setIsDeleting(true)
           try {
@@ -130,7 +109,7 @@ export function useAgentActions({ agent, setAgent }: UseAgentActionsArgs) {
             router.push('/ai-agents')
           } catch (error) {
             console.error('Failed to delete agent:', error)
-            toast.error('Failed to delete agent')
+            toast.error("Couldn't delete this agent", { description: 'Please try again.' })
             setIsDeleting(false)
           }
         },
@@ -138,19 +117,13 @@ export function useAgentActions({ agent, setAgent }: UseAgentActionsArgs) {
     })
   }, [agent?.id, router])
 
-  const dismissNotification = useCallback(() => {
-    setNotification(prev => ({ ...prev, show: false }))
-  }, [])
-
   return {
     isCloning,
     isPublishing,
     isDeleting,
-    notification,
     handleClone,
     handlePublish,
     handleUnpublish,
     handleDelete,
-    dismissNotification,
   }
 }

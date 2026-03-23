@@ -3,9 +3,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronDown, User, Settings, LogOut, Users } from 'lucide-react'
+import { toast } from 'sonner'
 import { useAuth } from '@/utils/AuthContext'
-import { logout, getCreditBalance, type CreditBalance } from '@/lib/api'
-import type { UserProfile } from '@/lib/api'
+import { logout, getCreditBalance, type CreditBalance } from '@/lib/api/user'
+import type { UserProfile } from '@/lib/api/types'
 
 interface UserMenuProps {
   className?: string
@@ -116,6 +117,7 @@ export function UserMenu({ className }: UserMenuProps) {
       router.push('/login')
     } catch (error) {
       console.error('Logout failed:', error)
+      toast.error("Couldn't sign you out", { description: 'Please try again.' })
     }
   }
 

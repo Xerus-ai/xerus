@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRedirectIfNotAuth } from '@/utils/AuthContext'
-import { getCreditBalance, type CreditBalance } from '@/lib/api'
+import { getCreditBalance, type CreditBalance } from '@/lib/api/user'
 import {
   getStatus as getWorkspaceStatus,
   pauseWorkspace,
@@ -66,7 +66,7 @@ export default function WorkspaceOverviewPage() {
       toast.success(successMsg)
       await fetchWorkspaceStatus()
     } catch {
-      toast.error(`Failed to ${action} workspace`)
+      toast.error("Something went wrong", { description: 'Please try again in a moment.' })
     } finally {
       setWorkspaceAction(null)
     }

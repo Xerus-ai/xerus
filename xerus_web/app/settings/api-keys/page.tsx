@@ -5,7 +5,7 @@ import { ExternalLink, Eye, EyeOff, RefreshCw, Network, Server, Shield, ArrowUpR
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import { useRedirectIfNotAuth } from '@/utils/AuthContext'
-import { saveApiKey, checkApiKeyStatus, deleteApiKey, getAllApiKeys } from '@/lib/api'
+import { saveApiKey, checkApiKeyStatus, deleteApiKey, getAllApiKeys } from '@/lib/api/user'
 import { getStatus as getWorkspaceStatus } from '@/lib/api/workspace'
 import type { WorkspaceStatus } from '@/lib/api/workspace'
 import { cn } from '@/lib/utils'
@@ -81,7 +81,7 @@ export default function ApiKeysPage() {
       setApiKeyInputs((prev) => ({ ...prev, [provider]: '' }))
       toast.success(`${PROVIDERS.find((p) => p.id === provider)?.name} API key saved`)
     } catch {
-      toast.error('Failed to save API key')
+      toast.error("Couldn't save your API key", { description: 'Please check the key and try again.' })
     } finally {
       setSavingStates((prev) => ({ ...prev, [provider]: false }))
     }
@@ -96,7 +96,7 @@ export default function ApiKeysPage() {
       setApiKeyInputs((prev) => ({ ...prev, [provider]: '' }))
       toast.success('API key removed')
     } catch {
-      toast.error('Failed to remove API key')
+      toast.error("Couldn't remove your API key", { description: 'Please try again.' })
     } finally {
       setSavingStates((prev) => ({ ...prev, [provider]: false }))
     }

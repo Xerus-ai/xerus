@@ -16,12 +16,33 @@ export const setUserInfo = (user: UserProfile): void => {
 
 export const getStoredUserInfo = (): UserProfile | null => {
   const stored = localStorage.getItem('xerus_user');
-  return stored ? JSON.parse(stored) : null;
+  if (!stored) return null;
+  try {
+    const parsed = JSON.parse(stored);
+    if (typeof parsed.uid === 'string' && typeof parsed.email === 'string') {
+      return { ...parsed, has_workspace: !!parsed.has_workspace };
+    }
+    return null;
+  } catch {
+    return null;
+  }
 };
 
 // ============================================================
 // USER ENDPOINTS (/api/v1/users)
 // ============================================================
+
+interface FindOrCreateResponse {
+  user_id: string;
+  email: string;
+  display_name?: string;
+  has_workspace?: boolean;
+  is_new?: boolean;
+  role?: string;
+  plan_type?: string;
+  credits_available?: number;
+  created_at?: string;
+}
 
 export const findOrCreateUser = async (profile: UserProfile): Promise<UserProfile> => {
   const response = await apiCall('/users/find-or-create', {
@@ -29,7 +50,7 @@ export const findOrCreateUser = async (profile: UserProfile): Promise<UserProfil
     body: JSON.stringify(profile),
   });
   const json = await response.json();
-  const userData = json.data || json;
+  const userData: FindOrCreateResponse = json.data || json;
 
   if (!userData.user_id || !userData.email) {
     throw new Error('Invalid response from backend: missing user_id or email');
@@ -39,6 +60,7 @@ export const findOrCreateUser = async (profile: UserProfile): Promise<UserProfil
     uid: userData.user_id,
     display_name: userData.display_name || profile.display_name,
     email: userData.email,
+    has_workspace: !!userData.has_workspace,
   };
 };
 
@@ -46,6 +68,7 @@ export const getUserProfile = async (): Promise<{
   uid: string;
   display_name: string;
   email: string;
+  has_workspace: boolean;
   plan_type?: string;
   created_at?: string;
 }> => {
@@ -72,7 +95,7 @@ export const updateUserProfile = async (updates: {
 
   const stored = getStoredUserInfo();
   if (stored && updates.display_name) {
-    setUserInfo({ ...stored, display_name: updates.display_name });
+    setUserInfo({ ...stored, display_name: updates.display_name, has_workspace: stored.has_workspace ?? false });
   }
 };
 
@@ -83,7 +106,6 @@ export const deleteAccount = async (): Promise<void> => {
   await signOut(firebaseAuth);
 
   localStorage.removeItem('xerus_user');
-  localStorage.removeItem('openai_api_key');
 
   window.location.href = '/login';
 };
@@ -101,13 +123,7 @@ export const getCreditBalance = async (): Promise<CreditBalance> => {
   const data = json.data || json;
 
   if (!data.plan_type || typeof data.credits_available !== 'number') {
-    console.error('[getCreditBalance] Invalid response:', data);
-    return {
-      plan_type: 'free',
-      credits_available: 0,
-      credits_used: 0,
-      credits_reset_date: new Date().toISOString(),
-    };
+    throw new Error(`Invalid credit balance response: missing plan_type or credits_available`);
   }
 
   return data;
@@ -117,7 +133,6 @@ export const logout = async (): Promise<void> => {
   const { signOut } = await import('firebase/auth');
   await signOut(firebaseAuth);
 
-  localStorage.removeItem('openai_api_key');
   localStorage.removeItem('xerus_user');
 
   window.location.href = '/login';

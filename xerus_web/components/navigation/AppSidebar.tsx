@@ -204,7 +204,7 @@ function HomeSidebarBody({ activeSection, isOnWorkspace, onSectionClick, onPathC
   return (
     <nav className="px-4 py-2 space-y-5">
       {/* Projects — dynamic from overview */}
-      {overview?.projects && overview.projects.length > 0 && overview.projects.map(project => {
+      {overview?.projects && overview.projects.length > 0 ? overview.projects.map(project => {
         const isExpanded = expandedProjects.has(project.slug)
         return (
           <div key={project.slug}>
@@ -227,19 +227,19 @@ function HomeSidebarBody({ activeSection, isOnWorkspace, onSectionClick, onPathC
                   >
                     <Hash className="w-4 h-4 shrink-0" />
                     <span className="flex-1 text-left truncate">{channel.name}</span>
-                    {channel.deliverables.length > 0 && (
+                    {channel.deliverables.length > 0 ? (
                       <span className="text-[10px] font-medium text-text-secondary">{channel.deliverables.length}</span>
-                    )}
+                    ) : null}
                   </button>
                 ))}
               </div>
             )}
           </div>
         )
-      })}
+      }) : null}
 
       {/* Drive — documents from shared/knowledge */}
-      {overview?.documents && overview.documents.length > 0 && (
+      {overview?.documents && overview.documents.length > 0 ? (
         <div>
           <p className="text-xs font-semibold text-text-secondary/60 mb-1.5 px-3 tracking-wide">Drive</p>
           <div className="space-y-0.5">
@@ -255,7 +255,7 @@ function HomeSidebarBody({ activeSection, isOnWorkspace, onSectionClick, onPathC
             ))}
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* Marketplace */}
       <div>

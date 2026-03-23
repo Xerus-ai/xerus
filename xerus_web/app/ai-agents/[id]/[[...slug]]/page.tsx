@@ -1,6 +1,10 @@
 import AIAgentDetailClient from "../client"
+import { ErrorBoundary } from '@/components/common/ErrorBoundary'
 
 export default function AIAgentDetailPage({ params }: { params: { id: string; slug?: string[] } }) {
-  // ID is the source of truth, slug is cosmetic (ignored)
-  return <AIAgentDetailClient agentId={params.id} />
+  return (
+    <ErrorBoundary label="Agent Editor">
+      <AIAgentDetailClient agentId={params.id} />
+    </ErrorBoundary>
+  )
 }

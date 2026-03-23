@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import type { Assistant } from "@/lib/api"
+import type { Assistant } from "@/lib/api/types"
 import { isMascotConfig } from '@/lib/mascot-config'
 import { MascotAvatar } from './MascotAvatar'
 

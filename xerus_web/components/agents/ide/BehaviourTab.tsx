@@ -14,12 +14,12 @@ import { ProactivitySection } from './ProactivitySection'
 import { BehaviourContextPanel } from './BehaviourContextPanel'
 import type { HeartbeatConfigDTO, Assistant } from '@/lib/api/types'
 import { apiCall } from '@/lib/api/client'
+import { formatPrompt } from '@/lib/api/agents'
 import {
-  formatPrompt,
   getHeartbeatConfig,
   updateHeartbeatConfig,
   deleteHeartbeatConfig,
-} from '@/lib/api'
+} from '@/lib/api/heartbeat'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
@@ -116,7 +116,7 @@ export function BehaviourTab({
   // File save handler
   const handleSaveFile = async () => {
     if (isAgentRunning) {
-      toast.warning('Agent is running. Changes may be overwritten during execution.')
+      toast.warning('Your agent is currently running', { description: 'Changes may be overwritten until it finishes.' })
     }
     setIsSaving(true)
     try {

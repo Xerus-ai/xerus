@@ -11,6 +11,7 @@ import { apiKeyService } from './api-key-service';
 import { UserUnauthorizedError, UserForbiddenError } from './errors';
 import { userValidator } from './validators';
 import { strictRateLimit } from '../../middleware/rate-limit';
+import { query } from '../../database/connection';
 
 const router = Router();
 const auth = authenticateFirebaseToken;
@@ -37,6 +38,12 @@ router.post('/find-or-create', auth, async (req: AuthenticatedRequest, res: Resp
             avatar_url,
         });
 
+        // Check workspace existence to determine onboarding state
+        const wsCheck = await query(
+            'SELECT 1 FROM workspaces WHERE user_id = $1 LIMIT 1',
+            [result.user.user_id],
+        );
+
         sendResponse(
             res,
             result.created ? 201 : 200,
@@ -49,6 +56,7 @@ router.post('/find-or-create', auth, async (req: AuthenticatedRequest, res: Resp
                 credits_available: result.credit_balance.balance,
                 created_at: result.user.created_at,
                 is_new: result.created,
+                has_workspace: wsCheck.rows.length > 0,
             },
             startTime
         );
@@ -66,7 +74,10 @@ router.get('/me', auth, async (req: AuthenticatedRequest, res: Response, next: N
         }
 
         const user = await userService.getByFirebaseUid(req.user.uid);
-        const creditBalance = await creditService.getBalance(user.user_id);
+        const [creditBalance, wsCheck] = await Promise.all([
+            creditService.getBalance(user.user_id),
+            query('SELECT 1 FROM workspaces WHERE user_id = $1 LIMIT 1', [user.user_id]),
+        ]);
 
         sendResponse(
             res,
@@ -84,6 +95,7 @@ router.get('/me', auth, async (req: AuthenticatedRequest, res: Response, next: N
                 is_active: user.is_active,
                 created_at: user.created_at,
                 last_login: user.last_login,
+                has_workspace: wsCheck.rows.length > 0,
             },
             startTime
         );

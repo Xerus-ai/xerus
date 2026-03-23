@@ -10,7 +10,7 @@ import { PostMessage, EscalationMessage, CoordinationMessage } from './activity-
 import { MentionInput } from './MentionInput'
 import { ExecutionDetail } from './ExecutionDetail'
 import { useChannelMessages } from '@/hooks/useChannelData'
-import { getAssistants } from '@/lib/api'
+import { getAssistants } from '@/lib/api/agents'
 import type { Agent } from '@/components/common/PresenceAvatars'
 
 // ---------------------------------------------------------------------------

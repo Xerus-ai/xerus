@@ -1,7 +1,7 @@
 'use client'
 
 import { SWRConfig } from 'swr'
-import { apiGet } from '@/lib/api'
+import { apiGet } from '@/lib/api/client'
 
 const swrFetcher = <T,>(key: string): Promise<T> => apiGet<T>(key)
 

@@ -8,10 +8,8 @@ import {
   useCallback,
   ReactNode,
 } from 'react'
-import { usePathname } from 'next/navigation'
 
 interface LayoutContextValue {
-  isSubSidebarVisible: boolean
   isRightPanelOpen: boolean
   rightPanelContent: React.ReactNode | null
   openRightPanel: (content: React.ReactNode) => void
@@ -22,7 +20,6 @@ interface LayoutContextValue {
 }
 
 const LayoutContext = createContext<LayoutContextValue>({
-  isSubSidebarVisible: false,
   isRightPanelOpen: false,
   rightPanelContent: null,
   openRightPanel: () => {},
@@ -36,7 +33,6 @@ const BREAKPOINT_MOBILE = 768
 const BREAKPOINT_DESKTOP = 1280
 
 export function LayoutProvider({ children }: { children: ReactNode }) {
-  const pathname = usePathname()
   const [rightPanelContent, setRightPanelContent] =
     useState<React.ReactNode | null>(null)
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(false)
@@ -44,14 +40,24 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
   const [hasMeasured, setHasMeasured] = useState(false)
 
   useEffect(() => {
+    let rafId: number | null = null
+
     const measure = () => {
       setWindowWidth(window.innerWidth)
       setHasMeasured(true)
     }
 
+    const onResize = () => {
+      if (rafId !== null) cancelAnimationFrame(rafId)
+      rafId = requestAnimationFrame(measure)
+    }
+
     measure()
-    window.addEventListener('resize', measure)
-    return () => window.removeEventListener('resize', measure)
+    window.addEventListener('resize', onResize, { passive: true })
+    return () => {
+      window.removeEventListener('resize', onResize)
+      if (rafId !== null) cancelAnimationFrame(rafId)
+    }
   }, [])
 
   const isMobile = hasMeasured && windowWidth < BREAKPOINT_MOBILE
@@ -60,8 +66,6 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
     windowWidth >= BREAKPOINT_MOBILE &&
     windowWidth < BREAKPOINT_DESKTOP
   const isDesktop = !hasMeasured || windowWidth >= BREAKPOINT_DESKTOP
-
-  const isSubSidebarVisible = pathname.startsWith('/inbox')
 
   const openRightPanel = useCallback((content: React.ReactNode) => {
     setRightPanelContent(content)
@@ -76,7 +80,6 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
   return (
     <LayoutContext.Provider
       value={{
-        isSubSidebarVisible,
         isRightPanelOpen,
         rightPanelContent,
         openRightPanel,

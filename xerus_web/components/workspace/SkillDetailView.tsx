@@ -6,7 +6,9 @@ import Image from 'next/image'
 import useSWR from 'swr'
 import { MarkdownPreview } from '@/components/workspace/MarkdownPreview'
 import { ArrowLeft, FileText, Trash2, Pencil, Loader2, Hash, Bot, X, Minus, Eye, Sparkles, ArrowUp, Shield } from 'lucide-react'
-import { getSkill, installSkill, uninstallSkill, deleteSkill, getAssistants, type SkillDetail, type Assistant } from '@/lib/api'
+import { getSkill, installSkill, uninstallSkill, deleteSkill } from '@/lib/api/skills'
+import { getAssistants } from '@/lib/api/agents'
+import type { SkillDetail, Assistant } from '@/lib/api/types'
 import { useAuth } from '@/utils/AuthContext'
 import { XerusLoader } from '@/components/common/XerusLoader'
 import { InstallButton } from '@/components/skills/InstallButton'
@@ -126,9 +128,9 @@ export function SkillDetailView({ skillSlug, onBack }: SkillDetailViewProps) {
 
   const handleDelete = useCallback(async () => {
     if (!skill) return
-    toast('Delete this skill?', {
+    toast('This skill will be permanently removed.', {
       action: {
-        label: 'Confirm Delete',
+        label: 'Yes, delete',
         onClick: async () => {
           setDeleting(true)
           try {
@@ -136,7 +138,7 @@ export function SkillDetailView({ skillSlug, onBack }: SkillDetailViewProps) {
             toast.success('Skill deleted')
             onBack()
           } catch {
-            toast.error('Failed to delete skill')
+            toast.error("Couldn't remove this skill")
           } finally {
             setDeleting(false)
           }

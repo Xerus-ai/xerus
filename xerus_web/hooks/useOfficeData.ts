@@ -2,11 +2,12 @@
 
 import { useState, useCallback, useMemo } from 'react'
 import useSWR from 'swr'
-import { getAssistants, getUserAgents, apiPost } from '@/lib/api'
-import type { Assistant } from '@/lib/api'
+import { toast } from 'sonner'
+import { getAssistants, getUserAgents } from '@/lib/api/agents'
+import { apiPost, apiGet } from '@/lib/api/client'
+import type { Assistant } from '@/lib/api/types'
 import type { KanbanTask } from '@/components/common/TaskCard'
 import type { Agent as KanbanAgent } from '@/components/common/PresenceAvatars'
-import { apiGet } from '@/lib/api'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -193,6 +194,7 @@ export function useCompanyTasks(): UseCompanyTasksReturn {
     try {
       await apiPost(`/tasks/${taskId}/status`, { status: newStatus })
     } catch {
+      toast.error("Couldn't move that task — reverting")
       fetchData()
     }
   }, [fetchData])

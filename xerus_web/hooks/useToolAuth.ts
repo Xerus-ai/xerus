@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Tool } from "@/types/tool"
-import { apiCall } from "@/lib/api"
+import { apiCall } from "@/lib/api/client"
 import { getSharedPipedreamClient } from '@/lib/pipedream-client'
 import { toast } from 'sonner'
 
@@ -47,7 +47,7 @@ export function useToolAuth(refetch: () => void) {
                         const iframes = document.querySelectorAll('iframe[id^="pipedream-connect-iframe-"]')
                         iframes.forEach(iframe => iframe.remove())
 
-                        toast.error(`Connection failed: ${err.message || 'Unknown error'}`)
+                        toast.error("Connection failed", { description: 'Please close and try again.' })
                     },
                     onClose: (_status) => {
                         setConfiguringAuth(null)
@@ -57,13 +57,13 @@ export function useToolAuth(refetch: () => void) {
                     }
                 })
             } catch (err) {
-                toast.error(`OAuth configuration failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
+                toast.error("Couldn't connect the app", { description: 'Please try again or check your permissions.' })
                 setConfiguringAuth(null)
             }
         } else if (!tool.auth_type || tool.auth_type === 'none') {
             toast.info('This tool does not require authentication')
         } else {
-            toast.error(`Unsupported authentication type: ${tool.auth_type}`)
+            toast.error("This tool's login type isn't supported yet")
         }
     }
 
@@ -71,7 +71,7 @@ export function useToolAuth(refetch: () => void) {
         const toolIdentifier = tool.mcp_server ? tool.mcp_server_id ?? tool.name : tool.tool_name || tool.name
 
         if (!tool.connected_account_ids || tool.connected_account_ids.length === 0) {
-            toast.error('No connected accounts found')
+            toast.error("This tool isn't connected yet")
             return
         }
 
@@ -92,16 +92,16 @@ export function useToolAuth(refetch: () => void) {
             if (failures.length > 0 && successes.length === 0) {
                 throw new Error(`Failed to disconnect all ${accountCount} account${accountCount > 1 ? 's' : ''}`)
             } else if (failures.length > 0) {
-                toast.warning(`${successes.length} of ${accountCount} accounts disconnected. ${failures.length} failed.`)
+                toast.warning("Some accounts couldn't be disconnected", { description: 'Please try the remaining ones again.' })
                 await new Promise(resolve => setTimeout(resolve, 500))
                 refetch()
             } else {
-                toast.success(`Disconnected ${accountCount} account${accountCount > 1 ? 's' : ''}`)
+                toast.success('App disconnected')
                 await new Promise(resolve => setTimeout(resolve, 500))
                 refetch()
             }
         } catch (err) {
-            toast.error(`Disconnect failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
+            toast.error("Couldn't disconnect the app", { description: 'Please try again.' })
         } finally {
             setConfiguringAuth(null)
         }

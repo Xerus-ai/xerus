@@ -46,16 +46,16 @@ export default function SchedulesList({
       await onToggle(schedule.id, !schedule.enabled);
     } catch (error) {
       console.error('Failed to toggle schedule:', error);
-      toast.error('Failed to toggle schedule');
+      toast.error("Couldn't update the schedule");
     } finally {
       setTogglingId(null);
     }
   };
 
   const handleDelete = async (scheduleId: string) => {
-    toast('Delete this schedule?', {
+    toast('This schedule will be permanently removed.', {
       action: {
-        label: 'Confirm Delete',
+        label: 'Yes, delete',
         onClick: async () => {
           setDeletingId(scheduleId);
           try {
@@ -63,7 +63,7 @@ export default function SchedulesList({
             toast.success('Schedule deleted');
           } catch (error) {
             console.error('Failed to delete schedule:', error);
-            toast.error('Failed to delete schedule');
+            toast.error("Couldn't remove the schedule");
           } finally {
             setDeletingId(null);
           }

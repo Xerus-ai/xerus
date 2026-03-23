@@ -1,8 +1,9 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, useRef, useCallback, useMemo, ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { UserProfile, setUserInfo, findOrCreateUser } from '@/lib/api'
+import type { UserProfile } from '@/lib/api/types'
+import { setUserInfo, findOrCreateUser } from '@/lib/api/user'
 import { auth as firebaseAuth } from './firebase'
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth'
 
@@ -10,6 +11,8 @@ interface AuthContextType {
   user: UserProfile | null
   isLoading: boolean
   isAuthReady: boolean
+  hasWorkspace: boolean
+  markWorkspaceReady: () => void
   mode: 'firebase' | null
 }
 
@@ -17,6 +20,8 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   isLoading: true,
   isAuthReady: false,
+  hasWorkspace: false,
+  markWorkspaceReady: () => {},
   mode: null,
 })
 
@@ -24,9 +29,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isAuthReady, setIsAuthReady] = useState(false)
+  const [hasWorkspace, setHasWorkspace] = useState(false)
   const [mode, setMode] = useState<'firebase' | null>(null)
   const processingRef = useRef(false)
   const isMountedRef = useRef(true)
+
+  const markWorkspaceReady = useCallback(() => {
+    setHasWorkspace(true)
+  }, [])
 
   useEffect(() => {
     isMountedRef.current = true
@@ -42,33 +52,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setMode('firebase')
           }
 
-          let profile: UserProfile = {
+          const profile = await findOrCreateUser({
             uid: firebaseUser.uid,
             display_name: firebaseUser.displayName || 'User',
             email: firebaseUser.email || '',
+            has_workspace: false,
+          })
+
+          if (isMountedRef.current) {
+            setUser(profile)
+            setHasWorkspace(profile.has_workspace)
+            setUserInfo(profile)
           }
 
-          try {
-            profile = await findOrCreateUser(profile)
-
-            // Ensure sandbox is running (non-blocking)
+          // Ensure sandbox is running (non-blocking, only if workspace exists)
+          if (profile.has_workspace) {
             try {
               const { ensureSandbox } = await import('@/lib/api/workspace')
               await ensureSandbox()
             } catch (err) {
               console.warn('[AuthContext] ensureSandbox failed (non-blocking):', err)
             }
-          } catch {
-            // Continue with Firebase data even if backend fails
-          }
-
-          if (isMountedRef.current) {
-            setUser(profile)
-            setUserInfo(profile)
           }
         } else {
           if (isMountedRef.current) {
             setUser(null)
+            setHasWorkspace(false)
             setMode(null)
           }
         }
@@ -87,8 +96,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const contextValue = useMemo(
+    () => ({ user, isLoading, isAuthReady, hasWorkspace, markWorkspaceReady, mode }),
+    [user, isLoading, isAuthReady, hasWorkspace, markWorkspaceReady, mode]
+  )
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, isAuthReady, mode }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   )

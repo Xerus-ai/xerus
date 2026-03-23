@@ -249,6 +249,7 @@ export interface UserProfile {
   uid: string;
   display_name: string;
   email: string;
+  has_workspace: boolean;
 }
 
 // ===========================
