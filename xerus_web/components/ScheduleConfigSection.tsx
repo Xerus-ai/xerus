@@ -134,7 +134,7 @@ export default function ScheduleConfigSection({
       });
     } catch (error) {
       console.error('Failed to save schedule:', error);
-      toast.error('Failed to save schedule. Please try again.');
+      toast.error("Couldn't save the schedule", { description: 'Please check your settings and try again.' });
     } finally {
       setIsSaving(false);
     }

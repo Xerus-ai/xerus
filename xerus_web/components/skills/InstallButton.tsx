@@ -2,8 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react';
 import useSWR from 'swr';
-import type { Skill, SkillDetail, Assistant } from '@/lib/api';
-import { apiCall } from '@/lib/api';
+import type { Skill, SkillDetail, Assistant } from '@/lib/api/types';
+import { apiCall } from '@/lib/api/client';
 import { AgentAvatarWithModel } from '@/components/agents/AgentAvatar';
 import { Check, ChevronDown, ChevronRight, Globe, Hash, Loader2, X, ArrowLeft, Bot } from 'lucide-react';
 

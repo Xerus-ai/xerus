@@ -16,7 +16,7 @@ import {
 } from 'react-icons/si'
 import { MascotAvatar } from '@/components/agents/MascotAvatar'
 import { isMascotConfig } from '@/lib/mascot-config'
-import { getSkills } from '@/lib/api'
+import { getSkills } from '@/lib/api/skills'
 import { auth as firebaseAuth } from '@/utils/firebase'
 
 /* ── Types ── */
@@ -92,7 +92,7 @@ const CHANNELS = [
 /* Inbox preview activity messages - derived from agents at runtime */
 const FALLBACK_ACTIVITY_MESSAGES = [
   { agent: 'Research Analyst', time: '2m ago', text: 'Compiled competitor analysis report — 12 sources reviewed, 3 key insights flagged.', color: '#FF6600' },
-  { agent: 'Content Writer', time: '8m ago', text: 'Draft newsletter ready for review. Subject line A/B variants attached.', color: '#3B82F6' },
+  { agent: 'Content Writer', time: '8m ago', text: 'Draft newsletter ready for review. Subject line A/B variants attached.', color: '#8B7355' },
 ]
 
 const ESCALATION = {
@@ -104,9 +104,9 @@ const ESCALATION = {
 const KANBAN_COLUMNS = [
   {
     title: 'To Do',
-    color: '#6B7280',
+    color: '#9E8E7E',
     tasks: [
-      { title: 'Review Q1 marketing brief', labels: [{ name: 'Marketing', color: '#8B5CF6' }], due: 'Feb 24' },
+      { title: 'Review Q1 marketing brief', labels: [{ name: 'Marketing', color: '#C2773B' }], due: 'Feb 24' },
       { title: 'Set up email campaign flow', labels: [{ name: 'Email', color: '#EA4335' }], due: 'Feb 26' },
     ],
   },
@@ -178,7 +178,7 @@ export function OnboardingSteps({ workspace, agents, onComplete }: OnboardingSte
   const ACTIVITY_MESSAGES = agents.length >= 2
     ? [
         { agent: agents[0].name, time: '2m ago', text: `Completed initial analysis and filed report.`, color: '#FF6600' },
-        { agent: agents[1].name, time: '8m ago', text: `Draft deliverable ready for review.`, color: '#3B82F6' },
+        { agent: agents[1].name, time: '8m ago', text: `Draft deliverable ready for review.`, color: '#8B7355' },
       ]
     : FALLBACK_ACTIVITY_MESSAGES
 
@@ -208,7 +208,7 @@ export function OnboardingSteps({ workspace, agents, onComplete }: OnboardingSte
     <div className="flex h-full">
       {/* ── Desktop Sidebar — ALWAYS visible ── */}
       <div className="hidden md:flex w-[340px] shrink-0 flex-col justify-center pl-12 pr-8">
-        <p className="text-lg font-semibold uppercase tracking-widest text-text-muted mb-8 select-none">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-8 select-none">
           Office Setup
         </p>
         <nav className="space-y-2">
@@ -397,7 +397,7 @@ export function OnboardingSteps({ workspace, agents, onComplete }: OnboardingSte
                         {agent.tools.map((tool) => (
                           <span
                             key={tool.name_slug}
-                            className="text-[10px] font-medium text-text-muted bg-surface-hover border border-surface-active rounded-md px-1.5 py-0.5"
+                            className="text-[10px] font-medium text-text-muted bg-surface-hover border border-surface-active rounded-full px-1.5 py-0.5"
                           >
                             {tool.name}
                           </span>
@@ -636,7 +636,7 @@ export function OnboardingSteps({ workspace, agents, onComplete }: OnboardingSte
                                 {task.labels.map((label) => (
                                   <span
                                     key={label.name}
-                                    className="text-[9px] font-medium rounded-md px-1.5 py-px"
+                                    className="text-[9px] font-medium rounded-full px-1.5 py-px"
                                     style={{
                                       color: label.color,
                                       backgroundColor: `${label.color}15`,

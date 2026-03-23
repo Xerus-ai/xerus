@@ -9,10 +9,9 @@ import {
     ArrowLeft, FileText, Trash2,
     Pencil, Loader2, Hash, Bot, X, Minus, Eye, Sparkles, ArrowUp, Shield,
 } from 'lucide-react';
-import {
-    getSkill, installSkill, uninstallSkill, deleteSkill, getAssistants,
-    type SkillDetail, type Assistant,
-} from '@/lib/api';
+import { getSkill, installSkill, uninstallSkill, deleteSkill } from '@/lib/api/skills';
+import { getAssistants } from '@/lib/api/agents';
+import type { SkillDetail, Assistant } from '@/lib/api/types';
 import { useRedirectIfNotAuth, useAuth } from '@/utils/AuthContext';
 import { XerusLoader } from '@/components/common/XerusLoader';
 import { InstallButton } from '@/components/skills/InstallButton';
@@ -81,9 +80,9 @@ export default function SkillDetailPage() {
 
     const handleDelete = useCallback(async () => {
         if (!skill) return;
-        toast('Delete this skill?', {
+        toast('This skill will be permanently removed.', {
             action: {
-                label: 'Confirm Delete',
+                label: 'Yes, delete',
                 onClick: async () => {
                     setDeleting(true);
                     try {
@@ -91,8 +90,7 @@ export default function SkillDetailPage() {
                         toast.success('Skill deleted');
                         router.push('/skills');
                     } catch (error) {
-                        console.error('Failed to delete skill:', error);
-                        toast.error('Failed to delete skill');
+                        toast.error("Couldn't remove this skill");
                     } finally {
                         setDeleting(false);
                     }

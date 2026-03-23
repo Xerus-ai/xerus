@@ -3,8 +3,9 @@
 import { useParams } from 'next/navigation'
 import { useDomains } from '@/hooks/useDomains'
 import { ChannelHeader } from '@/components/channels/ChannelHeader'
+import { ErrorBoundary } from '@/components/common/ErrorBoundary'
 
-export default function ChannelPage() {
+function ChannelPageInner() {
   const params = useParams<{ domain: string; channel: string }>()
   const { domains, isLoading } = useDomains()
 
@@ -36,5 +37,13 @@ export default function ChannelPage() {
         channelAgents={[]}
       />
     </main>
+  )
+}
+
+export default function ChannelPage() {
+  return (
+    <ErrorBoundary label="Channel">
+      <ChannelPageInner />
+    </ErrorBoundary>
   )
 }

@@ -1,6 +1,6 @@
 import { createFrontendClient, BrowserClient } from '@pipedream/sdk/browser'
 import { auth } from '@/utils/firebase'
-import { apiCall } from './api'
+import { apiCall } from './api/client'
 import { getWebUrl } from '@/utils/context-detection'
 
 let sharedClient: BrowserClient | null = null

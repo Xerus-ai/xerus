@@ -10,6 +10,7 @@ import { WorkspaceSectionProvider } from '@/components/layout/WorkspaceSectionCo
 import { SidebarSlotProvider } from '@/components/layout/SidebarSlotContext'
 import { AppSidebar } from '@/components/navigation/AppSidebar'
 import { MobileBottomBar } from '@/components/navigation/MobileBottomBar'
+import { MobileHeader } from '@/components/navigation/MobileHeader'
 import { MotionConfig } from 'framer-motion'
 
 // Code-split: only loaded on /login route
@@ -38,7 +39,7 @@ function LoadingScreen() {
 function LayoutShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { user, isAuthReady } = useAuth()
+  const { user, isAuthReady, hasWorkspace } = useAuth()
   const {
     isRightPanelOpen,
     rightPanelContent,
@@ -46,6 +47,7 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
   } = useLayout()
 
   const isLoginPage = pathname === '/login'
+  const isOnboardingPage = pathname === '/onboarding'
 
   // Redirect unauthenticated users to login
   useEffect(() => {
@@ -54,6 +56,20 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
     }
   }, [isAuthReady, user, isLoginPage, router])
 
+  // Redirect users without a workspace to onboarding
+  useEffect(() => {
+    if (isAuthReady && user && !hasWorkspace && !isOnboardingPage && !isLoginPage) {
+      router.push('/onboarding')
+    }
+  }, [isAuthReady, user, hasWorkspace, isOnboardingPage, isLoginPage, router])
+
+  // Redirect onboarded users away from /onboarding (prevent re-entry)
+  useEffect(() => {
+    if (isAuthReady && user && hasWorkspace && isOnboardingPage) {
+      router.push('/')
+    }
+  }, [isAuthReady, user, hasWorkspace, isOnboardingPage, router])
+
   // Show loading screen while auth state is resolving
   if (!isAuthReady) {
     return <LoadingScreen />
@@ -61,6 +77,11 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
 
   // Not authenticated — show loading while redirect to /login fires
   if (!user && !isLoginPage) {
+    return <LoadingScreen />
+  }
+
+  // Not onboarded — show loading while redirect to /onboarding fires
+  if (user && !hasWorkspace && !isOnboardingPage && !isLoginPage) {
     return <LoadingScreen />
   }
 
@@ -81,16 +102,17 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
     )
   }
 
-  // Mobile layout: content only + bottom bar
+  // Mobile layout: floating header + content + bottom bar
   if (isMobile) {
     return (
       <div className="flex flex-col h-screen bg-surface-alt">
         <a
           href="#main-content"
-          className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:top-2 focus:left-2 focus:px-4 focus:py-2 focus:bg-[#FF6600] focus:text-white focus:rounded-xl focus:text-sm focus:font-medium"
+          className="absolute -top-full left-2 z-[100] px-4 py-2 bg-[#FF6600] text-white rounded-xl text-sm font-medium focus:top-2 focus:outline-none transition-[top]"
         >
           Skip to main content
         </a>
+        <MobileHeader />
         <main id="main-content" className="flex-1 relative overflow-y-auto pb-14">
           {children}
         </main>
@@ -104,7 +126,7 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen overflow-hidden bg-surface-alt relative">
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:top-2 focus:left-2 focus:px-4 focus:py-2 focus:bg-[#FF6600] focus:text-white focus:rounded-xl focus:text-sm focus:font-medium"
+        className="absolute -top-full left-2 z-[100] px-4 py-2 bg-[#FF6600] text-white rounded-xl text-sm font-medium focus:top-2 focus:outline-none transition-[top]"
       >
         Skip to main content
       </a>

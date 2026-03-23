@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRedirectIfNotAuth } from '@/utils/AuthContext'
-import { getCreditBalance, type CreditBalance } from '@/lib/api'
+import { getCreditBalance, type CreditBalance } from '@/lib/api/user'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 import { Crown, MessageSquare, Clock, Database, Check, Sparkles } from 'lucide-react'
@@ -92,8 +92,8 @@ export default function BillingPage() {
   }, [user])
 
   const handlePlanSelect = (planId: string) => {
-    toast.info('Billing integration coming soon. Contact support for plan changes.', {
-      description: `Selected plan: ${planId}`,
+    toast.info('Plan upgrades coming soon', {
+      description: 'Reach out to support if you need to change your plan.',
     })
   }
 

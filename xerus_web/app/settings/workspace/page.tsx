@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRedirectIfNotAuth } from '@/utils/AuthContext'
-import { getCreditBalance, type CreditBalance } from '@/lib/api'
+import { getCreditBalance, type CreditBalance } from '@/lib/api/user'
 import {
   getStatus as getWorkspaceStatus,
   pauseWorkspace,
@@ -66,7 +66,7 @@ export default function WorkspaceOverviewPage() {
       toast.success(successMsg)
       await fetchWorkspaceStatus()
     } catch {
-      toast.error(`Failed to ${action} workspace`)
+      toast.error("Something went wrong", { description: 'Please try again in a moment.' })
     } finally {
       setWorkspaceAction(null)
     }
@@ -291,7 +291,7 @@ export default function WorkspaceOverviewPage() {
 
           {/* Skill Marketplace */}
           <Link
-            href="/ai-agents"
+            href="/skills"
             className="flex items-center w-full px-5 py-4 hover:bg-surface-hover/40 transition-colors text-left group"
           >
             <div className="w-8 h-8 rounded-lg bg-surface-hover flex items-center justify-center mr-3 shrink-0">

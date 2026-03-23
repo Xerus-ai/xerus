@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react'
 import { Brain } from 'lucide-react'
+import { toast } from 'sonner'
 import { getAgentMemories, type MemoryEntry } from '@/lib/api/memory'
 
 type MemoryFilter = 'all' | 'working' | 'episodic' | 'semantic' | 'procedural'
@@ -45,8 +46,10 @@ export function MemoryTab({ agent }: MemoryTabProps) {
                 const data = await getAgentMemories(Number(agent.id))
                 if (!cancelled) setMemories(data)
             } catch (err) {
-                console.error('Failed to fetch agent memories:', err)
-                if (!cancelled) setMemories([])
+                if (!cancelled) {
+                    toast.error("Couldn't load agent memories")
+                    setMemories([])
+                }
             } finally {
                 if (!cancelled) setIsLoading(false)
             }

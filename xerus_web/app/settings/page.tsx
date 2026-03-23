@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRedirectIfNotAuth } from '@/utils/AuthContext'
-import { getUserProfile, updateUserProfile, deleteAccount } from '@/lib/api'
+import { getUserProfile, updateUserProfile, deleteAccount } from '@/lib/api/user'
 import { useRouter } from 'next/navigation'
 import { Mail, Crown, Trash2, AlertTriangle } from 'lucide-react'
 import { motion } from 'framer-motion'
@@ -48,6 +48,7 @@ export default function ProfilePage() {
         })
         setDisplayNameInput(data.display_name)
       } catch {
+        toast.error("Couldn't load your profile")
         setProfile({
           uid: user.uid,
           email: user.email,
@@ -69,7 +70,7 @@ export default function ProfilePage() {
       setProfile((prev) => (prev ? { ...prev, display_name: displayNameInput } : null))
       toast.success('Display name updated')
     } catch {
-      toast.error('Failed to update display name')
+      toast.error("Couldn't save your changes", { description: 'Please try again.' })
     } finally {
       setIsSaving(false)
     }
@@ -81,7 +82,7 @@ export default function ProfilePage() {
       toast.success('Account deleted')
       router.push('/login')
     } catch {
-      toast.error('Failed to delete account')
+      toast.error("Couldn't delete your account", { description: 'Please contact support if this persists.' })
     }
   }
 

@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { User, Key, Server, HardDrive, CreditCard, LogOut, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { logout } from '@/lib/api'
+import { logout } from '@/lib/api/user'
 import { toast } from 'sonner'
 
 const NAV_SECTIONS = [
@@ -35,7 +35,7 @@ export function SettingsSidebar() {
       await logout()
       toast.success('Signed out')
     } catch {
-      toast.error('Sign out failed')
+      toast.error("Couldn't sign you out", { description: 'Please try again.' })
     }
   }
 

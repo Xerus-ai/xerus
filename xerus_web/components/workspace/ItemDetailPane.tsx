@@ -3,7 +3,7 @@
 import { X, MessageSquare, Settings, Copy, Bot, Puzzle, ExternalLink } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import type { Assistant, Skill } from '@/lib/api'
+import type { Assistant, Skill } from '@/lib/api/types'
 
 export type SelectedItem =
   | { type: 'agent'; data: Assistant }

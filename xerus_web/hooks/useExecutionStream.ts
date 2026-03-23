@@ -167,8 +167,10 @@ export function useExecutionStream(
 
   // Internal: create EventSource with fresh SSE token, wire up event handlers
   const createEventSource = useCallback(async (conversationId: string): Promise<EventSource> => {
-    const sseToken = await fetchSseToken();
-    const streamUrl = await getStreamUrl(conversationId);
+    const [sseToken, streamUrl] = await Promise.all([
+      fetchSseToken(),
+      getStreamUrl(conversationId),
+    ]);
     const separator = streamUrl.includes('?') ? '&' : '?';
     const urlWithAuth = `${streamUrl}${separator}token=${encodeURIComponent(sseToken)}`;
 

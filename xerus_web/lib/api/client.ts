@@ -23,8 +23,6 @@ export const getApiHeaders = async (excludeContentType: boolean = false): Promis
     try {
       const token = await user.getIdToken(false); // Use cached token
       headers['Authorization'] = `Bearer ${token}`;
-      headers['X-Firebase-UID'] = user.uid;
-      headers['X-User-ID'] = user.uid;
     } catch {
       // Token refresh failed — return headers without auth and let the server return 401
     }
@@ -45,10 +43,8 @@ export const apiCall = async (
   options: RequestInit = {},
   showErrorToast: boolean = true
 ): Promise<Response> => {
-  const baseUrl = await getApiBaseUrl();
+  const [baseUrl, apiHeaders] = await Promise.all([getApiBaseUrl(), getApiHeaders()]);
   const url = `${baseUrl}${endpoint}`;
-
-  const apiHeaders = await getApiHeaders();
   const defaultOptions: RequestInit = {
     headers: {
       'Content-Type': 'application/json',
@@ -127,50 +123,3 @@ export const apiPost = async <T>(
   return response.json();
 };
 
-// Helper for PUT requests with success toast
-export const apiPut = async <T>(
-  endpoint: string,
-  data: unknown,
-  successMessage?: string
-): Promise<T> => {
-  const response = await apiCall(endpoint, {
-    method: 'PUT',
-    body: JSON.stringify(data),
-  });
-
-  if (successMessage) {
-    toast.success(successMessage);
-  }
-
-  return response.json();
-};
-
-// Helper for PATCH requests with success toast
-export const apiPatch = async <T>(
-  endpoint: string,
-  data: unknown,
-  successMessage?: string
-): Promise<T> => {
-  const response = await apiCall(endpoint, {
-    method: 'PATCH',
-    body: JSON.stringify(data),
-  });
-
-  if (successMessage) {
-    toast.success(successMessage);
-  }
-
-  return response.json();
-};
-
-// Helper for DELETE requests with success toast
-export const apiDelete = async (
-  endpoint: string,
-  successMessage?: string
-): Promise<void> => {
-  await apiCall(endpoint, { method: 'DELETE' });
-
-  if (successMessage) {
-    toast.success(successMessage);
-  }
-};

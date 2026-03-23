@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Loader2, Sparkles, ChevronDown } from 'lucide-react'
-import { createAgent, formatPrompt, getFeaturedModels, type ModelEntry } from '@/lib/api'
+import { createAgent, formatPrompt } from '@/lib/api/agents'
+import { getFeaturedModels, type ModelEntry } from '@/lib/api/models'
 import { ModelIcon } from '@/components/agents/AgentAvatar'
 import { formatModelName } from '@/utils/models'
 import { slugify } from '@/utils/slugify'
@@ -63,7 +64,7 @@ export default function CreateAIAgentClient() {
         let cancelled = false
         getFeaturedModels()
             .then(data => { if (!cancelled) setModels(data) })
-            .catch(err => console.error('Failed to load models:', err))
+            .catch(() => { /* models fetch failed — fallback list used */ })
             .finally(() => { if (!cancelled) setIsLoadingModels(false) })
         return () => { cancelled = true }
     }, [])

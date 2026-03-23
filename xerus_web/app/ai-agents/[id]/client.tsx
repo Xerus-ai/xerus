@@ -8,9 +8,9 @@ import { useAuth } from "@/utils/AuthContext"
 import {
   getAssistant,
   updateAgent,
-  getSchedules,
   getAssistants,
-} from "@/lib/api"
+} from "@/lib/api/agents"
+import { getSchedules } from "@/lib/api/schedules"
 import { getAgentKnowledgeBases } from "@/lib/api/agent-kb"
 import { getTree, type FileNode } from "@/lib/api/workspace"
 import { canEditAgent, isSystemTemplate } from "@/utils/agentLabels"
@@ -26,8 +26,6 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 // UI Components
-import { NotificationBanner } from "@/components/ui/NotificationBanner"
-
 // IDE Components
 import { AgentProfileCard } from "@/components/agents/ide/AgentProfileCard"
 import { FloatingPanelProvider } from "@/components/common/FloatingPanelContext"
@@ -129,12 +127,10 @@ export default function AgentDetailsClient({ agentId }: AgentDetailsClientProps)
     isCloning,
     isPublishing,
     isDeleting,
-    notification,
     handleClone,
     handlePublish,
     handleUnpublish,
     handleDelete,
-    dismissNotification,
   } = useAgentActions({ agent, setAgent: () => mutateAgent() })
 
   // --- Handlers ---
@@ -322,14 +318,6 @@ export default function AgentDetailsClient({ agentId }: AgentDetailsClientProps)
         </Tabs>
       </div>
 
-      <NotificationBanner
-        show={notification.show}
-        type={notification.type}
-        title={notification.title}
-        message={notification.message}
-        autoCloseSeconds={notification.type === 'error' ? 15 : 8}
-        onClose={dismissNotification}
-      />
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react'
 import useSWR from 'swr'
-import { apiCall } from '@/lib/api'
+import { apiCall } from '@/lib/api/client'
 import { getTool, getToolsCatalog } from '@/lib/api/tools'
 import { Tool } from '@/types/tool'
 import { mapToolData } from '@/utils/tools'

@@ -1,5 +1,5 @@
 import React from 'react'
-import type { Assistant } from "@/lib/api"
+import type { Assistant } from "@/lib/api/types"
 import { AgentAvatarWithModel, ModelIcon } from './AgentAvatar'
 import { Loader2, Lock, Users, Plus, Wrench, Settings, Copy, ArrowRight } from 'lucide-react'
 import { canCloneAgent, getAgentVisibilityClass } from "@/utils/agentLabels"

@@ -79,9 +79,7 @@ const nextConfig = {
     return config
   },
   
-  // Allow dynamic routes without generateStaticParams
   experimental: {
-    missingSuspenseWithCSRBailout: false
   }
 }
 

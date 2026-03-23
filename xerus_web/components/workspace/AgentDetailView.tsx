@@ -5,13 +5,13 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import useSWR, { mutate } from 'swr'
 import { useAuth } from '@/utils/AuthContext'
-import { getAssistant, updateAgent, getSchedules, getAssistants } from '@/lib/api'
+import { getAssistant, updateAgent, getAssistants } from '@/lib/api/agents'
+import { getSchedules } from '@/lib/api/schedules'
 import { getAgentKnowledgeBases } from '@/lib/api/agent-kb'
 import { getTree, type FileNode } from '@/lib/api/workspace'
 import { canEditAgent, isSystemTemplate } from '@/utils/agentLabels'
 import { ArrowLeft, Loader2, Copy, Upload, Lock, Trash2 } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { NotificationBanner } from '@/components/ui/NotificationBanner'
 import { AgentProfileCard } from '@/components/agents/ide/AgentProfileCard'
 import { FloatingPanelProvider } from '@/components/common/FloatingPanelContext'
 import { RunHistory } from '@/components/agents/ide/RunHistory'
@@ -89,7 +89,7 @@ export function AgentDetailView({ agentId, onBack }: AgentDetailViewProps) {
     setAgent: () => mutateAgent(),
   })
 
-  const { isCloning, isPublishing, isDeleting, notification, handleClone, handlePublish, handleUnpublish, handleDelete, dismissNotification } =
+  const { isCloning, isPublishing, isDeleting, handleClone, handlePublish, handleUnpublish, handleDelete } =
     useAgentActions({ agent, setAgent: () => mutateAgent() })
 
   const handleUpdateAgent = async (updates: any) => {
@@ -217,7 +217,6 @@ export function AgentDetailView({ agentId, onBack }: AgentDetailViewProps) {
         </Tabs>
       </div>
 
-      <NotificationBanner show={notification.show} type={notification.type} title={notification.title} message={notification.message} autoCloseSeconds={notification.type === 'error' ? 15 : 8} onClose={dismissNotification} />
     </div>
   )
 }

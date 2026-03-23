@@ -10,7 +10,7 @@ import { PostMessage, EscalationMessage, CoordinationMessage } from './activity-
 import { MentionInput } from './MentionInput'
 import { ExecutionDetail } from './ExecutionDetail'
 import { useChannelMessages } from '@/hooks/useChannelData'
-import { getAssistants } from '@/lib/api'
+import { getAssistants } from '@/lib/api/agents'
 import type { Agent } from '@/components/common/PresenceAvatars'
 
 // ---------------------------------------------------------------------------
@@ -142,7 +142,6 @@ export function ChannelActivity({ channelId, className }: ChannelActivityProps) 
       })
       .catch((err) => {
         if (cancelled) return
-        console.error('Failed to load channel agents:', err)
         setAgentError('Failed to load agents for this channel')
       })
     return () => { cancelled = true }

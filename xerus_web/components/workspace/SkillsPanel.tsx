@@ -2,7 +2,9 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import useSWR, { mutate as swrMutate } from 'swr'
-import { getSkills, getAssistants, installSkill, uninstallSkill, type Skill, type Assistant } from '@/lib/api'
+import { getSkills, installSkill, uninstallSkill } from '@/lib/api/skills'
+import { getAssistants } from '@/lib/api/agents'
+import type { Skill, Assistant } from '@/lib/api/types'
 import { PageHeader } from '@/components/common/PageHeader'
 import { SkillCard } from '@/components/skills/SkillCard'
 

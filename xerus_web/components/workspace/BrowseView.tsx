@@ -69,8 +69,8 @@ export function BrowseView({
         onOpen: () => onFileClick(file),
         onDownload: () => {
           workspaceApi.downloadFile(file.path, file.name)
-            .then(() => toast.success(`Downloaded ${file.name}`))
-            .catch(() => toast.error(`Failed to download ${file.name}`))
+            .then(() => toast.success('File downloaded'))
+            .catch(() => toast.error("Couldn't download this file", { description: 'Please try again.' }))
         },
         // Disabled until backend supports these operations
         // onRename: undefined,

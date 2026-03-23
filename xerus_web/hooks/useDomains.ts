@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { apiGet } from '@/lib/api'
+import { apiGet } from '@/lib/api/client'
 import { useAuth } from '@/utils/AuthContext'
 
 export interface Channel {

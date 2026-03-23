@@ -6,12 +6,13 @@ import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import useSWR from 'swr'
 import {
-  Home, MessageSquare, Inbox,
+  MessageSquare, Inbox, Home,
   Bot, Puzzle, Unplug, FileText, Files, Settings,
   PanelLeftClose, PanelLeftOpen,
   Plus, Hash, ChevronDown, ChevronRight, FolderOpen, Folder, FolderPlus,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { apiCall } from '@/lib/api/client'
 import { UserMenu } from '@/components/UserMenu'
 import { useUnreadCounts } from '@/hooks/useUnreadCounts'
 import { useWorkspaceSection, type WorkspaceSection } from '@/components/layout/WorkspaceSectionContext'
@@ -37,11 +38,12 @@ export function AppSidebar() {
   const SlotComponent = useSidebarSlotContent()
   const [collapsed, setCollapsed] = useState(false)
 
-  const activeTab = pathname.startsWith('/chat') ? 'chat'
+  const activeTab = pathname === '/' ? null // Office dashboard — logo is the indicator, no tab active
+    : pathname.startsWith('/chat') ? 'chat'
     : pathname.startsWith('/inbox') ? 'inbox'
-    : 'home'
+    : 'home' // /workspace, /ai-agents, /skills, /settings etc.
 
-  const isOnWorkspace = pathname === '/workspace' || pathname === '/'
+  const isOnWorkspace = pathname === '/workspace'
 
   const isOnWorkspaceRef = useRef(isOnWorkspace)
   isOnWorkspaceRef.current = isOnWorkspace
@@ -63,11 +65,11 @@ export function AppSidebar() {
         <aside className="flex h-full w-[var(--sidebar-collapsed-width)] flex-col bg-surface border-r border-surface-active items-center py-3 gap-1" role="navigation">
           <Tooltip>
             <TooltipTrigger asChild>
-              <Link href="/workspace" className="flex items-center justify-center w-10 h-10 rounded-2xl hover:bg-surface-hover transition-colors mb-2">
+              <Link href="/" className="flex items-center justify-center w-10 h-10 rounded-2xl hover:bg-surface-hover transition-colors mb-2">
                 <Image src="/logo/xerus.svg" alt="Xerus" width={28} height={28} />
               </Link>
             </TooltipTrigger>
-            <TooltipContent side="right">Home</TooltipContent>
+            <TooltipContent side="right">Office</TooltipContent>
           </Tooltip>
           {TABS.map((tab) => {
             const active = activeTab === tab.name.toLowerCase()
@@ -97,7 +99,7 @@ export function AppSidebar() {
     <aside className="flex h-full w-[var(--sidebar-width)] flex-col bg-surface border-r border-surface-active" role="navigation" aria-label="Main navigation">
       {/* Header */}
       <div className="flex items-center justify-between px-5 h-[68px] shrink-0">
-        <Link href="/workspace" className="flex items-center gap-2.5">
+        <Link href="/" className="flex items-center gap-2.5 group">
           <div className="w-9 h-9 shrink-0 rounded-xl overflow-hidden">
             <Image src="/logo/xerus.svg" alt="Xerus" width={36} height={36} className="w-full h-full object-contain" />
           </div>
@@ -138,16 +140,18 @@ export function AppSidebar() {
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto scrollbar-thin min-h-0">
-        {activeTab === 'home' && (
+        {(activeTab === 'home' || activeTab === null) ? (
           <HomeSidebarBody
             activeSection={activeSection}
             isOnWorkspace={isOnWorkspace}
             onSectionClick={handleSectionClick}
             onPathClick={handlePathClick}
           />
-        )}
-        {activeTab === 'chat' && (SlotComponent ? <SlotComponent /> : <ChatSidebarFallback />)}
-        {activeTab === 'inbox' && <InboxSidebarBody counts={counts} markRead={markRead} />}
+        ) : activeTab === 'chat' ? (
+          SlotComponent ? <SlotComponent /> : <ChatSidebarFallback />
+        ) : activeTab === 'inbox' ? (
+          <InboxSidebarBody counts={counts} markRead={markRead} />
+        ) : null}
       </div>
 
       {/* Bottom */}
@@ -204,7 +208,7 @@ function HomeSidebarBody({ activeSection, isOnWorkspace, onSectionClick, onPathC
   return (
     <nav className="px-4 py-2 space-y-5">
       {/* Projects — dynamic from overview */}
-      {overview?.projects && overview.projects.length > 0 && overview.projects.map(project => {
+      {overview?.projects && overview.projects.length > 0 ? overview.projects.map(project => {
         const isExpanded = expandedProjects.has(project.slug)
         return (
           <div key={project.slug}>
@@ -227,21 +231,21 @@ function HomeSidebarBody({ activeSection, isOnWorkspace, onSectionClick, onPathC
                   >
                     <Hash className="w-4 h-4 shrink-0" />
                     <span className="flex-1 text-left truncate">{channel.name}</span>
-                    {channel.deliverables.length > 0 && (
+                    {channel.deliverables.length > 0 ? (
                       <span className="text-[10px] font-medium text-text-secondary">{channel.deliverables.length}</span>
-                    )}
+                    ) : null}
                   </button>
                 ))}
               </div>
             )}
           </div>
         )
-      })}
+      }) : null}
 
-      {/* Drive — documents from shared/knowledge */}
-      {overview?.documents && overview.documents.length > 0 && (
+      {/* Workspace — documents from shared/knowledge */}
+      {overview?.documents && overview.documents.length > 0 ? (
         <div>
-          <p className="text-xs font-semibold text-text-secondary/60 mb-1.5 px-3 tracking-wide">Drive</p>
+          <p className="text-xs font-semibold text-text-secondary/60 mb-1.5 px-3 tracking-wide">Workspace</p>
           <div className="space-y-0.5">
             {overview.documents.map(doc => (
               <button
@@ -255,7 +259,7 @@ function HomeSidebarBody({ activeSection, isOnWorkspace, onSectionClick, onPathC
             ))}
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* Marketplace */}
       <div>
@@ -324,7 +328,7 @@ function InboxSidebarBody({ counts, markRead }: {
 }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { domains, isLoading } = useDomains()
+  const { domains, isLoading, refetch: refreshDomains } = useDomains()
   const [expandedDomains, setExpandedDomains] = useState<Set<string>>(new Set())
 
   useEffect(() => {
@@ -354,9 +358,7 @@ function InboxSidebarBody({ counts, markRead }: {
       <div className="flex flex-col items-center justify-center px-5 py-16 gap-4">
         <FolderPlus className="w-10 h-10 text-text-secondary/50" />
         <p className="text-sm text-text-secondary text-center">No projects yet</p>
-        <button onClick={() => router.push('/chat?prompt=Create+a+new+project')} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white bg-[#FF6600] hover:bg-[#E65C00] transition-colors">
-          <Plus className="w-4 h-4" /> Create project
-        </button>
+        <CreateProjectInline onCreated={refreshDomains} />
       </div>
     )
   }
@@ -401,5 +403,61 @@ function InboxSidebarBody({ counts, markRead }: {
         })}
       </div>
     </ScrollArea>
+  )
+}
+
+// Inline project creation form for sidebar empty state
+function CreateProjectInline({ onCreated }: { onCreated: () => Promise<void> }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [name, setName] = useState('')
+  const [isCreating, setIsCreating] = useState(false)
+
+  const handleCreate = async () => {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    setIsCreating(true)
+    try {
+      await apiCall('/company/domains', {
+        method: 'POST',
+        body: JSON.stringify({ name: trimmed }),
+      })
+      setName('')
+      setIsOpen(false)
+      await onCreated()
+    } catch {
+      // apiCall already shows toast on error
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
+  if (!isOpen) {
+    return (
+      <button onClick={() => setIsOpen(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white bg-[#FF6600] hover:bg-[#E65C00] transition-colors">
+        <Plus className="w-4 h-4" /> Create project
+      </button>
+    )
+  }
+
+  return (
+    <div className="w-full px-2">
+      <input
+        autoFocus
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') setIsOpen(false) }}
+        placeholder="Project name"
+        className="w-full px-3 py-2 rounded-xl bg-surface border border-surface-active text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-[#FF6600]/40 focus:shadow-[0_2px_12px_rgba(255,102,0,0.08)]"
+        disabled={isCreating}
+      />
+      <div className="flex gap-2 mt-2">
+        <button onClick={handleCreate} disabled={isCreating || !name.trim()} className="flex-1 px-3 py-1.5 rounded-xl text-sm font-medium text-white bg-[#FF6600] hover:bg-[#E65C00] disabled:opacity-50 transition-colors">
+          {isCreating ? 'Creating...' : 'Create'}
+        </button>
+        <button onClick={() => { setIsOpen(false); setName('') }} className="px-3 py-1.5 rounded-xl text-sm text-text-muted hover:bg-surface-hover transition-colors">
+          Cancel
+        </button>
+      </div>
+    </div>
   )
 }

@@ -76,7 +76,7 @@ export const updateHeartbeatConfig = async (
   const result = await response.json();
   const data = result.data || result;
   const savedConfig: BackendHeartbeatConfig = data.heartbeat_config || data;
-  toast.success('Heartbeat updated');
+  toast.success('Automation settings saved');
   return mapHeartbeatConfigToFrontend(savedConfig);
 };
 
@@ -85,7 +85,7 @@ export const updateHeartbeatConfig = async (
  */
 export const deleteHeartbeatConfig = async (agentId: number): Promise<void> => {
   await apiCall(`/agents/${agentId}/heartbeat`, { method: 'DELETE' });
-  toast.success('Heartbeat removed');
+  toast.success('Automation removed');
 };
 
 /**
@@ -99,7 +99,7 @@ export const toggleHeartbeat = async (agentId: number, enabled: boolean): Promis
   const result = await response.json();
   const data = result.data || result;
   const config: BackendHeartbeatConfig = data.heartbeat_config || data;
-  toast.success(`Heartbeat ${enabled ? 'enabled' : 'paused'}`);
+  toast.success(enabled ? 'Automation turned on' : 'Automation paused');
   return mapHeartbeatConfigToFrontend(config);
 };
 

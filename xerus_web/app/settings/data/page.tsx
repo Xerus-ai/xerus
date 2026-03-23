@@ -45,7 +45,7 @@ export default function DataPage() {
       await exportWorkspace()
       toast.success('Workspace export downloaded')
     } catch {
-      toast.error('Failed to export workspace')
+      toast.error("Couldn't export your data", { description: 'Please try again.' })
     } finally {
       setActionInProgress(null)
     }
@@ -60,7 +60,7 @@ export default function DataPage() {
       await importWorkspace(file)
       toast.success('Workspace imported successfully')
     } catch {
-      toast.error('Failed to import workspace')
+      toast.error("Couldn't import the workspace", { description: 'Please check the file and try again.' })
     } finally {
       setActionInProgress(null)
       e.target.value = ''
@@ -74,7 +74,7 @@ export default function DataPage() {
       toast.success('Workspace restored from snapshot')
       setSnapshots([])
     } catch {
-      toast.error('Failed to restore workspace')
+      toast.error("Couldn't restore the workspace", { description: 'Please try again.' })
     } finally {
       setActionInProgress(null)
     }
@@ -90,7 +90,7 @@ export default function DataPage() {
         const result = await listSnapshots()
         setSnapshots(result)
       } catch {
-        toast.error('Failed to load snapshots')
+        toast.error("Couldn't load snapshots", { description: 'Please try again.' })
       } finally {
         setSnapshotsLoading(false)
       }

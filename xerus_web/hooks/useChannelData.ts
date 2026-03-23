@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { apiGet, apiPost } from '@/lib/api'
+import { apiGet, apiPost } from '@/lib/api/client'
 import { toast } from 'sonner'
 import type { ChannelMessage } from '@/components/channels/ChannelActivity'
 import type { KanbanTask } from '@/components/common/TaskCard'
@@ -81,7 +81,7 @@ export function useChannelMessages(channelId: string): UseChannelMessagesReturn 
     } catch {
       // Remove optimistic message on failure
       setMessages(prev => prev.filter(m => m.id !== optimistic.id));
-      toast.error('Failed to send message');
+      toast.error("Your message wasn't sent", { description: 'Please try again.' });
     }
   }, [channelId])
 
@@ -129,6 +129,7 @@ export function useChannelTasks(channelId: string): UseChannelTasksReturn {
     try {
       await apiPost(`/tasks/${taskId}/status`, { status: newStatus })
     } catch {
+      toast.error("Couldn't update that task — reverting")
       fetchTasks()
     }
   }, [fetchTasks])

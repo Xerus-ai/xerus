@@ -25,7 +25,7 @@ import {
 } from '@/components/ui/sheet'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
-import { apiGet } from '@/lib/api'
+import { apiGet } from '@/lib/api/client'
 
 // ---------------------------------------------------------------------------
 // Types

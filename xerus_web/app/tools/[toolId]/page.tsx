@@ -10,7 +10,7 @@ import { useToolAuth } from '@/hooks/useToolAuth'
 import { usePipedreamActions } from '@/hooks/usePipedreamActions'
 import { usePipedreamTriggers } from '@/hooks/usePipedreamTriggers'
 import { getApiUrl } from '@/utils/tools'
-import { getApiHeaders } from '@/lib/api'
+import { getApiHeaders } from '@/lib/api/client'
 import { useState, useEffect, useMemo } from 'react'
 
 export default function ToolDetailPage() {
@@ -80,7 +80,7 @@ export default function ToolDetailPage() {
                     setStats(data.data)
                 }
             } catch (error) {
-                console.error('Failed to fetch tool stats:', error)
+                void error /* tool stats fetch failed — non-critical */
             }
         }
 
