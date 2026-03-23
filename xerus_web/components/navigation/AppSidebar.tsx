@@ -6,8 +6,8 @@ import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import useSWR from 'swr'
 import {
-  Home, MessageSquare, Inbox,
-  Bot, Puzzle, Unplug, FileText, Files, Settings,
+  LayoutDashboard, MessageSquare, Inbox,
+  Bot, Puzzle, Unplug, FileText, Files, Settings, FolderClosed,
   PanelLeftClose, PanelLeftOpen,
   Plus, Hash, ChevronDown, ChevronRight, FolderOpen, Folder, FolderPlus,
 } from 'lucide-react'
@@ -22,7 +22,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { getWorkspaceOverview, type WorkspaceOverview } from '@/lib/api/workspace'
 
 const TABS = [
-  { name: 'Home', href: '/workspace', icon: Home },
+  { name: 'Workspace', href: '/workspace', icon: FolderClosed },
   { name: 'Chat', href: '/chat', icon: MessageSquare },
   { name: 'Inbox', href: '/inbox', icon: Inbox },
 ]
@@ -37,11 +37,13 @@ export function AppSidebar() {
   const SlotComponent = useSidebarSlotContent()
   const [collapsed, setCollapsed] = useState(false)
 
-  const activeTab = pathname.startsWith('/chat') ? 'chat'
+  const activeTab = pathname === '/' ? null // Office dashboard — logo is the indicator, no tab active
+    : pathname.startsWith('/chat') ? 'chat'
     : pathname.startsWith('/inbox') ? 'inbox'
-    : 'home'
+    : 'workspace' // /workspace, /ai-agents, /skills, /settings etc.
 
-  const isOnWorkspace = pathname === '/workspace' || pathname === '/'
+  const isOnOffice = pathname === '/'
+  const isOnWorkspace = pathname === '/workspace'
 
   const isOnWorkspaceRef = useRef(isOnWorkspace)
   isOnWorkspaceRef.current = isOnWorkspace
@@ -63,11 +65,11 @@ export function AppSidebar() {
         <aside className="flex h-full w-[var(--sidebar-collapsed-width)] flex-col bg-surface border-r border-surface-active items-center py-3 gap-1" role="navigation">
           <Tooltip>
             <TooltipTrigger asChild>
-              <Link href="/workspace" className="flex items-center justify-center w-10 h-10 rounded-2xl hover:bg-surface-hover transition-colors mb-2">
+              <Link href="/" className={cn('flex items-center justify-center w-10 h-10 rounded-2xl transition-colors mb-2', isOnOffice ? 'bg-[#FF6600]/10 ring-2 ring-[#FF6600]/30' : 'hover:bg-surface-hover')}>
                 <Image src="/logo/xerus.svg" alt="Xerus" width={28} height={28} />
               </Link>
             </TooltipTrigger>
-            <TooltipContent side="right">Home</TooltipContent>
+            <TooltipContent side="right">Office</TooltipContent>
           </Tooltip>
           {TABS.map((tab) => {
             const active = activeTab === tab.name.toLowerCase()
@@ -97,8 +99,8 @@ export function AppSidebar() {
     <aside className="flex h-full w-[var(--sidebar-width)] flex-col bg-surface border-r border-surface-active" role="navigation" aria-label="Main navigation">
       {/* Header */}
       <div className="flex items-center justify-between px-5 h-[68px] shrink-0">
-        <Link href="/workspace" className="flex items-center gap-2.5">
-          <div className="w-9 h-9 shrink-0 rounded-xl overflow-hidden">
+        <Link href="/" className="flex items-center gap-2.5 group">
+          <div className={cn('w-9 h-9 shrink-0 rounded-xl overflow-hidden transition-all', isOnOffice ? 'ring-2 ring-[#FF6600]/30' : 'group-hover:ring-2 group-hover:ring-surface-active/50')}>
             <Image src="/logo/xerus.svg" alt="Xerus" width={36} height={36} className="w-full h-full object-contain" />
           </div>
           <div className="flex items-start gap-1">
@@ -138,16 +140,18 @@ export function AppSidebar() {
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto scrollbar-thin min-h-0">
-        {activeTab === 'home' && (
+        {(activeTab === 'workspace' || activeTab === null) ? (
           <HomeSidebarBody
             activeSection={activeSection}
             isOnWorkspace={isOnWorkspace}
             onSectionClick={handleSectionClick}
             onPathClick={handlePathClick}
           />
-        )}
-        {activeTab === 'chat' && (SlotComponent ? <SlotComponent /> : <ChatSidebarFallback />)}
-        {activeTab === 'inbox' && <InboxSidebarBody counts={counts} markRead={markRead} />}
+        ) : activeTab === 'chat' ? (
+          SlotComponent ? <SlotComponent /> : <ChatSidebarFallback />
+        ) : activeTab === 'inbox' ? (
+          <InboxSidebarBody counts={counts} markRead={markRead} />
+        ) : null}
       </div>
 
       {/* Bottom */}
