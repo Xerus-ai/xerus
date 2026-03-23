@@ -16,6 +16,7 @@ import {
   ArrowRight,
   Sparkles,
   Users,
+  Coffee,
 } from 'lucide-react'
 import { useOfficePolling } from '@/hooks/useOfficePolling'
 import { XerusLoader } from '@/components/common/XerusLoader'
@@ -104,7 +105,43 @@ function AgentStatus({ agents }: { agents: OfficeAgent[] }) {
         </div>
       )}
 
-      {active.length === 0 && scheduled.length === 0 && (
+      {/* Agents exist but all idle — show "on break" with agent list */}
+      {active.length === 0 && scheduled.length === 0 && agents.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <Coffee className="w-4 h-4 text-text-muted" />
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">On Break</span>
+            <span className="bg-surface-hover text-text-secondary text-xs font-bold px-2 py-0.5 rounded-md">
+              {agents.length}
+            </span>
+          </div>
+          <div className="space-y-2.5">
+            {agents.slice(0, 6).map(agent => (
+              <div key={agent.id} className="flex items-center gap-3">
+                <div className="relative flex-shrink-0">
+                  <AgentAvatarWithModel
+                    name={agent.name}
+                    avatarUrl={agent.avatar_url}
+                    size="sm"
+                    hideBadge
+                  />
+                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-amber-400 border-2 border-surface" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-text truncate">{agent.name}</p>
+                  <p className="text-xs text-text-muted">Idle</p>
+                </div>
+              </div>
+            ))}
+            {agents.length > 6 && (
+              <p className="text-xs text-text-muted pl-10">+{agents.length - 6} more</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* No agents at all — show CTAs */}
+      {agents.length === 0 && (
         <div className="flex flex-col items-center justify-center py-6 text-center">
           <div className="w-12 h-12 rounded-2xl bg-surface-hover flex items-center justify-center mb-4">
             <Sparkles className="w-5 h-5 text-text-muted" />
