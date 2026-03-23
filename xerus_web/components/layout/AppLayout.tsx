@@ -10,6 +10,7 @@ import { WorkspaceSectionProvider } from '@/components/layout/WorkspaceSectionCo
 import { SidebarSlotProvider } from '@/components/layout/SidebarSlotContext'
 import { AppSidebar } from '@/components/navigation/AppSidebar'
 import { MobileBottomBar } from '@/components/navigation/MobileBottomBar'
+import { MobileHeader } from '@/components/navigation/MobileHeader'
 import { MotionConfig } from 'framer-motion'
 
 // Code-split: only loaded on /login route
@@ -101,7 +102,7 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
     )
   }
 
-  // Mobile layout: content only + bottom bar
+  // Mobile layout: header + content + bottom bar
   if (isMobile) {
     return (
       <div className="flex flex-col h-screen bg-surface-alt">
@@ -111,6 +112,7 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
         >
           Skip to main content
         </a>
+        <MobileHeader />
         <main id="main-content" className="flex-1 relative overflow-y-auto pb-14">
           {children}
         </main>
