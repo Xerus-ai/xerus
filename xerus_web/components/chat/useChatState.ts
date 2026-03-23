@@ -4,7 +4,7 @@
  * Owns: agents, conversations, messages, current agent, workspace files.
  * Does NOT own: sandbox state, viewer state (those stay local to ChatContainer).
  */
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAuth } from '@/utils/AuthContext'
 import { getAssistants } from '@/lib/api/agents'
 import {
@@ -167,8 +167,14 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
   }, [agents])
 
   // ---- Parallel initial load: agents + conversations + workspace (async-parallel rule) ----
+  // Ref prevents double-fire in React Strict Mode and on dependency changes
+  const hasLoadedRef = useRef(false)
+  const loadConversationDetailsRef = useRef(loadConversationDetails)
+  loadConversationDetailsRef.current = loadConversationDetails
+
   useEffect(() => {
-    if (!isAuthReady) return
+    if (!isAuthReady || hasLoadedRef.current) return
+    hasLoadedRef.current = true
     let cancelled = false
 
     const loadAll = async () => {
@@ -212,7 +218,7 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
       if (convResult.status === 'fulfilled') {
         const convs: Conversation[] = convResult.value.conversations.map(mapConversation)
         setState((prev) => ({ ...prev, conversations: convs }))
-        if (conversationId) loadConversationDetails(conversationId)
+        if (conversationId) loadConversationDetailsRef.current(conversationId)
       } else {
         console.error('Failed to load conversations:', convResult.reason)
       }
@@ -231,7 +237,8 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
 
     loadAll()
     return () => { cancelled = true }
-  }, [isAuthReady, initialAgentId, conversationId, loadConversationDetails])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once when auth is ready, refs handle changing deps
+  }, [isAuthReady])
 
   // ---- Sync current agent when conversation changes ----
   useEffect(() => {
