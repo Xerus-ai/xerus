@@ -102,24 +102,34 @@ function AgentStatus({ agents }: { agents: OfficeAgent[] }) {
       )}
 
       {active.length === 0 && scheduled.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-4 text-center">
+        <div className="flex flex-col items-center justify-center py-3 text-center">
           <span className="text-2xl mb-2">&#9749;</span>
           <p className="text-sm font-medium text-text-secondary">All quiet</p>
-          <p className="text-xs text-text-muted mt-1 mb-4">No active tasks or upcoming schedules</p>
-          <div className="flex flex-col gap-2 w-full">
+          <p className="text-xs text-text-muted mt-1 mb-5">No active tasks or upcoming schedules</p>
+          <div className="flex flex-col gap-2.5 w-full">
             <Link
               href="/chat"
-              className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-text-secondary hover:bg-surface-hover hover:text-text transition-colors"
+              className="group flex items-center gap-3 p-3 rounded-2xl bg-surface-alt/80 shadow-[0_1px_8px_rgba(255,102,0,0.08)] hover:shadow-[0_2px_16px_rgba(255,102,0,0.15)] transition-all"
             >
-              <MessageSquare className="w-4 h-4 text-[#FF6600]" />
-              Chat with Xerus
+              <div className="w-8 h-8 rounded-xl bg-[#FF6600]/8 flex items-center justify-center shrink-0">
+                <MessageSquare className="w-4 h-4 text-[#FF6600]" />
+              </div>
+              <div className="text-left min-w-0">
+                <p className="text-[13px] font-semibold text-text group-hover:text-[#FF6600] transition-colors">Chat with Xerus</p>
+                <p className="text-[11px] text-text-muted truncate">Ask anything to get started</p>
+              </div>
             </Link>
             <Link
               href="/workspace"
-              className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-text-secondary hover:bg-surface-hover hover:text-text transition-colors"
+              className="group flex items-center gap-3 p-3 rounded-2xl bg-surface-alt/80 shadow-[0_1px_8px_rgba(255,102,0,0.08)] hover:shadow-[0_2px_16px_rgba(255,102,0,0.15)] transition-all"
             >
-              <Bot className="w-4 h-4 text-emerald-500" />
-              Browse agents
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
+                <Bot className="w-4 h-4 text-emerald-600" />
+              </div>
+              <div className="text-left min-w-0">
+                <p className="text-[13px] font-semibold text-text group-hover:text-[#FF6600] transition-colors">Browse agents</p>
+                <p className="text-[11px] text-text-muted truncate">Find one for your team</p>
+              </div>
             </Link>
           </div>
         </div>
