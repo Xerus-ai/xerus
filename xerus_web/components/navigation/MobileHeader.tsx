@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { Menu, X } from 'lucide-react'
+import { Menu } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useSidebarSlotContent } from '@/components/layout/SidebarSlotContext'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
@@ -20,45 +20,25 @@ import { useRouter } from 'next/navigation'
 import useSWR from 'swr'
 import { getWorkspaceOverview } from '@/lib/api/workspace'
 
-// Page title from pathname
-function getPageTitle(pathname: string): string {
-  if (pathname === '/') return 'Office'
-  if (pathname.startsWith('/chat')) return 'Chat'
-  if (pathname.startsWith('/inbox')) return 'Inbox'
-  if (pathname === '/workspace') return 'Workspace'
-  if (pathname.startsWith('/ai-agents')) return 'Agents'
-  if (pathname.startsWith('/skills')) return 'Skills'
-  if (pathname.startsWith('/settings')) return 'Settings'
-  return 'Xerus'
-}
-
 export function MobileHeader() {
-  const pathname = usePathname()
-  const isOnOffice = pathname === '/'
-  const title = getPageTitle(pathname)
-
   return (
-    <header className="flex items-center justify-between h-12 px-4 bg-surface border-b border-surface-active/60 shrink-0">
-      {/* Left: Logo → Office */}
-      <Link
-        href="/"
-        className={cn(
-          'flex items-center gap-2',
-          isOnOffice && 'pointer-events-none'
-        )}
-      >
-        <div className={cn(
-          'w-7 h-7 shrink-0 rounded-lg overflow-hidden transition-all',
-          isOnOffice && 'ring-2 ring-[#FF6600]/30'
-        )}>
-          <Image src="/logo/xerus.svg" alt="Xerus" width={28} height={28} className="w-full h-full object-contain" />
-        </div>
-        <span className="font-serif text-base text-text tracking-tight">{title}</span>
-      </Link>
+    <div className="fixed top-0 left-0 right-0 z-40 pointer-events-none">
+      <div className="flex items-center justify-between px-3 pt-2">
+        {/* Left: Logo → Office */}
+        <Link
+          href="/"
+          className="pointer-events-auto w-9 h-9 shrink-0 rounded-2xl bg-surface/90 backdrop-blur-sm border border-surface-active/40 flex items-center justify-center shadow-sm hover:shadow-md transition-all active:scale-95"
+          aria-label="Office"
+        >
+          <Image src="/logo/xerus.svg" alt="Xerus" width={24} height={24} />
+        </Link>
 
-      {/* Right: Drawer trigger */}
-      <MobileDrawer />
-    </header>
+        {/* Right: Drawer trigger */}
+        <div className="pointer-events-auto">
+          <MobileDrawer />
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -78,10 +58,10 @@ function MobileDrawer() {
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
         <button
-          className="p-2 -mr-2 rounded-xl text-text-secondary hover:text-text hover:bg-surface-hover transition-colors"
+          className="w-9 h-9 rounded-2xl bg-surface/90 backdrop-blur-sm border border-surface-active/40 flex items-center justify-center shadow-sm hover:shadow-md text-text-secondary hover:text-text transition-all active:scale-95"
           aria-label="Open menu"
         >
-          <Menu className="w-5 h-5" />
+          <Menu className="w-4.5 h-4.5" />
         </button>
       </SheetTrigger>
       <SheetContent side="right" className="w-[300px] bg-surface p-0 border-l border-surface-active">

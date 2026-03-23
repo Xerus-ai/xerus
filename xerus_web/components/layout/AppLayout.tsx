@@ -102,7 +102,7 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
     )
   }
 
-  // Mobile layout: header + content + bottom bar
+  // Mobile layout: floating header + content + bottom bar
   if (isMobile) {
     return (
       <div className="flex flex-col h-screen bg-surface-alt">
