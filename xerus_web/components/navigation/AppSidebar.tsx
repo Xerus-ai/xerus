@@ -6,12 +6,14 @@ import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import useSWR from 'swr'
 import {
-  LayoutDashboard, MessageSquare, Inbox,
+  MessageSquare, Inbox,
   Bot, Puzzle, Unplug, FileText, Files, Settings, FolderClosed,
   PanelLeftClose, PanelLeftOpen,
   Plus, Hash, ChevronDown, ChevronRight, FolderOpen, Folder, FolderPlus,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { apiCall } from '@/lib/api/client'
 import { UserMenu } from '@/components/UserMenu'
 import { useUnreadCounts } from '@/hooks/useUnreadCounts'
 import { useWorkspaceSection, type WorkspaceSection } from '@/components/layout/WorkspaceSectionContext'
@@ -42,7 +44,6 @@ export function AppSidebar() {
     : pathname.startsWith('/inbox') ? 'inbox'
     : 'workspace' // /workspace, /ai-agents, /skills, /settings etc.
 
-  const isOnOffice = pathname === '/'
   const isOnWorkspace = pathname === '/workspace'
 
   const isOnWorkspaceRef = useRef(isOnWorkspace)
@@ -65,7 +66,7 @@ export function AppSidebar() {
         <aside className="flex h-full w-[var(--sidebar-collapsed-width)] flex-col bg-surface border-r border-surface-active items-center py-3 gap-1" role="navigation">
           <Tooltip>
             <TooltipTrigger asChild>
-              <Link href="/" className={cn('flex items-center justify-center w-10 h-10 rounded-2xl transition-colors mb-2', isOnOffice ? 'bg-[#FF6600]/10 ring-2 ring-[#FF6600]/30' : 'hover:bg-surface-hover')}>
+              <Link href="/" className="flex items-center justify-center w-10 h-10 rounded-2xl hover:bg-surface-hover transition-colors mb-2">
                 <Image src="/logo/xerus.svg" alt="Xerus" width={28} height={28} />
               </Link>
             </TooltipTrigger>
@@ -100,7 +101,7 @@ export function AppSidebar() {
       {/* Header */}
       <div className="flex items-center justify-between px-5 h-[68px] shrink-0">
         <Link href="/" className="flex items-center gap-2.5 group">
-          <div className={cn('w-9 h-9 shrink-0 rounded-xl overflow-hidden transition-all', isOnOffice ? 'ring-2 ring-[#FF6600]/30' : 'group-hover:ring-2 group-hover:ring-surface-active/50')}>
+          <div className="w-9 h-9 shrink-0 rounded-xl overflow-hidden">
             <Image src="/logo/xerus.svg" alt="Xerus" width={36} height={36} className="w-full h-full object-contain" />
           </div>
           <div className="flex items-start gap-1">
@@ -328,7 +329,7 @@ function InboxSidebarBody({ counts, markRead }: {
 }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { domains, isLoading } = useDomains()
+  const { domains, isLoading, refetch: refreshDomains } = useDomains()
   const [expandedDomains, setExpandedDomains] = useState<Set<string>>(new Set())
 
   useEffect(() => {
@@ -358,9 +359,7 @@ function InboxSidebarBody({ counts, markRead }: {
       <div className="flex flex-col items-center justify-center px-5 py-16 gap-4">
         <FolderPlus className="w-10 h-10 text-text-secondary/50" />
         <p className="text-sm text-text-secondary text-center">No projects yet</p>
-        <button onClick={() => router.push('/chat?q=Create+a+new+project+for+me')} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white bg-[#FF6600] hover:bg-[#E65C00] transition-colors">
-          <Plus className="w-4 h-4" /> Create project
-        </button>
+        <CreateProjectInline onCreated={refreshDomains} />
       </div>
     )
   }
@@ -405,5 +404,62 @@ function InboxSidebarBody({ counts, markRead }: {
         })}
       </div>
     </ScrollArea>
+  )
+}
+
+// Inline project creation form for sidebar empty state
+function CreateProjectInline({ onCreated }: { onCreated: () => Promise<void> }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [name, setName] = useState('')
+  const [isCreating, setIsCreating] = useState(false)
+
+  const handleCreate = async () => {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    setIsCreating(true)
+    try {
+      await apiCall('/company/domains', {
+        method: 'POST',
+        body: JSON.stringify({ name: trimmed }),
+      })
+      toast.success(`${trimmed} created`)
+      setName('')
+      setIsOpen(false)
+      await onCreated()
+    } catch {
+      // apiCall already shows toast on error
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
+  if (!isOpen) {
+    return (
+      <button onClick={() => setIsOpen(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white bg-[#FF6600] hover:bg-[#E65C00] transition-colors">
+        <Plus className="w-4 h-4" /> Create project
+      </button>
+    )
+  }
+
+  return (
+    <div className="w-full px-2">
+      <input
+        autoFocus
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') setIsOpen(false) }}
+        placeholder="Project name"
+        className="w-full px-3 py-2 rounded-xl bg-surface border border-surface-active text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-[#FF6600]/40 focus:shadow-[0_2px_12px_rgba(255,102,0,0.08)]"
+        disabled={isCreating}
+      />
+      <div className="flex gap-2 mt-2">
+        <button onClick={handleCreate} disabled={isCreating || !name.trim()} className="flex-1 px-3 py-1.5 rounded-xl text-sm font-medium text-white bg-[#FF6600] hover:bg-[#E65C00] disabled:opacity-50 transition-colors">
+          {isCreating ? 'Creating...' : 'Create'}
+        </button>
+        <button onClick={() => { setIsOpen(false); setName('') }} className="px-3 py-1.5 rounded-xl text-sm text-text-muted hover:bg-surface-hover transition-colors">
+          Cancel
+        </button>
+      </div>
+    </div>
   )
 }
