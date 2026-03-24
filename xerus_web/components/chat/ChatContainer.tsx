@@ -44,6 +44,39 @@ function extToViewerType(ext: string): ViewerContentType {
   return EXT_TO_VIEWER[ext] ?? 'text'
 }
 
+// Top-level component rendered inside AppSidebar via the slot system.
+// Reads from a ref (latest data) and uses useState for forceUpdate.
+// Defined at module scope so React treats it as a proper component (hooks are legal).
+interface SidebarPropsRef {
+  projects: import('./types').ProjectGroup[]
+  conversationId: string | null
+  selectedChannel?: import('./types').SelectedChannel | null
+  isLoading: boolean
+  handleSelectConversation: (id: string) => void
+  handleNewConversation: () => void
+  handleDeleteConversation: (id: string) => void
+  handleSelectChannel: (ch: import('./types').SelectedChannel) => void
+  handleClearChannel: () => void
+}
+
+function ChatSidebarSlotComponent({ propsRef }: { propsRef: React.RefObject<SidebarPropsRef> }) {
+  const p = propsRef.current!
+  return (
+    <ConversationSidebar
+      projects={p.projects}
+      currentConversationId={p.conversationId}
+      onSelectConversation={p.handleSelectConversation}
+      onNewConversation={p.handleNewConversation}
+      onDeleteConversation={p.handleDeleteConversation}
+      isCollapsed={false}
+      isLoading={p.isLoading}
+      selectedChannel={p.selectedChannel}
+      onSelectChannel={p.handleSelectChannel}
+      onClearChannel={p.handleClearChannel}
+    />
+  )
+}
+
 interface ChatContainerProps {
   initialAgentId?: string
   conversationId?: string
@@ -204,36 +237,11 @@ export function ChatContainer({
     handleClearChannel: chat.handleClearChannel,
   }
 
-  // Holds the forceUpdate function from the wrapper rendered inside AppSidebar
-  const sidebarForceUpdateRef = useRef<() => void>(() => {})
-
-  const ChatSidebarSlot = useCallback(() => {
-    // This hook runs inside the AppSidebar render tree, not ChatContainer.
-    // The reducer gives us a stable forceUpdate that re-renders just this subtree.
-    const [, forceUpdate] = useState(0)
-    sidebarForceUpdateRef.current = () => forceUpdate(v => v + 1)
-
-    const p = sidebarPropsRef.current
-    return (
-      <ConversationSidebar
-        projects={p.projects}
-        currentConversationId={p.conversationId}
-        onSelectConversation={p.handleSelectConversation}
-        onNewConversation={p.handleNewConversation}
-        onDeleteConversation={p.handleDeleteConversation}
-        isCollapsed={false}
-        isLoading={p.isLoading}
-        selectedChannel={p.selectedChannel}
-        onSelectChannel={p.handleSelectChannel}
-        onClearChannel={p.handleClearChannel}
-      />
-    )
-  }, [])
-
-  // When sidebar-relevant data changes, poke the sidebar to re-render
-  useEffect(() => {
-    sidebarForceUpdateRef.current()
-  }, [chat.projects, state.conversationId, state.selectedChannel, chat.isLoadingAgents])
+  // Slot component: reads from ref on every render.
+  // Stable reference via useRef — no context cascades.
+  const ChatSidebarSlot = useRef(() => (
+    <ChatSidebarSlotComponent propsRef={sidebarPropsRef} />
+  )).current
 
   useSidebarSlotRegister('chat-sidebar', ChatSidebarSlot)
 
