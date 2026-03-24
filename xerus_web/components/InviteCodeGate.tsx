@@ -15,7 +15,6 @@ export function InviteCodeGate({ email }: InviteCodeGateProps) {
   const [code, setCode] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
   const [showRequestAccess, setShowRequestAccess] = useState(false)
   const [requestEmail, setRequestEmail] = useState(email)
   const [requestSent, setRequestSent] = useState(false)
@@ -35,10 +34,7 @@ export function InviteCodeGate({ email }: InviteCodeGateProps) {
 
     try {
       await redeemInviteCode(code)
-      setSuccess(true)
-      setTimeout(() => {
-        window.location.reload()
-      }, 1200)
+      window.location.reload()
     } catch (err) {
       const apiError = err as ApiError
       if (apiError.status === 429) {
@@ -78,36 +74,14 @@ export function InviteCodeGate({ email }: InviteCodeGateProps) {
             <img src="/logo/logo-svg.svg" alt="Xerus Logo" className="h-10 mt-3" />
           </div>
 
-          {success ? (
-            <>
-              <h1 className="text-4xl md:text-5xl font-serif font-medium text-text mb-4 tracking-tight">
-                You're in!
-              </h1>
-              <p className="text-text-secondary text-lg font-sans">
-                Setting up your workspace...
-              </p>
-            </>
-          ) : (
-            <>
-              <p className="text-text-secondary text-lg font-sans max-w-sm mx-auto">
-                Xerus is currently invite-only. Enter your code below to get started, or join the waitlist.
-              </p>
-            </>
-          )}
+          <p className="text-text-secondary text-lg font-sans max-w-sm mx-auto">
+            Xerus is currently invite-only. Enter your code below to get started, or join the waitlist.
+          </p>
         </div>
 
         {/* Card */}
         <div className="w-full bg-surface p-8 rounded-[32px] shadow-sm border border-[#FFE4D6]">
-          {success ? (
-            <div className="flex flex-col items-center gap-4 py-4">
-              <div className="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center">
-                <svg className="w-8 h-8 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <p className="text-text font-medium text-[15px]">Welcome to Xerus</p>
-            </div>
-          ) : showRequestAccess ? (
+          {showRequestAccess ? (
             // Request access form
             <div>
               <p className="text-text-secondary text-[15px] leading-relaxed mb-6 text-center">
@@ -214,19 +188,17 @@ export function InviteCodeGate({ email }: InviteCodeGateProps) {
         </div>
 
         {/* Footer */}
-        {!success && (
-          <div className="mt-8 text-center">
-            <p className="text-xs text-[#9CA3AF] font-sans">
-              Not you?{' '}
-              <button
-                onClick={handleLogout}
-                className="text-[#FF6600] hover:text-[#E65C00] transition-colors hover:underline"
-              >
-                Sign out
-              </button>
-            </p>
-          </div>
-        )}
+        <div className="mt-8 text-center">
+          <p className="text-xs text-[#9CA3AF] font-sans">
+            Not you?{' '}
+            <button
+              onClick={handleLogout}
+              className="text-[#FF6600] hover:text-[#E65C00] transition-colors hover:underline"
+            >
+              Sign out
+            </button>
+          </p>
+        </div>
       </div>
     </div>
   )
