@@ -4,6 +4,7 @@
 import { Router, Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../../types';
 import { sendResponse } from '../../utils/response';
+import { UnauthorizedError } from '../../utils/errors';
 import { verifyFirebaseToken, authenticateFirebaseToken, requireRole } from '../../middleware/auth';
 import { inviteCodeRateLimit } from '../../middleware/rate-limit';
 import { inviteCodeService } from './service';
@@ -15,7 +16,7 @@ router.post('/redeem', verifyFirebaseToken, inviteCodeRateLimit, async (req: Aut
     const startTime = res.locals.startTime || Date.now();
     try {
         if (!req.user) {
-            throw new Error('Authentication required');
+            throw new UnauthorizedError('Authentication required');
         }
 
         const { code } = req.body;
@@ -40,7 +41,7 @@ router.post('/generate', authenticateFirebaseToken, requireRole(['admin']), asyn
     const startTime = res.locals.startTime || Date.now();
     try {
         if (!req.user) {
-            throw new Error('Authentication required');
+            throw new UnauthorizedError('Authentication required');
         }
 
         const { count, expires_at } = req.body;
@@ -69,27 +70,16 @@ router.post('/generate', authenticateFirebaseToken, requireRole(['admin']), asyn
 router.get('/', authenticateFirebaseToken, requireRole(['admin']), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const startTime = res.locals.startTime || Date.now();
     try {
-        const { limit, offset } = req.query;
+        const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : undefined;
+        const offset = req.query.offset ? parseInt(String(req.query.offset), 10) : undefined;
 
-        const result = await inviteCodeService.listCodes(
-            limit ? parseInt(limit as string, 10) : undefined,
-            offset ? parseInt(offset as string, 10) : undefined
-        );
+        const result = await inviteCodeService.listCodes(limit, offset);
 
         sendResponse(
             res,
             200,
             {
-                codes: result.codes.map(c => ({
-                    id: c.id,
-                    code: c.code,
-                    created_by: c.created_by,
-                    used_by: c.used_by,
-                    used_at: c.used_at,
-                    expires_at: c.expires_at,
-                    is_used: c.is_used,
-                    created_at: c.created_at,
-                })),
+                codes: result.codes,
                 total: result.total,
             },
             startTime

@@ -3,7 +3,7 @@
 
 import Joi from 'joi';
 import { InviteCodeValidationError } from './errors';
-import type { GenerateCodesInput, RedeemCodeInput } from './types';
+import type { GenerateCodesInput } from './types';
 
 // ===== SCHEMAS =====
 
@@ -25,7 +25,7 @@ const generateSchema = Joi.object({
 // ===== VALIDATOR CLASS =====
 
 export class InviteCodeValidator {
-    validateRedeem(data: unknown): RedeemCodeInput {
+    validateRedeem(data: unknown): { code: string } {
         const { error, value } = redeemSchema.validate(data, {
             abortEarly: false,
             stripUnknown: true,
@@ -39,7 +39,7 @@ export class InviteCodeValidator {
             throw new InviteCodeValidationError(errors);
         }
 
-        return value as RedeemCodeInput;
+        return value as { code: string };
     }
 
     validateGenerate(data: unknown): GenerateCodesInput {

@@ -5,9 +5,12 @@ import crypto from 'crypto';
 import { query, transaction } from '../../database/connection';
 import { PoolClient } from 'pg';
 import type { InviteCode, InviteCodeRow } from './types';
+import { UserNotFoundError } from '../users/errors';
 
 // Ambiguity-free charset: no 0/O, 1/I/L
 const CHARSET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+const CHARSET_LEN = CHARSET.length; // 31
+const MAX_BYTE = CHARSET_LEN * Math.floor(256 / CHARSET_LEN); // 248 — eliminates modulo bias
 
 // ===== HELPERS =====
 
@@ -24,18 +27,24 @@ function mapInviteCodeRow(row: InviteCodeRow): InviteCode {
     };
 }
 
+// Rejection sampling: discard bytes >= MAX_BYTE to eliminate modulo bias
 function generateCode(): string {
-    const bytes = crypto.randomBytes(8);
-    return Array.from(bytes)
-        .map(b => CHARSET[b % CHARSET.length])
-        .join('');
+    const result: string[] = [];
+    while (result.length < 8) {
+        const [byte] = crypto.randomBytes(1);
+        if (byte < MAX_BYTE) {
+            result.push(CHARSET[byte % CHARSET_LEN]);
+        }
+    }
+    return result.join('');
 }
 
 // ===== REPOSITORY CLASS =====
 
 export class InviteCodeRepository {
     // Atomic redeem: UPDATE only if code is valid, unused, and not expired.
-    // Returns null if code is invalid/used/expired (no race condition).
+    // Cross-domain write on users table is intentional — transaction atomicity
+    // requires both the code mark-used and user activation to succeed or fail together.
     async redeemCode(code: string, userId: string): Promise<InviteCode | null> {
         return transaction(async (client: PoolClient) => {
             // Atomic UPDATE on invite code
@@ -52,29 +61,49 @@ export class InviteCodeRepository {
             }
 
             // Activate user in same transaction
-            await client.query(
+            const userResult = await client.query(
                 'UPDATE users SET is_active = true, updated_at = NOW() WHERE user_id = $1',
                 [userId]
             );
+
+            if (userResult.rowCount === 0) {
+                throw new UserNotFoundError(userId);
+            }
 
             return mapInviteCodeRow(codeResult.rows[0]);
         });
     }
 
+    // Check if a user has previously redeemed an invite code (for banned-user detection)
+    async hasUserRedeemedBefore(userId: string): Promise<boolean> {
+        const result = await query<{ exists: boolean }>(
+            'SELECT EXISTS(SELECT 1 FROM invite_codes WHERE used_by = $1 AND is_used = true) as exists',
+            [userId]
+        );
+        return result.rows[0]?.exists ?? false;
+    }
+
+    // Batch INSERT in a single transaction — no N+1
     async createBatch(createdBy: string, count: number, expiresAt: Date | null): Promise<string[]> {
-        const codes: string[] = [];
+        const codes = Array.from({ length: count }, () => generateCode());
 
-        for (let i = 0; i < count; i++) {
-            const code = generateCode();
-            await query<InviteCodeRow>(
-                `INSERT INTO invite_codes (code, created_by, expires_at)
-                 VALUES ($1, $2, $3)`,
-                [code, createdBy, expiresAt]
+        return transaction(async (client: PoolClient) => {
+            const values: unknown[] = [];
+            const placeholders: string[] = [];
+
+            codes.forEach((code, i) => {
+                const offset = i * 3;
+                placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3})`);
+                values.push(code, createdBy, expiresAt);
+            });
+
+            await client.query(
+                `INSERT INTO invite_codes (code, created_by, expires_at) VALUES ${placeholders.join(', ')}`,
+                values
             );
-            codes.push(code);
-        }
 
-        return codes;
+            return codes;
+        });
     }
 
     async findByCode(code: string): Promise<InviteCode | null> {
@@ -86,13 +115,15 @@ export class InviteCodeRepository {
     }
 
     async list(limit = 50, offset = 0): Promise<{ codes: InviteCode[]; total: number }> {
-        const countResult = await query<{ count: string }>('SELECT COUNT(*) as count FROM invite_codes');
-        const total = parseInt(countResult.rows[0].count, 10);
-
-        const result = await query<InviteCodeRow>(
-            'SELECT * FROM invite_codes ORDER BY created_at DESC LIMIT $1 OFFSET $2',
+        const result = await query<InviteCodeRow & { total_count: string }>(
+            `SELECT *, COUNT(*) OVER() as total_count
+             FROM invite_codes
+             ORDER BY created_at DESC
+             LIMIT $1 OFFSET $2`,
             [limit, offset]
         );
+
+        const total = result.rows[0] ? parseInt(result.rows[0].total_count, 10) : 0;
 
         return {
             codes: result.rows.map(mapInviteCodeRow),

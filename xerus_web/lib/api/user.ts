@@ -67,16 +67,11 @@ export const findOrCreateUser = async (profile: UserProfile): Promise<UserProfil
 };
 
 export const redeemInviteCode = async (code: string): Promise<void> => {
-  const response = await apiCall('/invite-codes/redeem', {
+  // showErrorToast: false — we handle errors in the InviteCodeGate component
+  await apiCall('/invite-codes/redeem', {
     method: 'POST',
     body: JSON.stringify({ code }),
-  });
-  const json = await response.json();
-  if (!json.success && !json.data?.activated) {
-    const errorCode = json.error?.code || 'UNKNOWN_ERROR';
-    const errorMessage = json.error?.message || 'Failed to redeem invite code';
-    throw new Error(`${errorCode}:${errorMessage}`);
-  }
+  }, false);
 };
 
 export const getUserProfile = async (): Promise<{

@@ -1,6 +1,7 @@
 import { Request } from 'express';
 import rateLimit from 'express-rate-limit';
 import { RateLimitError } from '../utils/errors';
+import { AuthenticatedRequest } from '../types';
 
 export const generalRateLimit = rateLimit({
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10),
@@ -26,7 +27,8 @@ export const strictRateLimit = rateLimit({
 
 export const inviteCodeRateLimit = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 5,                     // 5 attempts per window
+    max: 5,                     // 5 attempts per window per user
+    keyGenerator: (req: Request) => (req as AuthenticatedRequest).user?.uid ?? req.ip ?? 'anonymous',
     standardHeaders: true,
     legacyHeaders: false,
     handler: () => {
