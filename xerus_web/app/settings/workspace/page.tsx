@@ -31,12 +31,16 @@ const PLAN_LABELS: Record<string, string> = {
   prodigy: 'Prodigy',
 }
 
-// Pod resource defaults from xerus-pod config (Hetzner cx32)
-// These will come from a backend API endpoint in the future
-const POD_RESOURCES = {
-  vcpus: 4,
-  memoryGb: 8,
-  diskGb: 50,
+// Per-sandbox resource allocation by plan tier
+// Maps to Daytona sandbox resource limits (RESOURCE_LIMITS_DISABLED=false in prod)
+const PLAN_RESOURCES: Record<string, { vcpus: number; memoryGb: number; storageGb: number }> = {
+  free:     { vcpus: 1, memoryGb: 1, storageGb: 5 },
+  starter:  { vcpus: 1, memoryGb: 2, storageGb: 10 },
+  advanced: { vcpus: 2, memoryGb: 4, storageGb: 25 },
+  prodigy:  { vcpus: 4, memoryGb: 8, storageGb: 50 },
+}
+
+const POD_ENV = {
   os: 'Ubuntu 24.04',
   region: 'Nuremberg, EU',
 } as const
@@ -83,6 +87,8 @@ export default function WorkspaceOverviewPage() {
   }
 
   const isRunning = workspaceStatus?.sandbox_running
+  const planType = credits?.plan_type || 'free'
+  const podResources = PLAN_RESOURCES[planType] || PLAN_RESOURCES.free
   const totalCredits = credits ? PLAN_CREDITS[credits.plan_type] || 10 : 10
   const creditsPercent = credits ? Math.min(100, (credits.credits_available / totalCredits) * 100) : 0
 
@@ -157,33 +163,33 @@ export default function WorkspaceOverviewPage() {
             <div className="flex items-center justify-center gap-1.5 mb-1">
               <Cpu className="w-3.5 h-3.5 text-text-secondary" />
             </div>
-            <p className="text-lg font-semibold text-text">{POD_RESOURCES.vcpus}</p>
+            <p className="text-lg font-semibold text-text">{podResources.vcpus}</p>
             <p className="text-[11px] text-text-secondary">vCPUs</p>
           </div>
           <div className="bg-surface-hover/50 border border-surface-active/40 rounded-xl p-3.5 text-center">
             <div className="flex items-center justify-center gap-1.5 mb-1">
               <MemoryStick className="w-3.5 h-3.5 text-text-secondary" />
             </div>
-            <p className="text-lg font-semibold text-text">{POD_RESOURCES.memoryGb} <span className="text-sm font-normal text-text-secondary">GB</span></p>
+            <p className="text-lg font-semibold text-text">{podResources.memoryGb} <span className="text-sm font-normal text-text-secondary">GB</span></p>
             <p className="text-[11px] text-text-secondary">Memory</p>
           </div>
           <div className="bg-surface-hover/50 border border-surface-active/40 rounded-xl p-3.5 text-center">
             <div className="flex items-center justify-center gap-1.5 mb-1">
               <HardDrive className="w-3.5 h-3.5 text-text-secondary" />
             </div>
-            <p className="text-lg font-semibold text-text">{POD_RESOURCES.diskGb} <span className="text-sm font-normal text-text-secondary">GB</span></p>
-            <p className="text-[11px] text-text-secondary">Disk</p>
+            <p className="text-lg font-semibold text-text">{podResources.storageGb} <span className="text-sm font-normal text-text-secondary">GB</span></p>
+            <p className="text-[11px] text-text-secondary">Storage</p>
           </div>
         </div>
 
         {/* OS + Region info row */}
         <div className="flex items-center gap-3 text-[11px] text-text-secondary mb-4">
           <span className="inline-flex items-center gap-1.5 bg-surface-hover/50 border border-surface-active/40 rounded-lg px-2.5 py-1">
-            {POD_RESOURCES.os}
+            {POD_ENV.os}
           </span>
           <span className="inline-flex items-center gap-1.5 bg-surface-hover/50 border border-surface-active/40 rounded-lg px-2.5 py-1">
             <span className="text-[13px]">&#127466;&#127482;</span>
-            {POD_RESOURCES.region}
+            {POD_ENV.region}
           </span>
         </div>
 
@@ -272,7 +278,7 @@ export default function WorkspaceOverviewPage() {
             <p className="text-2xl font-semibold text-text mb-0.5">
               --
               <span className="text-sm font-normal text-text-secondary ml-1">
-                / {POD_RESOURCES.diskGb} GB
+                / {podResources.storageGb} GB
               </span>
             </p>
             <div className="w-full h-1.5 bg-surface-hover rounded-full mt-2 mb-2 overflow-hidden">
