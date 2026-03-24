@@ -7,7 +7,8 @@ import { Router, Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../../types';
 import { sendResponse } from '../../utils/response';
 import { authenticateFirebaseToken } from '../../middleware/auth';
-import { query } from '../../database/connection';
+import { transaction } from '../../database/connection';
+import { PoolClient } from 'pg';
 import type { SandboxService } from '../execution';
 
 const router = Router();
@@ -80,67 +81,75 @@ router.post('/handoff', auth, async (req: AuthenticatedRequest, res: Response, n
         const projectSlug = projectName ? slugify(projectName) : 'default';
         const projectDisplayName = projectName || 'Default';
 
-        // 1. Create workspace row (idempotent via ON CONFLICT)
-        const wsResult = await query(
-            `INSERT INTO workspaces (user_id, slug, name)
-             VALUES ($1, $2, $3)
-             ON CONFLICT (user_id) DO UPDATE SET
-                 name = EXCLUDED.name,
-                 slug = EXCLUDED.slug,
-                 updated_at = NOW()
-             RETURNING id::text, slug, name`,
-            [userId, workspaceSlug, workspaceName],
-        );
-        const workspace = wsResult.rows[0] as { id: string; slug: string; name: string };
-
-        // 2. Create default domain
-        const domainResult = await query(
-            `INSERT INTO domains (user_id, workspace_id, slug, name, description)
-             VALUES ($1, $2, $3, $4, $5)
-             ON CONFLICT (workspace_id, slug) DO UPDATE SET
-                 name = EXCLUDED.name,
-                 updated_at = NOW()
-             RETURNING id::text, slug, name`,
-            [userId, workspace.id, projectSlug, projectDisplayName, `${projectDisplayName} department`],
-        );
-        const domain = domainResult.rows[0] as { id: string; slug: string; name: string };
-
-        // 3. Create #general channel in the domain
-        const channelResult = await query(
-            `INSERT INTO channels (domain_id, user_id, slug, name, description)
-             VALUES ($1, $2, 'general', 'General', 'Default channel for team communication')
-             ON CONFLICT (domain_id, slug) DO UPDATE SET
-                 name = EXCLUDED.name,
-                 updated_at = NOW()
-             RETURNING id::text`,
-            [domain.id, userId],
-        );
-        const channel = channelResult.rows[0] as { id: string };
-
-        // 4. Seed first conversation with template messages (shows in /chat)
+        // Steps 1-5 in a single transaction — all-or-nothing
         const userName = req.user?.name || 'there';
         const firstNameForGreeting = userName.split(' ')[0] || 'there';
         const templateMsgs = buildTemplateMessages(firstNameForGreeting);
 
-        const convResult = await query(
-            `INSERT INTO conversations (user_id, agent_slug, title, message_count, last_message_at)
-             VALUES ($1, 'xerus-master', 'Onboarding', $2, NOW())
-             RETURNING id::text`,
-            [userId, templateMsgs.length],
-        );
-        const conversationId = (convResult.rows[0] as { id: string }).id;
+        const result = await transaction(async (client: PoolClient) => {
+            // 1. Create workspace row
+            const wsResult = await client.query(
+                `INSERT INTO workspaces (user_id, slug, name)
+                 VALUES ($1, $2, $3)
+                 ON CONFLICT (user_id) DO UPDATE SET
+                     name = EXCLUDED.name, slug = EXCLUDED.slug, updated_at = NOW()
+                 RETURNING id::text, slug, name`,
+                [userId, workspaceSlug, workspaceName],
+            );
+            const workspace = wsResult.rows[0] as { id: string; slug: string; name: string };
 
-        // Insert template messages as execution_session rows so /chat can load them
-        for (const msg of templateMsgs) {
-            await query(
+            // 2. Create default domain
+            const domainResult = await client.query(
+                `INSERT INTO domains (user_id, workspace_id, slug, name, description)
+                 VALUES ($1, $2, $3, $4, $5)
+                 ON CONFLICT (workspace_id, slug) DO UPDATE SET
+                     name = EXCLUDED.name, updated_at = NOW()
+                 RETURNING id::text, slug, name`,
+                [userId, workspace.id, projectSlug, projectDisplayName, `${projectDisplayName} department`],
+            );
+            const domain = domainResult.rows[0] as { id: string; slug: string; name: string };
+
+            // 3. Create #general channel
+            const channelResult = await client.query(
+                `INSERT INTO channels (domain_id, user_id, slug, name, description)
+                 VALUES ($1, $2, 'general', 'General', 'Default channel for team communication')
+                 ON CONFLICT (domain_id, slug) DO UPDATE SET
+                     name = EXCLUDED.name, updated_at = NOW()
+                 RETURNING id::text`,
+                [domain.id, userId],
+            );
+            const channel = channelResult.rows[0] as { id: string };
+
+            // 4. Seed conversation with template messages (shows in /chat)
+            const convResult = await client.query(
+                `INSERT INTO conversations (user_id, agent_slug, title, message_count, last_message_at)
+                 VALUES ($1, 'xerus-master', 'Onboarding', $2, NOW())
+                 RETURNING id::text`,
+                [userId, templateMsgs.length],
+            );
+            const conversationId = (convResult.rows[0] as { id: string }).id;
+
+            // 5. Batch insert template messages (trigger_type NULL — these are seed data, not real executions)
+            const msgValues: unknown[] = [];
+            const msgPlaceholders: string[] = [];
+            templateMsgs.forEach((msg, i) => {
+                const offset = i * 3;
+                msgPlaceholders.push(
+                    `(gen_random_uuid(), $${offset + 1}, 'xerus-master', 'completed', NULL, $${offset + 2}, $${offset + 3}, NOW(), NOW(), NOW())`
+                );
+                msgValues.push(workspace.id, conversationId, msg.content);
+            });
+            await client.query(
                 `INSERT INTO execution_sessions
                  (id, workspace_id, agent_slug, status, trigger_type, conversation_id, agent_response, started_at, completed_at, created_at)
-                 VALUES (gen_random_uuid(), $1, 'xerus-master', 'completed', 'onboarding', $2, $3, NOW(), NOW(), NOW())`,
-                [workspace.id, conversationId, msg.content],
+                 VALUES ${msgPlaceholders.join(', ')}`,
+                msgValues,
             );
-        }
 
-        // 5. Provision sandbox (runs in background — Screen 2 animation covers the wait)
+            return { workspace, domain, channel, conversationId };
+        });
+
+        // 6. Provision sandbox (outside transaction — Screen 2 animation covers the wait)
         let sandboxProvisioned = false;
         if (sandboxService) {
             try {
@@ -153,10 +162,10 @@ router.post('/handoff', auth, async (req: AuthenticatedRequest, res: Response, n
         }
 
         sendResponse(res, 200, {
-            workspace: { id: workspace.id, slug: workspace.slug, name: workspace.name },
-            domain: { id: domain.id, slug: domain.slug, name: domain.name },
-            channel: { id: channel.id, slug: 'general', name: 'General' },
-            conversation_id: conversationId,
+            workspace: { id: result.workspace.id, slug: result.workspace.slug, name: result.workspace.name },
+            domain: { id: result.domain.id, slug: result.domain.slug, name: result.domain.name },
+            channel: { id: result.channel.id, slug: 'general', name: 'General' },
+            conversation_id: result.conversationId,
             sandbox_provisioned: sandboxProvisioned,
         }, startTime);
     } catch (err) {
