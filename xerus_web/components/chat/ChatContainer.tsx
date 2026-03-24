@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { MessageList } from './MessageList'
 import { ChatInput } from './ChatInput'
@@ -177,6 +177,10 @@ export function ChatContainer({
   }, [])
 
   // ---- Sidebar slot ----
+  // The slot system renders a stable component ref inside AppSidebar.
+  // To avoid infinite re-render loops, the slot component is stable (useCallback []).
+  // Data is passed via ref + a forceUpdate callback so the sidebar re-renders
+  // when conversations load WITHOUT triggering context cascades.
   const sidebarPropsRef = useRef({
     projects: chat.projects,
     conversationId: state.conversationId,
@@ -198,7 +202,15 @@ export function ChatContainer({
     handleClearChannel: chat.handleClearChannel,
   }
 
+  // Holds the forceUpdate function from the wrapper rendered inside AppSidebar
+  const sidebarForceUpdateRef = useRef<() => void>(() => {})
+
   const ChatSidebarSlot = useCallback(() => {
+    // This hook runs inside the AppSidebar render tree, not ChatContainer.
+    // The reducer gives us a stable forceUpdate that re-renders just this subtree.
+    const [, forceUpdate] = useState(0)
+    sidebarForceUpdateRef.current = () => forceUpdate(v => v + 1)
+
     const p = sidebarPropsRef.current
     return (
       <ConversationSidebar
@@ -214,6 +226,11 @@ export function ChatContainer({
       />
     )
   }, [])
+
+  // When sidebar-relevant data changes, poke the sidebar to re-render
+  useEffect(() => {
+    sidebarForceUpdateRef.current()
+  }, [chat.projects, state.conversationId, state.selectedChannel])
 
   useSidebarSlotRegister('chat-sidebar', ChatSidebarSlot)
 
