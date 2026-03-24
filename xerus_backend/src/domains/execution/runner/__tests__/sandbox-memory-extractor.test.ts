@@ -1,6 +1,6 @@
 // SandboxMemoryExtractor Tests
 // Tests for direct Anthropic Haiku API memory extraction inside sandbox
-// Reference: glass-y5v.4.169
+// Reference: xerus-y5v.4.169
 
 import { SandboxMemoryExtractor, EXTRACTION_SYSTEM_PROMPT } from '../sandbox-memory-extractor';
 import type { ExtractedMemories } from '../../hooks/session-end.types';

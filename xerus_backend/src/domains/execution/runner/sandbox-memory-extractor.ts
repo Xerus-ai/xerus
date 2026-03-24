@@ -11,7 +11,7 @@
 // When ANTHROPIC_BASE_URL contains 'openrouter.ai', routes through OpenRouter
 // using OpenAI-compatible chat/completions endpoint.
 //
-// Reference: glass-y5v.4.169
+// Reference: xerus-y5v.4.169
 
 import type { ExtractedMemories, MemoryExtractor } from '../hooks/session-end.types';
 import type { PreCompactExtractedMemories, PreCompactMemoryExtractor } from '../hooks/pre-compact.hook';

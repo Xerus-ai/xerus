@@ -2,7 +2,7 @@
 // Generates project/channel-specific CLAUDE.md content for agent working directories.
 // SDK lazy-loads descendant CLAUDE.md files via ancestor walk, so this file auto-loads
 // when agent cwd is set to a channel path.
-// Reference: glass-y5v.4.173
+// Reference: xerus-y5v.4.173
 
 // -----------------------------------------------------------------------------
 // Types

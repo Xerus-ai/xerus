@@ -1,6 +1,6 @@
 // Response Error Builders
 // Serializers for error responses in SSE and non-SSE endpoints
-// Task: glass-y5v.4.74
+// Task: xerus-y5v.4.74
 
 import { ErrorType, ExecutionSummary, DoneEventMeta } from '../types';
 import { classifyErrorFromObject, extractErrorCode } from './error-classifier';

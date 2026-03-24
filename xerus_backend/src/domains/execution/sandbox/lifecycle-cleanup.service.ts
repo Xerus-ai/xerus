@@ -1,7 +1,7 @@
 // Sandbox Lifecycle Cleanup Service
 // Garbage collection for stale Daytona sandboxes
 // Handles: stale sandbox kill, orphan detection, stuck session cleanup
-// Spec: glass-y5v.4.112
+// Spec: xerus-y5v.4.112
 
 // -----------------------------------------------------------------------------
 // Types

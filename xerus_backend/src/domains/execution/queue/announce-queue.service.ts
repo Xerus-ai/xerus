@@ -1,6 +1,6 @@
 // Subagent Announce Queue Service
 // Batches subagent completion notifications for user inbox
-// Task: glass-y5v.4.40
+// Task: xerus-y5v.4.40
 
 import { XERUS_MASTER_SLUG } from '../agents/xerus-master.types';
 
