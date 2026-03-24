@@ -16,6 +16,9 @@ export function InviteCodeGate({ email }: InviteCodeGateProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const [showRequestAccess, setShowRequestAccess] = useState(false)
+  const [requestEmail, setRequestEmail] = useState(email)
+  const [requestSent, setRequestSent] = useState(false)
 
   const handleCodeChange = (value: string) => {
     const cleaned = value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 8)
@@ -35,9 +38,8 @@ export function InviteCodeGate({ email }: InviteCodeGateProps) {
       setSuccess(true)
       setTimeout(() => {
         window.location.reload()
-      }, 1000)
+      }, 1200)
     } catch (err) {
-      // apiCall throws ApiError with status and human-readable message from backend
       const apiError = err as ApiError
       if (apiError.status === 429) {
         setError('Too many attempts. Please wait and try again.')
@@ -47,6 +49,13 @@ export function InviteCodeGate({ email }: InviteCodeGateProps) {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  const handleRequestAccess = (e: FormEvent) => {
+    e.preventDefault()
+    // Open mailto or external form — for now, redirect to landing page waitlist
+    window.open(`https://www.xerus.ai?waitlist=${encodeURIComponent(requestEmail)}`, '_blank')
+    setRequestSent(true)
   }
 
   const handleLogout = async () => {
@@ -61,20 +70,33 @@ export function InviteCodeGate({ email }: InviteCodeGateProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-surface-alt">
       <GradientBackground />
 
-      {/* Content */}
       <div className="relative z-10 w-full max-w-md px-4 flex flex-col items-center">
-        {/* Logo and branding */}
+        {/* Logo */}
         <div className="text-center mb-10">
           <div className="flex items-center justify-center gap-3 mb-6">
             <img src="/logo/xerus.svg" alt="Xerus" className="w-16 h-16" />
             <img src="/logo/logo-svg.svg" alt="Xerus Logo" className="h-10 mt-3" />
           </div>
-          <h1 className="text-4xl md:text-5xl font-serif font-medium text-text mb-4 tracking-tight">
-            {success ? 'Welcome!' : 'Almost there'}
-          </h1>
-          <p className="text-text-secondary text-lg font-sans">
-            {success ? 'Setting up your workspace...' : 'Enter your invite code to get started'}
-          </p>
+
+          {success ? (
+            <>
+              <h1 className="text-4xl md:text-5xl font-serif font-medium text-text mb-4 tracking-tight">
+                You're in!
+              </h1>
+              <p className="text-text-secondary text-lg font-sans">
+                Setting up your workspace...
+              </p>
+            </>
+          ) : (
+            <>
+              <h1 className="text-4xl md:text-5xl font-serif font-medium text-text mb-4 tracking-tight">
+                Early access
+              </h1>
+              <p className="text-text-secondary text-lg font-sans max-w-sm mx-auto">
+                Xerus is currently invite-only. Enter your code below to get started.
+              </p>
+            </>
+          )}
         </div>
 
         {/* Card */}
@@ -86,14 +108,64 @@ export function InviteCodeGate({ email }: InviteCodeGateProps) {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <p className="text-text font-medium text-[15px]">Account activated</p>
+              <p className="text-text font-medium text-[15px]">Welcome to Xerus</p>
             </div>
-          ) : (
-            <form onSubmit={handleSubmit}>
+          ) : showRequestAccess ? (
+            // Request access form
+            <div>
               <p className="text-text-secondary text-[15px] leading-relaxed mb-6 text-center">
-                Signed in as <span className="font-medium text-text">{email}</span>
+                {requestSent
+                  ? "Thanks! We'll notify you when a spot opens up."
+                  : "Don't have a code? Join the waitlist and we'll send you one."}
               </p>
 
+              {!requestSent ? (
+                <form onSubmit={handleRequestAccess}>
+                  <input
+                    type="email"
+                    value={requestEmail}
+                    onChange={(e) => setRequestEmail(e.target.value)}
+                    placeholder="your@email.com"
+                    required
+                    className="w-full py-3.5 px-5 text-[15px] text-center border border-surface-active rounded-xl bg-surface-hover transition-all duration-300 outline-none focus:border-[#FF6600]/40 focus:shadow-[0_4px_20px_rgba(255,102,0,0.1)]"
+                  />
+
+                  <button
+                    type="submit"
+                    className="w-full flex items-center justify-center py-3.5 px-6 mt-4 bg-[#18181B] text-white rounded-xl font-medium text-[15px] hover:bg-[#27272A] transition-all duration-300 transform hover:-translate-y-0.5"
+                  >
+                    Join waitlist
+                  </button>
+                </form>
+              ) : (
+                <div className="flex items-center justify-center gap-2 py-2">
+                  <svg className="w-5 h-5 text-[#FF6600]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  <span className="text-text-secondary text-[15px]">Check your inbox</span>
+                </div>
+              )}
+
+              <button
+                onClick={() => setShowRequestAccess(false)}
+                className="w-full text-center mt-4 text-[13px] text-[#FF6600] hover:text-[#E65C00] transition-colors hover:underline"
+              >
+                I have an invite code
+              </button>
+            </div>
+          ) : (
+            // Invite code form
+            <form onSubmit={handleSubmit}>
+              <p className="text-text-secondary text-[15px] leading-relaxed mb-1 text-center">
+                Signed in as <span className="font-medium text-text">{email}</span>
+              </p>
+              <p className="text-text-secondary/60 text-[13px] mb-6 text-center">
+                Invite codes are shared on our Discord and social channels.
+              </p>
+
+              <label className="block text-[13px] font-medium text-text-secondary mb-2 ml-1">
+                Invite code
+              </label>
               <input
                 type="text"
                 value={displayCode}
@@ -105,7 +177,7 @@ export function InviteCodeGate({ email }: InviteCodeGateProps) {
                 maxLength={9}
                 autoFocus
                 disabled={isSubmitting}
-                className={`w-full py-4 px-6 font-mono text-2xl tracking-[0.3em] text-center uppercase border rounded-xl bg-surface-hover transition-all duration-300 outline-none ${
+                className={`w-full py-3.5 px-5 font-mono text-xl tracking-[0.25em] text-center uppercase border rounded-xl bg-surface-hover transition-all duration-300 outline-none ${
                   error
                     ? 'border-red-400 focus:border-red-400 focus:shadow-[0_4px_20px_rgba(239,68,68,0.1)]'
                     : 'border-surface-active focus:border-[#FF6600]/40 focus:shadow-[0_4px_20px_rgba(255,102,0,0.1)]'
@@ -113,25 +185,38 @@ export function InviteCodeGate({ email }: InviteCodeGateProps) {
               />
 
               {error && (
-                <p className="text-red-500 text-sm mt-2 text-center">{error}</p>
+                <p className="text-red-500 text-[13px] mt-2 text-center">{error}</p>
               )}
 
+              {/* Primary CTA — solid black */}
               <button
                 type="submit"
                 disabled={code.length < 8 || isSubmitting}
-                className="group w-full flex items-center justify-center gap-3 py-4 px-6 mt-4 bg-surface-hover border border-surface-active rounded-xl text-text font-medium hover:border-[#FF6600]/40 hover:shadow-[0_4px_20px_rgba(255,102,0,0.1)] transition-all duration-300 transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                className="w-full flex items-center justify-center gap-2.5 py-3.5 px-6 mt-4 bg-[#18181B] text-white rounded-xl font-medium text-[15px] hover:bg-[#27272A] transition-all duration-300 transform hover:-translate-y-0.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none"
               >
                 {isSubmitting ? (
-                  <div className="w-5 h-5 border-2 border-[#FF6600] border-t-transparent rounded-full animate-spin" />
-                ) : null}
-                <span className="font-sans text-[15px]">
-                  {isSubmitting ? 'Activating...' : 'Activate Account'}
-                </span>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                  </svg>
+                )}
+                <span>{isSubmitting ? 'Verifying...' : 'Verify & continue'}</span>
+              </button>
+
+              {/* Secondary — request access */}
+              <button
+                type="button"
+                onClick={() => setShowRequestAccess(true)}
+                className="w-full text-center mt-4 text-[13px] text-text-secondary hover:text-text transition-colors"
+              >
+                Don't have a code? <span className="text-[#FF6600] hover:underline">Request access</span>
               </button>
             </form>
           )}
         </div>
 
+        {/* Footer */}
         {!success && (
           <div className="mt-8 text-center">
             <p className="text-xs text-[#9CA3AF] font-sans">
