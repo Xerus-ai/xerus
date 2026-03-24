@@ -15,6 +15,7 @@ import agentCrudRouter from './agent-crud.routes';
 import agentToolsRouter from './agent-tools.routes';
 import agentKbRouter from './agent-kb.routes';
 import agentHeartbeatRouter from './agent-heartbeat.routes';
+import agentImportRouter from './agent-import.routes';
 
 // -----------------------------------------------------------------------------
 // Dependency Injection for Workspace Sync
@@ -67,5 +68,6 @@ router.use('/', agentCrudRouter);
 router.use('/', agentToolsRouter);
 router.use('/', agentKbRouter);
 router.use('/', agentHeartbeatRouter);
+router.use('/', agentImportRouter);
 
 export default router;

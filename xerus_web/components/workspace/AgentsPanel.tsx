@@ -3,11 +3,12 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
-import { Plus } from 'lucide-react'
-import { getUserAgents, getMarketplaceAgents, cloneAgent } from '@/lib/api/agents'
+import { Plus, Upload } from 'lucide-react'
+import { getUserAgents, getMarketplaceAgents, cloneAgent, importAgent } from '@/lib/api/agents'
 import type { Assistant } from '@/lib/api/types'
 import { PageHeader } from '@/components/common/PageHeader'
 import { AgentCard, CreateAgentCard } from '@/components/agents/AgentCard'
+import { UploadPanel } from '@/components/upload/UploadPanel'
 
 interface AgentsPanelProps {
   onSelect: (agent: Assistant) => void
@@ -19,6 +20,7 @@ export function AgentsPanel({ onSelect, onCountChange }: AgentsPanelProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [cloningSlug, setCloningSlug] = useState<string | null>(null)
+  const [uploadPanelOpen, setUploadPanelOpen] = useState(false)
 
   // SWR for deduplication + caching (rule: client-swr-dedup)
   const { data: myAgentsRaw = [] } = useSWR('agents/mine', getUserAgents)
@@ -90,13 +92,22 @@ export function AgentsPanel({ onSelect, onCountChange }: AgentsPanelProps) {
           onToggleCategory={handleToggleCategory}
           onClearCategories={handleClearCategories}
         >
-          <button
-            onClick={() => router.push('/ai-agents/create')}
-            className="bg-text text-white hover:bg-[#1a1a1a] px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2 shadow-md mb-4"
-          >
-            <Plus className="w-4 h-4" />
-            Create Agent
-          </button>
+          <div className="flex items-center gap-2 mb-4">
+            <button
+              onClick={() => setUploadPanelOpen(true)}
+              className="border border-surface-active text-text hover:bg-surface-hover px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2"
+            >
+              <Upload className="w-4 h-4" />
+              Import
+            </button>
+            <button
+              onClick={() => router.push('/ai-agents/create')}
+              className="bg-text text-white hover:bg-[#1a1a1a] px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2 shadow-md"
+            >
+              <Plus className="w-4 h-4" />
+              Create Agent
+            </button>
+          </div>
         </PageHeader>
 
         {/* My Agents */}
@@ -154,6 +165,17 @@ export function AgentsPanel({ onSelect, onCountChange }: AgentsPanelProps) {
           </div>
         )}
       </div>
+
+      <UploadPanel
+        context="import"
+        isOpen={uploadPanelOpen}
+        onClose={() => setUploadPanelOpen(false)}
+        onImportAgent={async (files) => {
+          await importAgent(files)
+          mutate('agents/mine')
+          setUploadPanelOpen(false)
+        }}
+      />
     </div>
   )
 }

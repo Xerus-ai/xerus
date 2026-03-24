@@ -37,6 +37,7 @@ interface FindOrCreateResponse {
   email: string;
   display_name?: string;
   has_workspace?: boolean;
+  invite_required?: boolean;
   is_new?: boolean;
   role?: string;
   plan_type?: string;
@@ -61,7 +62,16 @@ export const findOrCreateUser = async (profile: UserProfile): Promise<UserProfil
     display_name: userData.display_name || profile.display_name,
     email: userData.email,
     has_workspace: !!userData.has_workspace,
+    invite_required: userData.invite_required || false,
   };
+};
+
+export const redeemInviteCode = async (code: string): Promise<void> => {
+  // showErrorToast: false — we handle errors in the InviteCodeGate component
+  await apiCall('/invite-codes/redeem', {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  }, false);
 };
 
 export const getUserProfile = async (): Promise<{

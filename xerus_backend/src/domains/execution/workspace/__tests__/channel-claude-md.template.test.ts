@@ -1,6 +1,6 @@
 // Channel CLAUDE.md Template Tests
 // Tests for channel-specific CLAUDE.md generation
-// Reference: glass-y5v.4.173
+// Reference: xerus-y5v.4.173
 
 import { generateChannelClaudeMd } from '../channel-claude-md.template';
 import type { ChannelClaudeMdParams } from '../channel-claude-md.template';

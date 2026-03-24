@@ -81,7 +81,7 @@ export class UserRepository {
         return result.rows[0] ? mapUserRow(result.rows[0]) : null;
     }
 
-    async create(data: UserCreateInput): Promise<User> {
+    async create(data: UserCreateInput, isActive = true): Promise<User> {
         const planCredits = PLAN_CREDITS.starter;
 
         const result = await query<UserRow>(
@@ -91,9 +91,9 @@ export class UserRepository {
         credits_available, credits_used,
         credits_reset_date, platform_key_access,
         created_at, updated_at, last_login
-      ) VALUES ($1, $2, $3, $4, 'user', 'starter', true, $5, 0, NOW(), true, NOW(), NOW(), NOW())
+      ) VALUES ($1, $2, $3, $4, 'user', 'starter', $6, $5, 0, NOW(), true, NOW(), NOW(), NOW())
       RETURNING *`,
-            [data.firebase_uid, data.email, data.display_name || null, data.avatar_url || null, planCredits]
+            [data.firebase_uid, data.email, data.display_name || null, data.avatar_url || null, planCredits, isActive]
         );
 
         return mapUserRow(result.rows[0]);
@@ -164,6 +164,17 @@ export class UserRepository {
 
     async updateLastLogin(userId: string): Promise<void> {
         await query('UPDATE users SET last_login = NOW(), updated_at = NOW() WHERE user_id = $1', [userId]);
+    }
+
+    async setActive(userId: string, isActive: boolean): Promise<User> {
+        const result = await query<UserRow>(
+            'UPDATE users SET is_active = $2, updated_at = NOW() WHERE user_id = $1 RETURNING *',
+            [userId, isActive]
+        );
+        if (result.rows.length === 0) {
+            throw new UserNotFoundError(userId);
+        }
+        return mapUserRow(result.rows[0]);
     }
 
     async delete(userId: string): Promise<{ agents_deleted: number; sessions_deleted: number; api_keys_deleted: number }> {

@@ -2,11 +2,13 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import useSWR, { mutate as swrMutate } from 'swr'
-import { getSkills, installSkill, uninstallSkill } from '@/lib/api/skills'
+import { Upload } from 'lucide-react'
+import { getSkills, installSkill, uninstallSkill, importSkill } from '@/lib/api/skills'
 import { getAssistants } from '@/lib/api/agents'
 import type { Skill, Assistant } from '@/lib/api/types'
 import { PageHeader } from '@/components/common/PageHeader'
 import { SkillCard } from '@/components/skills/SkillCard'
+import { UploadPanel } from '@/components/upload/UploadPanel'
 
 interface SkillsPanelProps {
   onSelect: (skill: Skill) => void
@@ -16,6 +18,7 @@ interface SkillsPanelProps {
 export function SkillsPanel({ onSelect, onCountChange }: SkillsPanelProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
+  const [uploadPanelOpen, setUploadPanelOpen] = useState(false)
 
   // SWR for deduplication + caching (rule: client-swr-dedup)
   const { data: skillsData } = useSWR('skills/all', () => getSkills({ limit: 100 }))
@@ -92,7 +95,15 @@ export function SkillsPanel({ onSelect, onCountChange }: SkillsPanelProps) {
           selectedCategories={selectedCategories}
           onToggleCategory={handleToggleCategory}
           onClearCategories={handleClearCategories}
-        />
+        >
+          <button
+            onClick={() => setUploadPanelOpen(true)}
+            className="border border-surface-active text-text hover:bg-surface-hover px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2 mb-4"
+          >
+            <Upload className="w-4 h-4" />
+            Import
+          </button>
+        </PageHeader>
 
         {/* My Skills */}
         {filteredMySkills.length > 0 && (
@@ -169,6 +180,17 @@ export function SkillsPanel({ onSelect, onCountChange }: SkillsPanelProps) {
           </div>
         )}
       </div>
+
+      <UploadPanel
+        context="import"
+        isOpen={uploadPanelOpen}
+        onClose={() => setUploadPanelOpen(false)}
+        onImportSkill={async (files) => {
+          await importSkill(files)
+          refreshSkills()
+          setUploadPanelOpen(false)
+        }}
+      />
     </div>
   )
 }

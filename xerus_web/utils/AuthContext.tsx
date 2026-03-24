@@ -14,6 +14,7 @@ interface AuthContextType {
   hasWorkspace: boolean
   markWorkspaceReady: () => void
   mode: 'firebase' | null
+  inviteRequired: boolean
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -23,6 +24,7 @@ const AuthContext = createContext<AuthContextType>({
   hasWorkspace: false,
   markWorkspaceReady: () => {},
   mode: null,
+  inviteRequired: false,
 })
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -31,6 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthReady, setIsAuthReady] = useState(false)
   const [hasWorkspace, setHasWorkspace] = useState(false)
   const [mode, setMode] = useState<'firebase' | null>(null)
+  const [inviteRequired, setInviteRequired] = useState(false)
   const processingRef = useRef(false)
   const isMountedRef = useRef(true)
 
@@ -65,8 +68,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUserInfo(profile)
           }
 
-          // Ensure sandbox is running (non-blocking, only if workspace exists)
-          if (profile.has_workspace) {
+          // Check if invite code is required
+          if (profile.invite_required) {
+            if (isMountedRef.current) {
+              setInviteRequired(true)
+            }
+          } else if (profile.has_workspace) {
+            // Ensure sandbox is running (non-blocking, only if workspace exists and user active)
             try {
               const { ensureSandbox } = await import('@/lib/api/workspace')
               await ensureSandbox()
@@ -97,8 +105,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const contextValue = useMemo(
-    () => ({ user, isLoading, isAuthReady, hasWorkspace, markWorkspaceReady, mode }),
-    [user, isLoading, isAuthReady, hasWorkspace, markWorkspaceReady, mode]
+    () => ({ user, isLoading, isAuthReady, hasWorkspace, markWorkspaceReady, mode, inviteRequired }),
+    [user, isLoading, isAuthReady, hasWorkspace, markWorkspaceReady, mode, inviteRequired]
   )
 
   return (

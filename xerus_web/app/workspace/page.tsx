@@ -5,7 +5,7 @@ import { FolderOpen, Upload, LayoutGrid, FolderClosed } from 'lucide-react'
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from 'react-resizable-panels'
 import { XerusLoader } from '@/components/common/XerusLoader'
 import { FloatingPanelProvider } from '@/components/common/FloatingPanelContext'
-import { FileUploadPanel } from '@/components/knowledge/FileUploadPanel'
+import { UploadPanel } from '@/components/upload/UploadPanel'
 import { FileTree, FileEditor, TabBar } from '@/components/workspace'
 import type { OpenTab } from '@/components/workspace'
 import { BrowseView } from '@/components/workspace/BrowseView'
@@ -353,7 +353,8 @@ export default function WorkspacePage() {
           </div>
         </div>
 
-        <FileUploadPanel
+        <UploadPanel
+          context="workspace"
           isOpen={uploadPanelOpen}
           onClose={() => setUploadPanelOpen(false)}
           folders={knowledgeFolders}

@@ -2,7 +2,7 @@
 // Runner-backend credit protocol handler
 // Handles: credit_check events, credit_response commands, session_ended deductions
 // Circuit breaker: kills agent if >N credits/hour burned
-// Spec: glass-y5v.4.113
+// Spec: xerus-y5v.4.113
 
 import {
     CreditCheckEvent,

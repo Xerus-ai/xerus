@@ -1,7 +1,7 @@
 // Runner Health Monitor
 // Detects runner process crashes and triggers automatic restart
 // Monitors via stdout activity + health probes
-// Spec: glass-y5v.4.146
+// Spec: xerus-y5v.4.146
 
 import type { HealthCommand } from './stdin-parser';
 import { SANDBOX_CONFIG } from '../sandbox/sandbox.config';

@@ -250,6 +250,7 @@ export interface UserProfile {
   display_name: string;
   email: string;
   has_workspace: boolean;
+  invite_required?: boolean;
 }
 
 // ===========================

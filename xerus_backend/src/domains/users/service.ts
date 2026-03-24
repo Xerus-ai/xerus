@@ -30,8 +30,12 @@ export class UserService {
             };
         }
 
+        // In invite-only mode, new users start inactive (must redeem invite code)
+        const isInviteOnly = process.env.INVITE_ONLY_MODE === 'true';
+        const isActive = !isInviteOnly;
+
         // Create new user (credits initialized to plan default in repository)
-        const user = await userRepository.create(validated);
+        const user = await userRepository.create(validated, isActive);
 
         // Get credit balance
         const creditBalance = await userRepository.getCreditBalance(user.user_id);
@@ -93,6 +97,14 @@ export class UserService {
     async updatePlan(userId: string, planType: PlanType): Promise<User> {
         await this.getById(userId);
         return userRepository.updatePlanType(userId, planType);
+    }
+
+    async activateUser(userId: string): Promise<User> {
+        const user = await userRepository.findById(userId);
+        if (!user) {
+            throw new UserNotFoundError(userId);
+        }
+        return userRepository.setActive(userId, true);
     }
 
     async list(limit = 50, offset = 0): Promise<{ users: User[]; total: number }> {

@@ -1,6 +1,6 @@
 -- Migration: 030_agent_outputs.sql
 -- Description: Create agent_outputs table for task-anchored output organization
--- Task: glass-y5v.4.84
+-- Task: xerus-y5v.4.84
 -- Depends: 022_execution_domain.sql (user_workspaces), 004_agents.sql
 
 -- ===== AGENT_OUTPUTS TABLE =====

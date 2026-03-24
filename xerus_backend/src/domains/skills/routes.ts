@@ -12,6 +12,7 @@ import { SkillUnauthorizedError, SkillValidationError } from './errors';
 import type { PaginatedSkills } from './types';
 import type { SandboxService } from '../execution/sandbox/sandbox.service';
 import { SkillWorkspaceService } from './workspace.service';
+import skillImportRouter from './skill-import.routes';
 
 // Dependency injection
 export interface SkillRoutesDeps {
@@ -254,5 +255,8 @@ agentSkillsRouter.get('/:agentSlug/skills', auth, async (req: AuthenticatedReque
         next(err);
     }
 });
+
+// Mount import sub-router
+router.use('/', skillImportRouter);
 
 export default router;
