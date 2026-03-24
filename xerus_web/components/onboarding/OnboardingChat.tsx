@@ -187,7 +187,7 @@ export function OnboardingChat() {
         id: `workspace-card`,
         role: 'assistant' as const,
         content: 'Great choice! Let\u2019s name your workspace and first project.',
-        source: 'template' as const,
+        source: 'stream' as const,
         ui: {
           type: 'workspace-setup',
           props: {},
