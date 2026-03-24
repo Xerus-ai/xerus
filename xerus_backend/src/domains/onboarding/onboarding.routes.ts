@@ -7,6 +7,7 @@ import { Router, Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../../types';
 import { sendResponse } from '../../utils/response';
 import { authenticateFirebaseToken } from '../../middleware/auth';
+import { UnauthorizedError, BadRequestError } from '../../utils/errors';
 import { transaction } from '../../database/connection';
 import { PoolClient } from 'pg';
 import type { SandboxService } from '../execution';
@@ -42,8 +43,7 @@ router.post('/start', auth, async (req: AuthenticatedRequest, res: Response, nex
     try {
         const userId = req.user?.uid;
         if (!userId) {
-            res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
-            return;
+            throw new UnauthorizedError('Authentication required');
         }
 
         sendResponse(res, 200, { status: 'ready' }, startTime);
@@ -65,16 +65,17 @@ router.post('/handoff', auth, async (req: AuthenticatedRequest, res: Response, n
     try {
         const userId = req.user?.uid;
         if (!userId) {
-            res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
-            return;
+            throw new UnauthorizedError('Authentication required');
         }
 
         const workspaceName = (req.body.workspace as string || '').trim();
         const projectName = (req.body.project as string || '').trim();
 
-        if (!workspaceName) {
-            res.status(400).json({ success: false, error: { code: 'BAD_REQUEST', message: 'workspace name is required' } });
-            return;
+        if (!workspaceName || workspaceName.length > 100) {
+            throw new BadRequestError('workspace name is required (max 100 chars)');
+        }
+        if (projectName.length > 100) {
+            throw new BadRequestError('project name too long (max 100 chars)');
         }
 
         const workspaceSlug = slugify(workspaceName);
@@ -82,8 +83,8 @@ router.post('/handoff', auth, async (req: AuthenticatedRequest, res: Response, n
         const projectDisplayName = projectName || 'Default';
 
         // Steps 1-5 in a single transaction — all-or-nothing
-        const userName = req.user?.name || 'there';
-        const firstNameForGreeting = userName.split(' ')[0] || 'there';
+        const safeName = (req.user?.name || 'there').replace(/[<>&"']/g, '');
+        const firstNameForGreeting = safeName.split(' ')[0] || 'there';
         const templateMsgs = buildTemplateMessages(firstNameForGreeting);
 
         const result = await transaction(async (client: PoolClient) => {
@@ -120,16 +121,24 @@ router.post('/handoff', auth, async (req: AuthenticatedRequest, res: Response, n
             );
             const channel = channelResult.rows[0] as { id: string };
 
-            // 4. Seed conversation with template messages (shows in /chat)
-            const convResult = await client.query(
-                `INSERT INTO conversations (user_id, agent_slug, title, message_count, last_message_at)
-                 VALUES ($1, 'xerus-master', 'Onboarding', $2, NOW())
-                 RETURNING id::text`,
-                [userId, templateMsgs.length],
+            // 4. Seed conversation (idempotent — skip if already exists from a previous attempt)
+            const existingConv = await client.query(
+                `SELECT id::text FROM conversations WHERE user_id = $1 AND title = 'Onboarding' LIMIT 1`,
+                [userId],
             );
-            const conversationId = (convResult.rows[0] as { id: string }).id;
+            let conversationId: string;
+            if (existingConv.rows.length > 0) {
+                conversationId = (existingConv.rows[0] as { id: string }).id;
+            } else {
+                const convResult = await client.query(
+                    `INSERT INTO conversations (user_id, agent_slug, title, message_count, last_message_at)
+                     VALUES ($1, 'xerus-master', 'Onboarding', $2, NOW())
+                     RETURNING id::text`,
+                    [userId, templateMsgs.length],
+                );
+                conversationId = (convResult.rows[0] as { id: string }).id;
 
-            // 5. Batch insert template messages (trigger_type NULL — these are seed data, not real executions)
+                // 5. Batch insert template messages (only for new conversations)
             const msgValues: unknown[] = [];
             const msgPlaceholders: string[] = [];
             templateMsgs.forEach((msg, i) => {
@@ -145,6 +154,7 @@ router.post('/handoff', auth, async (req: AuthenticatedRequest, res: Response, n
                  VALUES ${msgPlaceholders.join(', ')}`,
                 msgValues,
             );
+            }
 
             return { workspace, domain, channel, conversationId };
         });
