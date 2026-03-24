@@ -89,11 +89,8 @@ export function InviteCodeGate({ email }: InviteCodeGateProps) {
             </>
           ) : (
             <>
-              <h1 className="text-4xl md:text-5xl font-serif font-medium text-text mb-4 tracking-tight">
-                Early access
-              </h1>
               <p className="text-text-secondary text-lg font-sans max-w-sm mx-auto">
-                Xerus is currently invite-only. Enter your code below to get started.
+                Xerus is currently invite-only. Enter your code below to get started, or join the waitlist.
               </p>
             </>
           )}
