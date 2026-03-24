@@ -45,7 +45,6 @@ export function useOnboardingStream({ userId, onWorkspaceCreated }: UseOnboardin
   const eventSourceRef = useRef<EventSource | null>(null)
   const lastHandoffRef = useRef<{ choice: string; history: OnboardingMessage[] } | null>(null)
   const sseTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
-  const provisioningPromiseRef = useRef<Promise<void>>(Promise.resolve())
 
   // Clean up EventSource, abort pending requests, and clear timers on unmount
   useEffect(() => {
@@ -57,26 +56,22 @@ export function useOnboardingStream({ userId, onWorkspaceCreated }: UseOnboardin
   }, [])
 
   const startProvisioning = useCallback(async () => {
-    const promise = (async () => {
-      try {
-        const baseUrl = await getApiBaseUrl()
-        const headers = await getApiHeaders()
-        const res = await fetch(`${baseUrl}/onboarding/start`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({}),
-        })
-        if (res.ok) {
-          setSandboxReady(true)
-          setMode('ready')
-        }
-      } catch (err) {
-        console.error('[useOnboardingStream] startProvisioning failed:', err)
-        throw err
+    try {
+      const baseUrl = await getApiBaseUrl()
+      const headers = await getApiHeaders()
+      const res = await fetch(`${baseUrl}/onboarding/start`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({}),
+      })
+      if (res.ok) {
+        setSandboxReady(true)
+        setMode('ready')
       }
-    })()
-    provisioningPromiseRef.current = promise
-    return promise
+    } catch (err) {
+      console.error('[useOnboardingStream] startProvisioning failed:', err)
+      throw err
+    }
   }, [])
 
   const createWorkspace = useCallback(async (workspace: string, project: string): Promise<OnboardingHandoffResult | null> => {
@@ -113,13 +108,6 @@ export function useOnboardingStream({ userId, onWorkspaceCreated }: UseOnboardin
     abortRef.current = new AbortController()
 
     try {
-      // Wait for sandbox provisioning if it hasn't completed yet.
-      // startProvisioning runs on mount — by the time user clicks a quick reply
-      // (after logo + 3 template messages), it should be done. If not, we wait.
-      if (!sandboxReady) {
-        await provisioningPromiseRef.current
-      }
-
       // 1. Create conversation + fetch SSE token in parallel (independent operations)
       const [conversation, token] = await Promise.all([
         createConversationApi('xerus-master', 'Onboarding'),
@@ -200,7 +188,7 @@ export function useOnboardingStream({ userId, onWorkspaceCreated }: UseOnboardin
       setError('Something went wrong. Please try again.')
       setMode('ready')
     }
-  }, [sandboxReady])
+  }, [])
 
   const retryHandoff = useCallback(() => {
     if (!lastHandoffRef.current) return
