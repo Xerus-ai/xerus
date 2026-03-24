@@ -19,7 +19,7 @@ const NAV_SECTIONS = [
     label: 'Workspace',
     items: [
       { href: '/settings/workspace', label: 'Overview', icon: Server },
-      { href: '/settings/data', label: 'Data', icon: HardDrive },
+      { href: '/settings/data', label: 'Data & Backups', icon: HardDrive },
       { href: '/settings/billing', label: 'Billing', icon: CreditCard },
     ],
   },

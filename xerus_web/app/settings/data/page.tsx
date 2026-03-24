@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { useRedirectIfNotAuth } from '@/utils/AuthContext'
 import {
   exportWorkspace,
@@ -14,7 +14,7 @@ import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 
 export default function DataPage() {
-  const user = useRedirectIfNotAuth()
+  useRedirectIfNotAuth()
   const [actionInProgress, setActionInProgress] = useState<string | null>(null)
   const [snapshots, setSnapshots] = useState<SnapshotFile[]>([])
   const [snapshotsOpen, setSnapshotsOpen] = useState(false)
@@ -71,7 +71,7 @@ export default function DataPage() {
     setActionInProgress('restore')
     try {
       await restoreFromSnapshot(snapshot.key)
-      toast.success('Workspace restored from snapshot')
+      toast.success('Workspace restored from backup')
       setSnapshots([])
     } catch {
       toast.error("Couldn't restore the workspace", { description: 'Please try again.' })
@@ -90,7 +90,7 @@ export default function DataPage() {
         const result = await listSnapshots()
         setSnapshots(result)
       } catch {
-        toast.error("Couldn't load snapshots", { description: 'Please try again.' })
+        toast.error("Couldn't load backups", { description: 'Please try again.' })
       } finally {
         setSnapshotsLoading(false)
       }
@@ -104,7 +104,7 @@ export default function DataPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
       >
-        <h1 className="font-serif text-[22px] text-text tracking-tight mb-1">Data</h1>
+        <h1 className="font-serif text-[22px] text-text tracking-tight mb-1">Data &amp; Backups</h1>
         <p className="text-sm text-text-secondary mb-8">
           Export, import, and restore your workspace
         </p>
@@ -193,7 +193,7 @@ export default function DataPage() {
               <History className="w-4 h-4 text-text-secondary" />
             </div>
             <div>
-              <p className="text-sm font-medium text-text">Snapshots</p>
+              <p className="text-sm font-medium text-text">Backups</p>
               <p className="text-xs text-text-secondary mt-0.5">
                 View and restore from previous backups
               </p>
@@ -215,7 +215,7 @@ export default function DataPage() {
                 ))}
               </div>
             ) : snapshots.length === 0 ? (
-              <p className="text-sm text-text-secondary py-2">No snapshots available</p>
+              <p className="text-sm text-text-secondary py-2">No backups available</p>
             ) : (
               <div className="space-y-2">
                 {snapshots.map((snapshot) => (
@@ -241,6 +241,9 @@ export default function DataPage() {
                 ))}
               </div>
             )}
+            <p className="text-[11px] text-text-muted mt-3">
+              Up to 7 backups retained automatically
+            </p>
           </div>
         )}
       </motion.div>

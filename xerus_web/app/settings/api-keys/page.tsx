@@ -1,14 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ExternalLink, Eye, EyeOff, RefreshCw, Network, Server, Shield, ArrowUpRight } from 'lucide-react'
+import { ExternalLink, Eye, EyeOff, RefreshCw, Network, Shield, ArrowUpRight } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import { useRedirectIfNotAuth } from '@/utils/AuthContext'
 import { saveApiKey, checkApiKeyStatus, deleteApiKey, getAllApiKeys } from '@/lib/api/user'
-import { getStatus as getWorkspaceStatus } from '@/lib/api/workspace'
-import type { WorkspaceStatus } from '@/lib/api/workspace'
-import { cn } from '@/lib/utils'
 
 const PROVIDERS = [
   {
@@ -21,15 +18,6 @@ const PROVIDERS = [
     usageUrl: 'https://openrouter.ai/activity',
     modelsUrl: 'https://openrouter.ai/models',
   },
-  {
-    id: 'daytona',
-    name: 'Daytona',
-    description: 'Persistent cloud sandboxes where agents execute code.',
-    Icon: Server,
-    keyUrl: 'https://app.daytona.io/dashboard/keys',
-    docsUrl: 'https://www.daytona.io/docs',
-    dashboardUrl: 'https://app.daytona.io/dashboard',
-  },
 ]
 
 export default function ApiKeysPage() {
@@ -40,7 +28,6 @@ export default function ApiKeysPage() {
   const [apiKeyStatus, setApiKeyStatus] = useState<Record<string, boolean>>({})
   const [apiKeys, setApiKeys] = useState<Record<string, string | null>>({})
   const [isHydrated, setIsHydrated] = useState(false)
-  const [sandboxStatus, setSandboxStatus] = useState<WorkspaceStatus | null>(null)
 
   const updateApiKeyStatus = (newStatus: Record<string, boolean>) => {
     setApiKeyStatus(newStatus)
@@ -61,7 +48,6 @@ export default function ApiKeysPage() {
     if (!user) return
     checkApiKeyStatus().then(updateApiKeyStatus)
     getAllApiKeys().then(setApiKeys)
-    getWorkspaceStatus().then(setSandboxStatus).catch(() => {})
   }, [user])
 
   const getMaskedPreview = (provider: string): string | undefined => {
@@ -228,132 +214,52 @@ export default function ApiKeysPage() {
                 </div>
               </div>
 
-              {/* Contextual info panel */}
+              {/* OpenRouter info panel */}
               <div className="border-t border-surface-active/30 bg-surface-hover/20 px-5 py-4">
-                {provider.id === 'openrouter' && (
-                  <div>
-                    <p className="text-[11px] font-medium text-text-secondary mb-2">
-                      Available Models
-                    </p>
-                    <div className="flex flex-wrap gap-1.5 mb-3">
-                      {['Claude 4.5', 'GPT-5', 'Gemini 2.5', 'DeepSeek V3', 'Qwen 3'].map(
-                        (model) => (
-                          <span
-                            key={model}
-                            className="text-[10px] font-medium text-text-secondary bg-white/80 border border-surface-active/40 px-2 py-0.5 rounded-md"
-                          >
-                            {model}
-                          </span>
-                        )
-                      )}
-                      <span className="text-[10px] font-medium text-text-secondary px-1 py-0.5">
-                        +230 more
+                <p className="text-[11px] font-medium text-text-secondary mb-2">
+                  Available Models
+                </p>
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  {['Claude 4.5', 'GPT-5', 'Gemini 2.5', 'DeepSeek V3', 'Qwen 3'].map(
+                    (model) => (
+                      <span
+                        key={model}
+                        className="text-[10px] font-medium text-text-secondary bg-white/80 border border-surface-active/40 px-2 py-0.5 rounded-md"
+                      >
+                        {model}
                       </span>
-                    </div>
-                    <div className="flex gap-4">
-                      <a
-                        href={provider.modelsUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[11px] text-text-secondary hover:text-text-secondary transition-colors inline-flex items-center gap-1"
-                      >
-                        View all models <ExternalLink className="w-2.5 h-2.5" />
-                      </a>
-                      <a
-                        href={provider.usageUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[11px] text-text-secondary hover:text-text-secondary transition-colors inline-flex items-center gap-1"
-                      >
-                        Check usage <ExternalLink className="w-2.5 h-2.5" />
-                      </a>
-                      <a
-                        href={provider.docsUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[11px] text-text-secondary hover:text-text-secondary transition-colors inline-flex items-center gap-1"
-                      >
-                        Docs <ExternalLink className="w-2.5 h-2.5" />
-                      </a>
-                    </div>
-                  </div>
-                )}
-
-                {provider.id === 'daytona' && (
-                  <div>
-                    <p className="text-[11px] font-medium text-text-secondary mb-2">
-                      Sandbox Environment
-                    </p>
-
-                    {isSet && sandboxStatus ? (
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className={cn(
-                              'w-1.5 h-1.5 rounded-full',
-                              sandboxStatus.sandbox_running
-                                ? 'bg-emerald-500'
-                                : 'bg-text-muted/40'
-                            )}
-                          />
-                          <span className="text-[11px] font-medium text-text">
-                            {sandboxStatus.sandbox_running ? 'Running' : 'Stopped'}
-                          </span>
-                        </div>
-                        {sandboxStatus.sandbox_id && (
-                          <span className="text-[10px] text-text-secondary font-mono">
-                            {sandboxStatus.sandbox_id}
-                          </span>
-                        )}
-                      </div>
-                    ) : isSet ? (
-                      <p className="text-[11px] text-text-secondary mb-3">
-                        Key connected. Sandbox will start on first agent execution.
-                      </p>
-                    ) : (
-                      <p className="text-[11px] text-text-secondary mb-3">
-                        Connect your key to provision a persistent sandbox.
-                      </p>
-                    )}
-
-                    <div className="flex flex-wrap gap-1.5 mb-3">
-                      {[
-                        'Persistent volumes',
-                        'Terminal access',
-                        'Browser preview',
-                        'File system',
-                      ].map((cap) => (
-                        <span
-                          key={cap}
-                          className="text-[10px] font-medium text-text-secondary bg-white/80 border border-surface-active/40 px-2 py-0.5 rounded-md"
-                        >
-                          {cap}
-                        </span>
-                      ))}
-                    </div>
-
-                    <div className="flex gap-4">
-                      {'dashboardUrl' in provider && (
-                        <a
-                          href={provider.dashboardUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[11px] text-text-secondary hover:text-text-secondary transition-colors inline-flex items-center gap-1"
-                        >
-                          Dashboard <ExternalLink className="w-2.5 h-2.5" />
-                        </a>
-                      )}
-                      <a
-                        href={provider.docsUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[11px] text-text-secondary hover:text-text-secondary transition-colors inline-flex items-center gap-1"
-                      >
-                        Documentation <ExternalLink className="w-2.5 h-2.5" />
-                      </a>
-                    </div>
-                  </div>
-                )}
+                    )
+                  )}
+                  <span className="text-[10px] font-medium text-text-secondary px-1 py-0.5">
+                    +230 more
+                  </span>
+                </div>
+                <div className="flex gap-4">
+                  <a
+                    href={provider.modelsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] text-text-secondary hover:text-text-secondary transition-colors inline-flex items-center gap-1"
+                  >
+                    View all models <ExternalLink className="w-2.5 h-2.5" />
+                  </a>
+                  <a
+                    href={provider.usageUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] text-text-secondary hover:text-text-secondary transition-colors inline-flex items-center gap-1"
+                  >
+                    Check usage <ExternalLink className="w-2.5 h-2.5" />
+                  </a>
+                  <a
+                    href={provider.docsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] text-text-secondary hover:text-text-secondary transition-colors inline-flex items-center gap-1"
+                  >
+                    Docs <ExternalLink className="w-2.5 h-2.5" />
+                  </a>
+                </div>
               </div>
             </motion.div>
           )
