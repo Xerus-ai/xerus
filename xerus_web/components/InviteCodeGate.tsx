@@ -7,6 +7,10 @@ import { signOut } from 'firebase/auth'
 import { GradientBackground } from './GradientBackground'
 import type { ApiError } from '@/lib/api/client'
 
+// Hoisted regex — avoid re-creation on every keystroke (js-hoist-regexp)
+const NON_ALPHANUMERIC = /[^A-Za-z0-9]/g
+const HYPHEN = /-/g
+
 interface InviteCodeGateProps {
   email: string
 }
@@ -20,7 +24,7 @@ export function InviteCodeGate({ email }: InviteCodeGateProps) {
   const [requestSent, setRequestSent] = useState(false)
 
   const handleCodeChange = (value: string) => {
-    const cleaned = value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 8)
+    const cleaned = value.replace(NON_ALPHANUMERIC, '').toUpperCase().slice(0, 8)
     setCode(cleaned)
     setError(null)
   }
@@ -141,7 +145,7 @@ export function InviteCodeGate({ email }: InviteCodeGateProps) {
                 type="text"
                 value={displayCode}
                 onChange={(e) => {
-                  const raw = e.target.value.replace(/-/g, '')
+                  const raw = e.target.value.replace(HYPHEN, '')
                   handleCodeChange(raw)
                 }}
                 placeholder="XXXX-XXXX"

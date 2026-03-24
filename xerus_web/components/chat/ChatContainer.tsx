@@ -59,7 +59,12 @@ interface SidebarPropsRef {
   handleClearChannel: () => void
 }
 
-function ChatSidebarSlotComponent({ propsRef }: { propsRef: React.RefObject<SidebarPropsRef> }) {
+function ChatSidebarSlotComponent({ propsRef, forceUpdateRef }: {
+  propsRef: React.RefObject<SidebarPropsRef>
+  forceUpdateRef: React.MutableRefObject<() => void>
+}) {
+  const [, setTick] = useState(0)
+  forceUpdateRef.current = () => setTick(t => t + 1)
   const p = propsRef.current!
   return (
     <ConversationSidebar
@@ -237,11 +242,19 @@ export function ChatContainer({
     handleClearChannel: chat.handleClearChannel,
   }
 
-  // Slot component: reads from ref on every render.
-  // Stable reference via useRef — no context cascades.
+  // forceUpdate ref: ChatSidebarSlotComponent stores its updater here on mount.
+  // ChatContainer calls it when sidebar-relevant data changes.
+  const sidebarForceUpdateRef = useRef<() => void>(() => {})
+
+  // Stable slot component — registered once, re-renders via forceUpdate ref
   const ChatSidebarSlot = useRef(() => (
-    <ChatSidebarSlotComponent propsRef={sidebarPropsRef} />
+    <ChatSidebarSlotComponent propsRef={sidebarPropsRef} forceUpdateRef={sidebarForceUpdateRef} />
   )).current
+
+  // Poke sidebar to re-render when data changes (ref was updated above)
+  useEffect(() => {
+    sidebarForceUpdateRef.current()
+  }, [chat.projects, state.conversationId, state.selectedChannel, chat.isLoadingAgents])
 
   useSidebarSlotRegister('chat-sidebar', ChatSidebarSlot)
 

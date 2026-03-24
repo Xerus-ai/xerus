@@ -98,11 +98,10 @@ export function OnboardingChat() {
     if (saved === 'template') return saved as Phase
     return 'logo'
   })
-  const setPhaseRef = useRef((p: Phase) => {
+  const setPhase = useCallback((p: Phase) => {
     setPhaseRaw(p)
     sessionStorage.setItem('xerus_onboarding_phase', p)
-  })
-  const setPhase = setPhaseRef.current
+  }, [])
   const [messages, setMessages] = useState<OnboardingMessage[]>([])
   const [templateIndex, setTemplateIndex] = useState(0)
   const [templateTypingDone, setTemplateTypingDone] = useState(-1)
@@ -119,7 +118,7 @@ export function OnboardingChat() {
     if (phase !== 'logo') return
     const timer = setTimeout(() => setPhase('template'), 2500)
     return () => clearTimeout(timer)
-  }, [phase])
+  }, [phase, setPhase])
 
   // Sequential template messages
   useEffect(() => {
@@ -225,7 +224,7 @@ export function OnboardingChat() {
     }
 
     collapseCard(messageId, '')
-  }, [collapseCard, createWorkspace])
+  }, [collapseCard, createWorkspace, setPhase])
 
   const handleSetupComplete = useCallback(() => {
     stream.completeOnboarding()
