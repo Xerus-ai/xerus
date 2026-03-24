@@ -185,6 +185,7 @@ export function ChatContainer({
     projects: chat.projects,
     conversationId: state.conversationId,
     selectedChannel: state.selectedChannel,
+    isLoading: chat.isLoadingAgents,
     handleSelectConversation: chat.handleSelectConversation,
     handleNewConversation: chat.handleNewConversation,
     handleDeleteConversation: chat.handleDeleteConversation,
@@ -195,6 +196,7 @@ export function ChatContainer({
     projects: chat.projects,
     conversationId: state.conversationId,
     selectedChannel: state.selectedChannel,
+    isLoading: chat.isLoadingAgents,
     handleSelectConversation: chat.handleSelectConversation,
     handleNewConversation: chat.handleNewConversation,
     handleDeleteConversation: chat.handleDeleteConversation,
@@ -220,6 +222,7 @@ export function ChatContainer({
         onNewConversation={p.handleNewConversation}
         onDeleteConversation={p.handleDeleteConversation}
         isCollapsed={false}
+        isLoading={p.isLoading}
         selectedChannel={p.selectedChannel}
         onSelectChannel={p.handleSelectChannel}
         onClearChannel={p.handleClearChannel}
@@ -230,7 +233,7 @@ export function ChatContainer({
   // When sidebar-relevant data changes, poke the sidebar to re-render
   useEffect(() => {
     sidebarForceUpdateRef.current()
-  }, [chat.projects, state.conversationId, state.selectedChannel])
+  }, [chat.projects, state.conversationId, state.selectedChannel, chat.isLoadingAgents])
 
   useSidebarSlotRegister('chat-sidebar', ChatSidebarSlot)
 

@@ -24,13 +24,20 @@ export function setOnboardingDeps(deps: { sandboxService: SandboxService }): voi
 
 import { slugify } from '../../shared/slugify';
 
-// Template messages seeded into the first conversation so /chat shows the Xerus intro
-function buildTemplateMessages(firstName: string): Array<{ role: 'assistant'; content: string }> {
-    return [
-        { role: 'assistant', content: `Hey ${firstName}! I\u2019m Xerus \u2014 think of me as your co-CEO.` },
-        { role: 'assistant', content: `Quick intro to how this place works \u2014 you and I run a virtual office together. I manage a team of AI agents, each one like a dedicated employee. Researchers, writers, social media managers, data analysts\u2026 you pick who you need from the marketplace, connect them to apps you already use \u2014 Gmail, Slack, Notion, Sheets \u2014 and they get to work.\n\nThe best part? They don\u2019t just sit around waiting for instructions. They check in on their own, spot things that need your attention, and post updates in your channels. Your workspace keeps everything organized into projects so you always know what\u2019s happening across the board.` },
-        { role: 'assistant', content: `Now let\u2019s build your office. I\u2019ll walk you through it step by step \u2014 just a few questions so I can set things up right for you.\n\nAre you starting fresh, or bringing an existing company onboard?` },
-    ];
+// Single contextual welcome message seeded into /chat post-onboarding.
+// References BOOTSTRAP.md checklist items so the agent can continue from here.
+function buildWelcomeMessage(firstName: string, workspaceName: string, projectName: string): string {
+    return `Hey ${firstName}! Welcome to **${workspaceName}** \u2014 your AI office is all set up.
+
+I\u2019ve created your **${projectName}** project with a #general channel. Now I need to learn about your business so I can build the right team for you.
+
+Here\u2019s what I\u2019ll do next:
+\u2022 Learn about your business and top priorities
+\u2022 Set up your company knowledge base
+\u2022 Suggest the right AI agents for your needs
+\u2022 Get your first deliverable rolling within 24 hours
+
+**Tell me \u2014 what\u2019s your business about, and what are your top 3 goals for the next 90 days?**`;
 }
 
 // -------------------------------------------------------------------------
@@ -85,7 +92,7 @@ router.post('/handoff', auth, async (req: AuthenticatedRequest, res: Response, n
         // Steps 1-5 in a single transaction — all-or-nothing
         const safeName = (req.user?.name || 'there').replace(/[<>&"']/g, '');
         const firstNameForGreeting = safeName.split(' ')[0] || 'there';
-        const templateMsgs = buildTemplateMessages(firstNameForGreeting);
+        const welcomeMessage = buildWelcomeMessage(firstNameForGreeting, workspaceName, projectDisplayName);
 
         const result = await transaction(async (client: PoolClient) => {
             // 1. Create workspace row
@@ -121,7 +128,7 @@ router.post('/handoff', auth, async (req: AuthenticatedRequest, res: Response, n
             );
             const channel = channelResult.rows[0] as { id: string };
 
-            // 4. Seed conversation (idempotent — skip if already exists from a previous attempt)
+            // 4. Seed conversation with welcome message (idempotent — skip if exists)
             const existingConv = await client.query(
                 `SELECT id::text FROM conversations WHERE user_id = $1 AND title = 'Onboarding' LIMIT 1`,
                 [userId],
@@ -132,28 +139,19 @@ router.post('/handoff', auth, async (req: AuthenticatedRequest, res: Response, n
             } else {
                 const convResult = await client.query(
                     `INSERT INTO conversations (user_id, agent_slug, title, message_count, last_message_at)
-                     VALUES ($1, 'xerus-master', 'Onboarding', $2, NOW())
+                     VALUES ($1, 'xerus-master', 'Onboarding', 1, NOW())
                      RETURNING id::text`,
-                    [userId, templateMsgs.length],
+                    [userId],
                 );
                 conversationId = (convResult.rows[0] as { id: string }).id;
 
-                // 5. Batch insert template messages (only for new conversations)
-            const msgValues: unknown[] = [];
-            const msgPlaceholders: string[] = [];
-            templateMsgs.forEach((msg, i) => {
-                const offset = i * 3;
-                msgPlaceholders.push(
-                    `(gen_random_uuid(), $${offset + 1}, 'xerus-master', 'completed', NULL, $${offset + 2}, $${offset + 3}, NOW(), NOW(), NOW())`
+                // 5. Single welcome message referencing BOOTSTRAP.md guidance
+                await client.query(
+                    `INSERT INTO execution_sessions
+                     (id, workspace_id, agent_slug, status, trigger_type, conversation_id, agent_response, started_at, completed_at, created_at)
+                     VALUES (gen_random_uuid(), $1, 'xerus-master', 'completed', NULL, $2, $3, NOW(), NOW(), NOW())`,
+                    [workspace.id, conversationId, welcomeMessage],
                 );
-                msgValues.push(workspace.id, conversationId, msg.content);
-            });
-            await client.query(
-                `INSERT INTO execution_sessions
-                 (id, workspace_id, agent_slug, status, trigger_type, conversation_id, agent_response, started_at, completed_at, created_at)
-                 VALUES ${msgPlaceholders.join(', ')}`,
-                msgValues,
-            );
             }
 
             return { workspace, domain, channel, conversationId };

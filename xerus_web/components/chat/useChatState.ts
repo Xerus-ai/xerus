@@ -238,7 +238,10 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
     }
 
     loadAll()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      hasLoadedRef.current = false // Reset so Strict Mode remount can re-load
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once when auth is ready, refs handle changing deps
   }, [isAuthReady])
 
