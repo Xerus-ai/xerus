@@ -174,7 +174,7 @@ export function InviteCodeGate({ email }: InviteCodeGateProps) {
                 maxLength={9}
                 autoFocus
                 disabled={isSubmitting}
-                className={`w-full py-3.5 px-5 font-mono text-xl tracking-[0.25em] text-center uppercase border rounded-xl bg-surface-hover transition-all duration-300 outline-none ${
+                className={`w-full py-4 px-5 font-mono text-3xl font-bold tracking-[0.3em] text-center uppercase border rounded-xl bg-surface-hover transition-all duration-300 outline-none ${
                   error
                     ? 'border-red-400 focus:border-red-400 focus:shadow-[0_4px_20px_rgba(239,68,68,0.1)]'
                     : 'border-surface-active focus:border-[#FF6600]/40 focus:shadow-[0_4px_20px_rgba(255,102,0,0.1)]'
