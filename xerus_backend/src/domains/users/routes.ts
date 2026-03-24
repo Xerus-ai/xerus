@@ -4,7 +4,7 @@
 import { Router, Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../../types';
 import { sendResponse } from '../../utils/response';
-import { authenticateFirebaseToken } from '../../middleware/auth';
+import { authenticateFirebaseToken, verifyFirebaseToken } from '../../middleware/auth';
 import { userService } from './service';
 import { creditService } from './credit-service';
 import { apiKeyService } from './api-key-service';
@@ -17,7 +17,8 @@ const router = Router();
 const auth = authenticateFirebaseToken;
 
 // POST /api/v1/users/find-or-create - Login/Register
-router.post('/find-or-create', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+// Uses verifyFirebaseToken (no DB lookup) so new users can be created
+router.post('/find-or-create', verifyFirebaseToken, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const startTime = res.locals.startTime || Date.now();
     try {
         if (!req.user) {
@@ -44,6 +45,9 @@ router.post('/find-or-create', auth, async (req: AuthenticatedRequest, res: Resp
             [result.user.user_id],
         );
 
+        // If user is inactive and invite mode is on, signal frontend to show invite gate
+        const inviteRequired = !result.user.is_active && process.env.INVITE_ONLY_MODE === 'true';
+
         sendResponse(
             res,
             result.created ? 201 : 200,
@@ -57,6 +61,7 @@ router.post('/find-or-create', auth, async (req: AuthenticatedRequest, res: Resp
                 created_at: result.user.created_at,
                 is_new: result.created,
                 has_workspace: wsCheck.rows.length > 0,
+                invite_required: inviteRequired,
             },
             startTime
         );

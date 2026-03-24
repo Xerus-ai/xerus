@@ -24,6 +24,17 @@ export const strictRateLimit = rateLimit({
     validate: { xForwardedForHeader: false },
 });
 
+export const inviteCodeRateLimit = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5,                     // 5 attempts per window
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: () => {
+        throw new RateLimitError();
+    },
+    validate: { xForwardedForHeader: false },
+});
+
 export const uploadRateLimit = rateLimit({
     windowMs: 60000,
     max: 10,

@@ -65,6 +65,40 @@ export async function authenticateFirebaseToken(req: AuthenticatedRequest, _res:
     }
 }
 
+// Firebase token verification ONLY — no DB lookup, no is_active check.
+// Restricted to: POST /users/find-or-create, POST /invite-codes/redeem
+export async function verifyFirebaseToken(req: AuthenticatedRequest, _res: Response, next: NextFunction): Promise<void> {
+    try {
+        let token: string | undefined;
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            token = authHeader.split('Bearer ')[1];
+        }
+
+        if (!token) {
+            throw new UnauthorizedError('No token provided');
+        }
+
+        initializeFirebase();
+        const decodedToken = await admin.auth().verifyIdToken(token);
+
+        req.user = {
+            uid: decodedToken.uid,
+            email: decodedToken.email || '',
+            name: decodedToken.name,
+            role: 'user',
+        };
+
+        next();
+    } catch (error) {
+        if (error instanceof UnauthorizedError) {
+            next(error);
+        } else {
+            next(new UnauthorizedError('Invalid or expired token'));
+        }
+    }
+}
+
 export function requireAuth(req: AuthenticatedRequest, _res: Response, next: NextFunction): void {
     if (!req.user) {
         next(new UnauthorizedError('Authentication required'));

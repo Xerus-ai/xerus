@@ -13,6 +13,8 @@ import { MobileBottomBar } from '@/components/navigation/MobileBottomBar'
 import { MobileHeader } from '@/components/navigation/MobileHeader'
 import { MotionConfig } from 'framer-motion'
 
+import { InviteCodeGate } from '@/components/InviteCodeGate'
+
 // Code-split: only loaded on /login route
 const LoginOverlay = dynamic(
   () => import('@/components/LoginOverlay').then(mod => ({ default: mod.LoginOverlay })),
@@ -39,7 +41,7 @@ function LoadingScreen() {
 function LayoutShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { user, isAuthReady, hasWorkspace } = useAuth()
+  const { user, isAuthReady, hasWorkspace, inviteRequired } = useAuth()
   const {
     isRightPanelOpen,
     rightPanelContent,
@@ -78,6 +80,11 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
   // Not authenticated — show loading while redirect to /login fires
   if (!user && !isLoginPage) {
     return <LoadingScreen />
+  }
+
+  // User authenticated but needs invite code (checked BEFORE workspace redirect)
+  if (user && inviteRequired && !isLoginPage) {
+    return <InviteCodeGate email={user.email} />
   }
 
   // Not onboarded — show loading while redirect to /onboarding fires

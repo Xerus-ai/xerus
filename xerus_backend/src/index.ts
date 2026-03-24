@@ -37,6 +37,7 @@ import { driveRouter, setDriveDeps, DriveService } from './domains/drive';
 import skillRoutes, { setSkillRoutesDeps, agentSkillsRouter } from './domains/skills/routes';
 import { agentChannelsRouter, setAgentChannelsDeps } from './domains/agents/agent-channels.routes';
 import { scheduleRoutes } from './domains/schedules';
+import inviteCodeRoutes from './domains/invite-codes/routes';
 import { createMessageBridgeService } from './domains/inbox/messaging/message-bridge.service';
 import { MessageBridgeRepository } from './domains/inbox/messaging/message-bridge.repository';
 import { HITLHandler } from './domains/execution/hitl/hitl.handler';
@@ -109,6 +110,7 @@ app.use('/api/v1/models', modelsRoutes);
 app.use('/api/v1/workspace', driveRouter);
 app.use('/api/v1/skills', skillRoutes);
 app.use('/api/v1/schedules', scheduleRoutes);
+app.use('/api/v1/invite-codes', inviteCodeRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
