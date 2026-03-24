@@ -3,7 +3,7 @@
  * CRUD operations for AI agents/assistants
  */
 import { toast } from 'sonner';
-import { apiCall } from './client';
+import { apiCall, getApiHeaders } from './client';
 import { mapAgentToAssistant } from './mappers';
 import type {
   Assistant,
@@ -367,4 +367,27 @@ export const formatPrompt = async (rawPrompt: string): Promise<FormattedPromptRe
     personality_type: data.personality_type || 'assistant',
     tags: data.tags || [],
   };
+};
+
+/**
+ * Import an agent from uploaded files (agent.md + optional config.json)
+ */
+export const importAgent = async (files: File[]): Promise<Assistant> => {
+  const formData = new FormData();
+  for (const file of files) {
+    formData.append('files', file);
+  }
+
+  const headers = await getApiHeaders(true); // Exclude Content-Type for FormData
+
+  const response = await apiCall('/agents/import', {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+
+  const result = await response.json();
+  const agentData = result.data || result;
+  const agent: BackendAgent = agentData.agent || agentData;
+  return mapAgentToAssistant(agent);
 };

@@ -3,7 +3,7 @@
  * CRUD operations for skills marketplace, install/uninstall, and file operations
  */
 import { toast } from 'sonner';
-import { apiCall } from './client';
+import { apiCall, getApiHeaders } from './client';
 import { mapSkillToFrontend, mapSkillDetailToFrontend } from './mappers';
 import type {
   Skill,
@@ -182,4 +182,27 @@ export const setSkillSecret = async (skillSlug: string, envKey: string, value: s
 export const deleteSkillSecret = async (skillSlug: string, envKey: string): Promise<void> => {
   await apiCall(`/skills/${skillSlug}/secrets/${envKey}`, { method: 'DELETE' });
   toast.success('Secret removed');
+};
+
+/**
+ * Import a skill from uploaded files (SKILL.md + optional xerushub.json + supporting files)
+ */
+export const importSkill = async (files: File[]): Promise<Skill> => {
+  const formData = new FormData();
+  for (const file of files) {
+    formData.append('files', file);
+  }
+
+  const headers = await getApiHeaders(true); // Exclude Content-Type for FormData
+
+  const response = await apiCall('/skills/import', {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+
+  const result = await response.json();
+  const skillData = result.data || result;
+  const skill = skillData.skill || skillData;
+  return mapSkillToFrontend(skill);
 };

@@ -250,6 +250,15 @@ export class SkillService {
         return skill;
     }
 
+    /**
+     * Write an additional file to an existing skill directory.
+     * Used by import routes to write supporting files (references, scripts, etc.)
+     */
+    async writeAdditionalFile(userId: string, skillSlug: string, filename: string, content: string): Promise<void> {
+        const ws = this.requireWorkspace();
+        await ws.writeSkillFile(userId, skillSlug, filename, content);
+    }
+
     // ===== PRIVATE HELPERS =====
 
     private checkOwnership(skill: Skill, userId: string): void {
