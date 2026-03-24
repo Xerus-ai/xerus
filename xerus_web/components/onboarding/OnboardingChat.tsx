@@ -11,7 +11,7 @@ import { OnboardingMessages } from './OnboardingMessages'
 import { OnboardingSteps } from './OnboardingSteps'
 import type { OnboardingMessage, OnboardingTemplateMessage } from './types'
 
-type Phase = 'logo' | 'template' | 'live' | 'setup'
+type Phase = 'logo' | 'template' | 'setup'
 
 // Preset agents shown during the onboarding setup wizard step
 const SETUP_AGENTS = [
@@ -92,25 +92,20 @@ export function OnboardingChat() {
   const firstName = user?.display_name?.split(' ')[0] || 'there'
   const userId = user?.uid || ''
 
-  // Restore phase from sessionStorage on refresh (skip logo/template if already past them)
   const [phase, setPhaseRaw] = useState<Phase>(() => {
     if (typeof window === 'undefined') return 'logo'
     const saved = sessionStorage.getItem('xerus_onboarding_phase')
-    // Only restore 'template' or 'live' — 'setup' requires workspaceData which is lost
-    if (saved === 'template' || saved === 'live') return saved as Phase
+    if (saved === 'template') return saved as Phase
     return 'logo'
   })
-  // Wrapper that persists phase to sessionStorage (stable identity via ref)
-  const setPhaseRef = useRef((p: Phase) => {
+  const setPhase = useCallback((p: Phase) => {
     setPhaseRaw(p)
     sessionStorage.setItem('xerus_onboarding_phase', p)
-  })
-  const setPhase = setPhaseRef.current
+  }, [])
   const [messages, setMessages] = useState<OnboardingMessage[]>([])
   const [templateIndex, setTemplateIndex] = useState(0)
   const [templateTypingDone, setTemplateTypingDone] = useState(-1)
   const [quickReplies, setQuickReplies] = useState<typeof INITIAL_QUICK_REPLIES>([])
-  const [logoReady, setLogoReady] = useState(false)
   const [workspaceData, setWorkspaceData] = useState<{ workspace: string; project: string } | null>(null)
   const hasNavigatedRef = useRef(false)
   const quickReplyTimerRef = useRef<ReturnType<typeof setTimeout>>()
@@ -118,19 +113,12 @@ export function OnboardingChat() {
   const stream = useOnboardingStream({ userId, onWorkspaceCreated: markWorkspaceReady })
   const templateMessages = useMemo(() => buildTemplateMessages(firstName), [firstName])
 
-  // Provision sandbox in background on mount
-  // startProvisioning has stable identity (useCallback with [] deps)
-  const { startProvisioning } = stream
-  useEffect(() => {
-    if (userId) startProvisioning().catch(() => { /* non-critical: /onboarding/start is a readiness check */ })
-  }, [userId, startProvisioning])
-
   // Logo phase: hold for 2.5s then transition to template
   useEffect(() => {
     if (phase !== 'logo') return
     const timer = setTimeout(() => setPhase('template'), 2500)
     return () => clearTimeout(timer)
-  }, [phase])
+  }, [phase, setPhase])
 
   // Sequential template messages
   useEffect(() => {
@@ -177,46 +165,35 @@ export function OnboardingChat() {
     }
   }, [templateMessages.length])
 
-  // Clean up quick reply timer on unmount
   useEffect(() => () => clearTimeout(quickReplyTimerRef.current), [])
 
-  // Merge streamed messages from the hook
-  useEffect(() => {
-    if (stream.streamedMessages.length === 0) return
-    setMessages((prev) => {
-      const nonStreamed = prev.filter((m) => m.source !== 'stream')
-      return [...nonStreamed, ...stream.streamedMessages]
-    })
-  }, [stream.streamedMessages])
-
-  const messagesRef = useRef(messages)
-  messagesRef.current = messages
-
+  // User clicks "Start fresh" / "Bring my company" → add workspace setup card to chat
   const handleQuickReply = useCallback((value: string) => {
     const reply = INITIAL_QUICK_REPLIES.find((r) => r.value === value)
     const label = reply?.label || value
-    const userMsg: OnboardingMessage = {
+    // Add user's choice as a message
+    setMessages((prev) => [...prev, {
       id: `user-${Date.now()}`,
-      role: 'user',
+      role: 'user' as const,
       content: label,
-      source: 'template',
-    }
-    setMessages((prev) => [...prev, userMsg])
+      source: 'template' as const,
+    }])
     setQuickReplies([])
-    setPhase('live')
-    stream.handoff(value, [...messagesRef.current, userMsg])
-  }, [stream])
 
-  const handleSend = useCallback((content: string) => {
-    const userMsg: OnboardingMessage = {
-      id: `user-${Date.now()}`,
-      role: 'user',
-      content,
-      source: phase === 'live' ? 'stream' : 'template',
-    }
-    setMessages((prev) => [...prev, userMsg])
-    if (phase === 'live') stream.sendMessage(content)
-  }, [phase, stream])
+    // Add Xerus response with the workspace setup card — same chat UI
+    setTimeout(() => {
+      setMessages((prev) => [...prev, {
+        id: `workspace-card`,
+        role: 'assistant' as const,
+        content: 'Great choice! Let\u2019s name your workspace and first project.',
+        source: 'stream' as const,
+        ui: {
+          type: 'workspace-setup',
+          props: {},
+        },
+      }])
+    }, 600)
+  }, [])
 
   const collapseCard = useCallback((messageId: string, collapsedText: string) => {
     setMessages((prev) =>
@@ -227,36 +204,33 @@ export function OnboardingChat() {
     )
   }, [])
 
+  // Handle workspace card submit → collapse card, show Screen 2, handoff in background
+  const { createWorkspace } = stream
   const handleUIAction = useCallback(async (messageId: string, action: string, data: Record<string, unknown>) => {
-    // Workspace creation → await backend, collapse card only on success
     if (action === 'create-workspace') {
       const workspace = String(data.workspace ?? '')
       const project = String(data.project ?? '')
       setWorkspaceData({ workspace, project })
-      const result = await stream.createWorkspace(workspace, project)
-      if (!result) return // createWorkspace throws on error, toast shown by error handler
-      collapseCard(messageId, `${workspace} created with ${project} project`)
+      collapseCard(messageId, `${workspace} \u2014 ${project}`)
       setPhase('setup')
+
+      // Background: POST /onboarding/handoff (creates workspace + domain + channel + sandbox)
+      try {
+        await createWorkspace(workspace, project)
+      } catch (err) {
+        console.error('[Onboarding] Workspace creation failed:', err)
+      }
       return
     }
 
-    // Other UI actions — collapse immediately
     collapseCard(messageId, '')
-
-    // Forward to stream
-    if (phase === 'live') {
-      stream.sendMessage(`[action:${action}] ${JSON.stringify(data)}`)
-    }
-  }, [phase, stream, collapseCard])
+  }, [collapseCard, createWorkspace, setPhase])
 
   const handleSetupComplete = useCallback(() => {
     stream.completeOnboarding()
-    // Navigation is deferred to useEffect below — React must flush
-    // setHasWorkspace(true) before LayoutShell renders on '/'
   }, [stream])
 
-  // Navigate after onboarding completes and hasWorkspace is flushed
-  // Guard with ref to prevent double-fire in React Strict Mode
+  // Navigate after onboarding completes
   useEffect(() => {
     if (stream.mode === 'complete' && !hasNavigatedRef.current) {
       hasNavigatedRef.current = true
@@ -265,14 +239,14 @@ export function OnboardingChat() {
     }
   }, [stream.mode, router])
 
-  const showChat = phase === 'logo' || phase === 'template' || phase === 'live'
+  const showChat = phase === 'logo' || phase === 'template'
 
   return (
     <div className="fixed inset-0 flex flex-col bg-surface-alt">
       <BlobBackground />
 
       <AnimatePresence mode="wait">
-        {/* ── Chat phases ── */}
+        {/* ── Chat phases (logo + template messages + workspace card) ── */}
         {showChat && (
           <motion.div
             key="chat"
@@ -280,7 +254,6 @@ export function OnboardingChat() {
             transition={{ duration: 0.4 }}
             className="flex-1 flex flex-col min-h-0"
           >
-            {/* Logo splash */}
             <AnimatePresence>
               {phase === 'logo' && (
                 <motion.div
@@ -293,8 +266,7 @@ export function OnboardingChat() {
               )}
             </AnimatePresence>
 
-            {/* Messages */}
-            {phase !== 'logo' && (
+            {phase === 'template' && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -303,33 +275,18 @@ export function OnboardingChat() {
               >
                 <OnboardingMessages
                   messages={messages}
-                  onLogoReady={() => setLogoReady(true)}
+                  onLogoReady={() => {}}
                   onTypingComplete={handleTypingComplete}
                   onUIAction={handleUIAction}
                   quickReplies={quickReplies.length > 0 ? quickReplies : undefined}
                   onQuickReply={handleQuickReply}
                 />
-
-                {/* SSE error with retry — like ChatGPT/Claude pattern */}
-                {stream.error ? (
-                  <div className="flex items-center justify-center gap-3 py-4 px-6">
-                    <p className="text-sm text-text-muted">{stream.error}</p>
-                    <button
-                      onClick={stream.retryHandoff}
-                      className="text-sm font-medium text-[#FF6600] hover:text-[#E65C00] transition-colors"
-                    >
-                      Try again
-                    </button>
-                  </div>
-                ) : null}
               </motion.div>
             )}
-
-            {/* Input bar removed — onboarding uses generative UI only */}
           </motion.div>
         )}
 
-        {/* ── Setup wizard ── */}
+        {/* ── Setup wizard (Screen 2 — visual progress + provisioning in background) ── */}
         {phase === 'setup' && workspaceData && (
           <motion.div
             key="setup"
@@ -349,4 +306,3 @@ export function OnboardingChat() {
     </div>
   )
 }
-

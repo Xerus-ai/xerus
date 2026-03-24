@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { MessageList } from './MessageList'
 import { ChatInput } from './ChatInput'
@@ -42,6 +42,44 @@ const EXT_TO_VIEWER: Record<string, ViewerContentType> = {
 }
 function extToViewerType(ext: string): ViewerContentType {
   return EXT_TO_VIEWER[ext] ?? 'text'
+}
+
+// Top-level component rendered inside AppSidebar via the slot system.
+// Reads from a ref (latest data) and uses useState for forceUpdate.
+// Defined at module scope so React treats it as a proper component (hooks are legal).
+interface SidebarPropsRef {
+  projects: import('./types').ProjectGroup[]
+  conversationId: string | null
+  selectedChannel?: import('./types').SelectedChannel | null
+  isLoading: boolean
+  handleSelectConversation: (id: string) => void
+  handleNewConversation: () => void
+  handleDeleteConversation: (id: string) => void
+  handleSelectChannel: (ch: import('./types').SelectedChannel) => void
+  handleClearChannel: () => void
+}
+
+function ChatSidebarSlotComponent({ propsRef, forceUpdateRef }: {
+  propsRef: React.RefObject<SidebarPropsRef>
+  forceUpdateRef: React.MutableRefObject<() => void>
+}) {
+  const [, setTick] = useState(0)
+  forceUpdateRef.current = () => setTick(t => t + 1)
+  const p = propsRef.current!
+  return (
+    <ConversationSidebar
+      projects={p.projects}
+      currentConversationId={p.conversationId}
+      onSelectConversation={p.handleSelectConversation}
+      onNewConversation={p.handleNewConversation}
+      onDeleteConversation={p.handleDeleteConversation}
+      isCollapsed={false}
+      isLoading={p.isLoading}
+      selectedChannel={p.selectedChannel}
+      onSelectChannel={p.handleSelectChannel}
+      onClearChannel={p.handleClearChannel}
+    />
+  )
 }
 
 interface ChatContainerProps {
@@ -177,10 +215,15 @@ export function ChatContainer({
   }, [])
 
   // ---- Sidebar slot ----
+  // The slot system renders a stable component ref inside AppSidebar.
+  // To avoid infinite re-render loops, the slot component is stable (useCallback []).
+  // Data is passed via ref + a forceUpdate callback so the sidebar re-renders
+  // when conversations load WITHOUT triggering context cascades.
   const sidebarPropsRef = useRef({
     projects: chat.projects,
     conversationId: state.conversationId,
     selectedChannel: state.selectedChannel,
+    isLoading: chat.isLoadingAgents,
     handleSelectConversation: chat.handleSelectConversation,
     handleNewConversation: chat.handleNewConversation,
     handleDeleteConversation: chat.handleDeleteConversation,
@@ -191,6 +234,7 @@ export function ChatContainer({
     projects: chat.projects,
     conversationId: state.conversationId,
     selectedChannel: state.selectedChannel,
+    isLoading: chat.isLoadingAgents,
     handleSelectConversation: chat.handleSelectConversation,
     handleNewConversation: chat.handleNewConversation,
     handleDeleteConversation: chat.handleDeleteConversation,
@@ -198,22 +242,19 @@ export function ChatContainer({
     handleClearChannel: chat.handleClearChannel,
   }
 
-  const ChatSidebarSlot = useCallback(() => {
-    const p = sidebarPropsRef.current
-    return (
-      <ConversationSidebar
-        projects={p.projects}
-        currentConversationId={p.conversationId}
-        onSelectConversation={p.handleSelectConversation}
-        onNewConversation={p.handleNewConversation}
-        onDeleteConversation={p.handleDeleteConversation}
-        isCollapsed={false}
-        selectedChannel={p.selectedChannel}
-        onSelectChannel={p.handleSelectChannel}
-        onClearChannel={p.handleClearChannel}
-      />
-    )
-  }, [])
+  // forceUpdate ref: ChatSidebarSlotComponent stores its updater here on mount.
+  // ChatContainer calls it when sidebar-relevant data changes.
+  const sidebarForceUpdateRef = useRef<() => void>(() => {})
+
+  // Stable slot component — registered once, re-renders via forceUpdate ref
+  const ChatSidebarSlot = useRef(() => (
+    <ChatSidebarSlotComponent propsRef={sidebarPropsRef} forceUpdateRef={sidebarForceUpdateRef} />
+  )).current
+
+  // Poke sidebar to re-render when data changes (ref was updated above)
+  useEffect(() => {
+    sidebarForceUpdateRef.current()
+  }, [chat.projects, state.conversationId, state.selectedChannel, chat.isLoadingAgents])
 
   useSidebarSlotRegister('chat-sidebar', ChatSidebarSlot)
 

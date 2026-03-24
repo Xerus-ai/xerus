@@ -95,7 +95,7 @@ export function MessageList({
 
   return (
     <div className={cn('flex-1 overflow-y-auto scrollbar-thin', className)}>
-      <div className="max-w-3xl mx-auto pb-4">
+      <div className="max-w-3xl mx-auto pb-4 animate-[fadeInUp_0.4s_ease-out]">
         {/* Messages */}
         <div className="divide-y divide-surface-active/50">
           {allMessages.map((message) => (

@@ -26,6 +26,7 @@ interface ConversationSidebarProps {
   onNewConversation: () => void
   onDeleteConversation?: (id: string) => void
   isCollapsed?: boolean
+  isLoading?: boolean
   onToggleCollapse?: () => void
   className?: string
   selectedChannel?: SelectedChannel | null
@@ -337,6 +338,7 @@ export function ConversationSidebar({
   onNewConversation,
   onDeleteConversation,
   isCollapsed = false,
+  isLoading = false,
   onToggleCollapse,
   className,
   selectedChannel,
@@ -453,11 +455,19 @@ export function ConversationSidebar({
       <ScrollArea className="flex-1 px-2 pt-1">
         {filteredProjects.length === 0 ? (
           <div className="px-3 py-8 text-center">
-            <p className="text-sm text-text-muted">
-              {searchQuery ? 'No matching sessions' : 'No conversations yet'}
-            </p>
-            {!searchQuery && (
-              <p className="text-xs text-text-muted mt-1">Send a message to get started</p>
+            {isLoading ? (
+              <div className="space-y-3 px-2 animate-pulse">
+                <div className="h-3 bg-surface-active/40 rounded-full w-24" />
+                <div className="h-8 bg-surface-active/30 rounded-lg" />
+                <div className="h-8 bg-surface-active/20 rounded-lg" />
+              </div>
+            ) : searchQuery ? (
+              <p className="text-sm text-text-muted">No matching sessions</p>
+            ) : (
+              <>
+                <p className="text-sm text-text-muted">No conversations yet</p>
+                <p className="text-xs text-text-muted mt-1">Send a message to get started</p>
+              </>
             )}
           </div>
         ) : (

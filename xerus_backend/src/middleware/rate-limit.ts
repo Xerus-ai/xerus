@@ -28,13 +28,13 @@ export const strictRateLimit = rateLimit({
 export const inviteCodeRateLimit = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 5,                     // 5 attempts per window per user
-    keyGenerator: (req: Request) => (req as AuthenticatedRequest).user?.uid ?? req.ip ?? 'anonymous',
+    keyGenerator: (req: Request) => (req as AuthenticatedRequest).user?.uid ?? 'anonymous',
     standardHeaders: true,
     legacyHeaders: false,
     handler: () => {
         throw new RateLimitError();
     },
-    validate: { xForwardedForHeader: false },
+    validate: { xForwardedForHeader: false, keyGeneratorIpFallback: false },
 });
 
 export const uploadRateLimit = rateLimit({

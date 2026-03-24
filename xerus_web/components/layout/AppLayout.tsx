@@ -21,18 +21,29 @@ const LoginOverlay = dynamic(
   { ssr: false }
 )
 
-// Loading screen shown during auth check and initial hydration
-function LoadingScreen() {
+// Contextual loading screen — shows appropriate message per gate
+function LoadingScreen({ title, subtitle }: { title?: string; subtitle?: string }) {
   return (
     <div className="flex h-screen items-center justify-center bg-surface-alt">
-      <div className="flex flex-col items-center gap-6">
-        <img src="/logo/xerus.svg" alt="Xerus" className="w-14 h-14 animate-pulse" />
-        <div className="flex flex-col items-center gap-2">
-          <p className="text-sm font-medium text-text">Getting your workspace ready</p>
-          <div className="w-48 h-1 bg-surface-active rounded-full overflow-hidden">
-            <div className="h-full bg-[#FF6600] rounded-full animate-[loading_1.5s_ease-in-out_infinite]" />
+      <div className="flex flex-col items-center gap-8 animate-tab-in">
+        <img src="/logo/xerus.svg" alt="Xerus" className="w-20 h-20 animate-pulse" />
+
+        {title ? (
+          <div className="flex flex-col items-center gap-3">
+            <p className="text-lg font-semibold text-text">{title}</p>
+            {subtitle && (
+              <p className="text-sm text-text-secondary">{subtitle}</p>
+            )}
+            <div className="w-56 h-1.5 bg-surface-active rounded-full overflow-hidden mt-1">
+              <div className="h-full bg-[#FF6600] rounded-full animate-[loading_1.5s_ease-in-out_infinite]" />
+            </div>
           </div>
-        </div>
+        ) : (
+          /* Minimal: no text — used during hydration & login auth check */
+          <div className="w-40 h-1 bg-surface-active rounded-full overflow-hidden">
+            <div className="h-full bg-[#FF6600]/70 rounded-full animate-[loading_1.5s_ease-in-out_infinite]" />
+          </div>
+        )}
       </div>
     </div>
   )
@@ -74,12 +85,14 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
 
   // Show loading screen while auth state is resolving
   if (!isAuthReady) {
-    return <LoadingScreen />
+    return isLoginPage
+      ? <LoadingScreen />
+      : <LoadingScreen title="Loading your workspace" subtitle="Verifying your session..." />
   }
 
   // Not authenticated — show loading while redirect to /login fires
   if (!user && !isLoginPage) {
-    return <LoadingScreen />
+    return <LoadingScreen title="Session expired" subtitle="Redirecting to sign in..." />
   }
 
   // User authenticated but needs invite code (checked BEFORE workspace redirect)
@@ -89,7 +102,18 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
 
   // Not onboarded — show loading while redirect to /onboarding fires
   if (user && !hasWorkspace && !isOnboardingPage && !isLoginPage) {
-    return <LoadingScreen />
+    return <LoadingScreen title="Setting up your workspace" subtitle="Preparing your AI workforce..." />
+  }
+
+  // Onboarding page: no sidebar, full-screen onboarding chat
+  if (isOnboardingPage && user) {
+    return (
+      <div className="flex h-screen overflow-hidden bg-surface-alt">
+        <main className="flex-1 relative h-screen overflow-y-auto">
+          {children}
+        </main>
+      </div>
+    )
   }
 
   // Login page: no sidebar, overlay

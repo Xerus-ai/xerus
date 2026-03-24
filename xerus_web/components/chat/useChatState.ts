@@ -218,7 +218,9 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
       if (convResult.status === 'fulfilled') {
         const convs: Conversation[] = convResult.value.conversations.map(mapConversation)
         setState((prev) => ({ ...prev, conversations: convs }))
-        if (conversationId) loadConversationDetailsRef.current(conversationId)
+        // Auto-select: if no conversation was specified, load the most recent one
+        const targetConvId = conversationId || convs[0]?.id
+        if (targetConvId) loadConversationDetailsRef.current(targetConvId)
       } else {
         console.error('Failed to load conversations:', convResult.reason)
       }
@@ -236,7 +238,10 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
     }
 
     loadAll()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      hasLoadedRef.current = false // Reset so Strict Mode remount can re-load
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once when auth is ready, refs handle changing deps
   }, [isAuthReady])
 

@@ -73,13 +73,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (isMountedRef.current) {
               setInviteRequired(true)
             }
-          } else if (profile.has_workspace) {
-            // Ensure sandbox is running (non-blocking, only if workspace exists and user active)
-            try {
-              const { ensureSandbox } = await import('@/lib/api/workspace')
-              await ensureSandbox()
-            } catch (err) {
-              console.warn('[AuthContext] ensureSandbox failed (non-blocking):', err)
+          } else {
+            if (isMountedRef.current) {
+              setInviteRequired(false)
+            }
+            if (profile.has_workspace) {
+              // Ensure sandbox is running (non-blocking, only if workspace exists and user active)
+              try {
+                const { ensureSandbox } = await import('@/lib/api/workspace')
+                await ensureSandbox()
+              } catch (err) {
+                console.warn('[AuthContext] ensureSandbox failed (non-blocking):', err)
+              }
             }
           }
         } else {
