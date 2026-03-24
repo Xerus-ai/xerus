@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo, useRef, FormEvent } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/utils/AuthContext'
@@ -11,7 +11,7 @@ import { OnboardingMessages } from './OnboardingMessages'
 import { OnboardingSteps } from './OnboardingSteps'
 import type { OnboardingMessage, OnboardingTemplateMessage } from './types'
 
-type Phase = 'logo' | 'template' | 'workspace-form' | 'setup'
+type Phase = 'logo' | 'template' | 'setup'
 
 // Preset agents shown during the onboarding setup wizard step
 const SETUP_AGENTS = [
@@ -107,12 +107,7 @@ export function OnboardingChat() {
   const [templateIndex, setTemplateIndex] = useState(0)
   const [templateTypingDone, setTemplateTypingDone] = useState(-1)
   const [quickReplies, setQuickReplies] = useState<typeof INITIAL_QUICK_REPLIES>([])
-  const [logoReady, setLogoReady] = useState(false)
   const [workspaceData, setWorkspaceData] = useState<{ workspace: string; project: string } | null>(null)
-  const [workspaceName, setWorkspaceName] = useState('')
-  const [projectName, setProjectName] = useState('')
-  const [isProvisioning, setIsProvisioning] = useState(false)
-  const [provisionError, setProvisionError] = useState<string | null>(null)
   const hasNavigatedRef = useRef(false)
   const quickReplyTimerRef = useRef<ReturnType<typeof setTimeout>>()
 
@@ -173,10 +168,11 @@ export function OnboardingChat() {
 
   useEffect(() => () => clearTimeout(quickReplyTimerRef.current), [])
 
-  // User clicks "Start fresh" / "Bring my company" → show workspace form
+  // User clicks "Start fresh" / "Bring my company" → add workspace setup card to chat
   const handleQuickReply = useCallback((value: string) => {
     const reply = INITIAL_QUICK_REPLIES.find((r) => r.value === value)
     const label = reply?.label || value
+    // Add user's choice as a message
     setMessages((prev) => [...prev, {
       id: `user-${Date.now()}`,
       role: 'user' as const,
@@ -184,33 +180,52 @@ export function OnboardingChat() {
       source: 'template' as const,
     }])
     setQuickReplies([])
-    setPhase('workspace-form')
+
+    // Add Xerus response with the workspace setup card — same chat UI
+    setTimeout(() => {
+      setMessages((prev) => [...prev, {
+        id: `workspace-card`,
+        role: 'assistant' as const,
+        content: 'Great choice! Let\u2019s name your workspace and first project.',
+        source: 'template' as const,
+        ui: {
+          type: 'workspace-setup',
+          props: {},
+        },
+      }])
+    }, 600)
   }, [])
 
-  // Submit workspace form → immediately show Screen 2 → handoff in background
-  const handleWorkspaceSubmit = useCallback(async (e: FormEvent) => {
-    e.preventDefault()
-    const ws = workspaceName.trim() || 'My Workspace'
-    const proj = projectName.trim() || 'Default'
+  const collapseCard = useCallback((messageId: string, collapsedText: string) => {
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.id !== messageId || !m.ui) return m
+        return { ...m, ui: { ...m.ui, collapsed: true, collapsedText } }
+      })
+    )
+  }, [])
 
-    setWorkspaceData({ workspace: ws, project: proj })
-    setIsProvisioning(true)
-    setProvisionError(null)
-    setPhase('setup')
+  // Handle workspace card submit → collapse card, show Screen 2, handoff in background
+  const { createWorkspace } = stream
+  const handleUIAction = useCallback(async (messageId: string, action: string, data: Record<string, unknown>) => {
+    if (action === 'create-workspace') {
+      const workspace = String(data.workspace ?? '')
+      const project = String(data.project ?? '')
+      setWorkspaceData({ workspace, project })
+      collapseCard(messageId, `${workspace} \u2014 ${project}`)
+      setPhase('setup')
 
-    // Background: create workspace + domain + channel + sandbox + seed conversation
-    try {
-      const result = await stream.createWorkspace(ws, proj)
-      if (!result) {
-        setProvisionError('Failed to create workspace')
+      // Background: POST /onboarding/handoff (creates workspace + domain + channel + sandbox)
+      try {
+        await createWorkspace(workspace, project)
+      } catch (err) {
+        console.error('[Onboarding] Workspace creation failed:', err)
       }
-    } catch (err) {
-      console.error('[Onboarding] Workspace creation failed:', err)
-      setProvisionError('Something went wrong. Please try again.')
-    } finally {
-      setIsProvisioning(false)
+      return
     }
-  }, [workspaceName, projectName, stream])
+
+    collapseCard(messageId, '')
+  }, [collapseCard, createWorkspace])
 
   const handleSetupComplete = useCallback(() => {
     stream.completeOnboarding()
@@ -232,7 +247,7 @@ export function OnboardingChat() {
       <BlobBackground />
 
       <AnimatePresence mode="wait">
-        {/* ── Chat phases (logo + template messages) ── */}
+        {/* ── Chat phases (logo + template messages + workspace card) ── */}
         {showChat && (
           <motion.div
             key="chat"
@@ -261,73 +276,14 @@ export function OnboardingChat() {
               >
                 <OnboardingMessages
                   messages={messages}
-                  onLogoReady={() => setLogoReady(true)}
+                  onLogoReady={() => {}}
                   onTypingComplete={handleTypingComplete}
-                  onUIAction={() => {}}
+                  onUIAction={handleUIAction}
                   quickReplies={quickReplies.length > 0 ? quickReplies : undefined}
                   onQuickReply={handleQuickReply}
                 />
               </motion.div>
             )}
-          </motion.div>
-        )}
-
-        {/* ── Workspace name form ── */}
-        {phase === 'workspace-form' && (
-          <motion.div
-            key="workspace-form"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.4 }}
-            className="flex-1 flex items-center justify-center px-6"
-          >
-            <div className="w-full max-w-md">
-              <div className="text-center mb-8">
-                <h2 className="font-serif text-3xl sm:text-4xl text-text">
-                  Name your office
-                </h2>
-                <p className="text-base text-text-secondary mt-2">
-                  You can always change this later.
-                </p>
-              </div>
-
-              <form onSubmit={handleWorkspaceSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-[13px] font-medium text-text-secondary mb-2">
-                    Workspace name
-                  </label>
-                  <input
-                    type="text"
-                    value={workspaceName}
-                    onChange={(e) => setWorkspaceName(e.target.value)}
-                    placeholder="My Company"
-                    autoFocus
-                    className="w-full py-3.5 px-4 text-[15px] border border-surface-active rounded-xl bg-surface transition-all duration-200 outline-none focus:border-[#FF6600]/40 focus:shadow-[0_4px_20px_rgba(255,102,0,0.1)]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[13px] font-medium text-text-secondary mb-2">
-                    First project
-                  </label>
-                  <input
-                    type="text"
-                    value={projectName}
-                    onChange={(e) => setProjectName(e.target.value)}
-                    placeholder="Marketing"
-                    className="w-full py-3.5 px-4 text-[15px] border border-surface-active rounded-xl bg-surface transition-all duration-200 outline-none focus:border-[#FF6600]/40 focus:shadow-[0_4px_20px_rgba(255,102,0,0.1)]"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full flex items-center justify-center gap-2 py-3.5 px-6 mt-2 bg-[#18181B] text-white rounded-xl font-medium text-[15px] hover:bg-[#27272A] transition-all duration-200 transform hover:-translate-y-0.5"
-                >
-                  Set up my office
-                </button>
-              </form>
-            </div>
           </motion.div>
         )}
 
