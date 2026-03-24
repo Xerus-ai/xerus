@@ -1,7 +1,7 @@
 // Onboarding Routes
 // REST endpoints for new user onboarding flow:
-// - POST /start   -> Acknowledge readiness (near no-op)
-// - POST /handoff -> Create workspace, provision sandbox, scaffold, create default domain + channel
+// - POST /start   -> Create default workspace + provision sandbox (must complete before AI conversation)
+// - POST /handoff -> Rename workspace, create domain + channel (after AI guides user through naming)
 
 import { Router, Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../../types';
@@ -24,7 +24,8 @@ import { slugify } from '../../shared/slugify';
 
 // -------------------------------------------------------------------------
 // POST /api/v1/onboarding/start
-// Frontend calls this on mount. Returns ok so template flow can continue.
+// Creates a default workspace row + provisions sandbox so the AI conversation
+// can run inside it. Called on mount — template messages play while this completes.
 // -------------------------------------------------------------------------
 
 router.post('/start', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
@@ -36,7 +37,43 @@ router.post('/start', auth, async (req: AuthenticatedRequest, res: Response, nex
             return;
         }
 
-        sendResponse(res, 200, { status: 'ready' }, startTime);
+        // Check if workspace already exists (idempotent — safe to call multiple times)
+        const existing = await query(
+            'SELECT id::text FROM workspaces WHERE user_id = $1 LIMIT 1',
+            [userId],
+        );
+
+        let workspaceId: string;
+        if (existing.rows.length > 0) {
+            workspaceId = String(existing.rows[0].id);
+        } else {
+            // Create default workspace row so execution pipeline can find it
+            const wsResult = await query(
+                `INSERT INTO workspaces (user_id, slug, name)
+                 VALUES ($1, 'default', 'My Workspace')
+                 ON CONFLICT (user_id) DO NOTHING
+                 RETURNING id::text`,
+                [userId],
+            );
+            workspaceId = String(wsResult.rows[0]?.id ?? '');
+        }
+
+        // Provision sandbox (this is the slow part — ~9s)
+        let sandboxReady = false;
+        if (sandboxService) {
+            try {
+                await sandboxService.getOrCreateSandbox({ userId });
+                sandboxReady = true;
+            } catch (err) {
+                console.warn(`[Onboarding] Sandbox provisioning failed for user ${userId}: ${(err as Error).message}`);
+            }
+        }
+
+        sendResponse(res, 200, {
+            status: 'ready',
+            workspace_id: workspaceId,
+            sandbox_ready: sandboxReady,
+        }, startTime);
     } catch (err) {
         next(err);
     }
@@ -44,8 +81,9 @@ router.post('/start', auth, async (req: AuthenticatedRequest, res: Response, nex
 
 // -------------------------------------------------------------------------
 // POST /api/v1/onboarding/handoff
-// Heavy lifting: create workspace row, provision sandbox, create default domain + channel.
-// Body: { workspace: string, project: string, choice?: string }
+// Rename workspace, create default domain + channel.
+// Workspace row + sandbox already exist from /start.
+// Body: { workspace: string, project: string }
 // -------------------------------------------------------------------------
 
 router.post('/handoff', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
@@ -69,7 +107,7 @@ router.post('/handoff', auth, async (req: AuthenticatedRequest, res: Response, n
         const projectSlug = projectName ? slugify(projectName) : 'default';
         const projectDisplayName = projectName || 'Default';
 
-        // 1. Create workspace row (idempotent via ON CONFLICT)
+        // 1. Update workspace name (row already created by /start)
         const wsResult = await query(
             `INSERT INTO workspaces (user_id, slug, name)
              VALUES ($1, $2, $3)
@@ -94,7 +132,7 @@ router.post('/handoff', auth, async (req: AuthenticatedRequest, res: Response, n
         );
         const domain = domainResult.rows[0] as { id: string; slug: string; name: string };
 
-        // 5. Create #general channel in the domain
+        // 3. Create #general channel in the domain
         const channelResult = await query(
             `INSERT INTO channels (domain_id, user_id, slug, name, description)
              VALUES ($1, $2, 'general', 'General', 'Default channel for team communication')
@@ -106,24 +144,10 @@ router.post('/handoff', auth, async (req: AuthenticatedRequest, res: Response, n
         );
         const channel = channelResult.rows[0] as { id: string };
 
-        // 6. Provision sandbox (async — don't block response if slow)
-        // The sandbox will be created on first execution if not ready yet.
-        let sandboxProvisioned = false;
-        if (sandboxService) {
-            try {
-                await sandboxService.getOrCreateSandbox({ userId });
-                sandboxProvisioned = true;
-            } catch (err) {
-                console.warn(`[Onboarding] Sandbox provisioning deferred for user ${userId}: ${(err as Error).message}`);
-                sandboxProvisioned = false;
-            }
-        }
-
         sendResponse(res, 200, {
             workspace: { id: workspace.id, slug: workspace.slug, name: workspace.name },
             domain: { id: domain.id, slug: domain.slug, name: domain.name },
             channel: { id: channel.id, slug: 'general', name: 'General' },
-            sandbox_provisioned: sandboxProvisioned,
         }, startTime);
     } catch (err) {
         next(err);
