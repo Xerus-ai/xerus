@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/utils/AuthContext'
@@ -11,7 +11,7 @@ import { OnboardingMessages } from './OnboardingMessages'
 import { OnboardingSteps } from './OnboardingSteps'
 import type { OnboardingMessage, OnboardingTemplateMessage } from './types'
 
-type Phase = 'logo' | 'template' | 'live' | 'setup'
+type Phase = 'logo' | 'template' | 'workspace-form' | 'setup'
 
 // Preset agents shown during the onboarding setup wizard step
 const SETUP_AGENTS = [
@@ -92,15 +92,12 @@ export function OnboardingChat() {
   const firstName = user?.display_name?.split(' ')[0] || 'there'
   const userId = user?.uid || ''
 
-  // Restore phase from sessionStorage on refresh (skip logo/template if already past them)
   const [phase, setPhaseRaw] = useState<Phase>(() => {
     if (typeof window === 'undefined') return 'logo'
     const saved = sessionStorage.getItem('xerus_onboarding_phase')
-    // Only restore 'template' or 'live' — 'setup' requires workspaceData which is lost
-    if (saved === 'template' || saved === 'live') return saved as Phase
+    if (saved === 'template') return saved as Phase
     return 'logo'
   })
-  // Wrapper that persists phase to sessionStorage (stable identity via ref)
   const setPhaseRef = useRef((p: Phase) => {
     setPhaseRaw(p)
     sessionStorage.setItem('xerus_onboarding_phase', p)
@@ -112,18 +109,15 @@ export function OnboardingChat() {
   const [quickReplies, setQuickReplies] = useState<typeof INITIAL_QUICK_REPLIES>([])
   const [logoReady, setLogoReady] = useState(false)
   const [workspaceData, setWorkspaceData] = useState<{ workspace: string; project: string } | null>(null)
+  const [workspaceName, setWorkspaceName] = useState('')
+  const [projectName, setProjectName] = useState('')
+  const [isProvisioning, setIsProvisioning] = useState(false)
+  const [provisionError, setProvisionError] = useState<string | null>(null)
   const hasNavigatedRef = useRef(false)
   const quickReplyTimerRef = useRef<ReturnType<typeof setTimeout>>()
 
   const stream = useOnboardingStream({ userId, onWorkspaceCreated: markWorkspaceReady })
   const templateMessages = useMemo(() => buildTemplateMessages(firstName), [firstName])
-
-  // Provision sandbox in background on mount
-  // startProvisioning has stable identity (useCallback with [] deps)
-  const { startProvisioning } = stream
-  useEffect(() => {
-    if (userId) startProvisioning().catch(() => { /* non-critical: /onboarding/start is a readiness check */ })
-  }, [userId, startProvisioning])
 
   // Logo phase: hold for 2.5s then transition to template
   useEffect(() => {
@@ -177,86 +171,52 @@ export function OnboardingChat() {
     }
   }, [templateMessages.length])
 
-  // Clean up quick reply timer on unmount
   useEffect(() => () => clearTimeout(quickReplyTimerRef.current), [])
 
-  // Merge streamed messages from the hook
-  useEffect(() => {
-    if (stream.streamedMessages.length === 0) return
-    setMessages((prev) => {
-      const nonStreamed = prev.filter((m) => m.source !== 'stream')
-      return [...nonStreamed, ...stream.streamedMessages]
-    })
-  }, [stream.streamedMessages])
-
-  const messagesRef = useRef(messages)
-  messagesRef.current = messages
-
+  // User clicks "Start fresh" / "Bring my company" → show workspace form
   const handleQuickReply = useCallback((value: string) => {
     const reply = INITIAL_QUICK_REPLIES.find((r) => r.value === value)
     const label = reply?.label || value
-    const userMsg: OnboardingMessage = {
+    setMessages((prev) => [...prev, {
       id: `user-${Date.now()}`,
-      role: 'user',
+      role: 'user' as const,
       content: label,
-      source: 'template',
-    }
-    setMessages((prev) => [...prev, userMsg])
+      source: 'template' as const,
+    }])
     setQuickReplies([])
-    setPhase('live')
-    stream.handoff(value, [...messagesRef.current, userMsg])
-  }, [stream])
-
-  const handleSend = useCallback((content: string) => {
-    const userMsg: OnboardingMessage = {
-      id: `user-${Date.now()}`,
-      role: 'user',
-      content,
-      source: phase === 'live' ? 'stream' : 'template',
-    }
-    setMessages((prev) => [...prev, userMsg])
-    if (phase === 'live') stream.sendMessage(content)
-  }, [phase, stream])
-
-  const collapseCard = useCallback((messageId: string, collapsedText: string) => {
-    setMessages((prev) =>
-      prev.map((m) => {
-        if (m.id !== messageId || !m.ui) return m
-        return { ...m, ui: { ...m.ui, collapsed: true, collapsedText } }
-      })
-    )
+    setPhase('workspace-form')
   }, [])
 
-  const handleUIAction = useCallback(async (messageId: string, action: string, data: Record<string, unknown>) => {
-    // Workspace creation → await backend, collapse card only on success
-    if (action === 'create-workspace') {
-      const workspace = String(data.workspace ?? '')
-      const project = String(data.project ?? '')
-      setWorkspaceData({ workspace, project })
-      const result = await stream.createWorkspace(workspace, project)
-      if (!result) return // createWorkspace throws on error, toast shown by error handler
-      collapseCard(messageId, `${workspace} created with ${project} project`)
-      setPhase('setup')
-      return
-    }
+  // Submit workspace form → immediately show Screen 2 → handoff in background
+  const handleWorkspaceSubmit = useCallback(async (e: FormEvent) => {
+    e.preventDefault()
+    const ws = workspaceName.trim() || 'My Workspace'
+    const proj = projectName.trim() || 'Default'
 
-    // Other UI actions — collapse immediately
-    collapseCard(messageId, '')
+    setWorkspaceData({ workspace: ws, project: proj })
+    setIsProvisioning(true)
+    setProvisionError(null)
+    setPhase('setup')
 
-    // Forward to stream
-    if (phase === 'live') {
-      stream.sendMessage(`[action:${action}] ${JSON.stringify(data)}`)
+    // Background: create workspace + domain + channel + sandbox + seed conversation
+    try {
+      const result = await stream.createWorkspace(ws, proj)
+      if (!result) {
+        setProvisionError('Failed to create workspace')
+      }
+    } catch (err) {
+      console.error('[Onboarding] Workspace creation failed:', err)
+      setProvisionError('Something went wrong. Please try again.')
+    } finally {
+      setIsProvisioning(false)
     }
-  }, [phase, stream, collapseCard])
+  }, [workspaceName, projectName, stream])
 
   const handleSetupComplete = useCallback(() => {
     stream.completeOnboarding()
-    // Navigation is deferred to useEffect below — React must flush
-    // setHasWorkspace(true) before LayoutShell renders on '/'
   }, [stream])
 
-  // Navigate after onboarding completes and hasWorkspace is flushed
-  // Guard with ref to prevent double-fire in React Strict Mode
+  // Navigate after onboarding completes
   useEffect(() => {
     if (stream.mode === 'complete' && !hasNavigatedRef.current) {
       hasNavigatedRef.current = true
@@ -265,14 +225,14 @@ export function OnboardingChat() {
     }
   }, [stream.mode, router])
 
-  const showChat = phase === 'logo' || phase === 'template' || phase === 'live'
+  const showChat = phase === 'logo' || phase === 'template'
 
   return (
     <div className="fixed inset-0 flex flex-col bg-surface-alt">
       <BlobBackground />
 
       <AnimatePresence mode="wait">
-        {/* ── Chat phases ── */}
+        {/* ── Chat phases (logo + template messages) ── */}
         {showChat && (
           <motion.div
             key="chat"
@@ -280,7 +240,6 @@ export function OnboardingChat() {
             transition={{ duration: 0.4 }}
             className="flex-1 flex flex-col min-h-0"
           >
-            {/* Logo splash */}
             <AnimatePresence>
               {phase === 'logo' && (
                 <motion.div
@@ -293,8 +252,7 @@ export function OnboardingChat() {
               )}
             </AnimatePresence>
 
-            {/* Messages */}
-            {phase !== 'logo' && (
+            {phase === 'template' && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -305,31 +263,75 @@ export function OnboardingChat() {
                   messages={messages}
                   onLogoReady={() => setLogoReady(true)}
                   onTypingComplete={handleTypingComplete}
-                  onUIAction={handleUIAction}
+                  onUIAction={() => {}}
                   quickReplies={quickReplies.length > 0 ? quickReplies : undefined}
                   onQuickReply={handleQuickReply}
                 />
-
-                {/* SSE error with retry — like ChatGPT/Claude pattern */}
-                {stream.error ? (
-                  <div className="flex items-center justify-center gap-3 py-4 px-6">
-                    <p className="text-sm text-text-muted">{stream.error}</p>
-                    <button
-                      onClick={stream.retryHandoff}
-                      className="text-sm font-medium text-[#FF6600] hover:text-[#E65C00] transition-colors"
-                    >
-                      Try again
-                    </button>
-                  </div>
-                ) : null}
               </motion.div>
             )}
-
-            {/* Input bar removed — onboarding uses generative UI only */}
           </motion.div>
         )}
 
-        {/* ── Setup wizard ── */}
+        {/* ── Workspace name form ── */}
+        {phase === 'workspace-form' && (
+          <motion.div
+            key="workspace-form"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.4 }}
+            className="flex-1 flex items-center justify-center px-6"
+          >
+            <div className="w-full max-w-md">
+              <div className="text-center mb-8">
+                <h2 className="font-serif text-3xl sm:text-4xl text-text">
+                  Name your office
+                </h2>
+                <p className="text-base text-text-secondary mt-2">
+                  You can always change this later.
+                </p>
+              </div>
+
+              <form onSubmit={handleWorkspaceSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-[13px] font-medium text-text-secondary mb-2">
+                    Workspace name
+                  </label>
+                  <input
+                    type="text"
+                    value={workspaceName}
+                    onChange={(e) => setWorkspaceName(e.target.value)}
+                    placeholder="My Company"
+                    autoFocus
+                    className="w-full py-3.5 px-4 text-[15px] border border-surface-active rounded-xl bg-surface transition-all duration-200 outline-none focus:border-[#FF6600]/40 focus:shadow-[0_4px_20px_rgba(255,102,0,0.1)]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[13px] font-medium text-text-secondary mb-2">
+                    First project
+                  </label>
+                  <input
+                    type="text"
+                    value={projectName}
+                    onChange={(e) => setProjectName(e.target.value)}
+                    placeholder="Marketing"
+                    className="w-full py-3.5 px-4 text-[15px] border border-surface-active rounded-xl bg-surface transition-all duration-200 outline-none focus:border-[#FF6600]/40 focus:shadow-[0_4px_20px_rgba(255,102,0,0.1)]"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full flex items-center justify-center gap-2 py-3.5 px-6 mt-2 bg-[#18181B] text-white rounded-xl font-medium text-[15px] hover:bg-[#27272A] transition-all duration-200 transform hover:-translate-y-0.5"
+                >
+                  Set up my office
+                </button>
+              </form>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ── Setup wizard (Screen 2 — visual progress + provisioning in background) ── */}
         {phase === 'setup' && workspaceData && (
           <motion.div
             key="setup"
@@ -349,4 +351,3 @@ export function OnboardingChat() {
     </div>
   )
 }
-
