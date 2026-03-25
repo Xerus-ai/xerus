@@ -2,7 +2,7 @@
  * Skills API Module
  * CRUD operations for skills marketplace, install/uninstall, and file operations
  */
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { apiCall, getApiHeaders } from './client';
 import { mapSkillToFrontend, mapSkillDetailToFrontend } from './mappers';
 import type {
@@ -83,7 +83,7 @@ export const createSkill = async (input: SkillCreateInput): Promise<Skill> => {
   });
   const result = await response.json();
   const data = result.data || result;
-  toast.success('Skill created');
+  toast.success('Skill created', { description: 'Your new skill is ready to use.' });
   return mapSkillToFrontend(data.skill || data);
 };
 
@@ -94,13 +94,13 @@ export const updateSkill = async (slug: string, updates: SkillUpdateInput): Prom
   });
   const result = await response.json();
   const data = result.data || result;
-  toast.success('Skill updated');
+  toast.success('Skill updated', { description: 'Your changes have been applied.' });
   return mapSkillToFrontend(data.skill || data);
 };
 
 export const deleteSkill = async (slug: string): Promise<void> => {
   await apiCall(`/skills/${slug}`, { method: 'DELETE' });
-  toast.success('Skill deleted');
+  toast.success('Skill deleted', { description: 'This skill has been permanently removed.' });
 };
 
 // ============================================================
@@ -112,7 +112,7 @@ export const installSkill = async (skillSlug: string, input: SkillInstallInput):
     method: 'POST',
     body: JSON.stringify(input),
   });
-  toast.success('Skill installed');
+  toast.success('Skill installed', { description: 'This skill is now available to your agents.' });
 };
 
 export const uninstallSkill = async (skillSlug: string, scope: 'channel' | 'global' = 'global', channelPath?: string): Promise<void> => {
@@ -120,7 +120,7 @@ export const uninstallSkill = async (skillSlug: string, scope: 'channel' | 'glob
     method: 'DELETE',
     body: JSON.stringify({ scope, channel_id: channelPath }),
   });
-  toast.success('Skill uninstalled');
+  toast.success('Skill uninstalled', { description: 'This skill has been removed from your workspace.' });
 };
 
 
@@ -147,12 +147,12 @@ export const writeSkillFile = async (idOrSlug: string, filePath: string, content
     method: 'PUT',
     body: JSON.stringify({ content }),
   });
-  toast.success('File saved');
+  toast.success('File saved', { description: 'Your changes have been written to disk.' });
 };
 
 export const deleteSkillFile = async (idOrSlug: string, filePath: string): Promise<void> => {
   await apiCall(`/skills/${idOrSlug}/files/${filePath}`, { method: 'DELETE' });
-  toast.success('File deleted');
+  toast.success('File deleted', { description: 'This file has been permanently removed.' });
 };
 
 // ============================================================
@@ -176,12 +176,12 @@ export const setSkillSecret = async (skillSlug: string, envKey: string, value: s
     method: 'PUT',
     body: JSON.stringify({ value }),
   });
-  toast.success('Secret saved');
+  toast.success('Secret saved', { description: 'Your secret is securely stored.' });
 };
 
 export const deleteSkillSecret = async (skillSlug: string, envKey: string): Promise<void> => {
   await apiCall(`/skills/${skillSlug}/secrets/${envKey}`, { method: 'DELETE' });
-  toast.success('Secret removed');
+  toast.success('Secret removed', { description: 'This secret has been deleted.' });
 };
 
 /**

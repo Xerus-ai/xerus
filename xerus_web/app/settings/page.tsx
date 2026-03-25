@@ -6,7 +6,7 @@ import { getUserProfile, updateUserProfile, deleteAccount } from '@/lib/api/user
 import { useRouter } from 'next/navigation'
 import { Mail, Crown, Trash2, AlertTriangle } from 'lucide-react'
 import { motion } from 'framer-motion'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import Link from 'next/link'
 
 interface ProfileData {
@@ -48,7 +48,7 @@ export default function ProfilePage() {
         })
         setDisplayNameInput(data.display_name)
       } catch {
-        toast.error("Couldn't load your profile")
+        toast.error("Couldn't load your profile", { description: 'Please refresh the page and try again.' })
         setProfile({
           uid: user.uid,
           email: user.email,
@@ -68,7 +68,7 @@ export default function ProfilePage() {
     try {
       await updateUserProfile({ display_name: displayNameInput })
       setProfile((prev) => (prev ? { ...prev, display_name: displayNameInput } : null))
-      toast.success('Display name updated')
+      toast.success('Display name updated', { description: 'Your new name will appear across the platform.' })
     } catch {
       toast.error("Couldn't save your changes", { description: 'Please try again.' })
     } finally {
@@ -79,7 +79,7 @@ export default function ProfilePage() {
   const handleDeleteAccount = async () => {
     try {
       await deleteAccount()
-      toast.success('Account deleted')
+      toast.success('Account deleted', { description: 'Your account and all data have been removed.' })
       router.push('/login')
     } catch {
       toast.error("Couldn't delete your account", { description: 'Please contact support if this persists.' })

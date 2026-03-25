@@ -13,7 +13,7 @@ import {
 import type { WorkspaceStatus } from '@/lib/api/workspace'
 import { Cpu, HardDrive, MemoryStick, Server, Sparkles, Play, Pause, Square, Archive, Bot, Puzzle, ChevronRight } from 'lucide-react'
 import { motion } from 'framer-motion'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 
@@ -31,8 +31,7 @@ const PLAN_LABELS: Record<string, string> = {
   prodigy: 'Prodigy',
 }
 
-// Per-sandbox resource allocation by plan tier
-// Maps to Daytona sandbox resource limits (RESOURCE_LIMITS_DISABLED=false in prod)
+// Per-pod resource allocation by plan tier
 const PLAN_RESOURCES: Record<string, { vcpus: number; memoryGb: number; storageGb: number }> = {
   free:     { vcpus: 1, memoryGb: 1, storageGb: 5 },
   starter:  { vcpus: 1, memoryGb: 2, storageGb: 10 },

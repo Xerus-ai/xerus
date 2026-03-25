@@ -19,7 +19,7 @@ import { FloatingPanel } from '@/components/common/FloatingPanel';
 import { FloatingPanelProvider } from '@/components/common/FloatingPanelContext';
 import { SkillSecretsCard } from '@/components/skills/SkillSecretsCard';
 import { parseSkillEnvKeys } from '@/lib/utils/parse-skill-env-keys';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 
 export default function SkillDetailPage() {
     const router = useRouter();
@@ -87,10 +87,10 @@ export default function SkillDetailPage() {
                     setDeleting(true);
                     try {
                         await deleteSkill(skill.slug);
-                        toast.success('Skill deleted');
+                        toast.success('Skill deleted', { description: 'This skill has been permanently removed.' });
                         router.push('/skills');
                     } catch (error) {
-                        toast.error("Couldn't remove this skill");
+                        toast.error("Couldn't remove this skill", { description: 'Please try again in a moment.' });
                     } finally {
                         setDeleting(false);
                     }

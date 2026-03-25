@@ -2,7 +2,7 @@
 
 import { useRef, useState, useCallback } from 'react'
 import { FolderOpen, Plus, Upload, Search, LayoutGrid, List, ArrowUpDown, FolderInput } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 import { FolderCard, FolderSvgDefinitions } from '@/components/FolderCard'
 import { FileCard } from './FileCard'
@@ -69,7 +69,7 @@ export function BrowseView({
         onOpen: () => onFileClick(file),
         onDownload: () => {
           workspaceApi.downloadFile(file.path, file.name)
-            .then(() => toast.success('File downloaded'))
+            .then(() => toast.success('File downloaded', { description: 'Check your downloads folder.' }))
             .catch(() => toast.error("Couldn't download this file", { description: 'Please try again.' }))
         },
         // Disabled until backend supports these operations

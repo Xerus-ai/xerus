@@ -2,7 +2,7 @@
  * Agents API Module
  * CRUD operations for AI agents/assistants
  */
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { apiCall, getApiHeaders } from './client';
 import { mapAgentToAssistant } from './mappers';
 import type {
@@ -200,7 +200,7 @@ export const createAgent = async (data: AgentCreateInput): Promise<Assistant> =>
   // Validate behaviour fields before sending to backend
   const validationError = validateBehaviourFields(data);
   if (validationError) {
-    toast.error(validationError);
+    toast.error(validationError, { description: 'Please review your input and try again.' });
     throw new Error(validationError);
   }
 
@@ -212,7 +212,7 @@ export const createAgent = async (data: AgentCreateInput): Promise<Assistant> =>
   const result = await response.json();
   const agentData = result.data || result;
   const agent: BackendAgent = agentData.agent || agentData;
-  toast.success('Agent created');
+  toast.success('Agent created', { description: 'Your new agent is ready to configure.' });
   return mapAgentToAssistant(agent);
 };
 
@@ -223,7 +223,7 @@ export const updateAgent = async (id: number, updates: AgentUpdateInput): Promis
   // Validate behaviour fields before sending to backend
   const validationError = validateBehaviourFields(updates);
   if (validationError) {
-    toast.error(validationError);
+    toast.error(validationError, { description: 'Please review your input and try again.' });
     throw new Error(validationError);
   }
 
@@ -250,7 +250,7 @@ export const updateAgent = async (id: number, updates: AgentUpdateInput): Promis
   const result = await response.json();
   const agentData = result.data || result;
   const agent: BackendAgent = agentData.agent || agentData;
-  toast.success('Changes saved');
+  toast.success('Changes saved', { description: 'Your agent has been updated.' });
 
   const assistant = mapAgentToAssistant(agent);
   return {
@@ -264,7 +264,7 @@ export const updateAgent = async (id: number, updates: AgentUpdateInput): Promis
  */
 export const deleteAssistant = async (id: number): Promise<void> => {
   await apiCall(`/agents/${id}`, { method: 'DELETE' });
-  toast.success('Agent deleted');
+  toast.success('Agent deleted', { description: 'This agent has been permanently removed.' });
 };
 
 /**
@@ -320,7 +320,7 @@ export const setDefaultAgent = async (agentId: number): Promise<Assistant> => {
   const response = await apiCall(`/agents/${agentId}/set-default`, { method: 'POST' });
   const result = await response.json();
   const data = result.data || result;
-  toast.success('Set as default agent');
+  toast.success('Default agent updated', { description: 'This agent will now handle new conversations.' });
   return mapAgentToAssistant(data.agent || data);
 };
 

@@ -8,7 +8,7 @@ import { getFeaturedModels, type ModelEntry } from '@/lib/api/models'
 import { ModelIcon } from '@/components/agents/AgentAvatar'
 import { formatModelName } from '@/utils/models'
 import { slugify } from '@/utils/slugify'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 
 const DEFAULT_MODEL = 'anthropic/claude-sonnet-4-6'
 
@@ -73,7 +73,7 @@ export default function CreateAIAgentClient() {
 
     const handleWriteWithAI = async () => {
         if (!form.system_prompt.trim()) {
-            toast.error('Add some text first')
+            toast.error('Missing content', { description: 'Describe what you want your agent to do.' })
             return
         }
         setIsFormatting(true)
@@ -93,7 +93,7 @@ export default function CreateAIAgentClient() {
 
     const handleCreate = async () => {
         if (!form.name.trim()) {
-            toast.error('Give your agent a name')
+            toast.error('Name required', { description: 'Every agent needs a name to get started.' })
             return
         }
 

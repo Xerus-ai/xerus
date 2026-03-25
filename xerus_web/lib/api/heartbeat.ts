@@ -2,7 +2,7 @@
  * Heartbeat API Module
  * CRUD operations for agent heartbeat configuration and execution history
  */
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { apiCall } from './client';
 import {
   mapHeartbeatConfigToFrontend,
@@ -76,7 +76,7 @@ export const updateHeartbeatConfig = async (
   const result = await response.json();
   const data = result.data || result;
   const savedConfig: BackendHeartbeatConfig = data.heartbeat_config || data;
-  toast.success('Automation settings saved');
+  toast.success('Automation settings saved', { description: 'Your automation preferences have been updated.' });
   return mapHeartbeatConfigToFrontend(savedConfig);
 };
 
@@ -85,7 +85,7 @@ export const updateHeartbeatConfig = async (
  */
 export const deleteHeartbeatConfig = async (agentId: number): Promise<void> => {
   await apiCall(`/agents/${agentId}/heartbeat`, { method: 'DELETE' });
-  toast.success('Automation removed');
+  toast.success('Automation removed', { description: 'This automation has been disabled.' });
 };
 
 /**
@@ -99,7 +99,9 @@ export const toggleHeartbeat = async (agentId: number, enabled: boolean): Promis
   const result = await response.json();
   const data = result.data || result;
   const config: BackendHeartbeatConfig = data.heartbeat_config || data;
-  toast.success(enabled ? 'Automation turned on' : 'Automation paused');
+  toast.success(enabled ? 'Automation turned on' : 'Automation paused', {
+    description: enabled ? 'Your agent will now run automatically.' : 'Your agent will stop running until re-enabled.',
+  });
   return mapHeartbeatConfigToFrontend(config);
 };
 

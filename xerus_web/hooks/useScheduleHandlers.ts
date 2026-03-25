@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, type Dispatch, type SetStateAction } from 'react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import {
   createSchedule,
   getSchedules,

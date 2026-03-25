@@ -11,7 +11,7 @@ import {
 import type { SnapshotFile } from '@/lib/api/workspace'
 import { Download, Upload, History, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react'
 import { motion } from 'framer-motion'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 
 export default function DataPage() {
   useRedirectIfNotAuth()
@@ -43,7 +43,7 @@ export default function DataPage() {
     setActionInProgress('export')
     try {
       await exportWorkspace()
-      toast.success('Workspace export downloaded')
+      toast.success('Workspace export downloaded', { description: 'Check your downloads folder for the export file.' })
     } catch {
       toast.error("Couldn't export your data", { description: 'Please try again.' })
     } finally {
@@ -58,7 +58,7 @@ export default function DataPage() {
     setActionInProgress('import')
     try {
       await importWorkspace(file)
-      toast.success('Workspace imported successfully')
+      toast.success('Workspace imported successfully', { description: 'Your workspace data has been restored.' })
     } catch {
       toast.error("Couldn't import the workspace", { description: 'Please check the file and try again.' })
     } finally {
@@ -71,7 +71,7 @@ export default function DataPage() {
     setActionInProgress('restore')
     try {
       await restoreFromSnapshot(snapshot.key)
-      toast.success('Workspace restored from backup')
+      toast.success('Workspace restored from backup', { description: 'Your workspace has been rolled back to this backup.' })
       setSnapshots([])
     } catch {
       toast.error("Couldn't restore the workspace", { description: 'Please try again.' })
@@ -177,7 +177,7 @@ export default function DataPage() {
         </div>
       </motion.div>
 
-      {/* Snapshots */}
+      {/* Backups */}
       <motion.div
         className="bg-surface/60 rounded-2xl border border-surface-active/60 overflow-hidden"
         initial={{ opacity: 0, y: 8 }}

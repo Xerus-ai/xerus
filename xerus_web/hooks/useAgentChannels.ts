@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { apiCall } from '@/lib/api/client'
 import { useAuth } from '@/utils/AuthContext'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 
 export interface AgentChannel {
   channel_id: string
@@ -49,7 +49,7 @@ export function useAgentChannels(agentId: number): UseAgentChannelsReturn {
       const response = await apiCall(`/agents/${agentId}/channels`, { method: 'GET' })
       setAssignedChannels(await parseChannelsResponse(response))
     } catch {
-      toast.error("Couldn't load channel assignments")
+      toast.error("Couldn't load channel assignments", { description: 'Please refresh the page and try again.' })
       setAssignedChannels([])
     } finally {
       setIsLoading(false)

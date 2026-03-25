@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { Eye, Pencil, Loader2, Lock, Sparkles, ArrowUp } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 import { BinaryViewer } from './BinaryViewer'
 import { MarkdownPreview } from './MarkdownPreview'
@@ -75,7 +75,7 @@ export function FileEditor({ path, name, size, onDirtyChange, className }: FileE
     try {
       await workspaceApi.putFile(path, currentContent)
       setOriginalContent(currentContent)
-      toast.success('File saved')
+      toast.success('File saved', { description: 'Your changes have been written to disk.' })
     } catch (err) {
       toast.error("Couldn't save this file", { description: 'Please try again.' })
     } finally {

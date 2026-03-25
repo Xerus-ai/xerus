@@ -2,7 +2,7 @@
  * API Client with toast notifications
  * Base client for all API operations
  */
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { auth as firebaseAuth } from '@/utils/firebase';
 import { getApiUrlAsync } from '@/utils/context-detection';
 

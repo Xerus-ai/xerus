@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo } from 'react'
 import useSWR from 'swr'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { getAssistants, getUserAgents } from '@/lib/api/agents'
 import { apiPost, apiGet } from '@/lib/api/client'
 import type { Assistant } from '@/lib/api/types'
@@ -194,7 +194,7 @@ export function useCompanyTasks(): UseCompanyTasksReturn {
     try {
       await apiPost(`/tasks/${taskId}/status`, { status: newStatus })
     } catch {
-      toast.error("Couldn't move that task — reverting")
+      toast.error("Couldn't move that task — reverting", { description: 'The task has been moved back to its original position.' })
       fetchData()
     }
   }, [fetchData])

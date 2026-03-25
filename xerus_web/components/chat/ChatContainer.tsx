@@ -22,7 +22,7 @@ import type { ChatMessageExtended } from './chat-message.types'
 import { mapStreamEventsToExecution } from './mapStreamToExecutionEvents'
 
 const ExecutionDetail = dynamic(() => import('@/components/execution').then(m => ({ default: m.ExecutionDetail })))
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { XerusLoader } from '@/components/common/XerusLoader'
 import { startBrowser, startTerminal } from '@/lib/api/workspace'
 import { getSharedPipedreamClient } from '@/lib/pipedream-client'
@@ -116,7 +116,7 @@ export function ChatContainer({
         app: appSlug,
         onSuccess: () => {
           chat.handleDismissToolAuth()
-          toast.success('App connected')
+          toast.success('App connected', { description: 'Your agent can now use this app.' })
           document.querySelectorAll('iframe[id^="pipedream-connect-iframe-"]').forEach(el => el.remove())
         },
         onError: (err) => {

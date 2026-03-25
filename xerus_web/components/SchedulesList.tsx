@@ -17,7 +17,7 @@ import {
   Loader2,
   MoreVertical
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import type { ScheduledExecution } from '@/lib/api/types';
 
 interface SchedulesListProps {
@@ -46,7 +46,7 @@ export default function SchedulesList({
       await onToggle(schedule.id, !schedule.enabled);
     } catch (error) {
       console.error('Failed to toggle schedule:', error);
-      toast.error("Couldn't update the schedule");
+      toast.error("Couldn't update the schedule", { description: 'Please try again in a moment.' });
     } finally {
       setTogglingId(null);
     }
@@ -60,10 +60,10 @@ export default function SchedulesList({
           setDeletingId(scheduleId);
           try {
             await onDelete(scheduleId);
-            toast.success('Schedule deleted');
+            toast.success('Schedule deleted', { description: 'This schedule has been removed.' });
           } catch (error) {
             console.error('Failed to delete schedule:', error);
-            toast.error("Couldn't remove the schedule");
+            toast.error("Couldn't remove the schedule", { description: 'Please try again in a moment.' });
           } finally {
             setDeletingId(null);
           }

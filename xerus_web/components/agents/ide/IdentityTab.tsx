@@ -12,7 +12,7 @@ import { useAuth } from "@/utils/AuthContext"
 import { useSearchableTools, useToolLookup } from "@/hooks/useTools"
 import { useToolAuth } from "@/hooks/useToolAuth"
 import { Tool } from "@/types/tool"
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { isTemplateContent } from './FileCard'
 import { SchedulesCard } from './SchedulesCard'
 import { AgentChannelsCard } from './AgentChannelsCard'
@@ -230,7 +230,7 @@ export function IdentityTab({
   const handleWriteWithAI = async () => {
     const content = activeFile ? editContent : tempPrompt
     if (!content.trim()) {
-      toast.error('Add some text first')
+      toast.error('Missing content', { description: 'Add some text before using AI.' })
       return
     }
     setIsFormatting(true)

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { ExternalLink, Eye, EyeOff, RefreshCw, Network, Shield, ArrowUpRight } from 'lucide-react'
 import { motion } from 'framer-motion'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { useRedirectIfNotAuth } from '@/utils/AuthContext'
 import { saveApiKey, checkApiKeyStatus, deleteApiKey, getAllApiKeys } from '@/lib/api/user'
 
@@ -65,7 +65,7 @@ export default function ApiKeysPage() {
       updateApiKeyStatus({ ...apiKeyStatus, [provider]: true })
       setApiKeys((prev) => ({ ...prev, [provider]: input }))
       setApiKeyInputs((prev) => ({ ...prev, [provider]: '' }))
-      toast.success(`${PROVIDERS.find((p) => p.id === provider)?.name} API key saved`)
+      toast.success(`${PROVIDERS.find((p) => p.id === provider)?.name} API key saved`, { description: 'Your key is securely stored and ready to use.' })
     } catch {
       toast.error("Couldn't save your API key", { description: 'Please check the key and try again.' })
     } finally {
@@ -80,7 +80,7 @@ export default function ApiKeysPage() {
       updateApiKeyStatus({ ...apiKeyStatus, [provider]: false })
       setApiKeys((prev) => ({ ...prev, [provider]: null }))
       setApiKeyInputs((prev) => ({ ...prev, [provider]: '' }))
-      toast.success('API key removed')
+      toast.success('API key removed', { description: 'This provider will no longer be used.' })
     } catch {
       toast.error("Couldn't remove your API key", { description: 'Please try again.' })
     } finally {
