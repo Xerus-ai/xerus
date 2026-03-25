@@ -206,26 +206,3 @@ export const importSkill = async (files: File[]): Promise<Skill> => {
   const skill = skillData.skill || skillData;
   return mapSkillToFrontend(skill);
 };
-
-/**
- * Import a skill from uploaded files (SKILL.md + optional xerushub.json + supporting files)
- */
-export const importSkill = async (files: File[]): Promise<Skill> => {
-  const formData = new FormData();
-  for (const file of files) {
-    formData.append('files', file);
-  }
-
-  const headers = await getApiHeaders(true); // Exclude Content-Type for FormData
-
-  const response = await apiCall('/skills/import', {
-    method: 'POST',
-    headers,
-    body: formData,
-  });
-
-  const result = await response.json();
-  const skillData = result.data || result;
-  const skill = skillData.skill || skillData;
-  return mapSkillToFrontend(skill);
-};
