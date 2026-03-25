@@ -188,6 +188,20 @@ export function UploadPanel(props: UploadPanelProps) {
         const type = detectUploadContent(files)
         setDetectedType(type)
 
+        // Always build the file list so attachments/images render for every context
+        const items: FileItem[] = files.map(file => {
+            const ft = getFileType(file)
+            return {
+                file,
+                id: Math.random().toString(36).substring(7),
+                status: 'pending' as const,
+                progress: 0,
+                type: ft,
+                blobUrl: ft === 'image' ? URL.createObjectURL(file) : undefined,
+            }
+        })
+        setFileItems(items)
+
         if (type === 'agent') {
             const agentMdFile = files.find(f => f.name === 'agent.md')
             if (agentMdFile) {
@@ -223,20 +237,6 @@ export function UploadPanel(props: UploadPanelProps) {
 
                 setSkillData({ frontmatter: data, xerushub, body })
             }
-        } else {
-            // Regular files — build FileItem list with blob URLs for images
-            const items: FileItem[] = files.map(file => {
-                const type = getFileType(file)
-                return {
-                    file,
-                    id: Math.random().toString(36).substring(7),
-                    status: 'pending' as const,
-                    progress: 0,
-                    type,
-                    blobUrl: type === 'image' ? URL.createObjectURL(file) : undefined,
-                }
-            })
-            setFileItems(items)
         }
     }, [])
 
@@ -437,39 +437,43 @@ export function UploadPanel(props: UploadPanelProps) {
                     {/* Body */}
                     <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 -mr-2">
 
-                        {/* Drop zone — shown when no files yet */}
-                        {!hasContent && (
-                            <div
-                                className={cn(
-                                    "border-2 border-dashed rounded-[24px] h-48 flex flex-col items-center justify-center text-center transition-colors cursor-pointer",
-                                    isDragActive
-                                        ? "border-[#FF6600] bg-[#FF6600]/5"
-                                        : "border-surface-active hover:border-[#FF6600] hover:bg-surface"
-                                )}
-                                onDragEnter={handleDrag}
-                                onDragLeave={handleDrag}
-                                onDragOver={handleDrag}
-                                onDrop={handleDrop}
-                                onClick={() => fileInputRef.current?.click()}
-                            >
-                                <input
-                                    type="file"
-                                    ref={fileInputRef}
-                                    className="hidden"
-                                    multiple
-                                    onChange={handleFileSelect}
-                                />
-                                <div className="flex flex-col items-center gap-2">
+                        {/* Drop zone — always visible, compact when files already added */}
+                        <div
+                            className={cn(
+                                "border-2 border-dashed rounded-[24px] flex flex-col items-center justify-center text-center transition-colors cursor-pointer mb-8",
+                                hasContent ? "h-24" : "h-48",
+                                isDragActive
+                                    ? "border-[#FF6600] bg-[#FF6600]/5"
+                                    : "border-surface-active hover:border-[#FF6600] hover:bg-surface"
+                            )}
+                            onDragEnter={handleDrag}
+                            onDragLeave={handleDrag}
+                            onDragOver={handleDrag}
+                            onDrop={handleDrop}
+                            onClick={() => fileInputRef.current?.click()}
+                        >
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                className="hidden"
+                                multiple
+                                onChange={handleFileSelect}
+                            />
+                            <div className="flex flex-col items-center gap-2">
+                                {!hasContent && (
                                     <div className="w-12 h-12 rounded-full bg-surface-hover flex items-center justify-center mb-2">
                                         <Upload className="w-5 h-5 text-text-secondary" />
                                     </div>
-                                    <span className="text-text font-medium">Drop files or folders here</span>
-                                    <p className="text-xs text-text-secondary">
-                                        or click to browse
-                                    </p>
+                                )}
+                                <div className="flex items-center gap-2 text-text font-medium">
+                                    {hasContent && <Upload className="w-4 h-4" />}
+                                    <span>{hasContent ? 'Drop more files or click to browse' : 'Drop files or folders here'}</span>
                                 </div>
+                                {!hasContent && (
+                                    <p className="text-xs text-text-secondary">or click to browse</p>
+                                )}
                             </div>
-                        )}
+                        </div>
 
                         {/* Agent Preview */}
                         {detectedType === 'agent' && agentData && (
@@ -508,8 +512,8 @@ export function UploadPanel(props: UploadPanelProps) {
                             </div>
                         )}
 
-                        {/* Workspace file list — same UI as old FileUploadPanel */}
-                        {detectedType === 'files' && fileItems.length > 0 && (
+                        {/* File list — always visible when files exist */}
+                        {fileItems.length > 0 && (
                             <>
                                 {/* Attachments */}
                                 {attachmentFiles.length > 0 && (
@@ -526,7 +530,7 @@ export function UploadPanel(props: UploadPanelProps) {
                                                     <div className="flex-1 min-w-0 flex items-center gap-3">
                                                         <span className="text-sm text-text truncate font-medium">{file.file.name}</span>
                                                         <span className="text-xs text-text-secondary shrink-0">
-                                                            {(file.file.size / (1024 * 1024)).toFixed(1)} MB
+                                                            {file.file.size < 1024 ? `${file.file.size} B` : file.file.size < 1048576 ? `${(file.file.size / 1024).toFixed(1)} KB` : `${(file.file.size / 1048576).toFixed(1)} MB`}
                                                         </span>
                                                     </div>
                                                     <button
@@ -555,7 +559,7 @@ export function UploadPanel(props: UploadPanelProps) {
                                                         className="w-full h-full object-cover"
                                                     />
                                                     <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/50 backdrop-blur-sm rounded-full text-[10px] text-white font-medium">
-                                                        {(file.file.size / (1024 * 1024)).toFixed(1)} MB
+                                                        {file.file.size < 1024 ? `${file.file.size} B` : file.file.size < 1048576 ? `${(file.file.size / 1024).toFixed(1)} KB` : `${(file.file.size / 1048576).toFixed(1)} MB`}
                                                     </div>
                                                     <button
                                                         onClick={() => removeFile(file.id)}
@@ -577,77 +581,77 @@ export function UploadPanel(props: UploadPanelProps) {
                                     </div>
                                 )}
 
-                                {/* Tags + Folder (workspace only) */}
-                                {context === 'workspace' && (
-                                    <div className="space-y-4 pt-2 border-t border-surface-active">
-                                        {/* Tags */}
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider flex items-center gap-2">
-                                                <Tag className="w-3 h-3" /> Tags
-                                            </label>
-                                            <div className="flex flex-wrap gap-2 bg-white p-2 rounded-lg border border-surface-active focus-within:ring-1 focus-within:ring-[#FF6600] transition-shadow">
-                                                {tags.map(tag => (
-                                                    <span key={tag} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-surface text-xs font-medium text-text">
-                                                        {tag}
-                                                        <button onClick={() => removeTag(tag)} className="hover:text-red-500" aria-label={`Remove tag ${tag}`}>
-                                                            <X className="w-3 h-3" />
-                                                        </button>
-                                                    </span>
-                                                ))}
-                                                <input
-                                                    type="text"
-                                                    value={tagInput}
-                                                    onChange={(e) => setTagInput(e.target.value)}
-                                                    onKeyDown={handleTagKeyDown}
-                                                    placeholder={tags.length === 0 ? "Add tags..." : ""}
-                                                    className="flex-1 min-w-[80px] text-sm bg-transparent focus:outline-none"
-                                                />
-                                            </div>
-                                            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                                                {['Design', 'Blog', 'Research', 'Archive'].map(suggestion => (
-                                                    <button
-                                                        key={suggestion}
-                                                        onClick={() => {
-                                                            if (!tags.includes(suggestion)) setTags([...tags, suggestion])
-                                                        }}
-                                                        className="px-2 py-1 rounded-full bg-surface-hover text-xs text-text-secondary hover:bg-surface-pressed hover:text-text transition-colors whitespace-nowrap"
-                                                    >
-                                                        + {suggestion}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        {/* Folder Selection */}
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider flex items-center gap-2">
-                                                <Folder className="w-3 h-3" /> Folder
-                                            </label>
-                                            <div className="relative">
-                                                <select
-                                                    value={selectedFolderId || ''}
-                                                    onChange={(e) => setSelectedFolderId(e.target.value || null)}
-                                                    className="w-full appearance-none bg-white border border-surface-active text-text text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-[#FF6600] transition-colors"
-                                                >
-                                                    <option value="">No Folder (Root)</option>
-                                                    {props.folders.map(folder => (
-                                                        <option key={folder.id} value={folder.id}>
-                                                            {folder.name}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary pointer-events-none" />
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
                             </>
                         )}
+
+                        {/* Tags + Folder — always visible */}
+                        <div className="space-y-4 pt-2 border-t border-surface-active">
+                            {/* Tags */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider flex items-center gap-2">
+                                    <Tag className="w-3 h-3" /> Tags
+                                </label>
+                                <div className="flex flex-wrap gap-2 bg-white p-2 rounded-lg border border-surface-active focus-within:ring-1 focus-within:ring-[#FF6600] transition-shadow">
+                                    {tags.map(tag => (
+                                        <span key={tag} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-surface text-xs font-medium text-text">
+                                            {tag}
+                                            <button onClick={() => removeTag(tag)} className="hover:text-red-500" aria-label={`Remove tag ${tag}`}>
+                                                <X className="w-3 h-3" />
+                                            </button>
+                                        </span>
+                                    ))}
+                                    <input
+                                        type="text"
+                                        value={tagInput}
+                                        onChange={(e) => setTagInput(e.target.value)}
+                                        onKeyDown={handleTagKeyDown}
+                                        placeholder={tags.length === 0 ? "Add tags..." : ""}
+                                        className="flex-1 min-w-[80px] text-sm bg-transparent focus:outline-none"
+                                    />
+                                </div>
+                                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                                    {['Design', 'Blog', 'Research', 'Archive'].map(suggestion => (
+                                        <button
+                                            key={suggestion}
+                                            onClick={() => {
+                                                if (!tags.includes(suggestion)) setTags([...tags, suggestion])
+                                            }}
+                                            className="px-2 py-1 rounded-full bg-surface-hover text-xs text-text-secondary hover:bg-surface-pressed hover:text-text transition-colors whitespace-nowrap"
+                                        >
+                                            + {suggestion}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Folder Selection — only when folders are available */}
+                            {context === 'workspace' && (
+                                <div className="space-y-2">
+                                    <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider flex items-center gap-2">
+                                        <Folder className="w-3 h-3" /> Folder
+                                    </label>
+                                    <div className="relative">
+                                        <select
+                                            value={selectedFolderId || ''}
+                                            onChange={(e) => setSelectedFolderId(e.target.value || null)}
+                                            className="w-full appearance-none bg-white border border-surface-active text-text text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-[#FF6600] transition-colors"
+                                        >
+                                            <option value="">No Folder (Root)</option>
+                                            {props.folders.map(folder => (
+                                                <option key={folder.id} value={folder.id}>
+                                                    {folder.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary pointer-events-none" />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
-                    {/* Footer Actions */}
-                    {hasContent && (
-                        <div className="pt-6 mt-auto flex justify-end gap-3 shrink-0 border-t border-surface-active">
+                    {/* Footer Actions — always visible */}
+                    <div className="pt-6 mt-auto flex justify-end gap-3 shrink-0 border-t border-surface-active">
                             <button
                                 onClick={onClose}
                                 className="px-6 py-2.5 rounded-[12px] border border-surface-active text-text hover:bg-surface font-medium text-sm transition-colors"
@@ -660,7 +664,7 @@ export function UploadPanel(props: UploadPanelProps) {
                                 <button
                                     onClick={() => handleImport(minimize)}
                                     disabled={isImporting}
-                                    className="px-6 py-2.5 rounded-[12px] bg-[#FF6600] hover:bg-[#E65C00] text-white text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    className="px-6 py-2.5 rounded-[12px] bg-text text-white text-sm font-medium hover:bg-[#1a1a1a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                                 >
                                     {isImporting ? (
                                         <>
@@ -674,7 +678,7 @@ export function UploadPanel(props: UploadPanelProps) {
                             )}
 
                             {/* Upload button for workspace files */}
-                            {detectedType === 'files' && context === 'workspace' && (
+                            {!isDetectedImport && context === 'workspace' && (
                                 <button
                                     onClick={() => handleWorkspaceUpload(minimize)}
                                     disabled={fileItems.length === 0 || isUploading}
@@ -690,8 +694,7 @@ export function UploadPanel(props: UploadPanelProps) {
                                     )}
                                 </button>
                             )}
-                        </div>
-                    )}
+                    </div>
                 </div>
             )}
         </FloatingPanel>

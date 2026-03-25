@@ -12,6 +12,7 @@ import { AppSidebar } from '@/components/navigation/AppSidebar'
 import { MobileBottomBar } from '@/components/navigation/MobileBottomBar'
 import { MobileHeader } from '@/components/navigation/MobileHeader'
 import { MotionConfig } from 'framer-motion'
+import { GradientBackground } from '@/components/GradientBackground'
 
 import { InviteCodeGate } from '@/components/InviteCodeGate'
 
@@ -136,7 +137,8 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
   // Mobile layout: floating header + content + bottom bar
   if (isMobile) {
     return (
-      <div className="flex flex-col h-screen bg-surface-alt">
+      <div className="flex flex-col h-screen relative">
+        <GradientBackground />
         <a
           href="#main-content"
           className="absolute -top-full left-2 z-[100] px-4 py-2 bg-[#FF6600] text-white rounded-xl text-sm font-medium focus:top-2 focus:outline-none transition-[top]"
@@ -154,7 +156,8 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
 
   // Desktop and Tablet layout
   return (
-    <div className="flex h-screen overflow-hidden bg-surface-alt relative">
+    <div className="flex h-screen overflow-hidden relative">
+      <GradientBackground />
       <a
         href="#main-content"
         className="absolute -top-full left-2 z-[100] px-4 py-2 bg-[#FF6600] text-white rounded-xl text-sm font-medium focus:top-2 focus:outline-none transition-[top]"

@@ -115,7 +115,7 @@ export default function CreateAIAgentClient() {
     }
 
     return (
-        <div className="min-h-screen bg-surface-alt">
+        <div className="min-h-screen">
             <div className="max-w-3xl mx-auto px-4 py-8">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-8">

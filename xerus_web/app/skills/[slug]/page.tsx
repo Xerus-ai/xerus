@@ -103,7 +103,7 @@ export default function SkillDetailPage() {
 
     if (error || !skill) {
         return (
-            <div className="min-h-screen bg-surface-alt flex flex-col items-center justify-center gap-6 px-4">
+            <div className="min-h-screen flex flex-col items-center justify-center gap-6 px-4">
                 <Image src="/logo/xerus.svg" alt="" width={40} height={40} className="opacity-30" />
                 <div className="text-center">
                     <h1 className="text-lg font-serif text-text mb-1">Skill not found</h1>
@@ -123,7 +123,7 @@ export default function SkillDetailPage() {
     const requiredEnvKeys = skillMdContent ? parseSkillEnvKeys(skillMdContent) : [];
 
     return (
-        <div className="min-h-screen bg-surface-alt font-sans text-text">
+        <div className="min-h-screen font-sans text-text">
             <div className="max-w-5xl mx-auto px-6 py-12">
                 {/* Nav bar */}
                 <div className="flex items-center justify-between mb-8">

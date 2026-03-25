@@ -267,11 +267,11 @@ export function ChatContainer({
   const agentSlug = state.currentAgent?.slug ?? null
 
   return (
-    <div className={cn('flex w-full bg-surface relative h-screen overflow-hidden', className)}>
+    <div className={cn('flex w-full relative h-screen overflow-hidden', className)}>
       <PanelGroup orientation="horizontal" className="flex-1 min-w-0">
         {/* Chat column */}
         <Panel defaultSize={isSandboxOpen ? 50 : 100} minSize={30}>
-          <div className="flex flex-col h-full bg-surface relative overflow-hidden">
+          <div className="flex flex-col h-full relative overflow-hidden">
             <MessageList
               messages={state.messages as ChatMessageExtended[]}
               currentAgent={state.currentAgent}

@@ -10,7 +10,7 @@ export default function GlobalError({
   reset: () => void
 }) {
   return (
-    <div className="min-h-screen bg-surface-alt flex flex-col items-center justify-center gap-6 px-4">
+    <div className="min-h-screen flex flex-col items-center justify-center gap-6 px-4">
       <Image
         src="/logo/xerus.svg"
         alt="Xerus"

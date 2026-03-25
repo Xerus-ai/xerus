@@ -134,7 +134,7 @@ export function BrowseView({
   return (
     <>
       {/* Search bar — Eden-style: dominant, full-width with scope chip */}
-      <div className="shrink-0 px-6 pt-6 pb-4 bg-surface-alt">
+      <div className="shrink-0 px-6 pt-6 pb-4">
         <div className="relative flex items-center bg-surface-hover rounded-[24px] overflow-hidden transition-all focus-within:ring-2 focus-within:ring-[#E5E5E5] px-1 py-1">
           <Search className="ml-3 w-4 h-4 text-text-muted shrink-0" />
           {currentDirPath && (

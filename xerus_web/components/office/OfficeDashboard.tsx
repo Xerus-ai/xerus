@@ -260,7 +260,7 @@ export function OfficeDashboard() {
   }
 
   return (
-    <div className="bg-surface-alt min-h-full font-sans text-text">
+    <div className="min-h-full font-sans text-text">
       <div className="max-w-[1140px] mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
         {/* Page header */}
         <header className="mb-8 flex items-center gap-3">
