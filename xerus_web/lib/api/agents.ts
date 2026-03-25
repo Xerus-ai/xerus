@@ -3,6 +3,10 @@
  * CRUD operations for AI agents/assistants
  */
 import { toast } from '@/lib/toast';
+import { apiCall, getApiHeaders } from './client';
+import { mapAgentToAssistant } from './mappers';
+import type {
+  Assistant,
   BackendAgent,
   AgentCreateInput,
   AgentUpdateInput,

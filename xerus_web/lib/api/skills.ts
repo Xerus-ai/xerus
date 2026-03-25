@@ -3,6 +3,10 @@
  * CRUD operations for skills marketplace, install/uninstall, and file operations
  */
 import { toast } from '@/lib/toast';
+import { apiCall, getApiHeaders } from './client';
+import { mapSkillToFrontend, mapSkillDetailToFrontend } from './mappers';
+import type {
+  Skill,
   SkillDetail,
   SkillCreateInput,
   SkillUpdateInput,
