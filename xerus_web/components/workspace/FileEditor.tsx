@@ -138,7 +138,7 @@ export function FileEditor({ path, name, size, onDirtyChange, className }: FileE
   const showSyntaxViewer = mode === 'view' && !isMd
 
   return (
-    <div className={cn("flex flex-col h-full bg-white", className)}>
+    <div className={cn("flex flex-col h-full", className)}>
 
       {/* Read-only notice — matching agent IDE pattern */}
       {!isEditable && (

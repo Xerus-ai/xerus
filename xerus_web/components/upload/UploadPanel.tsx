@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { Upload, X, Minus, Folder, Tag, Loader2, ChevronDown, Mic, Paperclip, RotateCcw } from 'lucide-react'
+import { Upload, X, Minus, Folder, Tag, Loader2, ChevronDown, Mic, Paperclip, RotateCcw, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FloatingPanel } from '@/components/common/FloatingPanel'
 import { detectUploadContent, type UploadContentType } from '@/lib/utils/detect-upload-content'
@@ -30,11 +30,11 @@ interface FileItem {
 type UploadPanelProps = {
     isOpen: boolean
     onClose: () => void
+    folders?: FolderOption[]
+    currentFolderId?: string | null
 } & (
     | {
         context: 'workspace'
-        folders: FolderOption[]
-        currentFolderId: string | null
         uploadFile: (file: File, tags: string[], folderId: string | null) => Promise<void>
         onUploadComplete: () => void
         onImportAgent?: never
@@ -44,8 +44,6 @@ type UploadPanelProps = {
         context: 'import'
         onImportAgent?: (files: File[]) => Promise<void>
         onImportSkill?: (files: File[]) => Promise<void>
-        folders?: never
-        currentFolderId?: never
         uploadFile?: never
         onUploadComplete?: never
     }
@@ -144,14 +142,14 @@ export function UploadPanel(props: UploadPanelProps) {
     const [tags, setTags] = useState<string[]>([])
     const [tagInput, setTagInput] = useState('')
     const [selectedFolderId, setSelectedFolderId] = useState<string | null>(
-        context === 'workspace' ? props.currentFolderId : null
+        props.currentFolderId || null
     )
     const [isDragActive, setIsDragActive] = useState(false)
     const [isUploading, setIsUploading] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     // Update folder when prop changes
-    const currentFolderProp = context === 'workspace' ? props.currentFolderId : null
+    const currentFolderProp = props.currentFolderId || null
     useEffect(() => {
         if (currentFolderProp) {
             setSelectedFolderId(currentFolderProp)
@@ -512,77 +510,71 @@ export function UploadPanel(props: UploadPanelProps) {
                             </div>
                         )}
 
-                        {/* File list — always visible when files exist */}
-                        {fileItems.length > 0 && (
-                            <>
-                                {/* Attachments */}
-                                {attachmentFiles.length > 0 && (
-                                    <div className="mb-8">
-                                        <h4 className="text-sm font-medium text-text mb-3">Attachments:</h4>
-                                        <div className="space-y-2">
-                                            {attachmentFiles.map(file => (
-                                                <div key={file.id} className="group flex items-center gap-3 p-3 rounded-[16px] border border-surface-active bg-white hover:bg-[#F9F9F9] transition-colors">
-                                                    <div className="w-8 h-8 rounded-full bg-surface flex items-center justify-center shrink-0">
-                                                        {file.type === 'pdf' && <span className="text-sm font-serif italic text-text-secondary">@</span>}
-                                                        {file.type === 'audio' && <Mic className="w-4 h-4 text-text-secondary" />}
-                                                        {file.type === 'other' && <Paperclip className="w-4 h-4 text-text-secondary" />}
-                                                    </div>
-                                                    <div className="flex-1 min-w-0 flex items-center gap-3">
-                                                        <span className="text-sm text-text truncate font-medium">{file.file.name}</span>
-                                                        <span className="text-xs text-text-secondary shrink-0">
-                                                            {file.file.size < 1024 ? `${file.file.size} B` : file.file.size < 1048576 ? `${(file.file.size / 1024).toFixed(1)} KB` : `${(file.file.size / 1048576).toFixed(1)} MB`}
-                                                        </span>
-                                                    </div>
-                                                    <button
-                                                        onClick={() => removeFile(file.id)}
-                                                        className="p-2 text-text-secondary hover:text-red-500 transition-colors"
-                                                        aria-label="Remove file"
-                                                    >
-                                                        <X className="w-4 h-4" />
-                                                    </button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Image Grid */}
-                                {imageFiles.length > 0 && (
-                                    <div className="mb-8">
-                                        <div className="grid grid-cols-3 gap-3">
-                                            {imageFiles.map(file => (
-                                                <div key={file.id} className="relative aspect-video rounded-[16px] overflow-hidden group border border-surface-active">
-                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                    <img
-                                                        src={file.blobUrl || ''}
-                                                        alt={file.file.name}
-                                                        className="w-full h-full object-cover"
-                                                    />
-                                                    <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/50 backdrop-blur-sm rounded-full text-[10px] text-white font-medium">
-                                                        {file.file.size < 1024 ? `${file.file.size} B` : file.file.size < 1048576 ? `${(file.file.size / 1024).toFixed(1)} KB` : `${(file.file.size / 1048576).toFixed(1)} MB`}
-                                                    </div>
-                                                    <button
-                                                        onClick={() => removeFile(file.id)}
-                                                        className="absolute top-2 right-2 w-6 h-6 bg-white/80 hover:bg-white rounded-full flex items-center justify-center text-text-secondary hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                                                        aria-label="Remove image"
-                                                    >
-                                                        <X className="w-3 h-3" />
-                                                    </button>
-                                                </div>
-                                            ))}
+                        {/* Attachments — always visible */}
+                        <div className="mb-6">
+                            <h4 className="text-sm font-medium text-text mb-3">Attachments:</h4>
+                            {attachmentFiles.length > 0 ? (
+                                <div className="space-y-2">
+                                    {attachmentFiles.map(file => (
+                                        <div key={file.id} className="group flex items-center gap-3 p-3 rounded-[16px] border border-surface-active bg-white hover:bg-[#F9F9F9] transition-colors">
+                                            <div className="w-8 h-8 rounded-full bg-surface flex items-center justify-center shrink-0">
+                                                {file.type === 'pdf' && <span className="text-sm font-serif italic text-text-secondary">@</span>}
+                                                {file.type === 'audio' && <Mic className="w-4 h-4 text-text-secondary" />}
+                                                {file.type === 'other' && <Paperclip className="w-4 h-4 text-text-secondary" />}
+                                            </div>
+                                            <div className="flex-1 min-w-0 flex items-center gap-3">
+                                                <span className="text-sm text-text truncate font-medium">{file.file.name}</span>
+                                                <span className="text-xs text-text-secondary shrink-0">
+                                                    {file.file.size < 1024 ? `${file.file.size} B` : file.file.size < 1048576 ? `${(file.file.size / 1024).toFixed(1)} KB` : `${(file.file.size / 1048576).toFixed(1)} MB`}
+                                                </span>
+                                            </div>
                                             <button
-                                                onClick={() => fileInputRef.current?.click()}
-                                                className="aspect-video rounded-[16px] bg-surface border border-surface-active flex items-center justify-center hover:bg-surface-hover transition-colors"
-                                                aria-label="Add image"
+                                                onClick={() => removeFile(file.id)}
+                                                className="p-2 text-text-secondary hover:text-red-500 transition-colors"
+                                                aria-label="Remove file"
                                             >
-                                                <PlusIcon className="w-6 h-6 text-text-secondary" />
+                                                <X className="w-4 h-4" />
                                             </button>
                                         </div>
-                                    </div>
-                                )}
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-xs text-text-secondary py-2">No files added yet</p>
+                            )}
+                        </div>
 
-                            </>
-                        )}
+                        {/* Image Grid — always visible */}
+                        <div className="mb-6">
+                            <div className="grid grid-cols-3 gap-3">
+                                {imageFiles.map(file => (
+                                    <div key={file.id} className="relative aspect-video rounded-[16px] overflow-hidden group border border-surface-active">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img
+                                            src={file.blobUrl || ''}
+                                            alt={file.file.name}
+                                            className="w-full h-full object-cover"
+                                        />
+                                        <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/50 backdrop-blur-sm rounded-full text-[10px] text-white font-medium">
+                                            {file.file.size < 1024 ? `${file.file.size} B` : file.file.size < 1048576 ? `${(file.file.size / 1024).toFixed(1)} KB` : `${(file.file.size / 1048576).toFixed(1)} MB`}
+                                        </div>
+                                        <button
+                                            onClick={() => removeFile(file.id)}
+                                            className="absolute top-2 right-2 w-6 h-6 bg-white/80 hover:bg-white rounded-full flex items-center justify-center text-text-secondary hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                                            aria-label="Remove image"
+                                        >
+                                            <X className="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                ))}
+                                <button
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="aspect-video rounded-[16px] bg-surface border border-surface-active flex items-center justify-center hover:bg-surface-hover transition-colors"
+                                    aria-label="Add image"
+                                >
+                                    <PlusIcon className="w-6 h-6 text-text-secondary" />
+                                </button>
+                            </div>
+                        </div>
 
                         {/* Tags + Folder — always visible */}
                         <div className="space-y-4 pt-2 border-t border-surface-active">
@@ -624,76 +616,88 @@ export function UploadPanel(props: UploadPanelProps) {
                                 </div>
                             </div>
 
-                            {/* Folder Selection — only when folders are available */}
-                            {context === 'workspace' && (
-                                <div className="space-y-2">
-                                    <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider flex items-center gap-2">
-                                        <Folder className="w-3 h-3" /> Folder
-                                    </label>
-                                    <div className="relative">
-                                        <select
-                                            value={selectedFolderId || ''}
-                                            onChange={(e) => setSelectedFolderId(e.target.value || null)}
-                                            className="w-full appearance-none bg-white border border-surface-active text-text text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-[#FF6600] transition-colors"
-                                        >
-                                            <option value="">No Folder (Root)</option>
-                                            {props.folders.map(folder => (
-                                                <option key={folder.id} value={folder.id}>
-                                                    {folder.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary pointer-events-none" />
-                                    </div>
+                            {/* Folder / Channel — always visible */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider flex items-center gap-2">
+                                    <Folder className="w-3 h-3" /> {context === 'workspace' ? 'Folder' : 'Channel'}
+                                </label>
+                                <div className="relative">
+                                    <select
+                                        value={selectedFolderId || ''}
+                                        onChange={(e) => setSelectedFolderId(e.target.value || null)}
+                                        className="w-full appearance-none bg-white border border-surface-active text-text text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-[#FF6600] transition-colors"
+                                    >
+                                        <option value="">{context === 'workspace' ? 'No Folder (Root)' : 'No Channel'}</option>
+                                        {(props.folders || []).map(folder => (
+                                            <option key={folder.id} value={folder.id}>
+                                                {folder.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary pointer-events-none" />
                                 </div>
-                            )}
+                            </div>
                         </div>
                     </div>
 
-                    {/* Footer Actions — always visible */}
-                    <div className="pt-6 mt-auto flex justify-end gap-3 shrink-0 border-t border-surface-active">
+                    {/* Footer — always visible */}
+                    <div className="pt-4 mt-auto shrink-0 border-t border-surface-active">
+                        <div className="flex items-center justify-between">
+                            {/* Left: Write with AI */}
                             <button
-                                onClick={onClose}
-                                className="px-6 py-2.5 rounded-[12px] border border-surface-active text-text hover:bg-surface font-medium text-sm transition-colors"
+                                disabled
+                                className="h-9 px-3 rounded-[12px] flex items-center gap-2 text-text-secondary font-medium text-sm opacity-50 cursor-not-allowed"
                             >
-                                Cancel
+                                <Sparkles className="w-4 h-4" />
+                                Write with AI
                             </button>
 
-                            {/* Import button for agent/skill */}
-                            {isDetectedImport && (
+                            {/* Right: Cancel + action */}
+                            <div className="flex items-center gap-3">
                                 <button
-                                    onClick={() => handleImport(minimize)}
-                                    disabled={isImporting}
-                                    className="px-6 py-2.5 rounded-[12px] bg-text text-white text-sm font-medium hover:bg-[#1a1a1a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    onClick={onClose}
+                                    className="px-6 py-2.5 rounded-[12px] border border-surface-active text-text hover:bg-surface font-medium text-sm transition-colors"
                                 >
-                                    {isImporting ? (
-                                        <>
-                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                            Importing...
-                                        </>
-                                    ) : (
-                                        detectedType === 'agent' ? 'Import Agent' : 'Import Skill'
-                                    )}
+                                    Cancel
                                 </button>
-                            )}
 
-                            {/* Upload button for workspace files */}
-                            {!isDetectedImport && context === 'workspace' && (
-                                <button
-                                    onClick={() => handleWorkspaceUpload(minimize)}
-                                    disabled={fileItems.length === 0 || isUploading}
-                                    className="px-6 py-2.5 rounded-[12px] bg-text text-white text-sm font-medium hover:bg-[#1a1a1a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                                >
-                                    {isUploading ? (
-                                        <>
-                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                            Uploading...
-                                        </>
-                                    ) : (
-                                        `Upload ${fileItems.length > 0 ? `${fileItems.length} Files` : ''}`
-                                    )}
-                                </button>
-                            )}
+                                {/* Import button for agent/skill */}
+                                {isDetectedImport && (
+                                    <button
+                                        onClick={() => handleImport(minimize)}
+                                        disabled={isImporting}
+                                        className="px-6 py-2.5 rounded-[12px] bg-text text-white text-sm font-medium hover:bg-[#1a1a1a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    >
+                                        {isImporting ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                Importing...
+                                            </>
+                                        ) : (
+                                            detectedType === 'agent' ? 'Import Agent' : 'Import Skill'
+                                        )}
+                                    </button>
+                                )}
+
+                                {/* Upload button for workspace files */}
+                                {!isDetectedImport && context === 'workspace' && (
+                                    <button
+                                        onClick={() => handleWorkspaceUpload(minimize)}
+                                        disabled={fileItems.length === 0 || isUploading}
+                                        className="px-6 py-2.5 rounded-[12px] bg-text text-white text-sm font-medium hover:bg-[#1a1a1a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    >
+                                        {isUploading ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                Uploading...
+                                            </>
+                                        ) : (
+                                            `Upload ${fileItems.length > 0 ? `${fileItems.length} Files` : ''}`
+                                        )}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
