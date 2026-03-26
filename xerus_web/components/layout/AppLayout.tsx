@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { AuthProvider, useAuth } from '@/utils/AuthContext'
@@ -25,8 +25,9 @@ const LoginOverlay = dynamic(
 // Contextual loading screen — shows appropriate message per gate
 function LoadingScreen({ title, subtitle }: { title?: string; subtitle?: string }) {
   return (
-    <div className="flex h-screen items-center justify-center">
-      <div className="flex flex-col items-center gap-8 animate-tab-in">
+    <div className="flex h-screen items-center justify-center relative">
+      <GradientBackground />
+      <div className="flex flex-col items-center gap-8 animate-tab-in relative z-10">
         <img src="/logo/xerus.svg" alt="Xerus" className="w-20 h-20 animate-pulse" />
 
         {title ? (
@@ -76,6 +77,13 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
       router.push('/onboarding')
     }
   }, [isAuthReady, user, hasWorkspace, isOnboardingPage, isLoginPage, router])
+
+  // Redirect authenticated users away from /login
+  useEffect(() => {
+    if (isAuthReady && user && isLoginPage) {
+      router.push('/')
+    }
+  }, [isAuthReady, user, isLoginPage, router])
 
   // Redirect onboarded users away from /onboarding (prevent re-entry)
   useEffect(() => {
@@ -195,14 +203,6 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
 }
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const [isMounted, setIsMounted] = useState(false)
-
-  useEffect(() => { setIsMounted(true) }, [])
-
-  if (!isMounted) {
-    return <LoadingScreen />
-  }
-
   return (
     <AuthProvider>
       <SWRProvider>

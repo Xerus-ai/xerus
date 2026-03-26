@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth'
 import { auth } from '@/utils/firebase'
 import { toast } from '@/lib/toast'
@@ -9,24 +8,21 @@ import { GradientBackground } from './GradientBackground'
 
 export function LoginOverlay() {
   const [isSigningIn, setIsSigningIn] = useState(false)
-  const router = useRouter()
 
   const handleGoogleSignIn = async () => {
     const provider = new GoogleAuthProvider()
     setIsSigningIn(true)
 
     try {
-      const result = await signInWithPopup(auth, provider)
-      if (result.user) {
-        router.push('/')
-      }
+      await signInWithPopup(auth, provider)
+      // Don't navigate here — AuthContext detects the Firebase state change,
+      // resolves the user profile, then LayoutShell redirects to /
     } catch (error) {
       console.error('Google login failed:', (error as { code?: string }).code)
       const firebaseError = error as { code?: string }
       if (firebaseError.code !== 'auth/popup-closed-by-user') {
         toast.error("Couldn't sign you in", { description: 'Please try again.' })
       }
-    } finally {
       setIsSigningIn(false)
     }
   }
