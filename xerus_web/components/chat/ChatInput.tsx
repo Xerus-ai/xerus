@@ -197,7 +197,7 @@ export function ChatInput({
   }, [value])
 
   return (
-    <div className={cn('w-full max-w-3xl mx-auto px-4 pb-1.5 pt-2 shrink-0 bg-surface', className)}>
+    <div className={cn('w-full max-w-3xl mx-auto px-4 pb-1.5 pt-2 shrink-0', className)}>
       <div className="relative">
         {/* @mention Picker */}
         {showPicker && filteredAgents.length > 0 && (
