@@ -5,7 +5,7 @@ import {
     History, Check, XCircle, Clock, Loader2,
     ChevronLeft, ChevronRight, Activity,
 } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { getAgentHistory, type RunEntry } from '@/lib/api/history'
 
 type RunStatus = 'all' | 'success' | 'failed'
@@ -31,7 +31,7 @@ export function RunHistory({ agent }: RunHistoryProps) {
                 if (!cancelled) setRuns(data)
             } catch (err) {
                 if (!cancelled) {
-                    toast.error("Couldn't load run history")
+                    toast.error("Couldn't load run history", { description: 'Please refresh the page and try again.' })
                     setRuns([])
                 }
             } finally {

@@ -2,7 +2,7 @@
  * Tools API Module
  * Operations for connector catalog and agent tool assignments.
  */
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { apiCall } from './client';
 
 export interface ToolCatalogResponse {
@@ -82,7 +82,9 @@ export const assignToolsToAgent = async (
       body: JSON.stringify({ tool_name: name, tool_config: {} }),
     })
   ));
-  toast.success(toolNames.length === 1 ? 'Tool added' : 'Tools added');
+  toast.success(toolNames.length === 1 ? 'Tool added' : 'Tools added', {
+    description: toolNames.length === 1 ? 'Your agent can now use this tool.' : 'Your agent can now use these tools.',
+  });
 };
 
 /**
@@ -107,7 +109,9 @@ export const removeToolsFromAgent = async (
   await Promise.all(toolNames.map(name =>
     apiCall(`/agents/${agentId}/tools/${encodeURIComponent(name)}`, { method: 'DELETE' })
   ));
-  toast.success(toolNames.length === 1 ? 'Tool removed' : 'Tools removed');
+  toast.success(toolNames.length === 1 ? 'Tool removed' : 'Tools removed', {
+    description: toolNames.length === 1 ? 'This tool has been disconnected from your agent.' : 'These tools have been disconnected from your agent.',
+  });
 };
 
 /**

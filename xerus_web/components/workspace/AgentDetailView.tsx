@@ -134,7 +134,7 @@ export function AgentDetailView({ agentId, onBack }: AgentDetailViewProps) {
   }
 
   return (
-    <div className="h-full overflow-y-auto scrollbar-thin bg-surface-alt text-text font-sans">
+    <div className="h-full overflow-y-auto scrollbar-thin text-text font-sans">
       <div className="max-w-5xl mx-auto px-6 py-8">
         {/* Navigation */}
         <div className="flex items-center justify-between mb-8">

@@ -307,7 +307,7 @@ export async function importWorkspace(file: File): Promise<{ imported: boolean; 
 }
 
 /**
- * List available S3 snapshots
+ * List available workspace backups
  */
 export async function listSnapshots(): Promise<SnapshotFile[]> {
   const response = await apiCall('/workspace/snapshots', { method: 'GET' });
@@ -316,7 +316,7 @@ export async function listSnapshots(): Promise<SnapshotFile[]> {
 }
 
 /**
- * Restore workspace from an S3 snapshot
+ * Restore workspace from a backup
  */
 export async function restoreFromSnapshot(snapshotKey: string): Promise<{ restored: boolean }> {
   const response = await apiCall('/workspace/restore', {

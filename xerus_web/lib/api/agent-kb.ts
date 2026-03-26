@@ -2,7 +2,7 @@
  * Agent Knowledge Base API Module
  * CRUD operations for agent-knowledge base associations
  */
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { apiCall } from './client';
 
 /**
@@ -44,7 +44,7 @@ export const addAgentKnowledgeBase = async (
   });
   const result = await response.json();
   const data = result.data || result;
-  toast.success('Knowledge base added');
+  toast.success('Knowledge base added', { description: 'Your agent can now access this knowledge.' });
   return data.knowledge_base || data;
 };
 
@@ -56,5 +56,5 @@ export const removeAgentKnowledgeBase = async (
   knowledgeBaseId: string
 ): Promise<void> => {
   await apiCall(`/agents/${agentId}/knowledge-bases/${knowledgeBaseId}`, { method: 'DELETE' });
-  toast.success('Knowledge base removed');
+  toast.success('Knowledge base removed', { description: 'This knowledge source has been disconnected.' });
 };

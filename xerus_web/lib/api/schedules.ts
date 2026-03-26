@@ -2,7 +2,7 @@
  * Schedules API Module
  * Operations for scheduled agent executions
  */
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { apiCall } from './client';
 import { mapScheduleToFrontend, mapScheduleToBackend } from './mappers';
 import type { ScheduledExecution, ExecutionResult, ScheduleFilters } from './types';
@@ -20,7 +20,7 @@ export const createSchedule = async (
 
   const result = await response.json();
   const data = result.data || result;
-  toast.success('Schedule created');
+  toast.success('Schedule created', { description: 'Your agent will run on the set schedule.' });
   return mapScheduleToFrontend(data.schedule || data);
 };
 
@@ -85,7 +85,7 @@ export const updateSchedule = async (
 
   const result = await response.json();
   const data = result.data || result;
-  toast.success('Schedule updated');
+  toast.success('Schedule updated', { description: 'Your changes have been applied.' });
   return mapScheduleToFrontend(data.schedule || data);
 };
 
@@ -94,7 +94,7 @@ export const updateSchedule = async (
  */
 export const deleteSchedule = async (id: string): Promise<void> => {
   await apiCall(`/schedules/${id}`, { method: 'DELETE' });
-  toast.success('Schedule deleted');
+  toast.success('Schedule deleted', { description: 'This schedule has been removed.' });
 };
 
 /**
@@ -104,7 +104,7 @@ export const enableSchedule = async (id: string): Promise<ScheduledExecution> =>
   const response = await apiCall(`/schedules/${id}/enable`, { method: 'POST' });
   const result = await response.json();
   const data = result.data || result;
-  toast.success('Schedule enabled');
+  toast.success('Schedule enabled', { description: 'Your agent will resume running on schedule.' });
   return mapScheduleToFrontend(data.schedule || data);
 };
 
@@ -115,7 +115,7 @@ export const disableSchedule = async (id: string): Promise<ScheduledExecution> =
   const response = await apiCall(`/schedules/${id}/disable`, { method: 'POST' });
   const result = await response.json();
   const data = result.data || result;
-  toast.success('Schedule paused');
+  toast.success('Schedule paused', { description: 'Your agent will stop running until re-enabled.' });
   return mapScheduleToFrontend(data.schedule || data);
 };
 
@@ -126,7 +126,7 @@ export const triggerSchedule = async (id: string): Promise<ExecutionResult> => {
   const response = await apiCall(`/schedules/${id}/trigger`, { method: 'POST' });
   const result = await response.json();
   const data = result.data || result;
-  toast.success('Schedule triggered');
+  toast.success('Schedule triggered', { description: 'Your agent is starting a new run now.' });
   return data.execution || data;
 };
 

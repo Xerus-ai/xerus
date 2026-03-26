@@ -9,7 +9,7 @@ import {
   deleteAssistant,
 } from '@/lib/api/agents'
 import { slugify } from '@/utils/slugify'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 
 interface UseAgentActionsArgs {
   agent: any
@@ -105,7 +105,7 @@ export function useAgentActions({ agent, setAgent }: UseAgentActionsArgs) {
           setIsDeleting(true)
           try {
             await deleteAssistant(parseInt(agent.id))
-            toast.success('Agent deleted')
+            toast.success('Agent deleted', { description: 'This agent has been permanently removed.' })
             router.push('/ai-agents')
           } catch (error) {
             console.error('Failed to delete agent:', error)

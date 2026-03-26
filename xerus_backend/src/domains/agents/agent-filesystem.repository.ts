@@ -4,6 +4,7 @@
 
 import { DriveService } from '../drive/drive.service';
 import type { PublicMetadata } from './types';
+import { generateMascotConfig } from './avatar';
 
 // Daytona SDK throws generic errors for missing files — match by message
 function isFileNotFoundError(err: unknown): boolean {
@@ -79,6 +80,24 @@ interface AgentIndexDocument {
     updated_at: string;
 }
 
+// Normalize raw config JSON to AgentConfigFile shape.
+// Handles field name mismatches between marketplace/template configs and canonical schema:
+//   - "model" -> "ai_model"
+//   - missing "mascot" -> generate one
+// Returns { config, dirty } so callers can persist back if needed.
+function normalizeConfig(raw: Record<string, unknown>): { config: AgentConfigFile; dirty: boolean } {
+    let dirty = false;
+    if (!raw.ai_model && raw.model) {
+        raw.ai_model = raw.model;
+        dirty = true;
+    }
+    if (!raw.mascot) {
+        raw.mascot = generateMascotConfig();
+        dirty = true;
+    }
+    return { config: raw as unknown as AgentConfigFile, dirty };
+}
+
 export class AgentFilesystemRepository {
     constructor(private readonly driveService: DriveService) {}
 
@@ -91,7 +110,12 @@ export class AgentFilesystemRepository {
             if (isFileNotFoundError(err)) return null;
             throw err;
         }
-        return JSON.parse(raw) as AgentConfigFile;
+        const { config, dirty } = normalizeConfig(JSON.parse(raw));
+        if (dirty) {
+            // Persist normalized fields so they stay stable across reads
+            this.putAgentConfig(userId, slug, config).catch(() => {});
+        }
+        return config;
     }
 
     async getAgentConfigs(userId: string, slugs: string[]): Promise<Map<string, AgentConfigFile>> {
@@ -183,7 +207,7 @@ export class AgentFilesystemRepository {
             if (isFileNotFoundError(err)) return null;
             throw err;
         }
-        return JSON.parse(raw) as AgentConfigFile;
+        return normalizeConfig(JSON.parse(raw)).config;
     }
 
     // List all marketplace agents by scanning category dirs under marketplace/agents/

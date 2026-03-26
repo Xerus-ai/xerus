@@ -39,7 +39,7 @@ import {
   commitTurn,
 } from './streaming-turn-reducer'
 import { extractTextFromParts } from './streaming-turn.utils'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 
 type SetState = React.Dispatch<React.SetStateAction<ChatState>>
 

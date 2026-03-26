@@ -12,7 +12,7 @@ import {
   Calendar,
   Check
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 
 export interface ScheduleConfig {
   time?: string; // "09:00"
@@ -104,17 +104,17 @@ export default function ScheduleConfigSection({
 
   const handleSave = async () => {
     if (!schedule.name) {
-      toast.error('Please enter a schedule name');
+      toast.error('Name required', { description: 'Give your schedule a name to continue.' });
       return;
     }
 
     if (!schedule.taskPrompt || schedule.taskPrompt.trim() === '') {
-      toast.error('Please enter a task prompt - what should the agent do?');
+      toast.error('Task prompt required', { description: 'Tell your agent what to do on each run.' });
       return;
     }
 
     if (schedule.taskPrompt.length > 2000) {
-      toast.error('Task prompt exceeds maximum length of 2000 characters');
+      toast.error('Prompt too long', { description: 'Keep your task prompt under 2,000 characters.' });
       return;
     }
 

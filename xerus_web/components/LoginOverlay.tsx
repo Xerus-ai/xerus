@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth'
 import { auth } from '@/utils/firebase'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { GradientBackground } from './GradientBackground'
 
 export function LoginOverlay() {

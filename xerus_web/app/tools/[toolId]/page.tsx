@@ -93,7 +93,7 @@ export default function ToolDetailPage() {
 
     if (error || !tool) {
         return (
-            <div className="min-h-screen bg-surface-alt flex flex-col items-center justify-center gap-6 px-4">
+            <div className="min-h-screen flex flex-col items-center justify-center gap-6 px-4">
                 <Image src="/logo/xerus.svg" alt="" width={40} height={40} className="opacity-30" />
                 <div className="text-center">
                     <h1 className="text-lg font-serif text-text mb-1">{error ? 'Something went wrong' : 'Connector not found'}</h1>
@@ -110,7 +110,7 @@ export default function ToolDetailPage() {
     }
 
     return (
-        <div className="min-h-screen bg-surface-alt font-sans text-text">
+        <div className="min-h-screen font-sans text-text">
             <div className="max-w-5xl mx-auto px-6 py-12">
                 <Link href="/tools" className="inline-flex items-center gap-2 text-text-secondary hover:text-text mb-8 transition-colors">
                     <ArrowLeft className="w-4 h-4" />

@@ -166,7 +166,7 @@ export default function AgentDetailsClient({ agentId }: AgentDetailsClientProps)
 
   if (!agent) {
     return (
-      <div className="min-h-screen bg-surface-alt flex flex-col items-center justify-center gap-6 px-4">
+      <div className="min-h-screen flex flex-col items-center justify-center gap-6 px-4">
         <Image src="/logo/xerus.svg" alt="" width={40} height={40} className="opacity-30" />
         <div className="text-center">
           <h1 className="text-lg font-serif text-text mb-1">Agent not found</h1>
@@ -183,7 +183,7 @@ export default function AgentDetailsClient({ agentId }: AgentDetailsClientProps)
   }
 
   return (
-    <div className="min-h-screen bg-surface-alt text-text font-sans">
+    <div className="min-h-screen text-text font-sans">
       <div className="max-w-5xl mx-auto px-6 py-12">
 
         {/* Top Navigation Row */}

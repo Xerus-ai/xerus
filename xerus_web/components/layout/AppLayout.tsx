@@ -12,6 +12,7 @@ import { AppSidebar } from '@/components/navigation/AppSidebar'
 import { MobileBottomBar } from '@/components/navigation/MobileBottomBar'
 import { MobileHeader } from '@/components/navigation/MobileHeader'
 import { MotionConfig } from 'framer-motion'
+import { GradientBackground } from '@/components/GradientBackground'
 
 import { InviteCodeGate } from '@/components/InviteCodeGate'
 
@@ -24,7 +25,7 @@ const LoginOverlay = dynamic(
 // Contextual loading screen — shows appropriate message per gate
 function LoadingScreen({ title, subtitle }: { title?: string; subtitle?: string }) {
   return (
-    <div className="flex h-screen items-center justify-center bg-surface-alt">
+    <div className="flex h-screen items-center justify-center">
       <div className="flex flex-col items-center gap-8 animate-tab-in">
         <img src="/logo/xerus.svg" alt="Xerus" className="w-20 h-20 animate-pulse" />
 
@@ -108,7 +109,7 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
   // Onboarding page: no sidebar, full-screen onboarding chat
   if (isOnboardingPage && user) {
     return (
-      <div className="flex h-screen overflow-hidden bg-surface-alt">
+      <div className="flex h-screen overflow-hidden">
         <main className="flex-1 relative h-screen overflow-y-auto">
           {children}
         </main>
@@ -119,7 +120,7 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
   // Login page: no sidebar, overlay
   if (isLoginPage) {
     return (
-      <div className="flex h-screen overflow-hidden bg-surface-alt relative">
+      <div className="flex h-screen overflow-hidden relative">
         <main className="flex-1 relative h-screen overflow-y-auto filter blur-sm">
           <div className="h-full flex items-center justify-center p-8">
             <div className="text-center text-text-secondary">
@@ -136,7 +137,8 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
   // Mobile layout: floating header + content + bottom bar
   if (isMobile) {
     return (
-      <div className="flex flex-col h-screen bg-surface-alt">
+      <div className="flex flex-col h-screen relative">
+        <GradientBackground />
         <a
           href="#main-content"
           className="absolute -top-full left-2 z-[100] px-4 py-2 bg-[#FF6600] text-white rounded-xl text-sm font-medium focus:top-2 focus:outline-none transition-[top]"
@@ -154,7 +156,8 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
 
   // Desktop and Tablet layout
   return (
-    <div className="flex h-screen overflow-hidden bg-surface-alt relative">
+    <div className="flex h-screen overflow-hidden relative">
+      <GradientBackground />
       <a
         href="#main-content"
         className="absolute -top-full left-2 z-[100] px-4 py-2 bg-[#FF6600] text-white rounded-xl text-sm font-medium focus:top-2 focus:outline-none transition-[top]"
@@ -179,7 +182,7 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
         {/* Right Panel */}
         {isRightPanelOpen && rightPanelContent && (
           <aside
-            className="shrink-0 w-[var(--right-panel-width)] h-screen border-l border-surface-active bg-surface overflow-y-auto"
+            className="shrink-0 w-[var(--right-panel-width)] h-screen border-l border-surface-active overflow-y-auto"
             role="complementary"
             aria-label="Detail panel"
           >

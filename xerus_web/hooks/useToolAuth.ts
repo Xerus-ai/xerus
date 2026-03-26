@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Tool } from "@/types/tool"
 import { apiCall } from "@/lib/api/client"
 import { getSharedPipedreamClient } from '@/lib/pipedream-client'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 
 export function useToolAuth(refetch: () => void) {
     const [configuringAuth, setConfiguringAuth] = useState<string | null>(null)
@@ -61,9 +61,9 @@ export function useToolAuth(refetch: () => void) {
                 setConfiguringAuth(null)
             }
         } else if (!tool.auth_type || tool.auth_type === 'none') {
-            toast.info('This tool does not require authentication')
+            toast.info('This tool does not require authentication', { description: 'You can use this tool right away.' })
         } else {
-            toast.error("This tool's login type isn't supported yet")
+            toast.error("This tool's login type isn't supported yet", { description: 'We are working on adding support for this.' })
         }
     }
 
@@ -71,7 +71,7 @@ export function useToolAuth(refetch: () => void) {
         const toolIdentifier = tool.mcp_server ? tool.mcp_server_id ?? tool.name : tool.tool_name || tool.name
 
         if (!tool.connected_account_ids || tool.connected_account_ids.length === 0) {
-            toast.error("This tool isn't connected yet")
+            toast.error("This tool isn't connected yet", { description: 'Connect this tool first to manage accounts.' })
             return
         }
 
@@ -96,7 +96,7 @@ export function useToolAuth(refetch: () => void) {
                 await new Promise(resolve => setTimeout(resolve, 500))
                 refetch()
             } else {
-                toast.success('App disconnected')
+                toast.success('App disconnected', { description: 'This app is no longer connected to your workspace.' })
                 await new Promise(resolve => setTimeout(resolve, 500))
                 refetch()
             }

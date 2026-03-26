@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { User, Key, Server, HardDrive, CreditCard, LogOut, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { logout } from '@/lib/api/user'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 
 const NAV_SECTIONS = [
   {
@@ -19,7 +19,7 @@ const NAV_SECTIONS = [
     label: 'Workspace',
     items: [
       { href: '/settings/workspace', label: 'Overview', icon: Server },
-      { href: '/settings/data', label: 'Data', icon: HardDrive },
+      { href: '/settings/data', label: 'Data & Backups', icon: HardDrive },
       { href: '/settings/billing', label: 'Billing', icon: CreditCard },
     ],
   },
@@ -33,7 +33,7 @@ export function SettingsSidebar() {
   const handleLogout = async () => {
     try {
       await logout()
-      toast.success('Signed out')
+      toast.success('Signed out', { description: 'You have been securely signed out.' })
     } catch {
       toast.error("Couldn't sign you out", { description: 'Please try again.' })
     }

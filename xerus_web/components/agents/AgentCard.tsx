@@ -3,6 +3,7 @@ import type { Assistant } from "@/lib/api/types"
 import { AgentAvatarWithModel, ModelIcon } from './AgentAvatar'
 import { Loader2, Lock, Users, Plus, Wrench, Settings, Copy, ArrowRight } from 'lucide-react'
 import { canCloneAgent, getAgentVisibilityClass } from "@/utils/agentLabels"
+import { formatModelName } from "@/utils/models"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface AgentCardProps {
@@ -46,7 +47,7 @@ export function AgentCard({ agent, onClone, onChat, onClick, isCloning, isOwner 
                     {agent.model && (
                         <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-white border border-surface-active rounded-md px-2 py-0.5 shadow-sm flex items-center gap-0.5 z-10 whitespace-nowrap">
                             <ModelIcon model={agent.model} size="sm" />
-                            <span className="text-[10px] font-bold text-text-secondary max-w-[60px] truncate">{agent.model}</span>
+                            <span className="text-[10px] font-bold text-text-secondary whitespace-nowrap">{formatModelName(agent.model)}</span>
                         </div>
                     )}
                 </div>

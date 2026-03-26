@@ -16,7 +16,7 @@ import { FloatingPanel } from '@/components/common/FloatingPanel'
 import { FloatingPanelProvider } from '@/components/common/FloatingPanelContext'
 import { SkillSecretsCard } from '@/components/skills/SkillSecretsCard'
 import { parseSkillEnvKeys } from '@/lib/utils/parse-skill-env-keys'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 
 function SkillFileViewer({ slug, filePath, onContentLoaded }: { slug: string; filePath: string; onContentLoaded?: (content: string) => void }) {
   const { data: content, isLoading: loading } = useSWR(
@@ -135,10 +135,10 @@ export function SkillDetailView({ skillSlug, onBack }: SkillDetailViewProps) {
           setDeleting(true)
           try {
             await deleteSkill(skill.slug)
-            toast.success('Skill deleted')
+            toast.success('Skill deleted', { description: 'This skill has been permanently removed.' })
             onBack()
           } catch {
-            toast.error("Couldn't remove this skill")
+            toast.error("Couldn't remove this skill", { description: 'Please try again in a moment.' })
           } finally {
             setDeleting(false)
           }
@@ -171,7 +171,7 @@ export function SkillDetailView({ skillSlug, onBack }: SkillDetailViewProps) {
   const requiredEnvKeys = skillMdContent ? parseSkillEnvKeys(skillMdContent) : []
 
   return (
-    <div className="h-full overflow-y-auto scrollbar-thin bg-surface-alt font-sans text-text">
+    <div className="h-full overflow-y-auto scrollbar-thin font-sans text-text">
       <div className="max-w-5xl mx-auto px-6 py-8">
         {/* Nav */}
         <div className="flex items-center justify-between mb-8">

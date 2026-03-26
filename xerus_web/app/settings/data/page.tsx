@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { useRedirectIfNotAuth } from '@/utils/AuthContext'
 import {
   exportWorkspace,
@@ -11,10 +11,10 @@ import {
 import type { SnapshotFile } from '@/lib/api/workspace'
 import { Download, Upload, History, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react'
 import { motion } from 'framer-motion'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 
 export default function DataPage() {
-  const user = useRedirectIfNotAuth()
+  useRedirectIfNotAuth()
   const [actionInProgress, setActionInProgress] = useState<string | null>(null)
   const [snapshots, setSnapshots] = useState<SnapshotFile[]>([])
   const [snapshotsOpen, setSnapshotsOpen] = useState(false)
@@ -43,7 +43,7 @@ export default function DataPage() {
     setActionInProgress('export')
     try {
       await exportWorkspace()
-      toast.success('Workspace export downloaded')
+      toast.success('Workspace export downloaded', { description: 'Check your downloads folder for the export file.' })
     } catch {
       toast.error("Couldn't export your data", { description: 'Please try again.' })
     } finally {
@@ -58,7 +58,7 @@ export default function DataPage() {
     setActionInProgress('import')
     try {
       await importWorkspace(file)
-      toast.success('Workspace imported successfully')
+      toast.success('Workspace imported successfully', { description: 'Your workspace data has been restored.' })
     } catch {
       toast.error("Couldn't import the workspace", { description: 'Please check the file and try again.' })
     } finally {
@@ -71,7 +71,7 @@ export default function DataPage() {
     setActionInProgress('restore')
     try {
       await restoreFromSnapshot(snapshot.key)
-      toast.success('Workspace restored from snapshot')
+      toast.success('Workspace restored from backup', { description: 'Your workspace has been rolled back to this backup.' })
       setSnapshots([])
     } catch {
       toast.error("Couldn't restore the workspace", { description: 'Please try again.' })
@@ -90,7 +90,7 @@ export default function DataPage() {
         const result = await listSnapshots()
         setSnapshots(result)
       } catch {
-        toast.error("Couldn't load snapshots", { description: 'Please try again.' })
+        toast.error("Couldn't load backups", { description: 'Please try again.' })
       } finally {
         setSnapshotsLoading(false)
       }
@@ -104,7 +104,7 @@ export default function DataPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
       >
-        <h1 className="font-serif text-[22px] text-text tracking-tight mb-1">Data</h1>
+        <h1 className="font-serif text-[22px] text-text tracking-tight mb-1">Data &amp; Backups</h1>
         <p className="text-sm text-text-secondary mb-8">
           Export, import, and restore your workspace
         </p>
@@ -177,7 +177,7 @@ export default function DataPage() {
         </div>
       </motion.div>
 
-      {/* Snapshots */}
+      {/* Backups */}
       <motion.div
         className="bg-surface/60 rounded-2xl border border-surface-active/60 overflow-hidden"
         initial={{ opacity: 0, y: 8 }}
@@ -193,7 +193,7 @@ export default function DataPage() {
               <History className="w-4 h-4 text-text-secondary" />
             </div>
             <div>
-              <p className="text-sm font-medium text-text">Snapshots</p>
+              <p className="text-sm font-medium text-text">Backups</p>
               <p className="text-xs text-text-secondary mt-0.5">
                 View and restore from previous backups
               </p>
@@ -215,7 +215,7 @@ export default function DataPage() {
                 ))}
               </div>
             ) : snapshots.length === 0 ? (
-              <p className="text-sm text-text-secondary py-2">No snapshots available</p>
+              <p className="text-sm text-text-secondary py-2">No backups available</p>
             ) : (
               <div className="space-y-2">
                 {snapshots.map((snapshot) => (
@@ -241,6 +241,9 @@ export default function DataPage() {
                 ))}
               </div>
             )}
+            <p className="text-[11px] text-text-muted mt-3">
+              Up to 7 backups retained automatically
+            </p>
           </div>
         )}
       </motion.div>

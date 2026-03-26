@@ -6,7 +6,7 @@ import { getCreditBalance, type CreditBalance } from '@/lib/api/user'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 import { Crown, MessageSquare, Clock, Database, Check, Sparkles } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 
 const PLAN_CREDITS: Record<string, number> = {
   free: 10,

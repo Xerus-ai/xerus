@@ -27,7 +27,7 @@ function AgentDetail({ agent, onClose, router }: { agent: Assistant; onClose: ()
   const isMarketplace = agent.agentType === 'public' || agent.agentType === 'shared'
 
   return (
-    <div className="h-full flex flex-col bg-white overflow-hidden">
+    <div className="h-full flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-3 border-b border-surface-active/40 shrink-0">
         <span className="text-xs font-medium text-text-secondary uppercase tracking-wider">Agent Details</span>
@@ -123,7 +123,7 @@ function AgentDetail({ agent, onClose, router }: { agent: Assistant; onClose: ()
 
 function SkillDetail({ skill, onClose, router }: { skill: Skill; onClose: () => void; router: ReturnType<typeof useRouter> }) {
   return (
-    <div className="h-full flex flex-col bg-white overflow-hidden">
+    <div className="h-full flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-3 border-b border-surface-active/40 shrink-0">
         <span className="text-xs font-medium text-text-secondary uppercase tracking-wider">Skill Details</span>

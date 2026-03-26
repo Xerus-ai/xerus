@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { apiGet, apiPost } from '@/lib/api/client'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import type { ChannelMessage } from '@/components/channels/ChannelActivity'
 import type { KanbanTask } from '@/components/common/TaskCard'
 
@@ -129,7 +129,7 @@ export function useChannelTasks(channelId: string): UseChannelTasksReturn {
     try {
       await apiPost(`/tasks/${taskId}/status`, { status: newStatus })
     } catch {
-      toast.error("Couldn't update that task — reverting")
+      toast.error("Couldn't update that task — reverting", { description: 'Your changes could not be saved. The task has been restored.' })
       fetchTasks()
     }
   }, [fetchTasks])

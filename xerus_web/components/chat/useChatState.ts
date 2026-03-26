@@ -18,7 +18,7 @@ import { getTree, type FileNode } from '@/lib/api/workspace'
 import { Agent, Conversation, ChatState, SelectedChannel, SessionEntry, ProjectGroup, SessionStatus } from './types'
 import { XERUS_MASTER_SLUG } from './AgentDropdown'
 import { useChatExecution } from './useChatExecution'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import type { ChatMessageExtended } from './chat-message.types'
 import type { WorkspaceFile } from './WorkspaceTree'
 
@@ -373,7 +373,7 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
         conversationId: prev.conversationId === id ? null : prev.conversationId,
         messages: prev.conversationId === id ? [] : prev.messages,
       }))
-      toast.success('Conversation deleted')
+      toast.success('Conversation deleted', { description: 'This conversation has been permanently removed.' })
     } catch (error) {
       console.error('Failed to delete conversation:', error)
       toast.error("Couldn't delete this conversation", { description: 'Please try again.' })

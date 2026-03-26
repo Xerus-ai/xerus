@@ -208,7 +208,7 @@ export default function WorkspacePage() {
   if (loading) return <XerusLoader message="Loading workspace..." />
   if (error) {
     return (
-      <div className="min-h-screen bg-surface-alt flex items-center justify-center p-8">
+      <div className="min-h-screen flex items-center justify-center p-8">
         <div className="text-center max-w-md">
           <div className="w-16 h-16 bg-surface-hover rounded-full flex items-center justify-center mx-auto mb-4">
             <FolderOpen className="w-8 h-8 text-text-secondary" />
@@ -225,10 +225,10 @@ export default function WorkspacePage() {
 
   return (
     <FloatingPanelProvider>
-      <div className="flex flex-col h-screen bg-surface-alt overflow-hidden">
+      <div className="flex flex-col h-screen overflow-hidden">
         <div className="flex-1 flex flex-col min-w-0 min-h-0">
           {/* Toolbar */}
-          <div className="flex items-center justify-between px-4 py-2 border-b border-surface-active/40 shrink-0 bg-surface-alt">
+          <div className="flex items-center justify-between px-4 py-2 border-b border-surface-active/40 shrink-0">
             <div className="flex items-center gap-3">
               <h3 className="text-sm font-medium text-text capitalize">
                 {activeSection === 'files' ? 'All Files'

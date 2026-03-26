@@ -2,7 +2,7 @@
 
 export function GradientBackground() {
   return (
-    <div className="absolute inset-0 overflow-hidden">
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
       <div className="absolute -top-40 -right-40 w-96 h-96 bg-[#FF6600]/20 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob" />
       <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-[#FFB800]/20 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-2000" />
       <div className="absolute top-40 left-40 w-96 h-96 bg-[#FF8533]/20 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-4000" />

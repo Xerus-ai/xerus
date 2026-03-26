@@ -20,7 +20,7 @@ import {
   updateHeartbeatConfig,
   deleteHeartbeatConfig,
 } from '@/lib/api/heartbeat'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
 type BehaviourSection = 'heartbeat' | 'thinking' | 'autonomy' | 'proactivity'
@@ -136,7 +136,7 @@ export function BehaviourTab({
 
   const handleWriteWithAI = async () => {
     if (!editContent.trim()) {
-      toast.error('Add some text first')
+      toast.error('Missing content', { description: 'Add some text before saving.' })
       return
     }
     setIsFormatting(true)
