@@ -49,6 +49,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (processingRef.current || !isMountedRef.current) return
       processingRef.current = true
 
+      // Show loading screen while auth state is being resolved
+      if (isMountedRef.current) {
+        setIsLoading(true)
+        setIsAuthReady(false)
+      }
+
       try {
         if (firebaseUser) {
           if (isMountedRef.current) {

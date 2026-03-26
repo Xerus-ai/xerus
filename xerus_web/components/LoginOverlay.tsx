@@ -23,6 +23,7 @@ export function LoginOverlay() {
       if (firebaseError.code !== 'auth/popup-closed-by-user') {
         toast.error("Couldn't sign you in", { description: 'Please try again.' })
       }
+    } finally {
       setIsSigningIn(false)
     }
   }
