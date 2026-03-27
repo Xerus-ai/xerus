@@ -43,9 +43,9 @@ interface WorkspaceTreeProps {
 function getFileIcon(file: WorkspaceFile, isOpen: boolean) {
   if (file.type === 'directory') {
     return isOpen ? (
-      <FolderOpen className="h-4 w-4 text-[#FF6600]" />
+      <FolderOpen className="h-4 w-4 text-primary" />
     ) : (
-      <Folder className="h-4 w-4 text-[#FF6600]" />
+      <Folder className="h-4 w-4 text-primary" />
     )
   }
 
@@ -111,7 +111,7 @@ function TreeNode({
         onClick={handleClick}
         className={cn(
           'flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-sm transition-colors duration-200',
-          'hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600]',
+          'hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
           isDir ? 'font-medium text-text' : 'text-text-secondary hover:text-text',
         )}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}

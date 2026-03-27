@@ -55,7 +55,7 @@ export function FileEditorPanel({
       title={activeFile ? (activeFileInfo?.label || activeFile) : 'System Prompt'}
       minimizedTitle={activeFile ? (activeFileInfo?.label || activeFile) : 'System Prompt'}
       icon={activeFile ? <FileText className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
-      className="w-[600px] h-[600px] rounded-[40px] shadow-sm bg-surface p-2"
+      className="w-[600px] h-[600px] max-w-[95vw] max-h-[95vh] rounded-[40px] shadow-sm bg-surface p-2"
       variant="clean"
     >
       {({ close, minimize }) => (
@@ -115,17 +115,17 @@ export function FileEditorPanel({
 
           {/* Read-only notice for system templates */}
           {!isEditable && (
-            <div className="flex items-center justify-between gap-3 p-4 bg-[#FF6600]/5 border border-[#FF6600]/20 rounded-2xl">
+            <div className="flex items-center justify-between gap-3 p-4 bg-primary/5 border border-primary/20 rounded-2xl">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-[#FF6600]/10 flex items-center justify-center">
-                  <Lock className="w-4 h-4 text-[#FF6600]" />
+                <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <Lock className="w-4 h-4 text-primary" />
                 </div>
                 <span className="text-sm text-text">This is a read-only template. Clone this agent to customize it.</span>
               </div>
               <button
                 onClick={onClone}
                 disabled={isCloning}
-                className="flex items-center gap-2 px-4 py-2 bg-[#FF6600] hover:bg-[#E65C00] text-white font-medium rounded-xl text-sm transition-colors disabled:opacity-50 shrink-0 shadow-sm"
+                className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white font-medium rounded-xl text-sm transition-colors disabled:opacity-50 shrink-0 shadow-sm"
               >
                 {isCloning ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -187,7 +187,7 @@ export function FileEditorPanel({
                   onClick={onSave}
                   disabled={activeFile ? isSaving : false}
                   className={cn(
-                    "w-9 h-9 bg-text text-white rounded-[12px] flex items-center justify-center hover:bg-[#FF6600] transition-colors shadow-md",
+                    "w-9 h-9 bg-text text-white rounded-[12px] flex items-center justify-center hover:bg-primary transition-colors shadow-md",
                     (activeFile && isSaving) && "opacity-50 cursor-not-allowed"
                   )}
                   aria-label="Save"

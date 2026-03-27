@@ -51,7 +51,7 @@ export function FileCard({
       disabled={isLoading}
       className={cn(
         'w-full text-left rounded-2xl border transition-all duration-200 p-5 group',
-        'hover:shadow-md hover:border-[#FF6600]/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600]/40',
+        'hover:shadow-md hover:border-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
         isMissing
           ? 'bg-surface-alt/50 border-surface-active/50 opacity-60 cursor-default'
           : 'bg-surface border-surface-active cursor-pointer',
@@ -63,11 +63,11 @@ export function FileCard({
         <div className="flex items-center gap-2.5">
           <div className={cn(
             'w-8 h-8 rounded-lg flex items-center justify-center',
-            isMissing ? 'bg-surface-hover/50' : 'bg-[#FF6600]/5 group-hover:bg-[#FF6600]/10'
+            isMissing ? 'bg-surface-hover/50' : 'bg-primary/5 group-hover:bg-primary/10'
           )}>
             <FileText className={cn(
               'w-4 h-4',
-              isMissing ? 'text-text-secondary/50' : 'text-[#FF6600]'
+              isMissing ? 'text-text-secondary/50' : 'text-primary'
             )} />
           </div>
           <div>

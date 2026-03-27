@@ -1,6 +1,6 @@
 'use client'
 
-import { X, MessageSquare, Settings, Copy, Bot, Puzzle, ExternalLink } from 'lucide-react'
+import { X, MessageSquare, Settings, Puzzle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import type { Assistant, Skill } from '@/lib/api/types'
@@ -75,7 +75,7 @@ function AgentDetail({ agent, onClose, router }: { agent: Assistant; onClose: ()
             <span className="text-xs text-text-secondary">Type</span>
             <span className={cn(
               'text-[10px] font-medium px-2 py-0.5 rounded-full',
-              isMarketplace ? 'bg-[#FF6600]/10 text-[#FF6600]' : 'bg-surface-hover text-text-secondary'
+              isMarketplace ? 'bg-primary/10 text-primary' : 'bg-surface-hover text-text-secondary'
             )}>
               {isMarketplace ? 'Marketplace' : 'Private'}
             </span>
@@ -104,7 +104,7 @@ function AgentDetail({ agent, onClose, router }: { agent: Assistant; onClose: ()
       <div className="px-5 py-4 border-t border-surface-active/40 flex gap-2 shrink-0">
         <button
           onClick={() => router.push(`/chat?agent=${agent.slug || agent.id}`)}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-[#FF6600] text-white text-xs font-medium rounded-xl hover:bg-[#E65C00] transition-colors"
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-primary text-white text-xs font-medium rounded-xl hover:bg-primary/90 transition-colors"
         >
           <MessageSquare className="w-3.5 h-3.5" />
           Chat
@@ -192,7 +192,7 @@ function SkillDetail({ skill, onClose, router }: { skill: Skill; onClose: () => 
       <div className="px-5 py-4 border-t border-surface-active/40 flex gap-2 shrink-0">
         <button
           onClick={() => router.push(`/skills/${skill.slug}`)}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-[#FF6600] text-white text-xs font-medium rounded-xl hover:bg-[#E65C00] transition-colors"
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-primary text-white text-xs font-medium rounded-xl hover:bg-primary/90 transition-colors"
         >
           <Settings className="w-3.5 h-3.5" />
           Manage

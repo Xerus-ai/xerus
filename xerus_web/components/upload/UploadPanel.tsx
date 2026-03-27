@@ -441,8 +441,8 @@ export function UploadPanel(props: UploadPanelProps) {
                                 "border-2 border-dashed rounded-[24px] flex flex-col items-center justify-center text-center transition-colors cursor-pointer mb-8",
                                 hasContent ? "h-24" : "h-48",
                                 isDragActive
-                                    ? "border-[#FF6600] bg-[#FF6600]/5"
-                                    : "border-surface-active hover:border-[#FF6600] hover:bg-surface"
+                                    ? "border-primary bg-primary/5"
+                                    : "border-surface-active hover:border-primary hover:bg-surface"
                             )}
                             onDragEnter={handleDrag}
                             onDragLeave={handleDrag}
@@ -583,7 +583,7 @@ export function UploadPanel(props: UploadPanelProps) {
                                 <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider flex items-center gap-2">
                                     <Tag className="w-3 h-3" /> Tags
                                 </label>
-                                <div className="flex flex-wrap gap-2 bg-white p-2 rounded-lg border border-surface-active focus-within:ring-1 focus-within:ring-[#FF6600] transition-shadow">
+                                <div className="flex flex-wrap gap-2 bg-white p-2 rounded-lg border border-surface-active focus-within:ring-1 focus-within:ring-primary transition-shadow">
                                     {tags.map(tag => (
                                         <span key={tag} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-surface text-xs font-medium text-text">
                                             {tag}
@@ -625,7 +625,7 @@ export function UploadPanel(props: UploadPanelProps) {
                                     <select
                                         value={selectedFolderId || ''}
                                         onChange={(e) => setSelectedFolderId(e.target.value || null)}
-                                        className="w-full appearance-none bg-white border border-surface-active text-text text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-[#FF6600] transition-colors"
+                                        className="w-full appearance-none bg-white border border-surface-active text-text text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-primary transition-colors"
                                     >
                                         <option value="">{context === 'workspace' ? 'No Folder (Root)' : 'No Channel'}</option>
                                         {(props.folders || []).map(folder => (

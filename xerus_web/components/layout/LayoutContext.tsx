@@ -6,6 +6,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   ReactNode,
 } from 'react'
 
@@ -77,18 +78,18 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
     setRightPanelContent(null)
   }, [])
 
+  const contextValue = useMemo(() => ({
+    isRightPanelOpen,
+    rightPanelContent,
+    openRightPanel,
+    closeRightPanel,
+    isMobile,
+    isTablet,
+    isDesktop,
+  }), [isRightPanelOpen, rightPanelContent, openRightPanel, closeRightPanel, isMobile, isTablet, isDesktop])
+
   return (
-    <LayoutContext.Provider
-      value={{
-        isRightPanelOpen,
-        rightPanelContent,
-        openRightPanel,
-        closeRightPanel,
-        isMobile,
-        isTablet,
-        isDesktop,
-      }}
-    >
+    <LayoutContext.Provider value={contextValue}>
       {children}
     </LayoutContext.Provider>
   )

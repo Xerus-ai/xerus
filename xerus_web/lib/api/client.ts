@@ -23,8 +23,8 @@ export const getApiHeaders = async (excludeContentType: boolean = false): Promis
     try {
       const token = await user.getIdToken(false); // Use cached token
       headers['Authorization'] = `Bearer ${token}`;
-    } catch {
-      // Token refresh failed — return headers without auth and let the server return 401
+    } catch (error) {
+      console.error('Token refresh failed:', error);
     }
   }
 
@@ -47,7 +47,6 @@ export const apiCall = async (
   const url = `${baseUrl}${endpoint}`;
   const defaultOptions: RequestInit = {
     headers: {
-      'Content-Type': 'application/json',
       ...apiHeaders,
       ...options.headers,
     },

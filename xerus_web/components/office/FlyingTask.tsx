@@ -15,7 +15,7 @@ function truncate(text: string, max: number): string {
 export function FlyingTask({ data, onComplete }: FlyingTaskProps) {
   const isDispatch = data.type === 'dispatch'
   const duration = isDispatch ? 2 : 1.5
-  const accentColor = isDispatch ? '#FF6600' : '#4CAF50'
+  const accentColor = isDispatch ? 'hsl(var(--primary))' : '#4CAF50'
 
   // Bezier control point for the arc (halfway x, offset y upward)
   const midX = (data.from.x + data.to.x) / 2

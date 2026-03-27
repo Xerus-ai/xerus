@@ -28,7 +28,7 @@ export function CoordinationGroup({ messages, className }: CoordinationGroupProp
         className={cn(
           'flex items-center gap-2 px-3 py-1.5 rounded-xl w-full text-left',
           'hover:bg-surface-hover transition-all duration-200',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600] focus-visible:ring-offset-2'
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
         )}
       >
         <ChevronDown

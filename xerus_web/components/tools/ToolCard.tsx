@@ -1,3 +1,5 @@
+'use client'
+
 import React, { memo } from 'react'
 import { Tool } from "@/types/tool"
 import { Loader2, Settings } from 'lucide-react'
@@ -68,7 +70,7 @@ const ToolCardComponent = ({ tool, onClick, onConnect, onDisconnect, onStartStop
 
                 {/* Body */}
                 <div className="mb-4">
-                    <h3 className="font-serif text-lg text-text mb-1 group-hover:text-[#F97316] transition-colors line-clamp-1" title={tool.name}>
+                    <h3 className="font-serif text-lg text-text mb-1 group-hover:text-primary transition-colors line-clamp-1" title={tool.name}>
                         {tool.name}
                     </h3>
                     <p className="text-xs text-text-secondary leading-relaxed line-clamp-2">
@@ -94,7 +96,7 @@ const ToolCardComponent = ({ tool, onClick, onConnect, onDisconnect, onStartStop
                                 e.stopPropagation();
                                 onConnect(e);
                             }}
-                            className="flex items-center justify-center gap-2 bg-[#FF6600] hover:bg-[#E65C00] text-white font-medium py-2.5 rounded-xl text-sm shadow-sm transition-all"
+                            className="flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white font-medium py-2.5 rounded-xl text-sm shadow-sm transition-all"
                         >
                             Connect
                         </button>
@@ -117,8 +119,8 @@ const ToolCardComponent = ({ tool, onClick, onConnect, onDisconnect, onStartStop
                             disabled={isOperating}
                             className={`flex items-center justify-center gap-2 font-medium py-2.5 rounded-xl text-sm transition-all disabled:opacity-50 ${
                                 isRunning
-                                    ? 'bg-[#FFF4E6] text-[#FF6600] hover:bg-[#FF6600] hover:text-white'
-                                    : 'bg-[#FF6600] hover:bg-[#E65C00] text-white shadow-sm'
+                                    ? 'bg-primary/10 text-primary hover:bg-primary hover:text-white'
+                                    : 'bg-primary hover:bg-primary/90 text-white shadow-sm'
                             }`}
                         >
                             {isOperating ? (

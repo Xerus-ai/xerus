@@ -3,7 +3,7 @@
 import { useState, useMemo, type ReactNode } from 'react'
 import Image from 'next/image'
 import {
-  LayoutGrid, Users, Send, FileText, Wrench,
+  Wrench,
 } from 'lucide-react'
 import { ModelIcon } from '@/components/agents/AgentAvatar'
 import { cn } from '@/lib/utils'
@@ -89,21 +89,21 @@ function PlanVisual() {
     <div className="relative w-full h-24 flex items-center justify-center">
       {/* Stacked document cards fanning out */}
       <div className="relative w-20 h-16">
-        <div className="absolute inset-0 rounded-lg bg-[#FF6600]/[0.10] border border-[#FF6600]/15 -rotate-6 group-hover:-rotate-12 group-hover:-translate-x-1 transition-transform duration-500" />
-        <div className="absolute inset-0 rounded-lg bg-[#FF6600]/[0.07] border border-[#FF6600]/15 rotate-3 group-hover:rotate-6 group-hover:translate-x-1 transition-transform duration-500">
+        <div className="absolute inset-0 rounded-lg bg-primary/[0.10] border border-primary/15 -rotate-6 group-hover:-rotate-12 group-hover:-translate-x-1 transition-transform duration-500" />
+        <div className="absolute inset-0 rounded-lg bg-primary/[0.07] border border-primary/15 rotate-3 group-hover:rotate-6 group-hover:translate-x-1 transition-transform duration-500">
           <div className="mt-3 mx-2.5 space-y-1">
-            <div className="h-[3px] w-10 rounded-full bg-[#FF6600]/30" />
-            <div className="h-[3px] w-7 rounded-full bg-[#FF6600]/20" />
+            <div className="h-[3px] w-10 rounded-full bg-primary/30" />
+            <div className="h-[3px] w-7 rounded-full bg-primary/20" />
           </div>
         </div>
-        <div className="absolute inset-0 rounded-lg bg-surface-alt border border-[#FF6600]/20 group-hover:-translate-y-1 transition-transform duration-500">
+        <div className="absolute inset-0 rounded-lg bg-surface-alt border border-primary/20 group-hover:-translate-y-1 transition-transform duration-500">
           <div className="mt-3 mx-2.5 space-y-1.5">
-            <div className="h-[3px] w-12 rounded-full bg-[#FF6600]/35" />
-            <div className="h-[3px] w-9 rounded-full bg-[#FF6600]/22" />
-            <div className="h-[3px] w-6 rounded-full bg-[#FF6600]/15" />
+            <div className="h-[3px] w-12 rounded-full bg-primary/35" />
+            <div className="h-[3px] w-9 rounded-full bg-primary/22" />
+            <div className="h-[3px] w-6 rounded-full bg-primary/15" />
           </div>
-          <div className="absolute bottom-2 right-2 w-4 h-4 rounded bg-[#FF6600]/10 flex items-center justify-center">
-            <div className="w-2 h-2 rounded-sm bg-[#FF6600]/30" />
+          <div className="absolute bottom-2 right-2 w-4 h-4 rounded bg-primary/10 flex items-center justify-center">
+            <div className="w-2 h-2 rounded-sm bg-primary/30" />
           </div>
         </div>
       </div>
@@ -157,9 +157,9 @@ function DelegateVisual() {
       <div className="flex gap-2">
         {/* Column 1: To Do */}
         <div className="w-14 flex flex-col gap-1">
-          <div className="h-1 w-8 rounded-full bg-[#FF6600]/20 mb-1" />
-          <div className="h-6 rounded-md bg-[#FF6600]/[0.06] border border-[#FF6600]/10 group-hover:translate-x-[64px] group-hover:translate-y-[28px] group-hover:bg-[#FF6600]/10 transition-all duration-700" />
-          <div className="h-5 rounded-md bg-[#FF6600]/[0.04] border border-[#FF6600]/8" />
+          <div className="h-1 w-8 rounded-full bg-primary/20 mb-1" />
+          <div className="h-6 rounded-md bg-primary/[0.06] border border-primary/10 group-hover:translate-x-[64px] group-hover:translate-y-[28px] group-hover:bg-primary/10 transition-all duration-700" />
+          <div className="h-5 rounded-md bg-primary/[0.04] border border-primary/8" />
         </div>
         {/* Column 2: Doing */}
         <div className="w-14 flex flex-col gap-1">
@@ -181,17 +181,17 @@ function SummarizeVisual() {
   return (
     <div className="relative w-full h-24 flex items-center justify-center">
       {/* Document with text lines that compress on hover */}
-      <div className="relative w-20 rounded-lg bg-surface-alt border border-[#FF6600]/10 p-3 overflow-hidden">
+      <div className="relative w-20 rounded-lg bg-surface-alt border border-primary/10 p-3 overflow-hidden">
         <div className="space-y-1.5 transition-all duration-500 group-hover:space-y-0.5">
-          <div className="h-[3px] w-full rounded-full bg-[#FF6600]/30 transition-all duration-500 group-hover:w-14" />
-          <div className="h-[3px] w-11 rounded-full bg-[#FF6600]/22 transition-all duration-500 group-hover:w-14 group-hover:delay-75" />
-          <div className="h-[3px] w-14 rounded-full bg-[#FF6600]/18 transition-all duration-500 group-hover:w-14" />
-          <div className="h-[3px] w-8 rounded-full bg-[#FF6600]/14 transition-all duration-500 group-hover:w-14" />
-          <div className="h-[3px] w-12 rounded-full bg-[#FF6600]/10 transition-all duration-500 group-hover:opacity-0" />
-          <div className="h-[3px] w-6 rounded-full bg-[#FF6600]/8 transition-all duration-500 group-hover:opacity-0" />
+          <div className="h-[3px] w-full rounded-full bg-primary/30 transition-all duration-500 group-hover:w-14" />
+          <div className="h-[3px] w-11 rounded-full bg-primary/22 transition-all duration-500 group-hover:w-14 group-hover:delay-75" />
+          <div className="h-[3px] w-14 rounded-full bg-primary/18 transition-all duration-500 group-hover:w-14" />
+          <div className="h-[3px] w-8 rounded-full bg-primary/14 transition-all duration-500 group-hover:w-14" />
+          <div className="h-[3px] w-12 rounded-full bg-primary/10 transition-all duration-500 group-hover:opacity-0" />
+          <div className="h-[3px] w-6 rounded-full bg-primary/8 transition-all duration-500 group-hover:opacity-0" />
         </div>
         {/* Summary badge that appears on hover */}
-        <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-[#FF6600]/10 text-[#FF6600] text-[8px] font-bold opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-200">
+        <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[8px] font-bold opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-200">
           TL;DR
         </div>
       </div>
@@ -203,7 +203,7 @@ function SummarizeVisual() {
 function IconVisual({ icon }: { icon: ReactNode }) {
   return (
     <div className="relative w-full h-24 flex items-center justify-center">
-      <div className="w-14 h-14 rounded-2xl bg-[#FF6600]/12 flex items-center justify-center text-[#FF6600]/60 group-hover:text-[#FF6600] group-hover:scale-110 group-hover:bg-[#FF6600]/18 transition-all duration-300">
+      <div className="w-14 h-14 rounded-2xl bg-primary/12 flex items-center justify-center text-primary/60 group-hover:text-primary group-hover:scale-110 group-hover:bg-primary/18 transition-all duration-300">
         <div className="w-7 h-7 [&>svg]:w-7 [&>svg]:h-7">
           {icon}
         </div>
@@ -274,7 +274,7 @@ function AgentHeroAvatar({ agent, size }: { agent: Agent; size: number }) {
     return <img src={avatarUrl} alt={agent.name} className="w-full h-full object-cover rounded-2xl" />
   }
   return (
-    <span className="w-full h-full flex items-center justify-center bg-[#FF6600]/10 text-[#FF6600] text-2xl font-semibold rounded-2xl">
+    <span className="w-full h-full flex items-center justify-center bg-primary/10 text-primary text-2xl font-semibold rounded-2xl">
       {agent.name.substring(0, 2).toUpperCase()}
     </span>
   )
@@ -299,7 +299,7 @@ function AgentProfileInline({ agent }: { agent: Agent }) {
             // eslint-disable-next-line @next/next/no-img-element
             <img src={avatarUrl} alt={agent.name} className="w-full h-full object-cover" />
           ) : (
-            <span className="w-full h-full flex items-center justify-center bg-[#FF6600]/10 text-[#FF6600] text-lg font-semibold">
+            <span className="w-full h-full flex items-center justify-center bg-primary/10 text-primary text-lg font-semibold">
               {agent.name.substring(0, 2).toUpperCase()}
             </span>
           )}
@@ -397,14 +397,14 @@ export function ChatWelcome({
                 'bg-surface/60 backdrop-blur-sm shadow-[0_2px_16px_rgba(255,102,0,0.15)]',
                 'hover:shadow-[0_4px_24px_rgba(255,102,0,0.22)]',
                 'active:scale-[0.98] transition-all duration-300 cursor-pointer',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600]/30',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30',
               )}
             >
               {/* Visual or icon fallback */}
               {s.visual ?? (s.icon && <IconVisual icon={s.icon} />)}
 
               {/* Text */}
-              <h3 className="font-serif text-base text-text group-hover:text-[#FF6600] transition-colors duration-300 mb-1">
+              <h3 className="font-serif text-base text-text group-hover:text-primary transition-colors duration-300 mb-1">
                 {s.label}
               </h3>
               <p className="text-sm text-text-muted leading-relaxed line-clamp-2">

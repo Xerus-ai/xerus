@@ -47,7 +47,7 @@ export function SettingsSidebar() {
           <h2 className="font-serif text-[22px] text-text tracking-tight">Settings</h2>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-6">
+        <nav aria-label="Settings navigation" className="flex-1 px-3 py-4 space-y-6">
           {NAV_SECTIONS.map((section) => (
             <div key={section.label}>
               <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-secondary mb-1.5 px-3">
@@ -109,7 +109,7 @@ export function SettingsSidebar() {
 
       {/* Mobile horizontal nav */}
       <div className="lg:hidden border-b border-surface-active/50 bg-surface-alt/60 px-2 py-2 overflow-x-auto scrollbar-none shrink-0">
-        <nav className="flex gap-1 min-w-max">
+        <nav role="tablist" aria-label="Settings navigation" className="flex gap-1 min-w-max">
           {ALL_ITEMS.map((item) => {
             const isActive = pathname === item.href
             const Icon = item.icon

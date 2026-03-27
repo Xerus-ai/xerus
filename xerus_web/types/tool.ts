@@ -14,12 +14,12 @@ export interface Tool {
     execution_time_avg: number
     avg_execution_time?: number
     success_rate: number
-    parameters: any
-    configuration?: any
+    parameters: Record<string, unknown>[] | Record<string, unknown>
+    configuration?: Record<string, unknown>
     provider: string
     version: string
     requires_auth?: boolean
-    auth_type?: 'oauth' | 'api_key' | null | string
+    auth_type?: 'oauth' | 'api_key' | 'keys' | 'none' | null
     is_configured?: boolean
     token_info?: {
         expires_at?: string | null

@@ -198,7 +198,7 @@ export default function WorkspaceOverviewPage() {
             <button
               onClick={() => handleAction('start', startWorkspace, 'Pod started')}
               disabled={workspaceAction !== null}
-              className="flex items-center gap-1.5 px-4 py-2 bg-[#FF6600] text-white text-xs font-medium rounded-lg hover:bg-[#E65C00] transition-colors disabled:opacity-40"
+              className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white text-xs font-medium rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-40"
             >
               <Play className="w-3 h-3" />
               {workspaceAction === 'start' ? 'Starting...' : 'Start'}
@@ -252,7 +252,7 @@ export default function WorkspaceOverviewPage() {
                 </p>
                 <div className="w-full h-1.5 bg-surface-hover rounded-full mt-2 mb-2 overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-[#FF6600]/70 transition-all duration-500"
+                    className="h-full rounded-full bg-primary/70 transition-all duration-500"
                     style={{ width: `${creditsPercent}%` }}
                   />
                 </div>
@@ -282,7 +282,7 @@ export default function WorkspaceOverviewPage() {
             </p>
             <div className="w-full h-1.5 bg-surface-hover rounded-full mt-2 mb-2 overflow-hidden">
               <div
-                className="h-full rounded-full bg-[#FF6600]/70 transition-all duration-500"
+                className="h-full rounded-full bg-primary/70 transition-all duration-500"
                 style={{ width: '0%' }}
               />
             </div>

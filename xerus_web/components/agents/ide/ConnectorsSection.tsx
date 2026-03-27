@@ -50,7 +50,7 @@ export function ConnectorsSection({
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 px-1">
-        <div className="text-[#FF6600]">
+        <div className="text-primary">
           <ConnectorsIcon />
         </div>
         <h3 className="text-2xl font-serif text-text">Connectors</h3>
@@ -76,17 +76,17 @@ export function ConnectorsSection({
           <div className="space-y-4">
             {/* Read-only notice for system templates */}
             {!isEditable && (
-              <div className="flex items-center justify-between gap-3 p-4 bg-[#FF6600]/5 border border-[#FF6600]/20 rounded-2xl">
+              <div className="flex items-center justify-between gap-3 p-4 bg-primary/5 border border-primary/20 rounded-2xl">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-[#FF6600]/10 flex items-center justify-center">
-                    <Lock className="w-4 h-4 text-[#FF6600]" />
+                  <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <Lock className="w-4 h-4 text-primary" />
                   </div>
                   <span className="text-sm text-text">To modify tools, clone this agent first.</span>
                 </div>
                 <button
                   onClick={onClone}
                   disabled={isCloning}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#FF6600] hover:bg-[#E65C00] text-white font-medium rounded-xl text-sm transition-colors disabled:opacity-50 shrink-0 shadow-sm"
+                  className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white font-medium rounded-xl text-sm transition-colors disabled:opacity-50 shrink-0 shadow-sm"
                 >
                   {isCloning ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -175,7 +175,7 @@ export function ConnectorsSection({
                         <button
                           onClick={() => onConnectTool(tool)}
                           disabled={isConfiguring}
-                          className="flex items-center justify-center gap-1.5 bg-[#FF6600] hover:bg-[#E65C00] text-white font-medium px-4 py-2 rounded-xl text-sm transition-colors disabled:opacity-50 shadow-sm"
+                          className="flex items-center justify-center gap-1.5 bg-primary hover:bg-primary/90 text-white font-medium px-4 py-2 rounded-xl text-sm transition-colors disabled:opacity-50 shadow-sm"
                         >
                           {isConfiguring ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
@@ -212,12 +212,12 @@ export function ConnectorsSection({
             {/* Add Tool Button */}
             <div
               onClick={onOpenToolPanel}
-              className="rounded-2xl border-2 border-dashed border-surface-active hover:border-[#FF6600] py-4 flex items-center justify-center gap-3 hover:bg-surface-hover/50 transition-all duration-300 cursor-pointer group"
+              className="rounded-2xl border-2 border-dashed border-surface-active hover:border-primary py-4 flex items-center justify-center gap-3 hover:bg-surface-hover/50 transition-all duration-300 cursor-pointer group"
             >
               <div className="w-8 h-8 bg-surface rounded-full flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform duration-300">
-                <Plus className="w-4 h-4 text-[#FF6600]" />
+                <Plus className="w-4 h-4 text-primary" />
               </div>
-              <span className="font-medium text-text-secondary group-hover:text-[#FF6600] transition-colors text-sm">
+              <span className="font-medium text-text-secondary group-hover:text-primary transition-colors text-sm">
                 Add Tool
               </span>
             </div>

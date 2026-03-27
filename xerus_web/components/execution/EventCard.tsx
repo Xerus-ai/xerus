@@ -148,7 +148,7 @@ function MessageCard({ event }: { event: ExecutionEvent }) {
   return (
     <div
       className={cn(
-        'rounded-[24px] px-4 py-3',
+        'rounded-2xl px-4 py-3',
         isThinking && 'bg-surface-alt border border-surface-active',
         isUser && 'bg-surface border border-surface-active',
         isSubagent && 'bg-accent-subtle border border-accent/20',

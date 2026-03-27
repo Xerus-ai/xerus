@@ -34,6 +34,8 @@ function TodoProgress({ done, total, items }: { done: number; total: number; ite
       <button
         type="button"
         onClick={() => hasItems && setExpanded(!expanded)}
+        aria-expanded={expanded}
+        aria-label="Toggle task details"
         className={cn(
           'inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-surface-active bg-surface-alt/50 transition-colors duration-150',
           hasItems && 'hover:bg-surface-hover/80',
@@ -100,14 +102,14 @@ function PlanCard({
   const [expanded, setExpanded] = useState(true)
 
   return (
-    <div className="rounded-2xl border border-[#FF6600]/20 bg-[#FF6600]/5 overflow-hidden mb-3">
+    <div className="rounded-2xl border border-primary/20 bg-primary/5 overflow-hidden mb-3">
       {/* Header */}
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-2.5 px-4 py-3 w-full text-left hover:bg-[#FF6600]/8 transition-colors"
+        className="flex items-center gap-2.5 px-4 py-3 w-full text-left hover:bg-primary/8 transition-colors"
       >
-        <div className="w-7 h-7 rounded-xl flex items-center justify-center bg-[#FF6600]/15 text-[#FF6600] shrink-0">
+        <div className="w-7 h-7 rounded-xl flex items-center justify-center bg-primary/15 text-primary shrink-0">
           <Sparkles className="w-3.5 h-3.5" />
         </div>
         <div className="flex-1 min-w-0">
@@ -121,7 +123,7 @@ function PlanCard({
             <button
               type="button"
               onClick={() => onOpenInWorkspace({ type: 'plan', title, content })}
-              className="p-1.5 rounded-lg text-text-muted hover:text-[#FF6600] hover:bg-[#FF6600]/8 transition-colors"
+              className="p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-primary/8 transition-colors"
               aria-label="Open in workspace"
             >
               <Maximize2 className="w-3.5 h-3.5" />
@@ -152,7 +154,7 @@ function PlanCard({
 
       {/* Expanded plan content */}
       {expanded && (
-        <div className="px-4 pb-4 max-h-[400px] overflow-y-auto border-t border-[#FF6600]/10 bg-surface-alt pt-3">
+        <div className="px-4 pb-4 max-h-[400px] overflow-y-auto border-t border-primary/10 bg-surface-alt pt-3">
           <MarkdownContent content={content} />
         </div>
       )}
@@ -201,7 +203,7 @@ function ArtifactCard({
             <button
               type="button"
               onClick={() => onOpenInWorkspace({ type: 'artifact', artifact })}
-              className="p-1.5 rounded-lg text-text-muted hover:text-[#FF6600] hover:bg-[#FF6600]/8 transition-colors"
+              className="p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-primary/8 transition-colors"
               aria-label="Open in workspace"
             >
               <ExternalLink className="w-3.5 h-3.5" />
@@ -254,7 +256,7 @@ function partToToolCall(part: TurnPart & { type: 'tool' }, agents?: Agent[]): To
 function StatusBadge({ label }: { label: string }) {
   return (
     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-alt border border-surface-active text-[11px] text-text-muted font-medium">
-      <span className="h-1.5 w-1.5 rounded-full bg-[#FF6600]" />
+      <span className="h-1.5 w-1.5 rounded-full bg-primary" />
       {label}
     </span>
   )
@@ -337,7 +339,7 @@ export const MessageBubble = memo(function MessageBubble({
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={agent.avatarUrl} alt={agent.name} className="w-7 h-7 object-cover" />
               ) : (
-                <span className="w-full h-full flex items-center justify-center bg-[#FF6600]/10 text-[#FF6600] text-[10px] font-semibold">
+                <span className="w-full h-full flex items-center justify-center bg-primary/10 text-primary text-[10px] font-semibold">
                   {agent.name.substring(0, 2).toUpperCase()}
                 </span>
               )
@@ -354,7 +356,7 @@ export const MessageBubble = memo(function MessageBubble({
         )}
         <span className={cn(
           'text-sm font-semibold',
-          isUser ? 'text-black' : 'text-[#FF6600]'
+          isUser ? 'text-black' : 'text-primary'
         )}>
           {isUser ? 'You' : agent?.name || message.agentName || 'Xerus'}
         </span>
@@ -368,7 +370,7 @@ export const MessageBubble = memo(function MessageBubble({
         </span>
         {isStreaming && (
           <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-black/60">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#FF6600]" />
+            <span className="h-1.5 w-1.5 rounded-full bg-primary" />
             Live
           </span>
         )}
@@ -403,7 +405,7 @@ export const MessageBubble = memo(function MessageBubble({
           </div>
         ) : isStreaming ? (
           <div className="flex items-center gap-2 text-sm text-black/65">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#FF6600]" />
+            <span className="h-1.5 w-1.5 rounded-full bg-primary" />
             Waiting for response...
           </div>
         ) : null
@@ -486,7 +488,7 @@ export const MessageBubble = memo(function MessageBubble({
             <button
               type="button"
               onClick={() => onViewExecution(message.id)}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] text-[#FF6600] hover:bg-[#FF6600]/8 transition-colors font-medium"
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] text-primary hover:bg-primary/8 transition-colors font-medium"
             >
               <Eye className="w-3 h-3" />
               View work

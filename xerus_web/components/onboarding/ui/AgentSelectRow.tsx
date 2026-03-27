@@ -62,7 +62,7 @@ export function AgentSelectRow({
                   shrink-0 w-[172px] rounded-[24px] p-4 cursor-pointer
                   transition-all duration-300 flex flex-col
                   ${isSelected
-                    ? 'bg-surface ring-2 ring-[#FF6600] shadow-md'
+                    ? 'bg-surface ring-2 ring-primary shadow-md'
                     : 'bg-surface hover:bg-surface-hover shadow-sm'
                   }
                 `}
@@ -119,7 +119,7 @@ export function AgentSelectRow({
                     mt-3 w-full py-1.5 rounded-xl text-xs font-medium transition-all duration-200
                     flex items-center justify-center gap-1.5
                     ${isSelected
-                      ? 'bg-[#FF6600] text-white'
+                      ? 'bg-primary text-white'
                       : 'bg-surface-hover hover:bg-surface-pressed text-text'
                     }
                   `}
@@ -142,7 +142,7 @@ export function AgentSelectRow({
         >
           <button
             onClick={handleConfirm}
-            className="px-5 py-2 rounded-xl bg-[#FF6600] hover:bg-[#E65C00] text-white text-sm font-medium transition-all duration-200 shadow-sm"
+            className="px-5 py-2 rounded-xl bg-primary hover:bg-primary/90 text-white text-sm font-medium transition-all duration-200 shadow-sm"
           >
             Confirm team ({selected.size} agent{selected.size !== 1 ? 's' : ''})
           </button>

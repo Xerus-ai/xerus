@@ -29,19 +29,19 @@ const xerusTheme = EditorView.theme({
   },
   '.cm-content': {
     padding: '16px 0',
-    caretColor: '#FF6600',
+    caretColor: 'hsl(var(--primary))',
   },
   '.cm-cursor, .cm-dropCursor': {
-    borderLeftColor: '#FF6600',
+    borderLeftColor: 'hsl(var(--primary))',
   },
   '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
-    backgroundColor: '#FF660020',
+    backgroundColor: 'hsl(var(--primary) / 0.13)',
   },
   '.cm-activeLine': {
-    backgroundColor: '#FF660008',
+    backgroundColor: 'hsl(var(--primary) / 0.03)',
   },
   '.cm-activeLineGutter': {
-    backgroundColor: '#FF660008',
+    backgroundColor: 'hsl(var(--primary) / 0.03)',
   },
   '.cm-gutters': {
     backgroundColor: '#FAFAF8',
@@ -58,17 +58,17 @@ const xerusTheme = EditorView.theme({
     padding: '0 4px',
   },
   '.cm-matchingBracket': {
-    backgroundColor: '#FF660030',
+    backgroundColor: 'hsl(var(--primary) / 0.19)',
     outline: 'none',
   },
   '.cm-searchMatch': {
-    backgroundColor: '#FF660030',
+    backgroundColor: 'hsl(var(--primary) / 0.19)',
   },
   '.cm-searchMatch.cm-searchMatch-selected': {
-    backgroundColor: '#FF660050',
+    backgroundColor: 'hsl(var(--primary) / 0.31)',
   },
   '.cm-selectionMatch': {
-    backgroundColor: '#FF660015',
+    backgroundColor: 'hsl(var(--primary) / 0.08)',
   },
   '.cm-tooltip': {
     border: '1px solid #E8E6E0',
@@ -78,7 +78,7 @@ const xerusTheme = EditorView.theme({
   },
   '.cm-tooltip-autocomplete': {
     '& > ul > li[aria-selected]': {
-      backgroundColor: '#FF660015',
+      backgroundColor: 'hsl(var(--primary) / 0.08)',
     },
   },
 })

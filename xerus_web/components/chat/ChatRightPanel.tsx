@@ -59,7 +59,7 @@ export function ChatRightPanel({
           )}
           aria-label={expanded ? 'Collapse workspace' : 'Open workspace'}
         >
-          <FolderOpen className={cn('w-4 h-4 shrink-0', expanded && 'text-[#FF6600]')} />
+          <FolderOpen className={cn('w-4 h-4 shrink-0', expanded && 'text-primary')} />
           Workspace
         </button>
 
@@ -67,7 +67,7 @@ export function ChatRightPanel({
           <button
             type="button"
             onClick={onToggleWorkspace}
-            className="p-1 rounded-lg text-text-muted hover:text-[#FF6600] transition-colors"
+            className="p-1 rounded-lg text-text-muted hover:text-primary transition-colors"
             aria-label="Collapse workspace"
           >
             <PanelRightClose className="w-[18px] h-[18px]" />

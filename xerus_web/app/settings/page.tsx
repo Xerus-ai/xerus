@@ -29,6 +29,7 @@ export default function ProfilePage() {
   const user = useRedirectIfNotAuth()
   const router = useRouter()
   const [profile, setProfile] = useState<ProfileData | null>(null)
+  const [profileError, setProfileError] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [displayNameInput, setDisplayNameInput] = useState('')
@@ -47,14 +48,11 @@ export default function ProfilePage() {
           created_at: data.created_at,
         })
         setDisplayNameInput(data.display_name)
-      } catch {
+      } catch (error) {
+        console.error('Failed to load profile:', error)
         toast.error("Couldn't load your profile", { description: 'Please refresh the page and try again.' })
-        setProfile({
-          uid: user.uid,
-          email: user.email,
-          display_name: user.display_name || '',
-        })
-        setDisplayNameInput(user.display_name || '')
+        setProfileError(true)
+        // Don't silently fall back to stale data
       } finally {
         setIsLoading(false)
       }
@@ -108,6 +106,21 @@ export default function ProfilePage() {
     )
   }
 
+  if (profileError && !profile) {
+    return (
+      <div className="max-w-[680px]">
+        <h1 className="font-serif text-[22px] text-text tracking-tight mb-1">Profile</h1>
+        <p className="text-sm text-text-secondary mb-8">Manage your personal information</p>
+        <div className="bg-red-50/30 rounded-2xl border border-red-200/60 p-6">
+          <p className="text-sm text-red-600 font-medium">Failed to load profile</p>
+          <p className="text-xs text-red-500/80 mt-1">
+            We couldn&apos;t load your profile data. Please refresh the page or try again later.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-[680px]">
       <motion.div
@@ -147,7 +160,7 @@ export default function ProfilePage() {
             {planType === 'free' && (
               <Link
                 href="/settings/billing"
-                className="text-xs font-medium text-[#FF6600] hover:text-[#E65C00] transition-colors"
+                className="text-xs font-medium text-primary hover:text-primary/90 transition-colors"
               >
                 Upgrade
               </Link>
@@ -169,14 +182,14 @@ export default function ProfilePage() {
             type="text"
             value={displayNameInput}
             onChange={(e) => setDisplayNameInput(e.target.value)}
-            className="flex-1 max-w-sm px-4 py-2.5 bg-white border border-surface-active rounded-xl text-sm text-text placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-[#FF6600]/15 focus:border-[#FF6600]/40 transition-all"
+            className="flex-1 max-w-sm px-4 py-2.5 bg-white border border-surface-active rounded-xl text-sm text-text placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary/40 transition-all"
             maxLength={32}
             placeholder="Enter your display name"
           />
           <button
             onClick={handleUpdateDisplayName}
             disabled={isSaving || !displayNameInput || displayNameInput === profile?.display_name}
-            className="px-5 py-2.5 bg-[#FF6600] text-white text-sm font-medium rounded-xl hover:bg-[#E65C00] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-5 py-2.5 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {isSaving ? 'Saving...' : 'Save'}
           </button>

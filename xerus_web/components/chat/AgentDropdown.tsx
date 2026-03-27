@@ -61,7 +61,7 @@ function AgentIcon({ agent, size = 20 }: { agent: Agent; size?: number }) {
     return <img src={avatarUrl} alt={agent.name} className="w-full h-full object-cover rounded-full" />
   }
   return (
-    <span className="w-full h-full flex items-center justify-center bg-[#FF6600]/10 text-[#FF6600] text-[10px] font-semibold rounded-full">
+    <span className="w-full h-full flex items-center justify-center bg-primary/10 text-primary text-[10px] font-semibold rounded-full">
       {agent.name.substring(0, 2).toUpperCase()}
     </span>
   )
@@ -203,8 +203,8 @@ export function AgentDropdown({
                   setOpen(false)
                 }}
                 className={cn(
-                  "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-[#FF6600]/[0.06]",
-                  isSelected ? "bg-[#FF6600]/[0.08]" : ""
+                  "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-primary/[0.06]",
+                  isSelected ? "bg-primary/[0.08]" : ""
                 )}
                 role="option"
                 aria-selected={isSelected}
@@ -257,8 +257,8 @@ export function AgentDropdown({
                     setOpen(false)
                   }}
                   className={cn(
-                    "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-[#FF6600]/[0.06] data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-                    selectedAgent && selectedAgent.id === agent.id ? "bg-[#FF6600]/[0.08]" : ""
+                    "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-primary/[0.06] data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+                    selectedAgent && selectedAgent.id === agent.id ? "bg-primary/[0.08]" : ""
                   )}
                   role="option"
                   aria-selected={selectedAgent?.id === agent.id}

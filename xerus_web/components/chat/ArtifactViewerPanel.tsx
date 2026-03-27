@@ -3,9 +3,8 @@
 import { useState, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { cn } from '@/lib/utils'
+import { CodeBlock } from '@/components/shared/CodeBlock'
 import {
   X,
   Copy,
@@ -84,7 +83,7 @@ function getTypeIcon(type: ViewerContentType) {
 
 function getTypeColor(type: ViewerContentType) {
   switch (type) {
-    case 'plan': return 'bg-[#FF6600]/15 text-[#FF6600]'
+    case 'plan': return 'bg-primary/15 text-primary'
     case 'html': return 'bg-cyan-500/10 text-cyan-600'
     case 'pdf': return 'bg-red-500/10 text-red-600'
     case 'image': return 'bg-emerald-500/10 text-emerald-600'
@@ -114,7 +113,7 @@ function HtmlRenderer({ content, url }: { content?: string; url?: string }) {
   return (
     <iframe
       title="HTML Preview"
-      sandbox="allow-scripts allow-same-origin"
+      sandbox="allow-scripts"
       srcDoc={content || undefined}
       src={!content && url ? url : undefined}
       className="w-full h-full border-0"
@@ -127,6 +126,7 @@ function PdfRenderer({ url }: { url: string }) {
     <iframe
       title="PDF Preview"
       src={url}
+      sandbox="allow-scripts allow-same-origin"
       className="w-full h-full border-0"
     />
   )
@@ -153,20 +153,38 @@ function MarkdownRenderer({ content }: { content: string }) {
       'prose-headings:font-semibold prose-headings:text-text prose-headings:mt-4 prose-headings:mb-2',
       'prose-h1:text-xl prose-h2:text-lg prose-h3:text-base',
       'prose-strong:text-text prose-strong:font-semibold',
-      'prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-lg prose-code:bg-surface prose-code:text-[#FF6600] prose-code:font-mono prose-code:text-sm',
+      'prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-lg prose-code:bg-surface prose-code:text-primary prose-code:font-mono prose-code:text-sm',
       'prose-code:before:content-none prose-code:after:content-none',
       'prose-pre:bg-[#1E1E1E] prose-pre:rounded-xl prose-pre:border prose-pre:border-gray-800',
       'prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-li:text-text-secondary prose-li:text-[14px]',
-      'prose-a:text-[#FF6600] prose-a:no-underline hover:prose-a:underline prose-a:font-medium',
+      'prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-a:font-medium',
       'prose-table:text-xs prose-th:text-left prose-th:text-text prose-th:font-semibold prose-th:pb-2',
       'prose-td:text-text-secondary prose-td:py-1',
       'prose-tr:border-b prose-tr:border-surface-active',
       'prose-em:text-text-secondary',
-      'prose-blockquote:border-l-[#FF6600] prose-blockquote:text-text-secondary',
+      'prose-blockquote:border-l-primary prose-blockquote:text-text-secondary',
     )}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
+          a({ href, children }: { href?: string; children?: React.ReactNode }) {
+            if (!href || href.startsWith('#')) {
+              return <span>{children}</span>;
+            }
+            try {
+              const parsed = new URL(href, window.location.origin);
+              if (!['http:', 'https:', 'mailto:'].includes(parsed.protocol)) {
+                return <span>{children}</span>;
+              }
+            } catch {
+              return <span>{children}</span>;
+            }
+            return (
+              <a href={href} target="_blank" rel="noopener noreferrer">
+                {children}
+              </a>
+            );
+          },
           code({ inline, className: codeClassName, children, ...props }: {
             inline?: boolean; className?: string; children?: React.ReactNode
           }) {
@@ -174,15 +192,12 @@ function MarkdownRenderer({ content }: { content: string }) {
             const text = String(children).replace(/\n$/, '')
 
             return !inline && match ? (
-              <SyntaxHighlighter
-                style={oneDark}
+              <CodeBlock
+                code={text}
                 language={match[1]}
-                PreTag="div"
+                preTag="div"
                 className="rounded-xl !mt-0 !mb-0 text-sm"
-                {...props}
-              >
-                {text}
-              </SyntaxHighlighter>
+              />
             ) : (
               <code className={codeClassName} {...props}>{children}</code>
             )
@@ -197,15 +212,13 @@ function MarkdownRenderer({ content }: { content: string }) {
 
 function CodeRenderer({ content, language }: { content: string; language: string }) {
   return (
-    <SyntaxHighlighter
-      style={oneDark}
+    <CodeBlock
+      code={content}
       language={language}
-      PreTag="div"
+      preTag="div"
       className="!m-0 !rounded-none text-sm"
       showLineNumbers
-    >
-      {content}
-    </SyntaxHighlighter>
+    />
   )
 }
 
@@ -220,7 +233,7 @@ function EmptyRenderer({ title, url }: { title: string; url?: string }) {
         <a
           href={url}
           download={title}
-          className="inline-flex items-center gap-1.5 text-xs text-[#FF6600] hover:text-[#E65C00] font-medium transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs text-primary hover:text-primary/90 font-medium transition-colors"
         >
           <Download className="w-3.5 h-3.5" />
           Download file

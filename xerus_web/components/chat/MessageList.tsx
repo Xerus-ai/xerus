@@ -38,7 +38,7 @@ function AgentAvatarIcon({ agent, size = 28 }: { agent: Agent; size?: number }) 
     return <img src={avatarUrl} alt={agent.name} className="w-full h-full object-cover rounded-full" loading="lazy" />
   }
   return (
-    <span className="w-full h-full flex items-center justify-center bg-[#FF6600]/10 text-[#FF6600] text-[10px] font-semibold rounded-full">
+    <span className="w-full h-full flex items-center justify-center bg-primary/10 text-primary text-[10px] font-semibold rounded-full">
       {agent.name.substring(0, 2).toUpperCase()}
     </span>
   )
@@ -94,7 +94,7 @@ export function MessageList({
   }
 
   return (
-    <div className={cn('flex-1 overflow-y-auto scrollbar-thin', className)}>
+    <div className={cn('flex-1 overflow-y-auto scrollbar-thin [contain:layout_style]', className)}>
       <div className="max-w-3xl mx-auto pb-4 animate-[fadeInUp_0.4s_ease-out]">
         {/* Messages */}
         <div className="divide-y divide-surface-active/50">
@@ -124,14 +124,14 @@ export function MessageList({
                 {currentAgent ? (
                   <AgentAvatarIcon agent={currentAgent} size={36} />
                 ) : (
-                  <span className="w-full h-full flex items-center justify-center bg-[#FF6600]/10 text-[#FF6600]">
+                  <span className="w-full h-full flex items-center justify-center bg-primary/10 text-primary">
                     <Bot className="h-4.5 w-4.5" />
                   </span>
                 )}
               </div>
 
               <div className="flex-1 min-w-0">
-                <span className="text-base font-semibold text-[#FF6600] block">
+                <span className="text-base font-semibold text-primary block">
                   {currentAgent?.name || 'Xerus'}
                 </span>
                 <ThinkingIndicator executionState={executionState} />

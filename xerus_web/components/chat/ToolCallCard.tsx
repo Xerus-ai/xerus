@@ -29,7 +29,7 @@ const TOOL_COLOR: Record<ToolCallIcon, string> = {
   search: 'bg-amber-500/10 text-amber-600',
   web: 'bg-cyan-500/10 text-cyan-600',
   think: 'bg-slate-500/10 text-slate-600',
-  agent: 'bg-[#FF6600]/10 text-[#FF6600]',
+  agent: 'bg-primary/10 text-primary',
   skill: 'bg-purple-500/10 text-purple-600',
   task: 'bg-teal-500/10 text-teal-600',
   question: 'bg-rose-500/10 text-rose-600',
@@ -69,7 +69,7 @@ export function ToolCallCard({ tool }: ToolCallCardProps) {
       className={cn(
         'inline-flex flex-col items-start max-w-full text-left rounded-xl border border-surface-active bg-surface-alt/50 overflow-hidden',
         'hover:bg-surface-hover/80 transition-colors duration-150',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600]'
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
       )}
     >
       {/* Header row */}
@@ -86,7 +86,7 @@ export function ToolCallCard({ tool }: ToolCallCardProps) {
         </div>
         <span className="text-xs font-medium text-text shrink-0">{tool.name}</span>
         {tool.target && (
-          <span className="text-xs text-[#FF6600] font-mono truncate min-w-0 flex-1 px-1.5 py-0.5 rounded-md border border-[#FF6600]/15 bg-[#FF6600]/5">
+          <span className="text-xs text-primary font-mono truncate min-w-0 flex-1 px-1.5 py-0.5 rounded-md border border-primary/15 bg-primary/5">
             {tool.target}
           </span>
         )}
@@ -114,7 +114,7 @@ export function ToolCallCard({ tool }: ToolCallCardProps) {
       {/* Expanded output */}
       {expanded && tool.output && (
         <div className="px-3 pb-2.5 pt-0">
-          <pre className="text-[11px] leading-relaxed text-black/80 bg-surface rounded-lg px-3 py-2 overflow-x-auto whitespace-pre-wrap font-mono border border-surface-active">
+          <pre className="text-[11px] leading-relaxed text-foreground/80 bg-surface rounded-lg px-3 py-2 overflow-x-auto whitespace-pre-wrap font-mono border border-surface-active">
             {tool.output}
           </pre>
         </div>

@@ -215,7 +215,7 @@ export default function WorkspacePage() {
           </div>
           <h2 className="text-lg font-serif text-text mb-2">Could not load workspace</h2>
           <p className="text-text-secondary mb-6 text-sm">{error}</p>
-          <button onClick={fetchData} className="px-6 py-2.5 rounded-full bg-[#FF6600] text-white hover:bg-[#E65C00] transition-colors text-sm font-medium">
+          <button onClick={fetchData} className="px-6 py-2.5 rounded-full bg-primary text-white hover:bg-primary/90 transition-colors text-sm font-medium">
             Try Again
           </button>
         </div>
@@ -335,7 +335,7 @@ export default function WorkspacePage() {
                   {isEditorMode && (
                     <>
                       <PanelResizeHandle className="w-1.5 flex items-center justify-center cursor-col-resize group shrink-0">
-                        <div className="w-px h-8 rounded-full bg-surface-active/40 group-hover:bg-[#FF6600]/40 group-hover:h-16 transition-all" />
+                        <div className="w-px h-8 rounded-full bg-surface-active/40 group-hover:bg-primary/40 group-hover:h-16 transition-all" />
                       </PanelResizeHandle>
                       <Panel defaultSize={55} minSize={25}>
                         <div className="flex flex-col h-full overflow-hidden">

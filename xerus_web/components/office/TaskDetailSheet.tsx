@@ -22,7 +22,7 @@ function CircularProgress({ completed, total }: { completed: number; total: numb
         <circle cx="14" cy="14" r={radius} fill="none" stroke="#E5E0DA" strokeWidth="2.5" />
         <circle
           cx="14" cy="14" r={radius} fill="none"
-          stroke={pct === 100 ? '#22C55E' : '#FF6600'}
+          stroke={pct === 100 ? '#22C55E' : 'hsl(var(--primary))'}
           strokeWidth="2.5"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
@@ -194,13 +194,13 @@ export function TaskDetailSheet({ selectedTask, onClose }: TaskDetailSheetProps)
                 <TabsList className="bg-transparent border-b border-surface-active/30 rounded-none p-0 h-auto w-full justify-start gap-0">
                   <TabsTrigger
                     value="subtasks"
-                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#FF6600] data-[state=active]:text-text data-[state=active]:shadow-none px-4 pb-2.5 pt-0 text-[13px] font-medium text-text-muted"
+                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-text data-[state=active]:shadow-none px-4 pb-2.5 pt-0 text-[13px] font-medium text-text-muted"
                   >
                     Subtasks
                   </TabsTrigger>
                   <TabsTrigger
                     value="comments"
-                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#FF6600] data-[state=active]:text-text data-[state=active]:shadow-none px-4 pb-2.5 pt-0 text-[13px] font-medium text-text-muted"
+                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-text data-[state=active]:shadow-none px-4 pb-2.5 pt-0 text-[13px] font-medium text-text-muted"
                   >
                     Comments
                     {selectedTask.commentCount !== undefined && selectedTask.commentCount > 0 && (
@@ -211,7 +211,7 @@ export function TaskDetailSheet({ selectedTask, onClose }: TaskDetailSheetProps)
                   </TabsTrigger>
                   <TabsTrigger
                     value="activity"
-                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#FF6600] data-[state=active]:text-text data-[state=active]:shadow-none px-4 pb-2.5 pt-0 text-[13px] font-medium text-text-muted"
+                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-text data-[state=active]:shadow-none px-4 pb-2.5 pt-0 text-[13px] font-medium text-text-muted"
                   >
                     Activities
                   </TabsTrigger>

@@ -122,7 +122,7 @@ export const AgentAvatarWithModel = ({
                     className="w-full h-full object-contain"
                 />
             ) : (
-                <span className="w-full h-full flex items-center justify-center bg-[#FF6600]/10 text-[#FF6600] font-semibold text-sm">
+                <span className="w-full h-full flex items-center justify-center bg-primary/10 text-primary font-semibold text-sm">
                     {resolvedName.substring(0, 2).toUpperCase()}
                 </span>
             )}

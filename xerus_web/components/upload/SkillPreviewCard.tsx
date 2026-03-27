@@ -54,7 +54,7 @@ export function SkillPreviewCard({ frontmatter, xerushub, markdownBody, files }:
               {tags.map(tag => (
                 <span
                   key={tag}
-                  className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-[#FF6600]/10 text-[#FF6600]"
+                  className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-primary/10 text-primary"
                 >
                   {tag}
                 </span>

@@ -33,7 +33,7 @@ export function SummaryCard({
 
       <div className="space-y-2 pl-2">
         <div className="flex items-center gap-2.5 text-sm text-text-secondary">
-          <FolderOpen className="w-4 h-4 text-[#FF6600] shrink-0" />
+          <FolderOpen className="w-4 h-4 text-primary shrink-0" />
           <span>{project}</span>
         </div>
 
@@ -43,7 +43,7 @@ export function SummaryCard({
         </div>
 
         <div className="flex items-center gap-2.5 text-sm text-text-secondary">
-          <Users className="w-4 h-4 text-[#FF6600] shrink-0" />
+          <Users className="w-4 h-4 text-primary shrink-0" />
           <span>{agents.join(', ')}</span>
         </div>
 

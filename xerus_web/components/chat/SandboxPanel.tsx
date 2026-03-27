@@ -108,7 +108,7 @@ export function SandboxPanel({
                 className={cn(
                   'flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md transition-colors',
                   isActive
-                    ? 'text-[#FF6600] bg-[#FF6600]/8'
+                    ? 'text-primary bg-primary/8'
                     : 'text-text-muted hover:text-text hover:bg-surface-hover',
                 )}
               >
@@ -170,7 +170,7 @@ export function SandboxPanel({
                   'absolute inset-0 flex flex-col items-center justify-center gap-3 z-20',
                   isDark ? 'bg-[#1a1a1a]' : 'bg-white',
                 )}>
-                  <div className="w-6 h-6 border-2 border-[#FF6600]/20 border-t-[#FF6600] rounded-full animate-spin" />
+                  <div className="w-6 h-6 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
                   <p className={cn('text-xs', isDark ? 'text-gray-400' : 'text-text-muted')}>
                     {tab.id === 'terminal' ? 'Starting Claude Code...' : 'Connecting...'}
                   </p>
@@ -190,7 +190,7 @@ export function SandboxPanel({
                   <button
                     type="button"
                     onClick={() => handleRetry(tab.id)}
-                    className="inline-flex items-center gap-1.5 text-xs text-[#FF6600] hover:text-[#E65C00] font-medium transition-colors"
+                    className="inline-flex items-center gap-1.5 text-xs text-primary hover:text-primary/90 font-medium transition-colors"
                   >
                     <RefreshCw className="w-3 h-3" />
                     Retry
@@ -204,7 +204,7 @@ export function SandboxPanel({
                   key={state.key}
                   title={`Sandbox ${tab.label}`}
                   src={url}
-                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                  sandbox="allow-scripts allow-same-origin allow-forms"
                   onLoad={() => handleLoad(tab.id)}
                   onError={() => handleError(tab.id)}
                   className={cn('w-full h-full border-0', isDark ? 'bg-[#1a1a1a]' : 'bg-white')}

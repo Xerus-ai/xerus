@@ -40,7 +40,7 @@ export function SchedulePicker({ agentName, onAction }: SchedulePickerProps) {
               flex items-center gap-2.5 px-4 py-3 rounded-xl text-left
               transition-all duration-200 border
               ${isActive
-                ? 'bg-[#FF6600] text-white border-[#FF6600]'
+                ? 'bg-primary text-white border-primary'
                 : 'bg-surface hover:bg-surface-hover text-text border-surface-active'
               }
             `}

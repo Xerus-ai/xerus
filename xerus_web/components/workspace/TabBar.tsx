@@ -47,7 +47,7 @@ export function TabBar({ tabs, activeTab, onSelectTab, onCloseTab, onCloseAll, c
               <FileText className="w-3 h-3 shrink-0" />
               <span className="truncate">{tab.name}</span>
               {tab.isDirty && (
-                <span className="w-1.5 h-1.5 rounded-full bg-[#FF6600] shrink-0" title="Unsaved changes" />
+                <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" title="Unsaved changes" />
               )}
               <button
                 onClick={(e) => {

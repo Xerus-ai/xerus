@@ -132,7 +132,7 @@ export default function DataPage() {
           <button
             onClick={handleExport}
             disabled={actionInProgress !== null}
-            className="px-4 py-2 bg-[#FF6600] text-white text-xs font-medium rounded-lg hover:bg-[#E65C00] transition-colors disabled:opacity-40"
+            className="px-4 py-2 bg-primary text-white text-xs font-medium rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-40"
           >
             {actionInProgress === 'export' ? 'Exporting...' : 'Export'}
           </button>

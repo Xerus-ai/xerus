@@ -55,7 +55,7 @@ export function WorkspaceSetupCard({
             value={workspace}
             onChange={(e) => setWorkspace(e.target.value)}
             placeholder="Acme Corp"
-            className="mt-1 w-full bg-white/60 rounded-xl border border-surface-active px-3 py-2.5 text-sm text-text placeholder:text-text-muted outline-none focus:border-[#FF6600]/40 transition-colors"
+            className="mt-1 w-full bg-white/60 rounded-xl border border-surface-active px-3 py-2.5 text-sm text-text placeholder:text-text-muted outline-none focus:border-primary/40 transition-colors"
           />
         </div>
         <div>
@@ -67,7 +67,7 @@ export function WorkspaceSetupCard({
             value={project}
             onChange={(e) => setProject(e.target.value)}
             placeholder="Content Strategy"
-            className="mt-1 w-full bg-white/60 rounded-xl border border-surface-active px-3 py-2.5 text-sm text-text placeholder:text-text-muted outline-none focus:border-[#FF6600]/40 transition-colors"
+            className="mt-1 w-full bg-white/60 rounded-xl border border-surface-active px-3 py-2.5 text-sm text-text placeholder:text-text-muted outline-none focus:border-primary/40 transition-colors"
           />
         </div>
       </div>
@@ -85,7 +85,7 @@ export function WorkspaceSetupCard({
               transition={{ type: 'spring', stiffness: 300, damping: 25 }}
               className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-surface-hover"
             >
-              <div className="w-6 h-6 rounded-lg bg-[#FF6600] flex items-center justify-center shrink-0">
+              <div className="w-6 h-6 rounded-lg bg-primary flex items-center justify-center shrink-0">
                 <Building2 className="w-3.5 h-3.5 text-white" />
               </div>
               <TypewriterPreview
@@ -105,7 +105,7 @@ export function WorkspaceSetupCard({
               className="ml-5"
             >
               <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl">
-                <FolderOpen className="w-4 h-4 text-[#FF6600] shrink-0" />
+                <FolderOpen className="w-4 h-4 text-primary shrink-0" />
                 <TypewriterPreview
                   text={project}
                   className="text-sm font-medium text-text truncate"
@@ -145,7 +145,7 @@ export function WorkspaceSetupCard({
         <button
           onClick={() => onAction('create-workspace', { workspace: workspace.trim(), project: project.trim() })}
           disabled={!canSubmit}
-          className="px-5 py-2.5 rounded-xl bg-[#FF6600] hover:bg-[#E65C00] text-white text-sm font-medium transition-all duration-200 disabled:opacity-30 disabled:hover:bg-[#FF6600]"
+          className="px-5 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-white text-sm font-medium transition-all duration-200 disabled:opacity-30 disabled:hover:bg-primary"
         >
           Create workspace
         </button>

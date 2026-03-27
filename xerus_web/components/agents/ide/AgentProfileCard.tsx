@@ -1,3 +1,5 @@
+'use client'
+
 import { useState, useEffect, useRef } from 'react'
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -103,7 +105,7 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={agent.avatarUrl} alt={agent.name} className="w-full h-full object-cover" />
                     ) : (
-                        <span className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#FF6600] to-[#E65C00] text-white font-semibold text-2xl">
+                        <span className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary to-primary/90 text-white font-semibold text-2xl">
                             {agent.name.charAt(0).toUpperCase()}
                         </span>
                     )}
@@ -112,7 +114,7 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                 {localAgent.model && (
                     isEditable ? (
                         <Select value={localAgent.model} onValueChange={handleModelChange}>
-                            <SelectTrigger className="absolute -bottom-1 left-1/2 -translate-x-1/2 h-auto px-2 py-0.5 bg-white border border-surface-active rounded-md shadow-sm focus:ring-0 focus:outline-none hover:bg-surface-hover transition-colors w-auto gap-1 z-10">
+                            <SelectTrigger className="absolute -bottom-1 left-1/2 -translate-x-1/2 h-auto px-2 py-0.5 bg-white border border-surface-active rounded-md shadow-sm focus:ring-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary hover:bg-surface-hover transition-colors w-auto gap-1 z-10">
                                 <div className="flex items-center gap-1">
                                     <ModelIcon model={localAgent.model} size="sm" />
                                     <span className="text-[10px] font-bold text-text-secondary whitespace-nowrap">{formatModelName(localAgent.model)}</span>
@@ -161,7 +163,7 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter') handleBlur('name')
                             }}
-                            className="font-serif !text-3xl text-text bg-transparent border-none shadow-none !h-auto focus-visible:ring-0 focus-visible:outline-none placeholder:text-text-secondary/50 w-auto min-w-[280px] p-0"
+                            className="font-serif !text-3xl text-text bg-transparent border-none shadow-none !h-auto focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none placeholder:text-text-secondary/50 w-auto min-w-[280px] p-0"
                             placeholder="Agent Name"
                         />
                     ) : (
@@ -174,7 +176,7 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                             </h1>
                             {/* Verified Badge - small orange circle with checkmark */}
                             {agent.isVerified && (
-                                <span className="shrink-0 w-4 h-4 bg-[#FF6600] rounded-full flex items-center justify-center" title="Verified">
+                                <span className="shrink-0 w-4 h-4 bg-primary rounded-full flex items-center justify-center" title="Verified">
                                     <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
                                         <polyline points="20 6 9 17 4 12" />
                                     </svg>
@@ -183,7 +185,7 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                             {isEditable && (
                                 <button
                                     onClick={() => setIsEditingName(true)}
-                                    className="p-1.5 rounded-lg hover:bg-surface-hover text-text-secondary hover:text-[#FF6600] transition-colors"
+                                    className="p-1.5 rounded-lg hover:bg-surface-hover text-text-secondary hover:text-primary transition-colors"
                                     title="Edit name"
                                 >
                                     <Pencil className="w-5 h-5" />
@@ -207,7 +209,7 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                             value={localAgent.description}
                             onChange={(e) => handleChange('description', e.target.value)}
                             onBlur={() => handleBlur('description')}
-                            className="text-base text-text-secondary bg-transparent border-none shadow-none p-0 min-h-[24px] focus-visible:ring-0 focus-visible:outline-none resize-none leading-relaxed w-full placeholder:text-text-secondary/50"
+                            className="text-base text-text-secondary bg-transparent border-none shadow-none p-0 min-h-[24px] focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none resize-none leading-relaxed w-full placeholder:text-text-secondary/50"
                             placeholder="Add a description..."
                             rows={1}
                             onInput={(e) => {
@@ -227,7 +229,7 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                             {isEditable && (
                                 <button
                                     onClick={() => setIsEditingDesc(true)}
-                                    className="p-1.5 rounded-lg hover:bg-surface-hover text-text-secondary hover:text-[#FF6600] transition-colors shrink-0"
+                                    className="p-1.5 rounded-lg hover:bg-surface-hover text-text-secondary hover:text-primary transition-colors shrink-0"
                                     title="Edit description"
                                 >
                                     <Pencil className="w-5 h-5" />

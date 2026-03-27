@@ -61,7 +61,7 @@ export function FloatingPanel({
                         }}
                         exit={{ opacity: 0, scale: 0.8, y: 20, right: getPanelPosition(panelId) }}
                         transition={{ type: "spring", stiffness: 350, damping: 25 }}
-                        className="fixed bottom-6 z-50 bg-text text-white rounded-xl shadow-xl cursor-pointer hover:bg-[#1a1a1a] flex items-center gap-3 px-4 py-3 w-[220px]"
+                        className="fixed bottom-6 z-50 bg-text text-white rounded-xl shadow-xl cursor-pointer hover:bg-[#1a1a1a] flex items-center gap-3 px-4 py-3 w-[220px] max-w-[calc(100vw-2rem)]"
                         onClick={() => setIsMinimized(false)}
                     >
                         {icon}
@@ -82,7 +82,7 @@ export function FloatingPanel({
                         }}
                         transition={{ type: "spring", stiffness: 350, damping: 30 }}
                         className={cn(
-                            "fixed bottom-6 z-50 w-[540px] rounded-xl shadow-2xl border border-surface-active flex flex-col overflow-hidden font-sans",
+                            "fixed bottom-6 z-50 w-[540px] max-w-[calc(100vw-2rem)] rounded-xl shadow-2xl border border-surface-active flex flex-col overflow-hidden font-sans",
                             variant === 'default' ? "bg-surface-alt" : "bg-white",
                             className
                         )}

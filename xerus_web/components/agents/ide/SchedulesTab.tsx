@@ -77,7 +77,7 @@ export function SchedulesTab({
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <Calendar className="w-6 h-6 text-[#FF6600]" />
+                    <Calendar className="w-6 h-6 text-primary" />
                     <h2 className="text-2xl font-serif text-text">Schedules</h2>
                     <span className="text-sm text-text-secondary bg-surface px-3 py-1 rounded-full">
                         {schedules.length} {schedules.length === 1 ? 'schedule' : 'schedules'}
@@ -195,7 +195,7 @@ export function SchedulesTab({
                 title="Create Schedule"
                 minimizedTitle="New Schedule"
                 icon={<Calendar className="w-4 h-4" />}
-                className="w-[600px] h-[600px] rounded-[40px] shadow-sm bg-surface p-2"
+                className="w-[600px] h-[600px] max-w-[95vw] max-h-[95vh] rounded-[40px] shadow-sm bg-surface p-2"
                 variant="clean"
             >
                 {({ close, minimize }) => (
@@ -242,7 +242,7 @@ export function SchedulesTab({
                 title="Schedule Details"
                 minimizedTitle={selectedSchedule?.name || 'Schedule'}
                 icon={<Calendar className="w-4 h-4" />}
-                className="w-[500px] h-[500px] rounded-[40px] shadow-sm bg-surface p-2"
+                className="w-[500px] h-[500px] max-w-[95vw] max-h-[95vh] rounded-[40px] shadow-sm bg-surface p-2"
                 variant="clean"
             >
                 {({ close, minimize }) => (

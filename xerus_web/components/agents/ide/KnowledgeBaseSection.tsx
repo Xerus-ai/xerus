@@ -53,7 +53,7 @@ export function KnowledgeBaseSection({
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 px-1">
-        <Book className="w-6 h-6 text-[#FF6600]" />
+        <Book className="w-6 h-6 text-primary" />
         <h3 className="text-2xl font-serif text-text">Knowledge Base</h3>
       </div>
 
@@ -110,7 +110,7 @@ export function KnowledgeBaseSection({
             {isEditable && !isMarketplace && (
               <button
                 onClick={() => setShowPicker(true)}
-                className="min-w-[200px] border-2 border-dashed border-surface-active rounded-xl flex flex-col items-center justify-center gap-2 text-text-secondary hover:border-[#FF6600] hover:text-[#FF6600] transition-colors group"
+                className="min-w-[200px] border-2 border-dashed border-surface-active rounded-xl flex flex-col items-center justify-center gap-2 text-text-secondary hover:border-primary hover:text-primary transition-colors group"
               >
                 <div className="w-10 h-10 rounded-full bg-surface flex items-center justify-center group-hover:bg-[#FFF5EB]">
                   <Plus className="w-5 h-5" />
@@ -144,7 +144,7 @@ export function KnowledgeBaseSection({
                     key={doc.id}
                     onClick={() => handleAdd(doc)}
                     disabled={loadingId === doc.id}
-                    className="flex items-center gap-3 p-3 rounded-xl border border-surface-active hover:border-[#FF6600] hover:bg-[#FFF5EB]/50 transition-colors text-left disabled:opacity-50"
+                    className="flex items-center gap-3 p-3 rounded-xl border border-surface-active hover:border-primary hover:bg-[#FFF5EB]/50 transition-colors text-left disabled:opacity-50"
                   >
                     <div className="w-8 h-8 rounded-lg bg-surface-hover flex items-center justify-center shrink-0">
                       <Book className="w-4 h-4 text-text-secondary" />
@@ -158,7 +158,7 @@ export function KnowledgeBaseSection({
                       </div>
                     </div>
                     {loadingId === doc.id && (
-                      <Loader2 className="w-4 h-4 animate-spin text-[#FF6600] shrink-0" />
+                      <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0" />
                     )}
                   </button>
                 ))}

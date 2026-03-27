@@ -101,7 +101,7 @@ export default function ToolDetailPage() {
                 </div>
                 <button
                     onClick={() => router.push('/tools')}
-                    className="px-5 py-2.5 bg-[#FF6600] hover:bg-[#E65C00] text-white font-medium rounded-xl text-sm transition-colors"
+                    className="px-5 py-2.5 bg-primary hover:bg-primary/90 text-white font-medium rounded-xl text-sm transition-colors"
                 >
                     Back to Connectors
                 </button>
@@ -143,7 +143,7 @@ export default function ToolDetailPage() {
                             <>
                                 {/* Header - Outside Card */}
                                 <h3 className="font-serif text-xl flex items-center gap-2 mt-8">
-                                    <Shield className="w-5 h-5 text-[#FF6600]" />
+                                    <Shield className="w-5 h-5 text-primary" />
                                     Authentication
                                 </h3>
 
@@ -165,7 +165,7 @@ export default function ToolDetailPage() {
                                                 onClick={() => handleAuthConfigure(tool)}
                                                 className={`px-4 py-2 rounded-lg font-medium text-sm transition-all shadow-sm flex items-center gap-2 ${tool.is_configured
                                                     ? 'bg-surface-hover text-text hover:bg-surface-pressed'
-                                                    : 'bg-[#FF6600] hover:bg-[#E65C00] text-white'
+                                                    : 'bg-primary hover:bg-primary/90 text-white'
                                                     }`}
                                             >
                                                 <div className="w-4 h-4 flex items-center justify-center">
@@ -216,7 +216,7 @@ export default function ToolDetailPage() {
                             <div>
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="font-serif text-xl flex items-center gap-2">
-                                        <Zap className="w-5 h-5 text-[#FF6600]" />
+                                        <Zap className="w-5 h-5 text-primary" />
                                         Capabilities
                                     </h3>
 
@@ -276,7 +276,7 @@ export default function ToolDetailPage() {
                                 <div className="flex items-center justify-between mt-8">
                                     {/* Left: Heading */}
                                     <h3 className="font-serif text-xl flex items-center gap-2">
-                                        <Hammer className="w-5 h-5 text-[#FF6600]" />
+                                        <Hammer className="w-5 h-5 text-primary" />
                                         Tools
                                     </h3>
 
@@ -387,7 +387,7 @@ export default function ToolDetailPage() {
                                             paginatedTriggers.map((trigger, i) => (
                                                 <div key={trigger.key} className={`flex items-start gap-3 ${i !== paginatedTriggers.length - 1 ? 'pb-4 border-b border-surface-active/60' : ''}`}>
                                                     <div className="mt-1 shrink-0">
-                                                        <Activity className="w-5 h-5 text-[#FF6600]" />
+                                                        <Activity className="w-5 h-5 text-primary" />
                                                     </div>
                                                     <div>
                                                         <h4 className="font-medium text-text">{trigger.name}</h4>
@@ -408,7 +408,7 @@ export default function ToolDetailPage() {
                         {tool.configuration && Object.keys(tool.configuration).length > 0 && (
                             <div className="bg-surface p-6 rounded-[24px] border border-surface-active shadow-sm">
                                 <h3 className="font-serif text-xl mb-4 flex items-center gap-2">
-                                    <Settings className="w-5 h-5 text-[#FF6600]" />
+                                    <Settings className="w-5 h-5 text-primary" />
                                     Configuration
                                 </h3>
                                 <pre className="bg-surface p-4 rounded-xl text-xs text-text-secondary overflow-x-auto font-mono">
@@ -421,7 +421,7 @@ export default function ToolDetailPage() {
                     <div className="space-y-6">
                         {/* Details Header - Aligned with Authentication header */}
                         <h3 className="font-serif text-xl flex items-center gap-2 mt-8">
-                            <Activity className="w-5 h-5 text-[#FF6600]" />
+                            <Activity className="w-5 h-5 text-primary" />
                             Details
                         </h3>
 

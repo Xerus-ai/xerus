@@ -76,9 +76,9 @@ export function ChannelTasks({ channelId, className }: ChannelTasksProps) {
               onKeyDown={(e) => { if (e.key === 'Enter') handleCreateTask(); if (e.key === 'Escape') setShowCreateForm(false) }}
               placeholder="Task title"
               disabled={isCreating}
-              className="px-3 py-1.5 rounded-xl bg-surface border border-surface-active text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-[#FF6600]/40 w-48"
+              className="px-3 py-1.5 rounded-xl bg-surface border border-surface-active text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary/40 w-48"
             />
-            <button onClick={handleCreateTask} disabled={isCreating || !newTaskTitle.trim()} className="px-3 py-1.5 rounded-xl text-sm font-medium text-white bg-[#FF6600] hover:bg-[#E65C00] disabled:opacity-50 transition-colors">
+            <button onClick={handleCreateTask} disabled={isCreating || !newTaskTitle.trim()} className="px-3 py-1.5 rounded-xl text-sm font-medium text-white bg-primary hover:bg-primary/90 disabled:opacity-50 transition-colors">
               {isCreating ? '...' : 'Add'}
             </button>
             <button onClick={() => { setShowCreateForm(false); setNewTaskTitle('') }} className="px-2 py-1.5 rounded-xl text-sm text-text-muted hover:bg-surface-hover transition-colors">
@@ -92,9 +92,9 @@ export function ChannelTasks({ channelId, className }: ChannelTasksProps) {
             aria-label={`Create new task in channel ${channelId}`}
             className={cn(
               'inline-flex items-center gap-1.5',
-              'bg-[#FF6600] hover:bg-[#E65C00] text-white font-medium py-2 px-4 rounded-xl text-sm',
+              'bg-primary hover:bg-primary/90 text-white font-medium py-2 px-4 rounded-xl text-sm',
               'transition-colors active:scale-95',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600] focus-visible:ring-offset-2'
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
             )}
           >
             <Plus className="w-4 h-4" />

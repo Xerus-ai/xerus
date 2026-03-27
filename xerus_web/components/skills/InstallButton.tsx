@@ -50,8 +50,8 @@ export function InstallButton({ skill, agents, onInstall, onUninstall, compact }
             <button
                 onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
                 className={compact
-                    ? "flex items-center justify-center gap-2 bg-[#FF6600] hover:bg-[#E65C00] text-white font-medium py-2.5 rounded-xl text-sm shadow-sm transition-all w-full"
-                    : "flex items-center gap-2 bg-[#FF6600] hover:bg-[#E65C00] text-white font-medium px-5 py-2.5 rounded-xl text-sm shadow-sm transition-all"
+                    ? "flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white font-medium py-2.5 rounded-xl text-sm shadow-sm transition-all w-full"
+                    : "flex items-center gap-2 bg-primary hover:bg-primary/90 text-white font-medium px-5 py-2.5 rounded-xl text-sm shadow-sm transition-all"
                 }
             >
                 Install
@@ -200,8 +200,8 @@ function InstallFlow({ skill, agents, onInstall, onUninstall, onClose }: Install
                         onClick={() => setStep('channel')}
                         className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-surface-hover transition-colors text-left"
                     >
-                        <div className="w-8 h-8 rounded-lg bg-[#FF6600]/10 flex items-center justify-center shrink-0">
-                            <Hash className="w-4 h-4 text-[#FF6600]" />
+                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                            <Hash className="w-4 h-4 text-primary" />
                         </div>
                         <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-text">Channel</p>

@@ -8,7 +8,6 @@ import { AgentAvatarWithModel } from '@/components/agents/AgentAvatar'
 import Link from 'next/link'
 import {
   Building2,
-  FolderOpen,
   Clock,
   Zap,
   MessageSquare,
@@ -82,7 +81,7 @@ function AgentStatus({ agents }: { agents: OfficeAgent[] }) {
       {scheduled.length > 0 && (
         <div>
           <div className="flex items-center gap-2 mb-3">
-            <Clock className="w-4 h-4 text-[#FF6600]" />
+            <Clock className="w-4 h-4 text-primary" />
             <span className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">Upcoming</span>
           </div>
           <div className="space-y-2.5">
@@ -151,29 +150,29 @@ function AgentStatus({ agents }: { agents: OfficeAgent[] }) {
           <div className="flex flex-col gap-3 w-full">
             <Link
               href="/chat"
-              className="group relative flex items-center gap-4 p-4 rounded-2xl border border-[#FF6600]/20 bg-gradient-to-r from-[#FF6600]/[0.04] to-transparent hover:border-[#FF6600]/40 hover:from-[#FF6600]/[0.08] transition-all duration-200"
+              className="group relative flex items-center gap-4 p-4 rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/[0.04] to-transparent hover:border-primary/40 hover:from-primary/[0.08] transition-all duration-200"
             >
-              <div className="w-10 h-10 rounded-xl bg-[#FF6600]/10 flex items-center justify-center shrink-0 group-hover:bg-[#FF6600]/15 transition-colors">
-                <MessageSquare className="w-[18px] h-[18px] text-[#FF6600]" />
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/15 transition-colors">
+                <MessageSquare className="w-[18px] h-[18px] text-primary" />
               </div>
               <div className="text-left min-w-0 flex-1">
                 <p className="text-[13px] font-semibold text-text">Chat with Xerus</p>
                 <p className="text-[11px] text-text-muted mt-0.5">Ask anything to get started</p>
               </div>
-              <ArrowRight className="w-4 h-4 text-text-muted group-hover:text-[#FF6600] group-hover:translate-x-0.5 transition-all shrink-0" />
+              <ArrowRight className="w-4 h-4 text-text-muted group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
             </Link>
             <Link
               href="/workspace"
-              className="group relative flex items-center gap-4 p-4 rounded-2xl border border-surface-active bg-surface-alt hover:border-[#FF6600]/30 hover:shadow-sm transition-all duration-200"
+              className="group relative flex items-center gap-4 p-4 rounded-2xl border border-surface-active bg-surface-alt hover:border-primary/30 hover:shadow-sm transition-all duration-200"
             >
-              <div className="w-10 h-10 rounded-xl bg-surface-hover flex items-center justify-center shrink-0 group-hover:bg-[#FF6600]/10 transition-colors">
-                <Users className="w-[18px] h-[18px] text-text-secondary group-hover:text-[#FF6600] transition-colors" />
+              <div className="w-10 h-10 rounded-xl bg-surface-hover flex items-center justify-center shrink-0 group-hover:bg-primary/10 transition-colors">
+                <Users className="w-[18px] h-[18px] text-text-secondary group-hover:text-primary transition-colors" />
               </div>
               <div className="text-left min-w-0 flex-1">
                 <p className="text-[13px] font-semibold text-text">Agent Marketplace</p>
                 <p className="text-[11px] text-text-muted mt-0.5">Find and hire agents for your team</p>
               </div>
-              <ArrowRight className="w-4 h-4 text-text-muted group-hover:text-[#FF6600] group-hover:translate-x-0.5 transition-all shrink-0" />
+              <ArrowRight className="w-4 h-4 text-text-muted group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
             </Link>
           </div>
         </div>
@@ -264,7 +263,7 @@ export function OfficeDashboard() {
       <div className="max-w-[1140px] mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
         {/* Page header */}
         <header className="mb-8 flex items-center gap-3">
-          <Building2 className="w-7 h-7 text-[#FF6600]" />
+          <Building2 className="w-7 h-7 text-primary" />
           <div>
             <h1 className="font-serif text-2xl text-text">Your Office</h1>
             <p className="text-sm text-text-secondary">

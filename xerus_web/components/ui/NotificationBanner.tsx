@@ -143,7 +143,7 @@ export function NotificationBanner({
       {autoCloseSeconds && countdown > 0 && (
         <div className="mt-1.5 text-center animate-in fade-in slide-in-from-top-1 duration-300">
           <p className="text-[9px] text-[#999] font-medium tracking-wide">
-            This message will automatically close in <span className="text-[#FF6600] font-bold">{countdown} sec</span>
+            This message will automatically close in <span className="text-primary font-bold">{countdown} sec</span>
           </p>
         </div>
       )}

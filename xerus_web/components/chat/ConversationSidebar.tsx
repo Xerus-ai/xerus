@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback, memo } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Plus,
@@ -116,7 +116,7 @@ function ChannelPickerPanel({
                         className={cn(
                           'flex items-center gap-1.5 w-full px-2 py-1 rounded-lg text-xs transition-colors',
                           isActive
-                            ? 'bg-[#FF6600]/10 text-[#FF6600] font-medium'
+                            ? 'bg-primary/10 text-primary font-medium'
                             : 'text-text-secondary hover:bg-surface-hover hover:text-text',
                         )}
                       >
@@ -158,7 +158,7 @@ function formatRelativeTime(timestamp: number): string {
 // ---------------------------------------------------------------------------
 
 const STATUS_CONFIG: Record<SessionStatus, { dotColor: string; textColor: string; label: string }> = {
-  working: { dotColor: 'text-[#FF6600]', textColor: 'text-[#FF6600]', label: 'Working' },
+  working: { dotColor: 'text-primary', textColor: 'text-primary', label: 'Working' },
   pending_approval: { dotColor: 'text-amber-500', textColor: 'text-amber-500', label: 'Pending your approval' },
   finished: { dotColor: 'text-emerald-500', textColor: 'text-emerald-500', label: 'Finished' },
   error: { dotColor: 'text-red-500', textColor: 'text-red-500', label: 'Error during generation' },
@@ -211,27 +211,35 @@ function ThreeDotMenu({ onClick }: { onClick: (e: React.MouseEvent) => void }) {
 // Session row
 // ---------------------------------------------------------------------------
 
-function SessionRow({
+const SessionRow = memo(function SessionRow({
   session,
   isActive,
-  onSelect,
-  onDelete,
+  onSelectConversation,
+  onDeleteConversation,
 }: {
   session: SessionEntry
   isActive: boolean
-  onSelect: () => void
-  onDelete?: () => void
+  onSelectConversation: (id: string) => void
+  onDeleteConversation?: (id: string) => void
 }) {
   const statusConfig = STATUS_CONFIG[session.status]
+
+  const handleSelect = useCallback(() => {
+    onSelectConversation(session.id)
+  }, [onSelectConversation, session.id])
+
+  const handleDelete = useCallback(() => {
+    onDeleteConversation?.(session.id)
+  }, [onDeleteConversation, session.id])
 
   return (
     <button
       type="button"
-      onClick={onSelect}
+      onClick={handleSelect}
       className={cn(
         'group relative flex items-center gap-2 w-full text-left px-3 py-2 rounded-lg transition-all duration-150',
         isActive
-          ? 'bg-[#FF6600]/10'
+          ? 'bg-primary/10'
           : 'hover:bg-surface-hover'
       )}
     >
@@ -244,7 +252,7 @@ function SessionRow({
       <div className="flex-1 min-w-0">
         <div className={cn(
           'text-sm font-medium truncate leading-tight',
-          isActive ? 'text-[#FF6600]' : 'text-text',
+          isActive ? 'text-primary' : 'text-text',
         )}>
           {session.title}
         </div>
@@ -260,18 +268,18 @@ function SessionRow({
       </div>
 
       {/* Three-dot menu — always visible */}
-      {onDelete && (
-        <ThreeDotMenu onClick={(e) => { e.stopPropagation(); onDelete() }} />
+      {onDeleteConversation && (
+        <ThreeDotMenu onClick={(e) => { e.stopPropagation(); handleDelete() }} />
       )}
     </button>
   )
-}
+})
 
 // ---------------------------------------------------------------------------
 // Project group
 // ---------------------------------------------------------------------------
 
-function ProjectGroupSection({
+const ProjectGroupSection = memo(function ProjectGroupSection({
   project,
   currentConversationId,
   onSelectConversation,
@@ -317,15 +325,15 @@ function ProjectGroupSection({
               key={session.id}
               session={session}
               isActive={currentConversationId === session.id}
-              onSelect={() => onSelectConversation(session.id)}
-              onDelete={onDeleteConversation ? () => onDeleteConversation(session.id) : undefined}
+              onSelectConversation={onSelectConversation}
+              onDeleteConversation={onDeleteConversation}
             />
           ))}
         </div>
       )}
     </div>
   )
-}
+})
 
 // ---------------------------------------------------------------------------
 // Main sidebar
@@ -388,7 +396,7 @@ export function ConversationSidebar({
         <button
           type="button"
           onClick={onToggleCollapse}
-          className="p-2 rounded-xl text-text-muted hover:text-[#FF6600] hover:bg-[#FF6600]/8 transition-colors"
+          className="p-2 rounded-xl text-text-muted hover:text-primary hover:bg-primary/8 transition-colors"
           aria-label="Expand sidebar"
         >
           <PanelLeftOpen className="w-4 h-4" />
@@ -396,7 +404,7 @@ export function ConversationSidebar({
         <button
           type="button"
           onClick={onNewConversation}
-          className="p-2 rounded-xl text-text-muted hover:text-[#FF6600] hover:bg-[#FF6600]/8 transition-colors"
+          className="p-2 rounded-xl text-text-muted hover:text-primary hover:bg-primary/8 transition-colors"
           aria-label="New session"
         >
           <Plus className="w-4 h-4" />
@@ -423,7 +431,7 @@ export function ConversationSidebar({
           <button
             type="button"
             onClick={onToggleCollapse}
-            className="p-1.5 rounded-lg text-text-muted hover:text-[#FF6600] hover:bg-[#FF6600]/8 transition-colors"
+            className="p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-primary/8 transition-colors"
             aria-label="Collapse sidebar"
           >
             <PanelLeftClose className="w-4 h-4" />
@@ -444,7 +452,7 @@ export function ConversationSidebar({
               'w-full pl-8 pr-3 py-1.5 rounded-lg text-sm',
               'bg-surface border border-surface-active',
               'text-text placeholder:text-text-muted',
-              'focus:outline-none focus:border-[#FF6600]/40 focus:ring-1 focus:ring-[#FF6600]/20',
+              'focus:outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/20',
               'transition-colors'
             )}
           />
@@ -494,7 +502,7 @@ export function ConversationSidebar({
               Channels
             </span>
             {selectedChannel && (
-              <button type="button" onClick={() => { onClearChannel!(); setIsChannelPickerOpen(false) }} className="text-[10px] text-[#FF6600] hover:underline">
+              <button type="button" onClick={() => { onClearChannel!(); setIsChannelPickerOpen(false) }} className="text-[10px] text-primary hover:underline">
                 Clear
               </button>
             )}
@@ -517,8 +525,8 @@ export function ConversationSidebar({
           className={cn(
             'flex items-center justify-center gap-1.5 flex-1 px-3 py-2 rounded-xl text-sm',
             selectedChannel
-              ? 'text-[#FF6600] bg-[#FF6600]/8 font-medium'
-              : 'text-text-secondary hover:text-[#FF6600] hover:bg-[#FF6600]/8',
+              ? 'text-primary bg-primary/8 font-medium'
+              : 'text-text-secondary hover:text-primary hover:bg-primary/8',
             'transition-colors active:scale-[0.98]',
           )}
           title={selectedChannel ? `${selectedChannel.domainName} / ${selectedChannel.name}` : 'Select channel'}
@@ -531,7 +539,7 @@ export function ConversationSidebar({
           onClick={onNewConversation}
           className={cn(
             'flex items-center justify-center gap-1.5 flex-1 px-3 py-2 rounded-xl text-sm',
-            'text-text-secondary hover:text-[#FF6600] hover:bg-[#FF6600]/8',
+            'text-text-secondary hover:text-primary hover:bg-primary/8',
             'transition-colors active:scale-[0.98]',
           )}
         >

@@ -44,7 +44,7 @@ export function OfficeHUD({ agents }: OfficeHUDProps) {
               key={agent.id}
               className="flex items-center gap-1.5 bg-white/80 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-sm whitespace-nowrap flex-shrink-0"
             >
-              <Zap className="w-3 h-3 text-[#FF6600]" />
+              <Zap className="w-3 h-3 text-primary" />
               <span className="text-[10px] font-medium text-text">{agent.name}</span>
               <span className="text-[10px] text-text-secondary max-w-[120px] truncate">
                 {agent.current_task}

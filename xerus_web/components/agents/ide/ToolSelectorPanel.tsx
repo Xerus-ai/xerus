@@ -59,7 +59,7 @@ export function ToolSelectorPanel({
       title="Connect Tools"
       minimizedTitle="Connect Tools"
       icon={<Wrench className="w-4 h-4" />}
-      className="w-[680px] h-[650px] rounded-[40px] shadow-sm bg-surface p-2"
+      className="w-[680px] h-[650px] max-w-[95vw] max-h-[95vh] rounded-[40px] shadow-sm bg-surface p-2"
       variant="clean"
     >
       {({ close, minimize }) => (
@@ -109,24 +109,24 @@ export function ToolSelectorPanel({
               placeholder="Search tools..."
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="pl-9 bg-surface-alt border-surface-active focus:border-[#FF6600] rounded-xl"
+              className="pl-9 bg-surface-alt border-surface-active focus:border-primary rounded-xl"
               autoFocus
             />
           </div>
 
           {/* Read-only notice for system templates */}
           {!isEditable && (
-            <div className="flex items-center justify-between gap-3 p-4 mb-4 bg-[#FF6600]/5 border border-[#FF6600]/20 rounded-2xl shrink-0">
+            <div className="flex items-center justify-between gap-3 p-4 mb-4 bg-primary/5 border border-primary/20 rounded-2xl shrink-0">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-[#FF6600]/10 flex items-center justify-center">
-                  <Lock className="w-4 h-4 text-[#FF6600]" />
+                <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <Lock className="w-4 h-4 text-primary" />
                 </div>
                 <span className="text-sm text-text">To add tools, clone this agent first.</span>
               </div>
               <button
                 onClick={onClone}
                 disabled={isCloning}
-                className="flex items-center gap-2 px-4 py-2 bg-[#FF6600] hover:bg-[#E65C00] text-white font-medium rounded-xl text-sm transition-colors disabled:opacity-50 shrink-0 shadow-sm"
+                className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white font-medium rounded-xl text-sm transition-colors disabled:opacity-50 shrink-0 shadow-sm"
               >
                 {isCloning ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -224,7 +224,7 @@ export function ToolSelectorPanel({
                               disabled={isConfiguring || !isEditable || isConnected}
                               className={`flex items-center justify-center gap-1.5 font-medium px-4 py-2 rounded-xl text-sm transition-colors disabled:opacity-50 ${
                                 isConnected
-                                  ? 'bg-[#FF6600] text-white cursor-default'
+                                  ? 'bg-primary text-white cursor-default'
                                   : 'bg-black hover:bg-[#1a1a1a] text-white'
                               }`}
                             >

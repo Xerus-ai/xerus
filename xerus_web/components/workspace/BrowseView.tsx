@@ -134,7 +134,7 @@ export function BrowseView({
   return (
     <>
       {/* Search bar — Eden-style: dominant, full-width with scope chip */}
-      <div className="shrink-0 px-6 pt-6 pb-4">
+      <div className="shrink-0 px-3 sm:px-6 pt-3 sm:pt-6 pb-4">
         <div className="relative flex items-center bg-surface-hover rounded-[24px] overflow-hidden transition-all focus-within:ring-2 focus-within:ring-[#E5E5E5] px-1 py-1">
           <Search className="ml-3 w-4 h-4 text-text-muted shrink-0" />
           {currentDirPath && (
@@ -205,7 +205,7 @@ export function BrowseView({
       </div>
 
       {/* Content area */}
-      <div className="flex-1 overflow-y-auto px-8 py-6">
+      <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-6">
         {/* Section header: current folder title + actions */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
@@ -274,7 +274,7 @@ export function BrowseView({
                       }}
                       placeholder="New folder"
                       className={cn(
-                        'w-full text-center text-sm px-3 py-2 rounded-lg border bg-white focus:outline-none focus:border-[#FF6600] transition-colors',
+                        'w-full text-center text-sm px-3 py-2 rounded-lg border bg-white focus:outline-none focus:border-primary transition-colors',
                         folderError ? 'border-red-500' : 'border-surface-active',
                       )}
                     />
@@ -292,7 +292,7 @@ export function BrowseView({
                       <button
                         onClick={handleConfirmFolder}
                         disabled={folderCreating}
-                        className="px-3 py-1.5 rounded-full text-xs font-medium bg-[#FF6600] text-white hover:bg-[#e55b00] transition-colors"
+                        className="px-3 py-1.5 rounded-full text-xs font-medium bg-primary text-white hover:bg-primary/90 transition-colors"
                       >
                         {folderCreating ? 'Creating...' : 'Create'}
                       </button>
@@ -310,7 +310,7 @@ export function BrowseView({
                   delay={`${index * 50}ms`}
                   onClick={() => onDirClick(dir)}
                   onContextMenu={(e) => handleFolderContextMenu(e, dir)}
-                  className={selectedPath === dir.path ? 'ring-2 ring-[#FF6600]' : ''}
+                  className={selectedPath === dir.path ? 'ring-2 ring-primary' : ''}
                 />
               ))}
             </div>
