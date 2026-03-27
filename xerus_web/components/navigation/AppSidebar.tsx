@@ -355,10 +355,38 @@ function InboxSidebarBody({ counts, markRead }: {
 
   if (domains.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center px-5 py-16 gap-4">
-        <FolderPlus className="w-10 h-10 text-text-secondary/50" />
-        <p className="text-sm text-text-secondary text-center">No projects yet</p>
-        <CreateProjectInline onCreated={refreshDomains} />
+      <div className="px-4 py-3 opacity-40 pointer-events-none select-none" aria-hidden="true">
+        {/* Ghost preview — shows what populated sidebar looks like */}
+        <div className="mb-1">
+          <div className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-sm font-medium text-text">
+            <ChevronDown className="w-4 h-4 text-text-secondary shrink-0" />
+            <FolderOpen className="w-[18px] h-[18px] text-primary shrink-0" />
+            <span className="flex-1 text-left truncate">Product</span>
+            <span className="text-[11px] font-medium text-text-secondary bg-surface-hover rounded-full px-2 py-0.5">3</span>
+          </div>
+          <div className="pl-6 pr-2 py-0.5 space-y-0.5">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm text-text-secondary">
+              <Hash className="w-4 h-4 shrink-0" />
+              <span>Onboarding</span>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm text-text-secondary">
+              <Hash className="w-4 h-4 shrink-0" />
+              <span>Analytics</span>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm text-text-secondary">
+              <Hash className="w-4 h-4 shrink-0" />
+              <span>Design</span>
+            </div>
+          </div>
+        </div>
+        <div className="mb-1">
+          <div className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-sm font-medium text-text">
+            <ChevronRight className="w-4 h-4 text-text-secondary shrink-0" />
+            <Folder className="w-[18px] h-[18px] text-text-secondary shrink-0" />
+            <span className="flex-1 text-left truncate">Engineering</span>
+            <span className="text-[11px] font-medium text-text-secondary bg-surface-hover rounded-full px-2 py-0.5">2</span>
+          </div>
+        </div>
       </div>
     )
   }
