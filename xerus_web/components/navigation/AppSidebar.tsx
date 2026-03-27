@@ -141,7 +141,7 @@ export function AppSidebar() {
         {activeTab === 'inbox' && (
           <button
             onClick={() => setShowInboxCreate(prev => !prev)}
-            className="ml-auto p-1 rounded-lg hover:bg-surface-hover text-text-muted hover:text-text transition-colors"
+            className="ml-auto p-1 rounded-lg hover:bg-primary/10 text-primary transition-colors"
             title="Create project"
           >
             <Plus className="w-5 h-5" />
