@@ -1,3 +1,5 @@
+'use client'
+
 import React from 'react'
 import type { Assistant } from "@/lib/api/types"
 import { AgentAvatarWithModel, ModelIcon } from './AgentAvatar'
@@ -15,7 +17,7 @@ interface AgentCardProps {
     isOwner?: boolean
 }
 
-export function AgentCard({ agent, onClone, onChat, onClick, isCloning, isOwner }: AgentCardProps) {
+const AgentCardComponent = ({ agent, onClone, onChat, onClick, isCloning, isOwner }: AgentCardProps) => {
     const isPublic = agent.agentType === 'public' || agent.agentType === 'shared'
 
     // Get visibility icon based on agent type
@@ -112,11 +114,11 @@ export function AgentCard({ agent, onClone, onChat, onClick, isCloning, isOwner 
             {/* Body */}
             <div className="mb-4">
                 <div className="flex items-start gap-0.5 overflow-visible">
-                    <h3 className="font-serif text-xl text-text group-hover:text-[#F97316] transition-colors line-clamp-1" title={agent.name}>
+                    <h3 className="font-serif text-xl text-text group-hover:text-primary transition-colors line-clamp-1" title={agent.name}>
                         {agent.name}
                     </h3>
                     {agent.isVerified && (
-                        <span className="shrink-0 w-3 h-3 bg-[#FF6600] rounded-full flex items-center justify-center -mt-0.5" title="Verified">
+                        <span className="shrink-0 w-3 h-3 bg-primary rounded-full flex items-center justify-center -mt-0.5" title="Verified">
                             <svg className="w-2 h-2 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
                                 <polyline points="20 6 9 17 4 12" />
                             </svg>
@@ -146,7 +148,7 @@ export function AgentCard({ agent, onClone, onChat, onClick, isCloning, isOwner 
                             e.stopPropagation();
                             onChat(e);
                         }}
-                        className="flex items-center justify-center gap-2 bg-[#FF6600] hover:bg-[#E65C00] text-white font-medium py-2.5 rounded-xl text-sm shadow-sm transition-all"
+                        className="flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white font-medium py-2.5 rounded-xl text-sm shadow-sm transition-all"
                     >
                         Chat
                         <ArrowRight className="w-4 h-4" />
@@ -158,7 +160,7 @@ export function AgentCard({ agent, onClone, onChat, onClick, isCloning, isOwner 
                             onClone(e);
                         }}
                         disabled={isCloning}
-                        className="flex items-center justify-center gap-2 bg-[#FF6600] hover:bg-[#E65C00] text-white font-medium py-2.5 rounded-xl text-sm shadow-sm transition-all disabled:opacity-50"
+                        className="flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white font-medium py-2.5 rounded-xl text-sm shadow-sm transition-all disabled:opacity-50"
                     >
                         {isCloning ? (
                             <span className="flex items-center justify-center gap-2">
@@ -188,6 +190,8 @@ export function AgentCard({ agent, onClone, onChat, onClick, isCloning, isOwner 
     )
 }
 
+export const AgentCard = React.memo(AgentCardComponent)
+
 interface CreateAgentCardProps {
     onClick?: () => void
 }
@@ -196,12 +200,12 @@ export function CreateAgentCard({ onClick }: CreateAgentCardProps) {
     return (
         <div
             onClick={onClick}
-            className="rounded-[32px] border-2 border-dashed border-surface-active hover:border-[#FF6600] p-6 flex flex-col items-center justify-center text-center h-full min-h-[280px] hover:bg-surface-hover/50 transition-all duration-300 cursor-pointer group"
+            className="rounded-[32px] border-2 border-dashed border-surface-active hover:border-primary p-6 flex flex-col items-center justify-center text-center h-full min-h-[280px] hover:bg-surface-hover/50 transition-all duration-300 cursor-pointer group"
         >
             <div className="w-16 h-16 bg-surface rounded-full flex items-center justify-center shadow-sm mb-4 group-hover:scale-110 transition-transform duration-300">
-                <Plus className="w-7 h-7 text-[#FF6600]" />
+                <Plus className="w-7 h-7 text-primary" />
             </div>
-            <h3 className="font-serif text-xl text-text group-hover:text-[#F97316] transition-colors">
+            <h3 className="font-serif text-xl text-text group-hover:text-primary transition-colors">
                 Create New
             </h3>
             <p className="text-sm text-text-secondary mt-2 max-w-[200px]">

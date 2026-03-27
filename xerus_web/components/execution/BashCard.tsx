@@ -83,7 +83,7 @@ export function BashCard({
   return (
     <div
       className={cn(
-        'bg-gray-900 rounded-[24px] overflow-hidden',
+        'bg-gray-900 rounded-2xl overflow-hidden',
         className
       )}
     >
@@ -93,7 +93,7 @@ export function BashCard({
         role="button"
         aria-expanded={expanded}
         aria-label={`Bash command: ${command}, status: ${status}`}
-        className="flex items-center gap-2 w-full px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600] focus-visible:ring-offset-2 active:scale-95 transition-all duration-200"
+        className="flex items-center gap-2 w-full px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 active:scale-95 transition-all duration-200"
         onClick={toggleExpanded}
         onKeyDown={handleKeyDown}
       >
@@ -132,7 +132,7 @@ export function BashCard({
             <button
               type="button"
               aria-label="Copy command"
-              className="p-1 rounded-lg hover:bg-gray-800 active:scale-95 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600] focus-visible:ring-offset-2"
+              className="p-1 rounded-lg hover:bg-gray-800 active:scale-95 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               onClick={(e) => handleCopy(command, e)}
             >
               <Copy className="h-3 w-3 text-gray-500" />
@@ -155,7 +155,7 @@ export function BashCard({
                 <button
                   type="button"
                   aria-label="Copy stdout"
-                  className="p-1 rounded-lg hover:bg-gray-800 active:scale-95 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600] focus-visible:ring-offset-2"
+                  className="p-1 rounded-lg hover:bg-gray-800 active:scale-95 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                   onClick={(e) => handleCopy(stdout, e)}
                 >
                   <Copy className="h-3 w-3 text-gray-500" />
@@ -184,7 +184,7 @@ export function BashCard({
                 <button
                   type="button"
                   aria-label="Copy stderr"
-                  className="p-1 rounded-lg hover:bg-gray-800 active:scale-95 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600] focus-visible:ring-offset-2"
+                  className="p-1 rounded-lg hover:bg-gray-800 active:scale-95 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                   onClick={(e) => handleCopy(stderr, e)}
                 >
                   <Copy className="h-3 w-3 text-gray-500" />

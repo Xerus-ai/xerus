@@ -41,8 +41,8 @@ async function fetchConnectedAccounts(appSlug?: string): Promise<ConnectedAccoun
   }
 }
 
-function enrichTools(toolsData: any[], accountInfo: ConnectedAccountInfo): Tool[] {
-  return toolsData.map((toolData: any) => {
+function enrichTools(toolsData: Record<string, unknown>[], accountInfo: ConnectedAccountInfo): Tool[] {
+  return toolsData.map((toolData: Record<string, unknown>) => {
     const tool = mapToolData(toolData)
     const appSlug = tool.tool_name || tool.id
     const toolAccounts = accountInfo.accounts.filter((account) => account.app.name_slug === appSlug)
@@ -83,6 +83,9 @@ async function fetchToolBySlug(toolSlug: string): Promise<Tool> {
     getTool(toolSlug),
     fetchConnectedAccounts(toolSlug),
   ])
+  if (!toolData) {
+    throw new Error(`Tool not found: ${toolSlug}`)
+  }
   return enrichTools([toolData], accountInfo)[0]
 }
 
@@ -95,8 +98,9 @@ async function fetchToolsBySlugs(toolSlugs: string[], accountInfo?: ConnectedAcc
   const resolvedAccountInfo = accountInfo ?? await fetchConnectedAccounts()
   const results = await Promise.allSettled(uniqueSlugs.map((toolSlug) => getTool(toolSlug)))
   const toolsData = results
-    .filter((result): result is PromiseFulfilledResult<any> => result.status === 'fulfilled')
+    .filter((result): result is PromiseFulfilledResult<Record<string, unknown> | null> => result.status === 'fulfilled')
     .map((result) => result.value)
+    .filter((value): value is Record<string, unknown> => value !== null)
   return enrichTools(toolsData, resolvedAccountInfo)
 }
 

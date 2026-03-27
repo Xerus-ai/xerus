@@ -1,3 +1,5 @@
+'use client'
+
 import { useState, useEffect, useRef } from 'react'
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -112,7 +114,7 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                 {localAgent.model && (
                     isEditable ? (
                         <Select value={localAgent.model} onValueChange={handleModelChange}>
-                            <SelectTrigger className="absolute -bottom-1 left-1/2 -translate-x-1/2 h-auto px-2 py-0.5 bg-white border border-surface-active rounded-md shadow-sm focus:ring-0 focus:outline-none hover:bg-surface-hover transition-colors w-auto gap-1 z-10">
+                            <SelectTrigger className="absolute -bottom-1 left-1/2 -translate-x-1/2 h-auto px-2 py-0.5 bg-white border border-surface-active rounded-md shadow-sm focus:ring-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary hover:bg-surface-hover transition-colors w-auto gap-1 z-10">
                                 <div className="flex items-center gap-1">
                                     <ModelIcon model={localAgent.model} size="sm" />
                                     <span className="text-[10px] font-bold text-text-secondary whitespace-nowrap">{formatModelName(localAgent.model)}</span>
@@ -161,7 +163,7 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter') handleBlur('name')
                             }}
-                            className="font-serif !text-3xl text-text bg-transparent border-none shadow-none !h-auto focus-visible:ring-0 focus-visible:outline-none placeholder:text-text-secondary/50 w-auto min-w-[280px] p-0"
+                            className="font-serif !text-3xl text-text bg-transparent border-none shadow-none !h-auto focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none placeholder:text-text-secondary/50 w-auto min-w-[280px] p-0"
                             placeholder="Agent Name"
                         />
                     ) : (
@@ -207,7 +209,7 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                             value={localAgent.description}
                             onChange={(e) => handleChange('description', e.target.value)}
                             onBlur={() => handleBlur('description')}
-                            className="text-base text-text-secondary bg-transparent border-none shadow-none p-0 min-h-[24px] focus-visible:ring-0 focus-visible:outline-none resize-none leading-relaxed w-full placeholder:text-text-secondary/50"
+                            className="text-base text-text-secondary bg-transparent border-none shadow-none p-0 min-h-[24px] focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none resize-none leading-relaxed w-full placeholder:text-text-secondary/50"
                             placeholder="Add a description..."
                             rows={1}
                             onInput={(e) => {

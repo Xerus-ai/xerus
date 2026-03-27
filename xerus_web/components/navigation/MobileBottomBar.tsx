@@ -46,7 +46,7 @@ export function MobileBottomBar() {
               key={item.name}
               href={item.href}
               className={cn(
-                'flex flex-col items-center justify-center gap-0.5 px-3 py-1 min-w-[56px]',
+                'flex flex-col items-center justify-center gap-0.5 px-3 py-1 min-w-[56px] min-h-[44px] min-w-[44px]',
                 'transition-colors duration-200',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600] focus-visible:ring-offset-2 rounded-lg',
                 isActive

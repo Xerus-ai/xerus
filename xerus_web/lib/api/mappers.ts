@@ -17,6 +17,30 @@ import type {
 } from './types';
 
 /**
+ * Backend schedule shape (snake_case) as returned by the API.
+ * Fields with defaults in mapScheduleToFrontend are optional to support partial responses.
+ */
+export interface BackendSchedule {
+  id: string;
+  name?: string;
+  description?: string;
+  agent_id?: number;
+  workflow_config?: ScheduledExecution['workflowConfig'];
+  schedule_type?: ScheduledExecution['scheduleType'] | string;
+  schedule_config?: ScheduledExecution['scheduleConfig'];
+  timezone?: string;
+  enabled?: boolean;
+  task_prompt?: string;
+  task_context?: Record<string, unknown>;
+  last_run_at?: string;
+  next_run_at?: string;
+  run_count?: number;
+  last_status?: ScheduledExecution['lastStatus'] | string;
+  last_error?: string;
+  last_execution_output?: string;
+}
+
+/**
  * Map backend agent data to frontend Assistant format
  * Used by: getAssistants, getAssistant, updateAgent, cloneAgent
  * Note: For list endpoints, enriched_tools is provided directly from backend.
@@ -61,32 +85,32 @@ export function mapAgentToAssistant(agent: BackendAgent): Assistant {
 /**
  * Map backend schedule response to frontend ScheduledExecution format
  */
-export function mapScheduleToFrontend(schedule: Record<string, unknown>): ScheduledExecution {
+export function mapScheduleToFrontend(schedule: BackendSchedule): ScheduledExecution {
   return {
-    id: schedule.id as string,
-    name: (schedule.name as string) || '',
-    description: schedule.description as string | undefined,
-    agentId: (schedule.agent_id as number) || 0,
-    workflowConfig: schedule.workflow_config as ScheduledExecution['workflowConfig'],
-    scheduleType: (schedule.schedule_type as ScheduledExecution['scheduleType']) || 'once',
-    scheduleConfig: (schedule.schedule_config as ScheduledExecution['scheduleConfig']) || {},
-    timezone: (schedule.timezone as string) || 'UTC',
-    enabled: (schedule.enabled as boolean) ?? true,
-    taskPrompt: schedule.task_prompt as string | undefined,
-    taskContext: schedule.task_context as Record<string, unknown> | undefined,
-    lastRunAt: schedule.last_run_at as string | undefined,
-    nextRunAt: schedule.next_run_at as string | undefined,
-    runCount: schedule.run_count as number | undefined,
+    id: schedule.id,
+    name: schedule.name || '',
+    description: schedule.description,
+    agentId: schedule.agent_id || 0,
+    workflowConfig: schedule.workflow_config,
+    scheduleType: (schedule.schedule_type || 'once') as ScheduledExecution['scheduleType'],
+    scheduleConfig: schedule.schedule_config || {},
+    timezone: schedule.timezone || 'UTC',
+    enabled: schedule.enabled ?? true,
+    taskPrompt: schedule.task_prompt,
+    taskContext: schedule.task_context,
+    lastRunAt: schedule.last_run_at,
+    nextRunAt: schedule.next_run_at,
+    runCount: schedule.run_count,
     lastStatus: schedule.last_status as ScheduledExecution['lastStatus'],
-    lastError: schedule.last_error as string | undefined,
-    lastExecutionOutput: schedule.last_execution_output as string | undefined,
+    lastError: schedule.last_error,
+    lastExecutionOutput: schedule.last_execution_output,
   };
 }
 
 /**
  * Map frontend ScheduledExecution to backend format (camelCase to snake_case)
  */
-export function mapScheduleToBackend(schedule: ScheduledExecution): Record<string, unknown> {
+export function mapScheduleToBackend(schedule: ScheduledExecution): Partial<BackendSchedule> {
   return {
     name: schedule.name,
     description: schedule.description,

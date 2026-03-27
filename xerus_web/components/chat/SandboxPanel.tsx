@@ -204,7 +204,7 @@ export function SandboxPanel({
                   key={state.key}
                   title={`Sandbox ${tab.label}`}
                   src={url}
-                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                  sandbox="allow-scripts allow-same-origin allow-forms"
                   onLoad={() => handleLoad(tab.id)}
                   onError={() => handleError(tab.id)}
                   className={cn('w-full h-full border-0', isDark ? 'bg-[#1a1a1a]' : 'bg-white')}

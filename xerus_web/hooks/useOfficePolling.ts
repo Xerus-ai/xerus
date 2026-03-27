@@ -3,32 +3,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import useSWR from 'swr'
 import { getUserAgents } from '@/lib/api/agents'
-import type { Assistant } from '@/lib/api/types'
 import type { OfficeAgent } from '@/hooks/useOfficeData'
 import type { StatusTransition } from '@/components/office/office-types'
-
-/** Map a real Assistant to the simplified OfficeAgent shape */
-function toOfficeAgent(a: Assistant): OfficeAgent {
-  let status: OfficeAgent['status'] = 'idle'
-  if (a.status === 'active') {
-    status = 'active'
-  } else {
-    const lastUsed = a.lastUsed ? new Date(a.lastUsed).getTime() : 0
-    const dayAgo = Date.now() - 24 * 60 * 60 * 1000
-    status = lastUsed > dayAgo ? 'idle' : 'sleeping'
-  }
-
-  return {
-    id: String(a.id),
-    name: a.name,
-    slug: a.name.toLowerCase().replace(/\s+/g, '-'),
-    avatar_url: a.avatarUrl ?? undefined,
-    status,
-    current_task: a.status === 'active' ? 'Working...' : undefined,
-    next_wake: undefined,
-    domain: a.category || 'general',
-  }
-}
+import { toOfficeAgent } from '@/utils/office'
 
 const fetchOfficeAgents = async (): Promise<OfficeAgent[]> => {
   const userAgents = await getUserAgents()

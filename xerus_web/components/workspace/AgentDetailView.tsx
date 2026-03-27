@@ -86,7 +86,6 @@ export function AgentDetailView({ agentId, onBack }: AgentDetailViewProps) {
   const { handleScheduleCreate, handleScheduleToggle, handleScheduleDelete } = useScheduleHandlers({
     agentId: agent?.id ?? 0,
     setSchedules: setLocalSchedules,
-    setAgent: () => mutateAgent(),
   })
 
   const { isCloning, isPublishing, isDeleting, handleClone, handlePublish, handleUnpublish, handleDelete } =

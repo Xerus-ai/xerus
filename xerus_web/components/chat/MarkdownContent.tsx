@@ -105,8 +105,21 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
             )
           },
           a({ href, children }) {
+            // Validate URL protocol to prevent XSS
+            // Pass through hash-only and empty hrefs without rewriting
+            if (!href || href.startsWith('#')) {
+              return <span>{children}</span>;
+            }
+            try {
+              const parsed = new URL(href, window.location.origin);
+              if (!['http:', 'https:', 'mailto:'].includes(parsed.protocol)) {
+                return <span>{children}</span>;
+              }
+            } catch {
+              return <span>{children}</span>;
+            }
             return (
-              <a href={href} target="_blank" rel="noopener noreferrer" className="text-[#FF6600] hover:underline font-medium">
+              <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">
                 {children}
               </a>
             )

@@ -4,7 +4,7 @@
  */
 import { toast } from '@/lib/toast';
 import { apiCall } from './client';
-import { mapScheduleToFrontend, mapScheduleToBackend } from './mappers';
+import { mapScheduleToFrontend, mapScheduleToBackend, type BackendSchedule } from './mappers';
 import type { ScheduledExecution, ExecutionResult, ScheduleFilters } from './types';
 
 /**
@@ -21,7 +21,7 @@ export const createSchedule = async (
   const result = await response.json();
   const data = result.data || result;
   toast.success('Schedule created', { description: 'Your agent will run on the set schedule.' });
-  return mapScheduleToFrontend(data.schedule || data);
+  return mapScheduleToFrontend((data.schedule || data) as BackendSchedule);
 };
 
 /**
@@ -45,7 +45,7 @@ export const getSchedules = async (
   const response = await apiCall(url, { method: 'GET' });
   const result = await response.json();
   const data = result.data || result;
-  return (Array.isArray(data) ? data : []).map(mapScheduleToFrontend);
+  return (Array.isArray(data) ? data : [] as BackendSchedule[]).map(mapScheduleToFrontend);
 };
 
 /**
@@ -55,7 +55,7 @@ export const getSchedule = async (id: string): Promise<ScheduledExecution> => {
   const response = await apiCall(`/schedules/${id}`, { method: 'GET' });
   const result = await response.json();
   const data = result.data || result;
-  return mapScheduleToFrontend(data.schedule || data);
+  return mapScheduleToFrontend((data.schedule || data) as BackendSchedule);
 };
 
 /**
@@ -86,7 +86,7 @@ export const updateSchedule = async (
   const result = await response.json();
   const data = result.data || result;
   toast.success('Schedule updated', { description: 'Your changes have been applied.' });
-  return mapScheduleToFrontend(data.schedule || data);
+  return mapScheduleToFrontend((data.schedule || data) as BackendSchedule);
 };
 
 /**
@@ -105,7 +105,7 @@ export const enableSchedule = async (id: string): Promise<ScheduledExecution> =>
   const result = await response.json();
   const data = result.data || result;
   toast.success('Schedule enabled', { description: 'Your agent will resume running on schedule.' });
-  return mapScheduleToFrontend(data.schedule || data);
+  return mapScheduleToFrontend((data.schedule || data) as BackendSchedule);
 };
 
 /**
@@ -116,7 +116,7 @@ export const disableSchedule = async (id: string): Promise<ScheduledExecution> =
   const result = await response.json();
   const data = result.data || result;
   toast.success('Schedule paused', { description: 'Your agent will stop running until re-enabled.' });
-  return mapScheduleToFrontend(data.schedule || data);
+  return mapScheduleToFrontend((data.schedule || data) as BackendSchedule);
 };
 
 /**

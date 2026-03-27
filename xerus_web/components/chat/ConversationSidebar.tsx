@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, memo } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Plus,
@@ -211,7 +211,7 @@ function ThreeDotMenu({ onClick }: { onClick: (e: React.MouseEvent) => void }) {
 // Session row
 // ---------------------------------------------------------------------------
 
-function SessionRow({
+const SessionRow = memo(function SessionRow({
   session,
   isActive,
   onSelect,
@@ -265,13 +265,13 @@ function SessionRow({
       )}
     </button>
   )
-}
+})
 
 // ---------------------------------------------------------------------------
 // Project group
 // ---------------------------------------------------------------------------
 
-function ProjectGroupSection({
+const ProjectGroupSection = memo(function ProjectGroupSection({
   project,
   currentConversationId,
   onSelectConversation,
@@ -325,7 +325,7 @@ function ProjectGroupSection({
       )}
     </div>
   )
-}
+})
 
 // ---------------------------------------------------------------------------
 // Main sidebar

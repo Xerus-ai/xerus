@@ -120,7 +120,6 @@ export default function AgentDetailsClient({ agentId }: AgentDetailsClientProps)
   } = useScheduleHandlers({
     agentId: agent?.id ?? 0,
     setSchedules: setLocalSchedules,
-    setAgent: () => mutateAgent(),
   })
 
   const {

@@ -6,7 +6,7 @@ import { toast } from '@/lib/toast';
 import { apiCall } from './client';
 
 export interface ToolCatalogResponse {
-  apps: any[];
+  apps: Record<string, unknown>[];
   pagination: {
     total: number;
     page: number;
@@ -44,7 +44,7 @@ export const getToolsCatalog = async (params: ToolCatalogParams = {}): Promise<T
   };
 };
 
-export const getTool = async (toolSlug: string): Promise<any> => {
+export const getTool = async (toolSlug: string): Promise<Record<string, unknown> | null> => {
   const response = await apiCall(`/tools/${encodeURIComponent(toolSlug)}`, { method: 'GET' });
   const result = await response.json();
   return result.data || result;

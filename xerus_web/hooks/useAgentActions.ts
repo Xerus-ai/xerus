@@ -10,10 +10,11 @@ import {
 } from '@/lib/api/agents'
 import { slugify } from '@/utils/slugify'
 import { toast } from '@/lib/toast'
+import type { Assistant } from '@/lib/api/types'
 
 interface UseAgentActionsArgs {
-  agent: any
-  setAgent: (agent: any) => void
+  agent: Assistant | null | undefined
+  setAgent: (agent: Assistant) => void
 }
 
 function formatPublishError(errorMsg: string): { title: string; description: string } {
@@ -70,9 +71,9 @@ export function useAgentActions({ agent, setAgent }: UseAgentActionsArgs) {
         description: 'Your agent is now available for others to discover.',
       })
       setAgent({ ...agent, ...updatedAgent })
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to publish agent:', error)
-      const friendly = formatPublishError(error?.message || '')
+      const friendly = formatPublishError(error instanceof Error ? error.message : String(error))
       toast.error(friendly.title, { description: friendly.description })
     } finally {
       setIsPublishing(false)
@@ -88,7 +89,7 @@ export function useAgentActions({ agent, setAgent }: UseAgentActionsArgs) {
         description: 'Your agent is now private. Only you can access it.',
       })
       setAgent({ ...agent, ...updatedAgent })
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to unpublish agent:', error)
       toast.error("Couldn't unpublish", { description: 'Something went wrong. Please try again.' })
     } finally {
@@ -104,7 +105,7 @@ export function useAgentActions({ agent, setAgent }: UseAgentActionsArgs) {
         onClick: async () => {
           setIsDeleting(true)
           try {
-            await deleteAssistant(parseInt(agent.id))
+            await deleteAssistant(Number(agent.id))
             toast.success('Agent deleted', { description: 'This agent has been permanently removed.' })
             router.push('/ai-agents')
           } catch (error) {

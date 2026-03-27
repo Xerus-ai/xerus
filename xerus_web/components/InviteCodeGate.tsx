@@ -96,12 +96,15 @@ export function InviteCodeGate({ email }: InviteCodeGateProps) {
 
               {!requestSent ? (
                 <form onSubmit={handleRequestAccess}>
+                  <label htmlFor="waitlistEmail" className="sr-only">Email</label>
                   <input
+                    id="waitlistEmail"
                     type="email"
                     value={requestEmail}
                     onChange={(e) => setRequestEmail(e.target.value)}
                     placeholder="your@email.com"
                     required
+                    aria-label="Email address"
                     className="w-full py-3.5 px-5 text-[15px] text-center border border-surface-active rounded-xl bg-surface-hover transition-all duration-300 outline-none focus:border-[#FF6600]/40 focus:shadow-[0_4px_20px_rgba(255,102,0,0.1)]"
                   />
 
@@ -138,10 +141,11 @@ export function InviteCodeGate({ email }: InviteCodeGateProps) {
                 Invite codes are shared on our Discord and social channels.
               </p>
 
-              <label className="block text-[13px] font-medium text-text-secondary mb-2 ml-1">
+              <label htmlFor="inviteCode" className="block text-[13px] font-medium text-text-secondary mb-2 ml-1">
                 Invite code
               </label>
               <input
+                id="inviteCode"
                 type="text"
                 value={displayCode}
                 onChange={(e) => {
@@ -152,6 +156,7 @@ export function InviteCodeGate({ email }: InviteCodeGateProps) {
                 maxLength={9}
                 autoFocus
                 disabled={isSubmitting}
+                aria-label="Invite code"
                 className={`w-full py-4 px-5 font-mono text-3xl font-bold tracking-[0.3em] text-center uppercase border rounded-xl bg-surface-hover transition-all duration-300 outline-none ${
                   error
                     ? 'border-red-400 focus:border-red-400 focus:shadow-[0_4px_20px_rgba(239,68,68,0.1)]'
@@ -160,7 +165,7 @@ export function InviteCodeGate({ email }: InviteCodeGateProps) {
               />
 
               {error && (
-                <p className="text-red-500 text-[13px] mt-2 text-center">{error}</p>
+                <p className="text-red-500 text-[13px] mt-2 text-center" role="alert">{error}</p>
               )}
 
               {/* Primary CTA — solid black */}

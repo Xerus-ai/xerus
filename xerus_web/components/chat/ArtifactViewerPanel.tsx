@@ -114,7 +114,7 @@ function HtmlRenderer({ content, url }: { content?: string; url?: string }) {
   return (
     <iframe
       title="HTML Preview"
-      sandbox="allow-scripts allow-same-origin"
+      sandbox="allow-scripts"
       srcDoc={content || undefined}
       src={!content && url ? url : undefined}
       className="w-full h-full border-0"
@@ -127,6 +127,7 @@ function PdfRenderer({ url }: { url: string }) {
     <iframe
       title="PDF Preview"
       src={url}
+      sandbox="allow-scripts allow-same-origin"
       className="w-full h-full border-0"
     />
   )
@@ -167,6 +168,24 @@ function MarkdownRenderer({ content }: { content: string }) {
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
+          a({ href, children }: { href?: string; children?: React.ReactNode }) {
+            if (!href || href.startsWith('#')) {
+              return <span>{children}</span>;
+            }
+            try {
+              const parsed = new URL(href, window.location.origin);
+              if (!['http:', 'https:', 'mailto:'].includes(parsed.protocol)) {
+                return <span>{children}</span>;
+              }
+            } catch {
+              return <span>{children}</span>;
+            }
+            return (
+              <a href={href} target="_blank" rel="noopener noreferrer">
+                {children}
+              </a>
+            );
+          },
           code({ inline, className: codeClassName, children, ...props }: {
             inline?: boolean; className?: string; children?: React.ReactNode
           }) {

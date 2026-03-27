@@ -6,18 +6,18 @@ import {
   createSchedule,
   getSchedules,
 } from '@/lib/api/schedules'
+import type { ScheduledExecution } from '@/lib/api/types'
 
 interface UseScheduleHandlersArgs {
   agentId: number
-  setSchedules: Dispatch<SetStateAction<any[] | null>>
-  setAgent: Dispatch<SetStateAction<any>>
+  setSchedules: Dispatch<SetStateAction<ScheduledExecution[] | null>>
 }
 
 export function useScheduleHandlers({
   agentId,
   setSchedules,
 }: UseScheduleHandlersArgs) {
-  const handleScheduleCreate = useCallback(async (scheduleData: any) => {
+  const handleScheduleCreate = useCallback(async (scheduleData: ScheduledExecution) => {
     try {
       await createSchedule(scheduleData)
       const updatedSchedules = await getSchedules({ agentId })

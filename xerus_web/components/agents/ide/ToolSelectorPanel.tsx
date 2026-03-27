@@ -59,7 +59,7 @@ export function ToolSelectorPanel({
       title="Connect Tools"
       minimizedTitle="Connect Tools"
       icon={<Wrench className="w-4 h-4" />}
-      className="w-[680px] h-[650px] rounded-[40px] shadow-sm bg-surface p-2"
+      className="w-[680px] h-[650px] max-w-[95vw] max-h-[95vh] rounded-[40px] shadow-sm bg-surface p-2"
       variant="clean"
     >
       {({ close, minimize }) => (

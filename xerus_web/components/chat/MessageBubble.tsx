@@ -34,6 +34,8 @@ function TodoProgress({ done, total, items }: { done: number; total: number; ite
       <button
         type="button"
         onClick={() => hasItems && setExpanded(!expanded)}
+        aria-expanded={expanded}
+        aria-label="Toggle task details"
         className={cn(
           'inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-surface-active bg-surface-alt/50 transition-colors duration-150',
           hasItems && 'hover:bg-surface-hover/80',

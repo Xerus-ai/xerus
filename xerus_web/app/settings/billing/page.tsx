@@ -84,11 +84,17 @@ const PLANS: PricingPlan[] = [
 export default function BillingPage() {
   const user = useRedirectIfNotAuth()
   const [credits, setCredits] = useState<CreditBalance | null>(null)
+  const [billingError, setBillingError] = useState(false)
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
 
   useEffect(() => {
     if (!user) return
-    getCreditBalance().then(setCredits).catch(() => {})
+    getCreditBalance()
+      .then(setCredits)
+      .catch((error) => {
+        console.error('Failed to fetch billing data:', error)
+        setBillingError(true)
+      })
   }, [user])
 
   const handlePlanSelect = (planId: string) => {
@@ -121,6 +127,20 @@ export default function BillingPage() {
         <h1 className="font-serif text-[22px] text-text tracking-tight mb-1">Billing</h1>
         <p className="text-sm text-text-secondary mb-8">Manage your plan and subscription</p>
       </motion.div>
+
+      {billingError && (
+        <motion.div
+          className="bg-red-50/30 rounded-2xl border border-red-200/60 p-5 mb-6"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.05 }}
+        >
+          <p className="text-sm text-red-600 font-medium">Failed to load billing data</p>
+          <p className="text-xs text-red-500/80 mt-1">
+            We couldn&apos;t retrieve your current plan information. Please refresh the page or try again later.
+          </p>
+        </motion.div>
+      )}
 
       {/* Current Plan */}
       <motion.div

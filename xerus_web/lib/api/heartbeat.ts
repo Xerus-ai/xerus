@@ -21,24 +21,19 @@ import type {
  * Get heartbeat configuration for an agent
  */
 export const getHeartbeatConfig = async (agentId: number): Promise<HeartbeatConfigDTO | null> => {
-  try {
-    const response = await apiCall(`/agents/${agentId}/heartbeat`, { method: 'GET' }, false);
+  const response = await apiCall(`/agents/${agentId}/heartbeat`, { method: 'GET' }, false);
 
-    if (!response.ok) {
-      if (response.status === 404) {
-        return null;
-      }
-      throw new Error('Failed to fetch heartbeat config');
+  if (!response.ok) {
+    if (response.status === 404) {
+      return null;
     }
-
-    const result = await response.json();
-    const data = result.data || result;
-    const config: BackendHeartbeatConfig = data.heartbeat_config || data;
-    return mapHeartbeatConfigToFrontend(config);
-  } catch (err) {
-    console.error('Failed to fetch heartbeat config:', err);
-    return null;
+    throw new Error('Failed to fetch heartbeat config');
   }
+
+  const result = await response.json();
+  const data = result.data || result;
+  const config: BackendHeartbeatConfig = data.heartbeat_config || data;
+  return mapHeartbeatConfigToFrontend(config);
 };
 
 /**

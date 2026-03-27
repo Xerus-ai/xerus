@@ -65,7 +65,7 @@ export function AppSidebar() {
         <aside className="flex h-full w-[var(--sidebar-collapsed-width)] flex-col bg-surface border-r border-surface-active items-center py-3 gap-1" role="navigation">
           <Tooltip>
             <TooltipTrigger asChild>
-              <Link href="/" className="flex items-center justify-center w-10 h-10 rounded-2xl hover:bg-surface-hover transition-colors mb-2">
+              <Link href="/" className="flex items-center justify-center w-10 h-10 rounded-2xl hover:bg-surface-hover transition-colors mb-2" aria-label="Home">
                 <Image src="/logo/xerus.svg" alt="Xerus" width={28} height={28} />
               </Link>
             </TooltipTrigger>
@@ -76,7 +76,7 @@ export function AppSidebar() {
             return (
               <Tooltip key={tab.name}>
                 <TooltipTrigger asChild>
-                  <Link href={tab.href} className={cn('relative flex items-center justify-center w-10 h-10 rounded-2xl transition-colors', active ? 'bg-[#FF6600]/10 text-[#FF6600]' : 'text-text-secondary hover:bg-surface-hover hover:text-text')}>
+                  <Link href={tab.href} className={cn('relative flex items-center justify-center w-10 h-10 rounded-2xl transition-colors', active ? 'bg-[#FF6600]/10 text-[#FF6600]' : 'text-text-secondary hover:bg-surface-hover hover:text-text')} aria-label={tab.name} aria-current={active ? 'page' : undefined}>
                     <tab.icon className="w-5 h-5" />
                     {tab.name === 'Inbox' && totalUnread > 0 && (
                       <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-[#FF6600] text-white text-[9px] font-semibold">{totalUnread > 99 ? '99+' : totalUnread}</span>
@@ -88,7 +88,7 @@ export function AppSidebar() {
             )
           })}
           <div className="flex-1" />
-          <Tooltip><TooltipTrigger asChild><button onClick={() => setCollapsed(false)} className="flex items-center justify-center w-10 h-10 rounded-2xl text-text-secondary hover:bg-surface-hover hover:text-text transition-colors"><PanelLeftOpen className="w-5 h-5" /></button></TooltipTrigger><TooltipContent side="right">Expand</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger asChild><button onClick={() => setCollapsed(false)} className="flex items-center justify-center w-10 h-10 rounded-2xl text-text-secondary hover:bg-surface-hover hover:text-text transition-colors" aria-label="Toggle sidebar"><PanelLeftOpen className="w-5 h-5" /></button></TooltipTrigger><TooltipContent side="right">Expand</TooltipContent></Tooltip>
         </aside>
       </TooltipProvider>
     )
@@ -447,7 +447,7 @@ function CreateProjectInline({ onCreated }: { onCreated: () => Promise<void> }) 
         onChange={(e) => setName(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') setIsOpen(false) }}
         placeholder="Project name"
-        className="w-full px-3 py-2 rounded-xl bg-surface border border-surface-active text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-[#FF6600]/40 focus:shadow-[0_2px_12px_rgba(255,102,0,0.08)]"
+        className="w-full px-3 py-2 rounded-xl bg-surface border border-surface-active text-sm text-text placeholder:text-text-muted outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 focus:border-[#FF6600]/40 focus:shadow-[0_2px_12px_rgba(255,102,0,0.08)]"
         disabled={isCreating}
       />
       <div className="flex gap-2 mt-2">

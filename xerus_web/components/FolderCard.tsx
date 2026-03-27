@@ -1,3 +1,5 @@
+'use client'
+
 import React from 'react';
 import { MoreHorizontal, FileText, HardDrive, User } from 'lucide-react';
 
@@ -20,7 +22,7 @@ export const AccessAvatars = ({ users = [], max = 4 }: { users?: string[], max?:
             {visibleUsers.map((user, index) => (
                 <div
                     key={index}
-                    className={`w-5 h-5 rounded-full ring-2 ring-[#FF6A13] ${getAvatarColor(user)} text-xs font-bold text-white flex items-center justify-center border border-white/10`}
+                    className={`w-5 h-5 rounded-full ring-2 ring-primary ${getAvatarColor(user)} text-xs font-bold text-white flex items-center justify-center border border-white/10`}
                     style={{ zIndex: users.length - index, transform: 'scale(1.05)' }}
                 >
                     {user[0]}
@@ -28,7 +30,7 @@ export const AccessAvatars = ({ users = [], max = 4 }: { users?: string[], max?:
             ))}
             {hiddenCount > 0 && (
                 <div
-                    className="w-5 h-5 rounded-full ring-2 ring-[#FF6A13] bg-text-secondary text-[10px] font-medium text-white flex items-center justify-center border border-white/10"
+                    className="w-5 h-5 rounded-full ring-2 ring-primary bg-text-secondary text-[10px] font-medium text-white flex items-center justify-center border border-white/10"
                     style={{ zIndex: 0 }}
                 >
                     +{hiddenCount}

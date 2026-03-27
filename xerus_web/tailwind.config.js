@@ -2,15 +2,12 @@
 module.exports = {
 	darkMode: ['class'],
 	content: [
-		'./pages/**/*.{js,ts,jsx,tsx,mdx}',
 		'./components/**/*.{js,ts,jsx,tsx,mdx}',
 		'./app/**/*.{js,ts,jsx,tsx,mdx}',
 	],
 	theme: {
 		extend: {
 			fontFamily: {
-				'heading': ['Lora', 'Georgia', 'Times New Roman', 'serif'],
-				'body': ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Helvetica', 'sans-serif'],
 				'sans': ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Helvetica', 'sans-serif'],
 				'serif': ['Lora', 'Georgia', 'Times New Roman', 'serif'],
 			},
@@ -75,12 +72,7 @@ module.exports = {
 					'5': 'hsl(var(--chart-5))'
 				}
 			},
-			spacing: {
-				'18': '4.5rem',
-				'88': '22rem',
-			},
 			borderRadius: {
-				'xs': '2px',
 				'sm': '4px',
 				'md': '8px',
 				'lg': '12px',

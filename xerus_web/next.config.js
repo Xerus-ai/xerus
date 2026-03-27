@@ -52,6 +52,14 @@ const nextConfig = {
             key: 'Strict-Transport-Security',
             value: 'max-age=31536000; includeSubDomains',
           },
+          {
+            key: 'Content-Security-Policy',
+            value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; connect-src 'self' https://*.xerus.ai https://*.neon.tech https://*.firebaseio.com https://*.firebasestorage.app https://*.googleapis.com https://*.openrouter.ai https://*.pipedream.com wss://*.firebaseio.com; frame-src 'self' https://*.fly.dev https://*.daytona.io https://*.pipedream.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+          },
+          {
+            key: 'X-Permitted-Cross-Domain-Policies',
+            value: 'none',
+          },
         ],
       },
     ];
@@ -79,6 +87,16 @@ const nextConfig = {
     return config
   },
   
+  async redirects() {
+    return [
+      {
+        source: '/skill/:slug',
+        destination: '/skills/:slug',
+        permanent: true,
+      },
+    ];
+  },
+
   experimental: {
   }
 }

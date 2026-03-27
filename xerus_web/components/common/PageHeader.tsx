@@ -1,3 +1,5 @@
+'use client'
+
 import React, { useState, useEffect, useMemo } from 'react'
 import { Search, ChevronDown, Check } from 'lucide-react'
 import { cn } from "@/lib/utils"
@@ -103,7 +105,7 @@ export function PageHeader({
                                 placeholder={searchPlaceholder}
                                 value={inputValue}
                                 onChange={(e) => setInputValue(e.target.value)}
-                                className="w-full pl-10 pr-4 py-3 bg-white/60 border border-surface-active rounded-full text-sm focus:outline-none focus:border-[#FF6600] transition-colors placeholder:text-text-secondary/60"
+                                className="w-full pl-10 pr-4 py-3 bg-white/60 border border-surface-active rounded-full text-sm focus:outline-none focus:border-primary transition-colors placeholder:text-text-secondary/60"
                             />
                         </div>
                     )}
@@ -116,7 +118,7 @@ export function PageHeader({
                                 className={cn(
                                     "px-6 py-2 rounded-full text-sm font-medium transition-all",
                                     isAllSelected
-                                        ? 'bg-[#261E1B] text-white shadow-sm'
+                                        ? 'bg-surface-active text-white shadow-sm'
                                         : 'bg-surface-hover text-text-secondary hover:text-text hover:bg-surface-pressed'
                                 )}
                             >
@@ -131,7 +133,7 @@ export function PageHeader({
                                     className={cn(
                                         "px-6 py-2 rounded-full text-sm font-medium transition-all",
                                         selectedCategories.includes(cat)
-                                            ? 'bg-[#261E1B] text-white shadow-sm'
+                                            ? 'bg-surface-active text-white shadow-sm'
                                             : 'bg-surface-hover text-text-secondary hover:text-text hover:bg-surface-pressed'
                                     )}
                                 >
@@ -147,7 +149,7 @@ export function PageHeader({
                                             className={cn(
                                                 "px-6 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2",
                                                 selectedInDropdown > 0
-                                                    ? 'bg-[#261E1B] text-white shadow-sm'
+                                                    ? 'bg-surface-active text-white shadow-sm'
                                                     : 'bg-surface-hover text-text-secondary hover:text-text hover:bg-surface-pressed'
                                             )}
                                         >
@@ -184,7 +186,7 @@ export function PageHeader({
                                                         <div className={cn(
                                                             "w-4 h-4 rounded border flex items-center justify-center flex-shrink-0",
                                                             isSelected
-                                                                ? 'bg-[#261E1B] border-[#261E1B]'
+                                                                ? 'bg-surface-active border-surface-active'
                                                                 : 'border-surface-active'
                                                         )}>
                                                             {isSelected && <Check className="w-3 h-3 text-white" />}

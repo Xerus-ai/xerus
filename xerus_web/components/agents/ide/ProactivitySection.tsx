@@ -296,7 +296,7 @@ export function ProactivitySection({
         title="Heartbeat Schedule"
         minimizedTitle="Heartbeat"
         icon={<Activity className="w-4 h-4" />}
-        className="w-[600px] h-[600px] rounded-[40px] shadow-sm bg-surface p-2"
+        className="w-[600px] h-[600px] max-w-[95vw] max-h-[95vh] rounded-[40px] shadow-sm bg-surface p-2"
         variant="clean"
       >
         {({ close, minimize }) => (

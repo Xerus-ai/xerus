@@ -29,6 +29,7 @@ export default function ProfilePage() {
   const user = useRedirectIfNotAuth()
   const router = useRouter()
   const [profile, setProfile] = useState<ProfileData | null>(null)
+  const [profileError, setProfileError] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [displayNameInput, setDisplayNameInput] = useState('')
@@ -47,14 +48,11 @@ export default function ProfilePage() {
           created_at: data.created_at,
         })
         setDisplayNameInput(data.display_name)
-      } catch {
+      } catch (error) {
+        console.error('Failed to load profile:', error)
         toast.error("Couldn't load your profile", { description: 'Please refresh the page and try again.' })
-        setProfile({
-          uid: user.uid,
-          email: user.email,
-          display_name: user.display_name || '',
-        })
-        setDisplayNameInput(user.display_name || '')
+        setProfileError(true)
+        // Don't silently fall back to stale data
       } finally {
         setIsLoading(false)
       }
@@ -103,6 +101,21 @@ export default function ProfilePage() {
               <div className="h-4 w-56 rounded-lg animate-shimmer" />
             </div>
           </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (profileError && !profile) {
+    return (
+      <div className="max-w-[680px]">
+        <h1 className="font-serif text-[22px] text-text tracking-tight mb-1">Profile</h1>
+        <p className="text-sm text-text-secondary mb-8">Manage your personal information</p>
+        <div className="bg-red-50/30 rounded-2xl border border-red-200/60 p-6">
+          <p className="text-sm text-red-600 font-medium">Failed to load profile</p>
+          <p className="text-xs text-red-500/80 mt-1">
+            We couldn&apos;t load your profile data. Please refresh the page or try again later.
+          </p>
         </div>
       </div>
     )

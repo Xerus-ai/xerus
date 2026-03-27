@@ -2,7 +2,7 @@
 
 import { ErrorBoundaryPage } from '@/components/common/ErrorBoundaryPage'
 
-export default function InboxError({
+export default function OnboardingError({
   error,
   reset,
 }: {
@@ -13,8 +13,8 @@ export default function InboxError({
     <ErrorBoundaryPage
       error={error}
       reset={reset}
-      title="Failed to load inbox"
-      message="We couldn't load your inbox. Check your connection and try again."
+      title="Onboarding error"
+      message="Something went wrong during onboarding. Try refreshing to continue."
     />
   )
 }
