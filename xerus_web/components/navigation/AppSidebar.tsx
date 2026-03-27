@@ -37,6 +37,7 @@ export function AppSidebar() {
   const { activeSection, setActiveSection, navigateToPath } = useWorkspaceSection()
   const SlotComponent = useSidebarSlotContent()
   const [collapsed, setCollapsed] = useState(false)
+  const [showInboxCreate, setShowInboxCreate] = useState(false)
 
   const activeTab = pathname === '/' ? null // Office dashboard — logo is the indicator, no tab active
     : pathname.startsWith('/chat') ? 'chat'
@@ -136,6 +137,16 @@ export function AppSidebar() {
             </Link>
           )
         })}
+        {/* + button for creating projects — visible when on inbox tab */}
+        {activeTab === 'inbox' && (
+          <button
+            onClick={() => setShowInboxCreate(prev => !prev)}
+            className="ml-auto p-1 rounded-lg hover:bg-surface-hover text-text-muted hover:text-text transition-colors"
+            title="Create project"
+          >
+            <Plus className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
       {/* Body */}
@@ -150,7 +161,7 @@ export function AppSidebar() {
         ) : activeTab === 'chat' ? (
           SlotComponent ? <SlotComponent /> : <ChatSidebarFallback />
         ) : activeTab === 'inbox' ? (
-          <InboxSidebarBody counts={counts} markRead={markRead} />
+          <InboxSidebarBody counts={counts} markRead={markRead} showCreateInput={showInboxCreate} setShowCreateInput={setShowInboxCreate} />
         ) : null}
       </div>
 
@@ -322,9 +333,11 @@ function ChatSidebarFallback() {
 }
 
 /* ---- Inbox body ---- */
-function InboxSidebarBody({ counts, markRead }: {
+function InboxSidebarBody({ counts, markRead, showCreateInput, setShowCreateInput }: {
   counts: Record<string, number>
   markRead: (channelId: string) => void
+  showCreateInput: boolean
+  setShowCreateInput: (v: boolean | ((prev: boolean) => boolean)) => void
 }) {
   const pathname = usePathname()
   const router = useRouter()
@@ -345,7 +358,6 @@ function InboxSidebarBody({ counts, markRead }: {
     })
   }
 
-  const [showCreateInput, setShowCreateInput] = useState(false)
   const [newProjectName, setNewProjectName] = useState('')
   const [isCreatingProject, setIsCreatingProject] = useState(false)
 
@@ -379,18 +391,6 @@ function InboxSidebarBody({ counts, markRead }: {
   if (domains.length === 0) {
     return (
       <div className="px-4 py-2">
-        {/* Section header with + button */}
-        <div className="flex items-center justify-between px-3 pt-1 pb-2">
-          <span className="text-[10px] font-semibold text-text-muted uppercase tracking-widest">Projects</span>
-          <button
-            onClick={() => setShowCreateInput(true)}
-            className="w-5 h-5 rounded-md flex items-center justify-center text-text-muted hover:bg-primary/10 hover:text-primary transition-colors"
-            title="Create project"
-          >
-            <Plus className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
         {/* Inline create input */}
         {showCreateInput && (
           <div className="px-2 pb-3">
@@ -448,21 +448,9 @@ function InboxSidebarBody({ counts, markRead }: {
 
   return (
     <ScrollArea className="flex-1">
-      {/* Section header with + button — always visible when projects exist */}
-      <div className="flex items-center justify-between px-7 pt-3 pb-1">
-        <span className="text-[10px] font-semibold text-text-muted uppercase tracking-widest">Projects</span>
-        <button
-          onClick={() => setShowCreateInput(prev => !prev)}
-          className="w-5 h-5 rounded-md flex items-center justify-center text-text-muted hover:bg-primary/10 hover:text-primary transition-colors"
-          title="Create project"
-        >
-          <Plus className="w-3.5 h-3.5" />
-        </button>
-      </div>
-
-      {/* Inline create input for when projects already exist */}
+      {/* Inline create input when + is clicked */}
       {showCreateInput && (
-        <div className="px-5 pb-2">
+        <div className="px-5 pt-2 pb-1">
           <input
             autoFocus
             value={newProjectName}
@@ -478,7 +466,7 @@ function InboxSidebarBody({ counts, markRead }: {
         </div>
       )}
 
-      <div className="px-4 pb-3">
+      <div className="px-4 py-3">
         {domains.map((domain) => {
           const isExpanded = expandedDomains.has(domain.id)
           const domainUnread = domain.channels.reduce((sum, ch) => sum + (counts[ch.id] ?? 0), 0)
