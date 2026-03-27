@@ -1,9 +1,10 @@
 'use client'
 
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useDomains } from '@/hooks/useDomains'
-import { Plus } from 'lucide-react'
-import { CreateProjectPopover } from '@/components/channels/CreateProjectPopover'
+import { apiCall } from '@/lib/api/client'
+import { Plus, FolderOpen, ChevronRight } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
 // Mini inbox preview — mirrors the real inbox layout precisely
@@ -170,6 +171,33 @@ export default function InboxPage() {
   const { domains, isLoading, refetch } = useDomains()
   const router = useRouter()
   const hasProjects = domains.length > 0
+  const [showCreate, setShowCreate] = useState(false)
+  const [projectName, setProjectName] = useState('')
+  const [isCreating, setIsCreating] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (showCreate) setTimeout(() => inputRef.current?.focus(), 50)
+  }, [showCreate])
+
+  const handleCreate = async () => {
+    const trimmed = projectName.trim()
+    if (!trimmed) return
+    setIsCreating(true)
+    try {
+      await apiCall('/company/domains', {
+        method: 'POST',
+        body: JSON.stringify({ name: trimmed }),
+      })
+      setProjectName('')
+      setShowCreate(false)
+      await refetch()
+    } catch {
+      // apiCall shows toast
+    } finally {
+      setIsCreating(false)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -222,14 +250,34 @@ export default function InboxPage() {
             and watch them collaborate, report progress, and request your approval.
           </p>
 
-          <CreateProjectPopover onCreated={refetch} side="top" align="center">
+          {!showCreate ? (
             <button
+              onClick={() => setShowCreate(true)}
               className="inline-flex items-center gap-2 px-6 py-[11px] rounded-[14px] text-[13px] font-medium text-white bg-[#FF6600] hover:bg-[#E65C00] shadow-[0_2px_16px_rgba(255,102,0,0.22)] hover:shadow-[0_4px_24px_rgba(255,102,0,0.32)] hover:-translate-y-px active:scale-[0.98] transition-all"
             >
               <Plus className="w-4 h-4" />
               Create your first project
             </button>
-          </CreateProjectPopover>
+          ) : (
+            <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-surface-alt animate-[fadeInUp_0.15s_ease-out]">
+              <ChevronRight className="w-4 h-4 text-text-secondary shrink-0" />
+              <FolderOpen className="w-[18px] h-[18px] text-primary shrink-0" />
+              <input
+                ref={inputRef}
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleCreate()
+                  if (e.key === 'Escape') { setShowCreate(false); setProjectName('') }
+                }}
+                onBlur={() => { if (!projectName.trim()) { setShowCreate(false); setProjectName('') } }}
+                placeholder="Project name..."
+                disabled={isCreating}
+                className="bg-transparent border-none outline-none text-sm font-medium text-text placeholder:text-text-muted caret-primary w-[180px]"
+              />
+              <span className="text-[10px] text-text-muted bg-surface rounded px-1.5 py-0.5 shrink-0">↵</span>
+            </div>
+          )}
         </div>
       </div>
     </div>

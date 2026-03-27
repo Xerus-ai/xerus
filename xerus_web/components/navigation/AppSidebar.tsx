@@ -20,7 +20,6 @@ import { useSidebarSlotContent } from '@/components/layout/SidebarSlotContext'
 import { useDomains } from '@/hooks/useDomains'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { CreateProjectPopover } from '@/components/channels/CreateProjectPopover'
 import { getWorkspaceOverview, type WorkspaceOverview } from '@/lib/api/workspace'
 
 const TABS = [
@@ -37,8 +36,8 @@ export function AppSidebar() {
   const { totalUnread, counts, markRead } = useUnreadCounts()
   const { activeSection, setActiveSection, navigateToPath } = useWorkspaceSection()
   const SlotComponent = useSidebarSlotContent()
-  const { refetch: refreshDomains } = useDomains()
   const [collapsed, setCollapsed] = useState(false)
+  const [showNewProjectRow, setShowNewProjectRow] = useState(false)
 
   const activeTab = pathname === '/' ? null // Office dashboard — logo is the indicator, no tab active
     : pathname.startsWith('/chat') ? 'chat'
@@ -140,14 +139,13 @@ export function AppSidebar() {
         })}
         {/* + button for creating projects — visible when on inbox tab */}
         {activeTab === 'inbox' && (
-          <CreateProjectPopover onCreated={refreshDomains} align="end">
-            <button
-              className="ml-auto p-1 rounded-lg hover:bg-primary/10 text-primary transition-colors"
-              title="Create project"
-            >
-              <Plus className="w-5 h-5" />
-            </button>
-          </CreateProjectPopover>
+          <button
+            onClick={() => setShowNewProjectRow(true)}
+            className="ml-auto p-1 rounded-lg hover:bg-primary/10 text-primary transition-colors"
+            title="Create project"
+          >
+            <Plus className="w-5 h-5" />
+          </button>
         )}
       </div>
 
@@ -163,7 +161,7 @@ export function AppSidebar() {
         ) : activeTab === 'chat' ? (
           SlotComponent ? <SlotComponent /> : <ChatSidebarFallback />
         ) : activeTab === 'inbox' ? (
-          <InboxSidebarBody counts={counts} markRead={markRead} />
+          <InboxSidebarBody counts={counts} markRead={markRead} showNewRow={showNewProjectRow} onNewRowDone={() => setShowNewProjectRow(false)} />
         ) : null}
       </div>
 
@@ -335,20 +333,32 @@ function ChatSidebarFallback() {
 }
 
 /* ---- Inbox body ---- */
-function InboxSidebarBody({ counts, markRead }: {
+function InboxSidebarBody({ counts, markRead, showNewRow, onNewRowDone }: {
   counts: Record<string, number>
   markRead: (channelId: string) => void
+  showNewRow: boolean
+  onNewRowDone: () => void
 }) {
   const pathname = usePathname()
   const router = useRouter()
   const { domains, isLoading, refetch: refreshDomains } = useDomains()
   const [expandedDomains, setExpandedDomains] = useState<Set<string>>(new Set())
+  const [newName, setNewName] = useState('')
+  const [isCreating, setIsCreating] = useState(false)
+  const newRowRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (domains.length > 0 && expandedDomains.size === 0) {
       setExpandedDomains(new Set(domains.map((d) => d.id)))
     }
   }, [domains, expandedDomains.size])
+
+  useEffect(() => {
+    if (showNewRow) {
+      setNewName('')
+      setTimeout(() => newRowRef.current?.focus(), 50)
+    }
+  }, [showNewRow])
 
   const toggleDomain = (domainId: string) => {
     setExpandedDomains((prev) => {
@@ -357,6 +367,48 @@ function InboxSidebarBody({ counts, markRead }: {
       return next
     })
   }
+
+  const handleCreateProject = async () => {
+    const trimmed = newName.trim()
+    if (!trimmed) return
+    setIsCreating(true)
+    try {
+      await apiCall('/company/domains', {
+        method: 'POST',
+        body: JSON.stringify({ name: trimmed }),
+      })
+      setNewName('')
+      onNewRowDone()
+      await refreshDomains()
+    } catch {
+      // apiCall shows toast
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
+  const newProjectRow = showNewRow ? (
+    <div className="mb-1 animate-[fadeInUp_0.15s_ease-out]">
+      <div className="flex items-center gap-2 w-full px-3 py-2 rounded-xl">
+        <ChevronRight className="w-4 h-4 text-text-secondary shrink-0" />
+        <FolderOpen className="w-[18px] h-[18px] text-primary shrink-0" />
+        <input
+          ref={newRowRef}
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleCreateProject()
+            if (e.key === 'Escape') { onNewRowDone(); setNewName('') }
+          }}
+          onBlur={() => { if (!newName.trim()) { onNewRowDone(); setNewName('') } }}
+          placeholder="Project name..."
+          disabled={isCreating}
+          className="flex-1 bg-transparent border-none outline-none text-sm font-medium text-text placeholder:text-text-muted caret-primary"
+        />
+        <span className="text-[10px] text-text-muted bg-surface rounded px-1.5 py-0.5 shrink-0">↵</span>
+      </div>
+    </div>
+  ) : null
 
   if (isLoading) {
     return (
@@ -369,6 +421,7 @@ function InboxSidebarBody({ counts, markRead }: {
   if (domains.length === 0) {
     return (
       <div className="px-4 py-2">
+        {newProjectRow}
         {/* Ghost preview — shows what populated sidebar looks like */}
         <div className="opacity-30 pointer-events-none select-none" aria-hidden="true">
           <div className="mb-1">
@@ -409,6 +462,7 @@ function InboxSidebarBody({ counts, markRead }: {
   return (
     <ScrollArea className="flex-1">
       <div className="px-4 py-3">
+        {newProjectRow}
         {domains.map((domain) => {
           const isExpanded = expandedDomains.has(domain.id)
           const domainUnread = domain.channels.reduce((sum, ch) => sum + (counts[ch.id] ?? 0), 0)
