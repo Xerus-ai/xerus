@@ -1,17 +1,3 @@
-@font-face {
-  font-family: 'PP Neue Montreal';
-  font-style: normal;
-  font-weight: 500;
-  src: url('/fonts/PPNeueMontreal-Medium.8b97a885.woff') format('woff');
-}
-
-@font-face {
-  font-family: 'PP Neue Montreal';
-  font-style: normal;
-  font-weight: 600;
-  src: url('/fonts/PPNeueMontreal-SemiBold.e62409a3.woff') format('woff');
-}
-
 /* Inter */
 @font-face {
   font-family: 'Inter';
@@ -156,11 +142,6 @@
     --sub-sidebar-width: 240px;
     --right-panel-width: 320px;
 
-    /* Presence Dot Colors */
-    --presence-online: #22C55E;
-    --presence-away: #EAB308;
-    --presence-busy: #EF4444;
-    --presence-offline: #9CA3AF;
   }
 
   @media (max-width: 768px) {
@@ -221,13 +202,6 @@
   }
 }
 
-/* Loading bar animation */
-@keyframes loading {
-  0% { width: 0%; margin-left: 0; }
-  50% { width: 60%; margin-left: 20%; }
-  100% { width: 0%; margin-left: 100%; }
-}
-
 /* Subtle entrance for chat messages on first load — GPU-accelerated (opacity + transform only) */
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(8px); }
@@ -286,13 +260,8 @@
     font-size: 1.375rem;
   }
 
-  p,
-  .text-large {
+  p {
     font-size: 1rem;
-  }
-
-  .text-description {
-    font-size: 0.8125rem;
   }
 }
 
@@ -331,12 +300,6 @@
   animation: status-pulse 2s ease-in-out infinite;
 }
 
-/* Office activity ticker scroll */
-@keyframes ticker {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
-
 /* Functional animation: skeleton loading shimmer */
 @keyframes shimmer {
   0% { background-position: -200% 0; }
@@ -357,18 +320,6 @@
 
 .animate-tab-in {
   animation: tab-fade-in 200ms ease-out;
-}
-
-/* Office spatial view: agent idle bobbing */
-@keyframes office-bob {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
-}
-
-/* Office spatial view: sleep Zzz float */
-@keyframes office-zzz {
-  0%, 100% { transform: translateY(0); opacity: 0.9; }
-  50% { transform: translateY(-6px); opacity: 0.5; }
 }
 
 /* Thinking indicator: slow sequential dot pulse for idle/thinking */
@@ -400,7 +351,7 @@
 .animate-thinking-active { animation: thinking-active 0.9s ease-in-out infinite; }
 .animate-thinking-settle { animation: thinking-settle 2.5s ease-in-out infinite; }
 
-/* Hide scrollbar for office ticker */
+/* Hide scrollbar */
 .scrollbar-none::-webkit-scrollbar {
   display: none;
 }

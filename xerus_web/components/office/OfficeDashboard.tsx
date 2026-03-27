@@ -8,7 +8,6 @@ import { AgentAvatarWithModel } from '@/components/agents/AgentAvatar'
 import Link from 'next/link'
 import {
   Building2,
-  FolderOpen,
   Clock,
   Zap,
   MessageSquare,

@@ -3,7 +3,7 @@
 import React, { useState, useCallback } from 'react';
 import type { Skill, Assistant } from '@/lib/api/types';
 import { InstallOverlay } from './InstallButton';
-import { Download, Settings } from 'lucide-react';
+import { Download, Settings, Upload } from 'lucide-react';
 
 interface SkillCardProps {
     skill: Skill;
@@ -96,6 +96,29 @@ export function SkillCard({ skill, onClick, agents = [], onInstall, onUninstall,
                     onClose={() => setInstallOpen(false)}
                 />
             )}
+        </div>
+    );
+}
+
+interface ImportSkillCardProps {
+    onClick?: () => void;
+}
+
+export function ImportSkillCard({ onClick }: ImportSkillCardProps) {
+    return (
+        <div
+            onClick={onClick}
+            className="rounded-[32px] border-2 border-dashed border-surface-active hover:border-primary p-6 flex flex-col items-center justify-center text-center h-full min-h-[260px] hover:bg-surface-hover/50 transition-all duration-300 cursor-pointer group"
+        >
+            <div className="w-16 h-16 bg-surface rounded-full flex items-center justify-center shadow-sm mb-4 group-hover:scale-110 transition-transform duration-300">
+                <Upload className="w-7 h-7 text-primary" />
+            </div>
+            <h3 className="font-serif text-xl text-text group-hover:text-primary transition-colors">
+                Import Skill
+            </h3>
+            <p className="text-sm text-text-secondary mt-2 max-w-[200px]">
+                Import a skill from files
+            </p>
         </div>
     );
 }

@@ -2,12 +2,11 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import useSWR, { mutate as swrMutate } from 'swr'
-import { Upload } from 'lucide-react'
 import { getSkills, installSkill, uninstallSkill, importSkill } from '@/lib/api/skills'
 import { getAssistants } from '@/lib/api/agents'
 import type { Skill, Assistant } from '@/lib/api/types'
 import { PageHeader } from '@/components/common/PageHeader'
-import { SkillCard } from '@/components/skills/SkillCard'
+import { SkillCard, ImportSkillCard } from '@/components/skills/SkillCard'
 import { UploadPanel } from '@/components/upload/UploadPanel'
 
 interface SkillsPanelProps {
@@ -95,62 +94,39 @@ export function SkillsPanel({ onSelect, onCountChange }: SkillsPanelProps) {
           selectedCategories={selectedCategories}
           onToggleCategory={handleToggleCategory}
           onClearCategories={handleClearCategories}
-        >
-          <button
-            onClick={() => setUploadPanelOpen(true)}
-            className="border border-surface-active text-text hover:bg-surface-hover px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2 mb-4"
-          >
-            <Upload className="w-4 h-4" />
-            Import
-          </button>
-        </PageHeader>
+        />
 
-        {/* My Skills */}
-        {filteredMySkills.length > 0 && (
-          <div className="w-full mb-12">
-            <div className="flex items-center gap-3 mb-6">
-              <h2 className="font-serif text-2xl text-text">My Skills</h2>
-              <span className="bg-primary/10 text-primary text-xs font-bold px-2 py-1 rounded-md">
-                {filteredMySkills.length} Skills
-              </span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              {filteredMySkills.map(skill => (
-                <SkillCard
-                  key={skill.slug}
-                  skill={skill}
-                  onClick={() => onSelect(skill)}
-                  agents={agents}
-                />
-              ))}
-            </div>
+        {/* My Skills (user-created + installed) */}
+        <div className="w-full mb-12">
+          <div className="flex items-center gap-3 mb-6">
+            <h2 className="font-serif text-2xl text-text">My Skills</h2>
+            <span className="bg-primary/10 text-primary text-xs font-bold px-2 py-1 rounded-md">
+              {filteredMySkills.length + filteredInstalled.length} Skills
+            </span>
           </div>
-        )}
-
-        {/* Installed */}
-        {filteredInstalled.length > 0 && (
-          <div className="w-full mb-12">
-            <div className="flex items-center gap-3 mb-6">
-              <h2 className="font-serif text-2xl text-text">Installed</h2>
-              <span className="bg-emerald-500/10 text-emerald-600 text-xs font-bold px-2 py-1 rounded-md">
-                {filteredInstalled.length} Active
-              </span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              {filteredInstalled.map(skill => (
-                <SkillCard
-                  key={skill.slug}
-                  skill={skill}
-                  onClick={() => onSelect(skill)}
-                  agents={agents}
-                  isInstalled
-                  onInstall={(agentId, scope, channelId) => handleInstall(skill.slug, agentId, scope, channelId)}
-                  onUninstall={() => handleUninstall(skill.slug)}
-                />
-              ))}
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            <ImportSkillCard onClick={() => setUploadPanelOpen(true)} />
+            {filteredMySkills.map(skill => (
+              <SkillCard
+                key={skill.slug}
+                skill={skill}
+                onClick={() => onSelect(skill)}
+                agents={agents}
+              />
+            ))}
+            {filteredInstalled.map(skill => (
+              <SkillCard
+                key={skill.slug}
+                skill={skill}
+                onClick={() => onSelect(skill)}
+                agents={agents}
+                isInstalled
+                onInstall={(agentId, scope, channelId) => handleInstall(skill.slug, agentId, scope, channelId)}
+                onUninstall={() => handleUninstall(skill.slug)}
+              />
+            ))}
           </div>
-        )}
+        </div>
 
         {/* Marketplace */}
         <div className="w-full">

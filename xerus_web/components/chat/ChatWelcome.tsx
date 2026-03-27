@@ -3,7 +3,7 @@
 import { useState, useMemo, type ReactNode } from 'react'
 import Image from 'next/image'
 import {
-  LayoutGrid, Users, Send, FileText, Wrench,
+  Wrench,
 } from 'lucide-react'
 import { ModelIcon } from '@/components/agents/AgentAvatar'
 import { cn } from '@/lib/utils'

@@ -3,9 +3,8 @@
 import { useState, ReactNode } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { cn } from '@/lib/utils'
+import { CodeBlock } from '@/components/shared/CodeBlock'
 import { Check, Copy } from 'lucide-react'
 
 // @mention highlight
@@ -88,15 +87,12 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
                     <CopyButton text={text} />
                   </div>
                 </div>
-                <SyntaxHighlighter
-                  style={oneDark}
+                <CodeBlock
+                  code={text}
                   language={match[1]}
-                  PreTag="div"
+                  preTag="div"
                   className="rounded-2xl !mt-0 !mb-0 !pt-10 shadow-sm border border-gray-800 text-sm"
-                  {...props}
-                >
-                  {text}
-                </SyntaxHighlighter>
+                />
               </div>
             ) : (
               <code className="px-1.5 py-0.5 rounded-lg bg-surface font-mono text-sm text-primary" {...props}>

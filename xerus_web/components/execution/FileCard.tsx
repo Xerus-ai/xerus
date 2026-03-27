@@ -11,8 +11,7 @@ import {
   ChevronRight,
   Copy,
 } from 'lucide-react'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import { CodeBlock } from '@/components/shared/CodeBlock'
 
 export interface FileCardProps {
   operation: 'read' | 'write' | 'edit'
@@ -233,9 +232,9 @@ export function FileCard({
                 className="rounded-xl overflow-hidden max-h-[400px] overflow-y-auto"
                 aria-label={`File content: ${lastSegment}`}
               >
-                <SyntaxHighlighter
+                <CodeBlock
+                  code={previewContent}
                   language={language}
-                  style={oneDark}
                   showLineNumbers
                   startingLineNumber={lineRange?.start || 1}
                   customStyle={{
@@ -248,9 +247,7 @@ export function FileCard({
                     minWidth: '2.5em',
                     paddingRight: '1em',
                   }}
-                >
-                  {previewContent}
-                </SyntaxHighlighter>
+                />
                 {extraLineCount > 0 && (
                   <div className="bg-[#282c34] px-4 py-2 text-xs text-gray-400 border-t border-gray-700">
                     ... {extraLineCount} more lines

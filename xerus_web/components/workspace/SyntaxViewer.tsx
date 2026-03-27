@@ -1,7 +1,7 @@
 'use client'
 
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { cn } from '@/lib/utils'
+import { CodeBlock } from '@/components/shared/CodeBlock'
 import { getExtension } from './file-utils'
 
 // Map file extensions to Prism language identifiers
@@ -96,10 +96,11 @@ export function SyntaxViewer({ content, filename, className }: SyntaxViewerProps
 
   return (
     <div className={cn('h-full overflow-auto bg-white', className)}>
-      <SyntaxHighlighter
+      <CodeBlock
+        code={content}
         language={language}
-        style={warmSyntaxTheme}
         showLineNumbers
+        theme={warmSyntaxTheme}
         customStyle={{
           margin: 0,
           borderRadius: 0,
@@ -115,9 +116,7 @@ export function SyntaxViewer({ content, filename, className }: SyntaxViewerProps
           paddingRight: '1.5em',
           userSelect: 'none',
         }}
-      >
-        {content}
-      </SyntaxHighlighter>
+      />
     </div>
   )
 }

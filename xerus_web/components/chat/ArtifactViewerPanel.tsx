@@ -3,9 +3,8 @@
 import { useState, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { cn } from '@/lib/utils'
+import { CodeBlock } from '@/components/shared/CodeBlock'
 import {
   X,
   Copy,
@@ -193,15 +192,12 @@ function MarkdownRenderer({ content }: { content: string }) {
             const text = String(children).replace(/\n$/, '')
 
             return !inline && match ? (
-              <SyntaxHighlighter
-                style={oneDark}
+              <CodeBlock
+                code={text}
                 language={match[1]}
-                PreTag="div"
+                preTag="div"
                 className="rounded-xl !mt-0 !mb-0 text-sm"
-                {...props}
-              >
-                {text}
-              </SyntaxHighlighter>
+              />
             ) : (
               <code className={codeClassName} {...props}>{children}</code>
             )
@@ -216,15 +212,13 @@ function MarkdownRenderer({ content }: { content: string }) {
 
 function CodeRenderer({ content, language }: { content: string; language: string }) {
   return (
-    <SyntaxHighlighter
-      style={oneDark}
+    <CodeBlock
+      code={content}
       language={language}
-      PreTag="div"
+      preTag="div"
       className="!m-0 !rounded-none text-sm"
       showLineNumbers
-    >
-      {content}
-    </SyntaxHighlighter>
+    />
   )
 }
 

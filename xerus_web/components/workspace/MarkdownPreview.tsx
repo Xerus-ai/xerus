@@ -3,9 +3,8 @@
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkFrontmatter from 'remark-frontmatter'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { cn } from '@/lib/utils'
+import { CodeBlock } from '@/components/shared/CodeBlock'
 
 interface MarkdownPreviewProps {
   content: string
@@ -14,25 +13,50 @@ interface MarkdownPreviewProps {
 
 // Warm code block theme matching Xerus design
 const warmCodeTheme: Record<string, React.CSSProperties> = {
-  ...oneDark,
   'pre[class*="language-"]': {
-    ...((oneDark as Record<string, React.CSSProperties>)['pre[class*="language-"]'] || {}),
     background: '#F5F0EB',
     borderRadius: '12px',
     color: '#2D2D2D',
+    fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+    fontSize: '13px',
+    lineHeight: '1.6',
   },
   'code[class*="language-"]': {
-    ...((oneDark as Record<string, React.CSSProperties>)['code[class*="language-"]'] || {}),
     background: '#F5F0EB',
     color: '#2D2D2D',
+    fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
   },
   comment: { color: '#999999', fontStyle: 'italic' },
-  string: { color: '#B5695A' },
-  keyword: { color: '#CC6600' },
-  number: { color: '#B5695A' },
-  function: { color: '#6E6E6E' },
-  operator: { color: '#6E6E6E' },
+  prolog: { color: '#999999' },
+  doctype: { color: '#999999' },
+  cdata: { color: '#999999' },
   punctuation: { color: '#999999' },
+  property: { color: '#CC6600' },
+  tag: { color: '#CC6600' },
+  boolean: { color: '#CC6600' },
+  number: { color: '#B5695A' },
+  constant: { color: '#B5695A' },
+  symbol: { color: '#B5695A' },
+  selector: { color: '#B5695A' },
+  'attr-name': { color: '#CC6600' },
+  string: { color: '#B5695A' },
+  char: { color: '#B5695A' },
+  builtin: { color: '#CC6600' },
+  inserted: { color: '#B5695A' },
+  operator: { color: '#6E6E6E' },
+  entity: { color: '#CC6600' },
+  url: { color: '#B5695A' },
+  '.language-css .token.string': { color: '#B5695A' },
+  '.style .token.string': { color: '#B5695A' },
+  atrule: { color: '#CC6600' },
+  'attr-value': { color: '#B5695A' },
+  keyword: { color: '#CC6600' },
+  function: { color: '#6E6E6E' },
+  'class-name': { color: '#2D2D2D', fontWeight: '600' },
+  regex: { color: '#B5695A' },
+  important: { color: '#CC6600', fontWeight: 'bold' },
+  variable: { color: '#2D2D2D' },
+  deleted: { color: '#B5695A' },
 }
 
 export function MarkdownPreview({ content, className }: MarkdownPreviewProps) {
@@ -76,10 +100,11 @@ export function MarkdownPreview({ content, className }: MarkdownPreviewProps) {
 
               if (isBlock) {
                 return (
-                  <SyntaxHighlighter
-                    style={warmCodeTheme}
+                  <CodeBlock
+                    code={codeString}
                     language={match ? match[1] : 'text'}
                     showLineNumbers
+                    theme={warmCodeTheme}
                     customStyle={{
                       margin: 0,
                       borderRadius: '12px',
@@ -95,9 +120,7 @@ export function MarkdownPreview({ content, className }: MarkdownPreviewProps) {
                       paddingRight: '1em',
                       userSelect: 'none',
                     }}
-                  >
-                    {codeString}
-                  </SyntaxHighlighter>
+                  />
                 )
               }
 

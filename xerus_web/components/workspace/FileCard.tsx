@@ -1,6 +1,6 @@
 'use client'
 
-import { FileText, Image as ImageIcon, FileSpreadsheet, FileArchive, File, FileCode } from 'lucide-react'
+import { FileText, Image as ImageIcon, FileSpreadsheet, FileArchive, File } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { FileNode } from '@/lib/api/workspace'
 import { getExtension, getFileCategory, getEditabilityBadge, formatSize, IMAGE_EXTENSIONS } from './file-utils'
