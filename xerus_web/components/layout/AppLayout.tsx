@@ -125,21 +125,9 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
     )
   }
 
-  // Login page: no sidebar, overlay
+  // Login page: full-screen overlay handles everything (bg, branding, form)
   if (isLoginPage) {
-    return (
-      <div className="flex h-screen overflow-hidden relative">
-        <main className="flex-1 relative h-screen overflow-y-auto filter blur-sm">
-          <div className="h-full flex items-center justify-center p-8">
-            <div className="text-center text-text-secondary">
-              <h2 className="text-xl font-semibold mb-2">AI Agents Dashboard</h2>
-              <p>Sign in to access your personalized AI assistants</p>
-            </div>
-          </div>
-        </main>
-        <LoginOverlay />
-      </div>
-    )
+    return <LoginOverlay />
   }
 
   // Mobile layout: floating header + content + bottom bar
