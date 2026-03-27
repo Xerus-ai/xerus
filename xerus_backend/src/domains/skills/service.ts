@@ -49,12 +49,14 @@ export class SkillService {
             throw new SkillNotFoundError(slug);
         }
 
-        if (!canUserViewSkill(skill, userId)) {
+        // Check install status first — installed skills are always viewable by the user
+        const isInstalled = await this.repository.isInstalled(userId, slug);
+
+        if (!isInstalled && !canUserViewSkill(skill, userId)) {
             throw new SkillAccessDeniedError(slug);
         }
 
         const files = await this.getSkillFiles(skill, userId);
-        const isInstalled = await this.repository.isInstalled(userId, slug);
 
         return {
             ...skill,
@@ -185,7 +187,8 @@ export class SkillService {
         if (!skill) {
             throw new SkillNotFoundError(slug);
         }
-        if (!canUserViewSkill(skill, userId)) {
+        const isInstalled = await this.repository.isInstalled(userId, slug);
+        if (!isInstalled && !canUserViewSkill(skill, userId)) {
             throw new SkillAccessDeniedError(slug);
         }
         return this.getSkillFiles(skill, userId);
@@ -194,7 +197,8 @@ export class SkillService {
     async readFile(slug: string, filePath: string, userId: string): Promise<string> {
         const skill = await this.repository.findBySlug(userId, slug);
         if (!skill) throw new SkillNotFoundError(slug);
-        if (!canUserViewSkill(skill, userId)) throw new SkillAccessDeniedError(slug);
+        const isInstalled = await this.repository.isInstalled(userId, slug);
+        if (!isInstalled && !canUserViewSkill(skill, userId)) throw new SkillAccessDeniedError(slug);
         const ws = this.requireWorkspace();
         return ws.readSkillFile(userId, skill.slug, filePath, skill.is_global);
     }

@@ -149,7 +149,27 @@ export function SkillDetailView({ skillSlug, onBack }: SkillDetailViewProps) {
 
   if (isLoading) return <XerusLoader />
 
-  if (error || !skill) {
+  if (error) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center gap-6 px-4">
+        <Image src="/logo/xerus.svg" alt="" width={40} height={40} className="opacity-30" />
+        <div className="text-center">
+          <h1 className="text-lg font-serif text-text mb-1">Could not load skill</h1>
+          <p className="text-sm text-text-secondary">Something went wrong. Please try again.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button onClick={() => mutateSkill()} className="px-5 py-2.5 bg-[#FF6600] hover:bg-[#E65C00] text-white font-medium rounded-xl text-sm transition-colors">
+            Retry
+          </button>
+          <button onClick={onBack} className="px-5 py-2.5 bg-surface-hover hover:bg-surface-active text-text font-medium rounded-xl text-sm transition-colors">
+            Back to Skills
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!skill) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-6 px-4">
         <Image src="/logo/xerus.svg" alt="" width={40} height={40} className="opacity-30" />

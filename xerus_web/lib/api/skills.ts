@@ -57,19 +57,14 @@ export const getSkills = async (options?: {
 // ============================================================
 
 export const getSkill = async (idOrSlug: string): Promise<SkillDetail | null> => {
-  try {
-    const response = await apiCall(`/skills/${idOrSlug}`, { method: 'GET' }, false);
-    if (!response.ok) {
-      if (response.status === 404) return null;
-      throw new Error('Failed to fetch skill');
-    }
-    const result = await response.json();
-    const data = result.data || result;
-    return mapSkillDetailToFrontend(data.skill || data);
-  } catch (err) {
-    console.error('Error fetching skill:', err);
-    return null;
+  const response = await apiCall(`/skills/${idOrSlug}`, { method: 'GET' }, false);
+  if (!response.ok) {
+    if (response.status === 404) return null;
+    throw new Error(`Failed to fetch skill: ${response.status}`);
   }
+  const result = await response.json();
+  const data = result.data || result;
+  return mapSkillDetailToFrontend(data.skill || data);
 };
 
 // ============================================================
