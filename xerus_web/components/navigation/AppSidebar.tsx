@@ -345,6 +345,29 @@ function InboxSidebarBody({ counts, markRead }: {
     })
   }
 
+  const [showCreateInput, setShowCreateInput] = useState(false)
+  const [newProjectName, setNewProjectName] = useState('')
+  const [isCreatingProject, setIsCreatingProject] = useState(false)
+
+  const handleCreateProject = async () => {
+    const trimmed = newProjectName.trim()
+    if (!trimmed) return
+    setIsCreatingProject(true)
+    try {
+      await apiCall('/company/domains', {
+        method: 'POST',
+        body: JSON.stringify({ name: trimmed }),
+      })
+      setNewProjectName('')
+      setShowCreateInput(false)
+      await refreshDomains()
+    } catch {
+      // apiCall shows toast
+    } finally {
+      setIsCreatingProject(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="px-4 py-6 space-y-3">
@@ -355,36 +378,68 @@ function InboxSidebarBody({ counts, markRead }: {
 
   if (domains.length === 0) {
     return (
-      <div className="px-4 py-3 opacity-40 pointer-events-none select-none" aria-hidden="true">
-        {/* Ghost preview — shows what populated sidebar looks like */}
-        <div className="mb-1">
-          <div className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-sm font-medium text-text">
-            <ChevronDown className="w-4 h-4 text-text-secondary shrink-0" />
-            <FolderOpen className="w-[18px] h-[18px] text-primary shrink-0" />
-            <span className="flex-1 text-left truncate">Product</span>
-            <span className="text-[11px] font-medium text-text-secondary bg-surface-hover rounded-full px-2 py-0.5">3</span>
-          </div>
-          <div className="pl-6 pr-2 py-0.5 space-y-0.5">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm text-text-secondary">
-              <Hash className="w-4 h-4 shrink-0" />
-              <span>Onboarding</span>
-            </div>
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm text-text-secondary">
-              <Hash className="w-4 h-4 shrink-0" />
-              <span>Analytics</span>
-            </div>
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm text-text-secondary">
-              <Hash className="w-4 h-4 shrink-0" />
-              <span>Design</span>
-            </div>
-          </div>
+      <div className="px-4 py-2">
+        {/* Section header with + button */}
+        <div className="flex items-center justify-between px-3 pt-1 pb-2">
+          <span className="text-[10px] font-semibold text-text-muted uppercase tracking-widest">Projects</span>
+          <button
+            onClick={() => setShowCreateInput(true)}
+            className="w-5 h-5 rounded-md flex items-center justify-center text-text-muted hover:bg-primary/10 hover:text-primary transition-colors"
+            title="Create project"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
         </div>
-        <div className="mb-1">
-          <div className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-sm font-medium text-text">
-            <ChevronRight className="w-4 h-4 text-text-secondary shrink-0" />
-            <Folder className="w-[18px] h-[18px] text-text-secondary shrink-0" />
-            <span className="flex-1 text-left truncate">Engineering</span>
-            <span className="text-[11px] font-medium text-text-secondary bg-surface-hover rounded-full px-2 py-0.5">2</span>
+
+        {/* Inline create input */}
+        {showCreateInput && (
+          <div className="px-2 pb-3">
+            <input
+              autoFocus
+              value={newProjectName}
+              onChange={(e) => setNewProjectName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleCreateProject()
+                if (e.key === 'Escape') { setShowCreateInput(false); setNewProjectName('') }
+              }}
+              placeholder="Project name..."
+              disabled={isCreatingProject}
+              className="w-full px-3 py-1.5 rounded-xl bg-surface border border-surface-active text-sm text-text placeholder:text-text-muted outline-none focus-visible:ring-2 focus-visible:ring-primary focus:border-primary/40 focus:shadow-[0_2px_12px_rgba(255,102,0,0.08)]"
+            />
+          </div>
+        )}
+
+        {/* Ghost preview — shows what populated sidebar looks like */}
+        <div className="opacity-30 pointer-events-none select-none" aria-hidden="true">
+          <div className="mb-1">
+            <div className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-sm font-medium text-text">
+              <ChevronDown className="w-4 h-4 text-text-secondary shrink-0" />
+              <FolderOpen className="w-[18px] h-[18px] text-primary shrink-0" />
+              <span className="flex-1 text-left truncate">Product</span>
+              <span className="text-[11px] font-medium text-text-secondary bg-surface-hover rounded-full px-2 py-0.5">3</span>
+            </div>
+            <div className="pl-6 pr-2 py-0.5 space-y-0.5">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm text-text-secondary">
+                <Hash className="w-4 h-4 shrink-0" />
+                <span>Onboarding</span>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm text-text-secondary">
+                <Hash className="w-4 h-4 shrink-0" />
+                <span>Analytics</span>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm text-text-secondary">
+                <Hash className="w-4 h-4 shrink-0" />
+                <span>Design</span>
+              </div>
+            </div>
+          </div>
+          <div className="mb-1">
+            <div className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-sm font-medium text-text">
+              <ChevronRight className="w-4 h-4 text-text-secondary shrink-0" />
+              <Folder className="w-[18px] h-[18px] text-text-secondary shrink-0" />
+              <span className="flex-1 text-left truncate">Engineering</span>
+              <span className="text-[11px] font-medium text-text-secondary bg-surface-hover rounded-full px-2 py-0.5">2</span>
+            </div>
           </div>
         </div>
       </div>
@@ -393,7 +448,37 @@ function InboxSidebarBody({ counts, markRead }: {
 
   return (
     <ScrollArea className="flex-1">
-      <div className="px-4 py-3">
+      {/* Section header with + button — always visible when projects exist */}
+      <div className="flex items-center justify-between px-7 pt-3 pb-1">
+        <span className="text-[10px] font-semibold text-text-muted uppercase tracking-widest">Projects</span>
+        <button
+          onClick={() => setShowCreateInput(prev => !prev)}
+          className="w-5 h-5 rounded-md flex items-center justify-center text-text-muted hover:bg-primary/10 hover:text-primary transition-colors"
+          title="Create project"
+        >
+          <Plus className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {/* Inline create input for when projects already exist */}
+      {showCreateInput && (
+        <div className="px-5 pb-2">
+          <input
+            autoFocus
+            value={newProjectName}
+            onChange={(e) => setNewProjectName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleCreateProject()
+              if (e.key === 'Escape') { setShowCreateInput(false); setNewProjectName('') }
+            }}
+            placeholder="Project name..."
+            disabled={isCreatingProject}
+            className="w-full px-3 py-1.5 rounded-xl bg-surface border border-surface-active text-sm text-text placeholder:text-text-muted outline-none focus-visible:ring-2 focus-visible:ring-primary focus:border-primary/40 focus:shadow-[0_2px_12px_rgba(255,102,0,0.08)]"
+          />
+        </div>
+      )}
+
+      <div className="px-4 pb-3">
         {domains.map((domain) => {
           const isExpanded = expandedDomains.has(domain.id)
           const domainUnread = domain.channels.reduce((sum, ch) => sum + (counts[ch.id] ?? 0), 0)
