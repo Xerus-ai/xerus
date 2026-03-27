@@ -30,7 +30,7 @@ export function ErrorBoundaryPage({
       </div>
       <button
         onClick={reset}
-        className="px-5 py-2.5 bg-[#FF6600] hover:bg-[#E65C00] text-white font-medium rounded-xl transition-colors"
+        className="px-5 py-2.5 bg-primary hover:bg-primary/90 text-white font-medium rounded-xl transition-colors"
       >
         Try Again
       </button>

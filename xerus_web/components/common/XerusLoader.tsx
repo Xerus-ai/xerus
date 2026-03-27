@@ -20,7 +20,7 @@ export function XerusLoader({ message, variant = 'page', className }: XerusLoade
     return (
       <div className={cn('flex flex-col items-center justify-center py-12 gap-4', className)}>
         <div className="relative">
-          <div className="absolute inset-0 rounded-full bg-[#FF6600]/10 animate-ping" style={{ animationDuration: '2s' }} />
+          <div className="absolute inset-0 rounded-full bg-primary/10 animate-ping" style={{ animationDuration: '2s' }} />
           <Image
             src="/logo/xerus.svg"
             alt="Loading"
@@ -43,8 +43,8 @@ export function XerusLoader({ message, variant = 'page', className }: XerusLoade
   return (
     <div className={cn('min-h-screen bg-surface-alt flex flex-col items-center justify-center gap-5', className)}>
       <div className="relative">
-        <div className="absolute -inset-3 rounded-full bg-[#FF6600]/8 animate-ping" style={{ animationDuration: '2.5s' }} />
-        <div className="absolute -inset-1.5 rounded-full bg-[#FF6600]/5 animate-pulse" style={{ animationDuration: '2s' }} />
+        <div className="absolute -inset-3 rounded-full bg-primary/8 animate-ping" style={{ animationDuration: '2.5s' }} />
+        <div className="absolute -inset-1.5 rounded-full bg-primary/5 animate-pulse" style={{ animationDuration: '2s' }} />
         <Image
           src="/logo/xerus.svg"
           alt="Loading"

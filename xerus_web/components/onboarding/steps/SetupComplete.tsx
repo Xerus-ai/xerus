@@ -51,7 +51,7 @@ export function SetupComplete({ workspace, project, onEnter }: SetupCompleteProp
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 1 }}
         onClick={onEnter}
-        className="mt-8 px-8 py-3 rounded-xl bg-[#FF6600] hover:bg-[#E65C00] text-white text-sm font-medium transition-all duration-200 flex items-center gap-2 shadow-[0_0_20px_rgba(255,102,0,0.2)] active:scale-95"
+        className="mt-8 px-8 py-3 rounded-xl bg-primary hover:bg-primary/90 text-white text-sm font-medium transition-all duration-200 flex items-center gap-2 shadow-[0_0_20px_rgba(255,102,0,0.2)] active:scale-95"
       >
         Enter your office
         <ArrowRight className="w-4 h-4" />

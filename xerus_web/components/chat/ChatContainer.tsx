@@ -346,7 +346,7 @@ export function ChatContainer({
         {isSandboxOpen && (
           <>
             <PanelResizeHandle className="w-2 flex items-center justify-center cursor-col-resize group shrink-0">
-              <div className="w-px h-8 rounded-full bg-[#E5E5E5] group-hover:bg-[#FF6600]/50 group-hover:h-16 transition-all" />
+              <div className="w-px h-8 rounded-full bg-[#E5E5E5] group-hover:bg-primary/50 group-hover:h-16 transition-all" />
             </PanelResizeHandle>
             <Panel defaultSize={50} minSize={25}>
               <SandboxPanel
@@ -368,7 +368,7 @@ export function ChatContainer({
         {!isSandboxOpen && viewerContent && (
           <>
             <PanelResizeHandle className="w-2 flex items-center justify-center cursor-col-resize group shrink-0">
-              <div className="w-px h-8 rounded-full bg-[#E5E5E5] group-hover:bg-[#FF6600]/50 group-hover:h-16 transition-all" />
+              <div className="w-px h-8 rounded-full bg-[#E5E5E5] group-hover:bg-primary/50 group-hover:h-16 transition-all" />
             </PanelResizeHandle>
             <Panel defaultSize={40} minSize={20}>
               <ArtifactViewerPanel

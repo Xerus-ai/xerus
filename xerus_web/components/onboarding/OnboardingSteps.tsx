@@ -91,7 +91,7 @@ const CHANNELS = [
 
 /* Inbox preview activity messages - derived from agents at runtime */
 const FALLBACK_ACTIVITY_MESSAGES = [
-  { agent: 'Research Analyst', time: '2m ago', text: 'Compiled competitor analysis report — 12 sources reviewed, 3 key insights flagged.', color: '#FF6600' },
+  { agent: 'Research Analyst', time: '2m ago', text: 'Compiled competitor analysis report — 12 sources reviewed, 3 key insights flagged.', color: 'hsl(var(--primary))' },
   { agent: 'Content Writer', time: '8m ago', text: 'Draft newsletter ready for review. Subject line A/B variants attached.', color: '#8B7355' },
 ]
 
@@ -114,7 +114,7 @@ const KANBAN_COLUMNS = [
     title: 'In Progress',
     color: '#3B82F6',
     tasks: [
-      { title: 'Competitor landscape analysis', labels: [{ name: 'Research', color: '#FF6600' }], due: 'Feb 22' },
+      { title: 'Competitor landscape analysis', labels: [{ name: 'Research', color: 'hsl(var(--primary))' }], due: 'Feb 22' },
       { title: 'Social media content calendar', labels: [{ name: 'Social', color: '#1DA1F2' }], due: 'Feb 23' },
     ],
   },
@@ -177,7 +177,7 @@ export function OnboardingSteps({ workspace, agents, onComplete }: OnboardingSte
   // Derive activity messages from the agents prop
   const ACTIVITY_MESSAGES = agents.length >= 2
     ? [
-        { agent: agents[0].name, time: '2m ago', text: `Completed initial analysis and filed report.`, color: '#FF6600' },
+        { agent: agents[0].name, time: '2m ago', text: `Completed initial analysis and filed report.`, color: 'hsl(var(--primary))' },
         { agent: agents[1].name, time: '8m ago', text: `Draft deliverable ready for review.`, color: '#8B7355' },
       ]
     : FALLBACK_ACTIVITY_MESSAGES
@@ -221,7 +221,7 @@ export function OnboardingSteps({ workspace, agents, onComplete }: OnboardingSte
               <div
                 key={step.label}
                 className={`flex items-start gap-3.5 px-3.5 py-3 rounded-2xl transition-all duration-200 ${
-                  isActive ? 'bg-[#FF6600]/5' : ''
+                  isActive ? 'bg-primary/5' : ''
                 }`}
               >
                 {isDone ? (
@@ -229,13 +229,13 @@ export function OnboardingSteps({ workspace, agents, onComplete }: OnboardingSte
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                    className="w-8 h-8 rounded-full bg-[#FF6600]/10 flex items-center justify-center shrink-0 mt-0.5"
+                    className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5"
                   >
-                    <Check className="w-4 h-4 text-[#FF6600]" />
+                    <Check className="w-4 h-4 text-primary" />
                   </motion.div>
                 ) : isActive ? (
-                  <div className="w-8 h-8 rounded-full bg-[#FF6600]/10 flex items-center justify-center shrink-0 mt-0.5">
-                    <Loader2 className="w-4 h-4 text-[#FF6600] animate-spin" />
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                    <Loader2 className="w-4 h-4 text-primary animate-spin" />
                   </div>
                 ) : (
                   <div className="w-8 h-8 rounded-full bg-surface-hover flex items-center justify-center shrink-0 mt-0.5">
@@ -246,7 +246,7 @@ export function OnboardingSteps({ workspace, agents, onComplete }: OnboardingSte
                 <div className="min-w-0 pt-0.5">
                   <span className={`text-base font-semibold leading-tight transition-colors duration-200 block ${
                     isDone ? 'text-text-secondary' :
-                    isActive ? 'text-[#FF6600]' :
+                    isActive ? 'text-primary' :
                     'text-text-muted'
                   }`}>
                     {step.label}
@@ -267,13 +267,13 @@ export function OnboardingSteps({ workspace, agents, onComplete }: OnboardingSte
           {PROGRESS_STEPS.map((step, idx) => (
             <div key={step.label} className="flex items-center gap-3">
               <div className={`w-2 h-2 rounded-full transition-colors duration-200 ${
-                (idx <= completedPhase || done) ? 'bg-[#FF6600]' :
-                (!done && idx === activePhase) ? 'bg-[#FF6600]/50' :
+                (idx <= completedPhase || done) ? 'bg-primary' :
+                (!done && idx === activePhase) ? 'bg-primary/50' :
                 'bg-surface-active'
               }`} />
               {idx < PROGRESS_STEPS.length - 1 && (
                 <div className={`w-4 h-px ${
-                  (done || completedPhase >= idx + 1) ? 'bg-[#FF6600]/30' : 'bg-surface-active'
+                  (done || completedPhase >= idx + 1) ? 'bg-primary/30' : 'bg-surface-active'
                 }`} />
               )}
             </div>
@@ -300,7 +300,7 @@ export function OnboardingSteps({ workspace, agents, onComplete }: OnboardingSte
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.2 }}
-                className="w-16 h-16 rounded-full bg-[#FF6600]/10 flex items-center justify-center mb-6"
+                className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-6"
               >
                 <Image src="/logo/xerus.svg" alt="Xerus" width={36} height={36} />
               </motion.div>
@@ -474,8 +474,8 @@ export function OnboardingSteps({ workspace, agents, onComplete }: OnboardingSte
                           transition={{ delay: 0.5 + i * 0.07 }}
                           className="rounded-xl bg-surface-alt/60 border border-surface-active/20 p-3.5 flex flex-col gap-2.5"
                         >
-                          <div className="w-9 h-9 rounded-lg bg-[#FF6600]/8 flex items-center justify-center">
-                            <Icon className="w-[18px] h-[18px] text-[#FF6600]" />
+                          <div className="w-9 h-9 rounded-lg bg-primary/8 flex items-center justify-center">
+                            <Icon className="w-[18px] h-[18px] text-primary" />
                           </div>
                           <div>
                             <div className="text-[13px] font-semibold text-text leading-tight">{skill.name}</div>
@@ -527,7 +527,7 @@ export function OnboardingSteps({ workspace, agents, onComplete }: OnboardingSte
                         key={ch.name}
                         className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                           ch.active
-                            ? 'bg-[#FF6600]/8 text-[#FF6600]'
+                            ? 'bg-primary/8 text-primary'
                             : 'text-text-muted hover:text-text-secondary'
                         }`}
                       >

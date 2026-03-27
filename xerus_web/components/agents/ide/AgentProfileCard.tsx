@@ -105,7 +105,7 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={agent.avatarUrl} alt={agent.name} className="w-full h-full object-cover" />
                     ) : (
-                        <span className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#FF6600] to-[#E65C00] text-white font-semibold text-2xl">
+                        <span className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary to-primary/90 text-white font-semibold text-2xl">
                             {agent.name.charAt(0).toUpperCase()}
                         </span>
                     )}
@@ -176,7 +176,7 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                             </h1>
                             {/* Verified Badge - small orange circle with checkmark */}
                             {agent.isVerified && (
-                                <span className="shrink-0 w-4 h-4 bg-[#FF6600] rounded-full flex items-center justify-center" title="Verified">
+                                <span className="shrink-0 w-4 h-4 bg-primary rounded-full flex items-center justify-center" title="Verified">
                                     <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
                                         <polyline points="20 6 9 17 4 12" />
                                     </svg>
@@ -185,7 +185,7 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                             {isEditable && (
                                 <button
                                     onClick={() => setIsEditingName(true)}
-                                    className="p-1.5 rounded-lg hover:bg-surface-hover text-text-secondary hover:text-[#FF6600] transition-colors"
+                                    className="p-1.5 rounded-lg hover:bg-surface-hover text-text-secondary hover:text-primary transition-colors"
                                     title="Edit name"
                                 >
                                     <Pencil className="w-5 h-5" />
@@ -229,7 +229,7 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                             {isEditable && (
                                 <button
                                     onClick={() => setIsEditingDesc(true)}
-                                    className="p-1.5 rounded-lg hover:bg-surface-hover text-text-secondary hover:text-[#FF6600] transition-colors shrink-0"
+                                    className="p-1.5 rounded-lg hover:bg-surface-hover text-text-secondary hover:text-primary transition-colors shrink-0"
                                     title="Edit description"
                                 >
                                     <Pencil className="w-5 h-5" />

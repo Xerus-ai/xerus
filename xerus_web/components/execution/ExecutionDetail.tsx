@@ -93,8 +93,8 @@ function TimelineContent({
           {isLive && (
             <div className="flex items-center gap-2 py-2 px-3">
               <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-pulse rounded-full bg-[#FF6600] opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-[#FF6600]" />
+                <span className="absolute inline-flex h-full w-full animate-pulse rounded-full bg-primary opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
               </span>
               <span className="text-xs text-text-muted">
                 Streaming events...
@@ -166,7 +166,7 @@ export function ExecutionDetail({
         <button
           type="button"
           aria-label="Close execution detail"
-          className="p-1.5 rounded-xl hover:bg-surface-hover active:scale-95 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600] focus-visible:ring-offset-2"
+          className="p-1.5 rounded-xl hover:bg-surface-hover active:scale-95 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
           onClick={onClose}
         >
           <svg

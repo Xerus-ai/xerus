@@ -149,7 +149,7 @@ export function UserMenu({ className }: UserMenuProps) {
         aria-haspopup="menu"
         className="flex items-center gap-2 w-full px-2 py-2 rounded-xl hover:bg-surface-hover/60 transition-all duration-200"
       >
-        <div className="w-8 h-8 rounded-full bg-[#FF6600]/10 flex items-center justify-center text-sm font-semibold text-[#FF6600] shrink-0">
+        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary shrink-0">
           {getUserInitial()}
         </div>
         <div className="flex-1 min-w-0 text-left">
@@ -186,7 +186,7 @@ export function UserMenu({ className }: UserMenuProps) {
             {/* Progress Bar */}
             <div className="h-1.5 w-full bg-surface-hover rounded-full overflow-hidden mb-3">
               <div
-                className="h-full bg-[#FF6600] rounded-full shadow-sm transition-all duration-300"
+                className="h-full bg-primary rounded-full shadow-sm transition-all duration-300"
                 style={{ width: `${getProgressPercentage()}%` }}
               />
             </div>
@@ -207,7 +207,7 @@ export function UserMenu({ className }: UserMenuProps) {
               {credits?.plan_type !== 'prodigy' && (
                 <button
                   onClick={() => router.push('/settings/billing')}
-                  className="text-[#FF6600] font-medium hover:text-[#e65c00] transition-colors hover:underline"
+                  className="text-primary font-medium hover:text-primary/90 transition-colors hover:underline"
                 >
                   Upgrade Plan
                 </button>

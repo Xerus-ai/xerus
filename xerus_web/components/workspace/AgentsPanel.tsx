@@ -3,7 +3,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
-import { Plus, Upload } from 'lucide-react'
 import { getUserAgents, getMarketplaceAgents, cloneAgent, importAgent } from '@/lib/api/agents'
 import type { Assistant } from '@/lib/api/types'
 import { PageHeader } from '@/components/common/PageHeader'
@@ -91,47 +90,29 @@ export function AgentsPanel({ onSelect, onCountChange }: AgentsPanelProps) {
           selectedCategories={selectedCategories}
           onToggleCategory={handleToggleCategory}
           onClearCategories={handleClearCategories}
-        >
-          <div className="flex items-center gap-2 mb-4">
-            <button
-              onClick={() => setUploadPanelOpen(true)}
-              className="border border-surface-active text-text hover:bg-surface-hover px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2"
-            >
-              <Upload className="w-4 h-4" />
-              Import
-            </button>
-            <button
-              onClick={() => router.push('/ai-agents/create')}
-              className="bg-text text-white hover:bg-[#1a1a1a] px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2 shadow-md"
-            >
-              <Plus className="w-4 h-4" />
-              Create Agent
-            </button>
-          </div>
-        </PageHeader>
+        />
 
         {/* My Agents */}
-        {myAgents.length > 0 && (
-          <div className="w-full mb-12">
-            <div className="flex items-center gap-3 mb-6">
-              <h2 className="font-serif text-2xl text-text">My Agents</h2>
-              <span className="bg-[#FF6600]/10 text-[#FF6600] text-xs font-bold px-2 py-1 rounded-md">
-                {myAgents.length} Agents
-              </span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              {myAgents.map((agent) => (
-                <AgentCard
-                  key={agent.slug || agent.id}
-                  agent={agent}
-                  onClick={() => onSelect(agent)}
-                  onChat={(e) => { e.stopPropagation(); router.push(`/chat?agent=${agent.slug || agent.id}`) }}
-                  isOwner
-                />
-              ))}
-            </div>
+        <div className="w-full mb-12">
+          <div className="flex items-center gap-3 mb-6">
+            <h2 className="font-serif text-2xl text-text">My Agents</h2>
+            <span className="bg-primary/10 text-primary text-xs font-bold px-2 py-1 rounded-md">
+              {myAgents.length} Agents
+            </span>
           </div>
-        )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            <CreateAgentCard onClick={() => setUploadPanelOpen(true)} />
+            {myAgents.map((agent) => (
+              <AgentCard
+                key={agent.slug || agent.id}
+                agent={agent}
+                onClick={() => onSelect(agent)}
+                onChat={(e) => { e.stopPropagation(); router.push(`/chat?agent=${agent.slug || agent.id}`) }}
+                isOwner
+              />
+            ))}
+          </div>
+        </div>
 
         {/* Marketplace */}
         <div className="w-full">
@@ -142,7 +123,6 @@ export function AgentsPanel({ onSelect, onCountChange }: AgentsPanelProps) {
             </span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            <CreateAgentCard onClick={() => router.push('/ai-agents/create')} />
             {marketplaceAgents.map((agent) => {
               const slug = agent.slug || String(agent.id)
               return (

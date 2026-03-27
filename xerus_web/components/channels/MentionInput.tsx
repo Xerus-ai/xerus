@@ -194,7 +194,7 @@ export function MentionInput({
                 className={cn(
                   'flex items-center gap-3 w-full px-3 py-2 text-left text-sm transition-colors',
                   idx === selectedIdx
-                    ? 'bg-[#FF6600]/8 text-[#FF6600]'
+                    ? 'bg-primary/8 text-primary'
                     : 'text-text hover:bg-surface-hover'
                 )}
                 onMouseDown={(e) => {
@@ -219,7 +219,7 @@ export function MentionInput({
           className={cn(
             'rounded-2xl border bg-white transition-all duration-200',
             focused
-              ? 'border-[#FF6600]/40 shadow-[0_2px_12px_rgba(255,102,0,0.08)]'
+              ? 'border-primary/40 shadow-[0_2px_12px_rgba(255,102,0,0.08)]'
               : 'border-surface-active shadow-sm hover:shadow-md hover:border-surface-hover'
           )}
         >
@@ -255,8 +255,8 @@ export function MentionInput({
                 aria-label="Mention an agent"
                 className={cn(
                   'p-1.5 rounded-lg text-text-muted transition-colors',
-                  'hover:text-[#FF6600] hover:bg-[#FF6600]/8',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600]'
+                  'hover:text-primary hover:bg-primary/8',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
                 )}
               >
                 <AtSign className="w-4 h-4" />
@@ -267,7 +267,7 @@ export function MentionInput({
                 className={cn(
                   'p-1.5 rounded-lg text-text-muted transition-colors',
                   'hover:text-text-secondary hover:bg-surface-hover',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600]'
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
                 )}
               >
                 <Paperclip className="w-4 h-4" />
@@ -301,11 +301,11 @@ export function MentionInput({
                 aria-label="Send message"
                 className={cn(
                   'flex items-center justify-center w-7 h-7 rounded-lg',
-                  'bg-[#FF6600] text-white',
-                  'hover:bg-[#E65C00] active:scale-90',
+                  'bg-primary text-white',
+                  'hover:bg-primary/90 active:scale-90',
                   'transition-all duration-150',
                   'disabled:opacity-40 disabled:cursor-not-allowed',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600] focus-visible:ring-offset-1'
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1'
                 )}
               >
                 <ArrowUp className="w-4 h-4" strokeWidth={2.5} />

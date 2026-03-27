@@ -164,7 +164,7 @@ export function FileCard({
         role="button"
         aria-expanded={expanded}
         aria-label={`${operationLabel} file: ${lastSegment}, status: ${status}`}
-        className="flex items-center gap-2 w-full px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600] focus-visible:ring-offset-2 active:scale-95 transition-all duration-200"
+        className="flex items-center gap-2 w-full px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 active:scale-95 transition-all duration-200"
         onClick={toggleExpanded}
         onKeyDown={handleKeyDown}
       >
@@ -206,7 +206,7 @@ export function FileCard({
             <button
               type="button"
               aria-label="Copy file path"
-              className="p-1 rounded-lg hover:bg-surface-hover active:scale-95 transition-all duration-200 ml-2 flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600] focus-visible:ring-offset-2"
+              className="p-1 rounded-lg hover:bg-surface-hover active:scale-95 transition-all duration-200 ml-2 flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               onClick={(e) => handleCopy(filePath, e)}
             >
               <Copy className="h-3 w-3 text-text-muted" />
@@ -223,7 +223,7 @@ export function FileCard({
                 <button
                   type="button"
                   aria-label="Copy file content"
-                  className="p-1 rounded-lg hover:bg-surface-hover active:scale-95 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600] focus-visible:ring-offset-2"
+                  className="p-1 rounded-lg hover:bg-surface-hover active:scale-95 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                   onClick={(e) => handleCopy(content, e)}
                 >
                   <Copy className="h-3 w-3 text-text-muted" />

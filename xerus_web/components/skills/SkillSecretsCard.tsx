@@ -110,7 +110,7 @@ function SecretRow({ skillSlug, envKey, status, onSaved }: {
                             value={value}
                             onChange={(e) => setValue(e.target.value)}
                             placeholder={`Enter ${envKey}`}
-                            className="w-full px-3 py-2 pr-8 rounded-lg border border-surface-active bg-surface text-sm focus:outline-none focus:border-[#FF6600] transition-colors"
+                            className="w-full px-3 py-2 pr-8 rounded-lg border border-surface-active bg-surface text-sm focus:outline-none focus:border-primary transition-colors"
                             autoFocus
                             onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') setEditing(false); }}
                         />
@@ -124,7 +124,7 @@ function SecretRow({ skillSlug, envKey, status, onSaved }: {
                     <button
                         onClick={handleSave}
                         disabled={saving || !value.trim()}
-                        className="h-9 px-4 bg-text hover:bg-[#FF6600] rounded-xl text-white flex items-center gap-2 shrink-0 text-sm font-medium transition-colors disabled:opacity-50"
+                        className="h-9 px-4 bg-text hover:bg-primary rounded-xl text-white flex items-center gap-2 shrink-0 text-sm font-medium transition-colors disabled:opacity-50"
                     >
                         {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                         Save
@@ -142,7 +142,7 @@ function SecretRow({ skillSlug, envKey, status, onSaved }: {
                     className={`h-9 px-4 rounded-xl flex items-center gap-2 shrink-0 text-sm font-medium transition-colors ${
                         status?.hasValue
                             ? 'bg-surface text-text-secondary hover:bg-surface-pressed hover:text-text'
-                            : 'bg-text hover:bg-[#FF6600] text-white'
+                            : 'bg-text hover:bg-primary text-white'
                     }`}
                 >
                     {status?.hasValue ? 'Update' : 'Set key'}

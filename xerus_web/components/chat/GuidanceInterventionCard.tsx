@@ -87,14 +87,14 @@ export function GuidanceInterventionCard({
   }, [onRespond, feedbackText])
 
   return (
-    <div className="mx-4 mb-2 rounded-2xl border border-[#FF6600]/20 bg-[#FF6600]/5 px-4 py-3">
+    <div className="mx-4 mb-2 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3">
       <div className="flex items-start gap-3">
         {/* Left: Icon + Content */}
         <div className="flex-1 min-w-0">
           {/* Label row */}
           <div className="flex items-center gap-2 mb-1.5">
-            <div className="w-7 h-7 rounded-xl flex items-center justify-center bg-[#FF6600]/15 shrink-0">
-              <Icon className="w-3.5 h-3.5 text-[#FF6600]" />
+            <div className="w-7 h-7 rounded-xl flex items-center justify-center bg-primary/15 shrink-0">
+              <Icon className="w-3.5 h-3.5 text-primary" />
             </div>
             <span className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">
               {label}
@@ -129,7 +129,7 @@ export function GuidanceInterventionCard({
                 href={browser_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-xs text-[#FF6600] hover:text-[#E65C00] font-medium transition-colors"
+                className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary/90 font-medium transition-colors"
               >
                 <Globe className="w-3 h-3" />
                 View in browser
@@ -140,7 +140,7 @@ export function GuidanceInterventionCard({
                 href={preview_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-xs text-[#FF6600] hover:text-[#E65C00] font-medium transition-colors"
+                className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary/90 font-medium transition-colors"
               >
                 <Eye className="w-3 h-3" />
                 Preview
@@ -177,7 +177,7 @@ export function GuidanceInterventionCard({
               className={cn(
                 'mt-2 w-full px-2.5 py-1.5 text-xs rounded-lg border',
                 'border-surface-active bg-surface-alt text-text placeholder:text-text-muted',
-                'focus:outline-none focus:border-[#FF6600]/30',
+                'focus:outline-none focus:border-primary/30',
               )}
             />
           )}
@@ -188,7 +188,7 @@ export function GuidanceInterventionCard({
           <button
             type="button"
             onClick={handleApprove}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[#FF6600] hover:bg-[#E65C00] text-white transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-primary hover:bg-primary/90 text-white transition-colors"
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
             Approve

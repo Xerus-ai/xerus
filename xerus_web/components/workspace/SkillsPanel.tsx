@@ -110,7 +110,7 @@ export function SkillsPanel({ onSelect, onCountChange }: SkillsPanelProps) {
           <div className="w-full mb-12">
             <div className="flex items-center gap-3 mb-6">
               <h2 className="font-serif text-2xl text-text">My Skills</h2>
-              <span className="bg-[#FF6600]/10 text-[#FF6600] text-xs font-bold px-2 py-1 rounded-md">
+              <span className="bg-primary/10 text-primary text-xs font-bold px-2 py-1 rounded-md">
                 {filteredMySkills.length} Skills
               </span>
             </div>

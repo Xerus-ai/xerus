@@ -211,7 +211,7 @@ export default function ScheduleConfigSection({
             onChange={(e) => setSchedule(prev => ({ ...prev, name: e.target.value }))}
             placeholder="e.g., Daily Report Generation"
             disabled={disabled}
-            className="w-full px-3 py-2 rounded-lg border border-surface-active text-sm focus:outline-none focus:border-[#FF6600] transition-colors bg-white text-text placeholder:text-[#9CA3AF]"
+            className="w-full px-3 py-2 rounded-lg border border-surface-active text-sm focus:outline-none focus:border-primary transition-colors bg-white text-text placeholder:text-[#9CA3AF]"
           />
         </div>
 
@@ -226,7 +226,7 @@ export default function ScheduleConfigSection({
             placeholder="Optional description of what this schedule does..."
             rows={2}
             disabled={disabled}
-            className="w-full px-3 py-2 rounded-lg border border-surface-active text-sm focus:outline-none focus:border-[#FF6600] transition-colors bg-white text-text placeholder:text-[#9CA3AF] resize-none"
+            className="w-full px-3 py-2 rounded-lg border border-surface-active text-sm focus:outline-none focus:border-primary transition-colors bg-white text-text placeholder:text-[#9CA3AF] resize-none"
           />
         </div>
 
@@ -241,7 +241,7 @@ export default function ScheduleConfigSection({
             placeholder="e.g., Generate a summary of yesterday's customer support tickets..."
             rows={4}
             disabled={disabled}
-            className="w-full px-3 py-2 rounded-lg border border-surface-active text-sm focus:outline-none focus:border-[#FF6600] transition-colors bg-white text-text placeholder:text-[#9CA3AF] resize-none"
+            className="w-full px-3 py-2 rounded-lg border border-surface-active text-sm focus:outline-none focus:border-primary transition-colors bg-white text-text placeholder:text-[#9CA3AF] resize-none"
           />
           <div className="flex items-center justify-between mt-1">
             <p className="text-xs text-text-secondary">
@@ -256,7 +256,7 @@ export default function ScheduleConfigSection({
 
           {/* Examples Dropdown */}
           <details className="mt-3 group">
-            <summary className="text-xs font-medium text-[#FF6600] cursor-pointer hover:text-[#e55b00] transition-colors list-none flex items-center gap-1">
+            <summary className="text-xs font-medium text-primary cursor-pointer hover:text-primary/90 transition-colors list-none flex items-center gap-1">
               <span>📋 View example task prompts</span>
             </summary>
             <div className="mt-2 p-3 bg-surface rounded-xl space-y-2 border border-surface-active">
@@ -269,10 +269,10 @@ export default function ScheduleConfigSection({
                   key={i}
                   type="button"
                   onClick={() => setSchedule(prev => ({ ...prev, taskPrompt: example.prompt }))}
-                  className="w-full text-left p-2.5 bg-white hover:border-[#FF6600] rounded-lg border border-surface-active transition-all group/btn"
+                  className="w-full text-left p-2.5 bg-white hover:border-primary rounded-lg border border-surface-active transition-all group/btn"
                   disabled={disabled}
                 >
-                  <div className="font-medium text-text text-sm group-hover/btn:text-[#FF6600] transition-colors">{example.title}</div>
+                  <div className="font-medium text-text text-sm group-hover/btn:text-primary transition-colors">{example.title}</div>
                   <div className="text-xs text-text-secondary mt-0.5">{example.desc}</div>
                 </button>
               ))}
@@ -300,11 +300,11 @@ export default function ScheduleConfigSection({
                 }))}
                 disabled={disabled}
                 className={`p-3 rounded-xl border text-left transition-all ${schedule.scheduleType === type.id
-                  ? 'border-[#FF6600] bg-[#FFF5EB]'
-                  : 'border-surface-active bg-white hover:border-[#FF6600]/50'
+                  ? 'border-primary bg-[#FFF5EB]'
+                  : 'border-surface-active bg-white hover:border-primary/50'
                   }`}
               >
-                <div className={`font-medium text-sm ${schedule.scheduleType === type.id ? 'text-[#FF6600]' : 'text-text'}`}>
+                <div className={`font-medium text-sm ${schedule.scheduleType === type.id ? 'text-primary' : 'text-text'}`}>
                   {type.name}
                 </div>
                 <div className="text-xs text-text-secondary mt-0.5">{type.description}</div>
@@ -328,7 +328,7 @@ export default function ScheduleConfigSection({
                   scheduleConfig: { ...prev.scheduleConfig, datetime: e.target.value }
                 }))}
                 disabled={disabled}
-                className="w-full px-3 py-2 rounded-lg border border-surface-active text-sm focus:outline-none focus:border-[#FF6600] transition-colors bg-white text-text"
+                className="w-full px-3 py-2 rounded-lg border border-surface-active text-sm focus:outline-none focus:border-primary transition-colors bg-white text-text"
               />
             </div>
           )}
@@ -347,7 +347,7 @@ export default function ScheduleConfigSection({
                   scheduleConfig: { ...prev.scheduleConfig, time: e.target.value }
                 }))}
                 disabled={disabled}
-                className="w-full px-3 py-2 rounded-lg border border-surface-active text-sm focus:outline-none focus:border-[#FF6600] transition-colors bg-white text-text"
+                className="w-full px-3 py-2 rounded-lg border border-surface-active text-sm focus:outline-none focus:border-primary transition-colors bg-white text-text"
               />
             </div>
           )}
@@ -364,8 +364,8 @@ export default function ScheduleConfigSection({
                     onClick={() => toggleDay(day.id)}
                     disabled={disabled}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${schedule.scheduleConfig.days?.includes(day.id)
-                      ? 'bg-[#FF6600] text-white border-[#FF6600]'
-                      : 'bg-white text-text-secondary border-surface-active hover:border-[#FF6600] hover:text-[#FF6600]'
+                      ? 'bg-primary text-white border-primary'
+                      : 'bg-white text-text-secondary border-surface-active hover:border-primary hover:text-primary'
                       }`}
                   >
                     {day.name}
@@ -390,7 +390,7 @@ export default function ScheduleConfigSection({
                   scheduleConfig: { ...prev.scheduleConfig, date: parseInt(e.target.value) }
                 }))}
                 disabled={disabled}
-                className="w-full px-3 py-2 rounded-lg border border-surface-active text-sm focus:outline-none focus:border-[#FF6600] transition-colors bg-white text-text"
+                className="w-full px-3 py-2 rounded-lg border border-surface-active text-sm focus:outline-none focus:border-primary transition-colors bg-white text-text"
               />
             </div>
           )}
@@ -408,7 +408,7 @@ export default function ScheduleConfigSection({
                 }))}
                 placeholder="0 9 * * *"
                 disabled={disabled}
-                className="w-full px-3 py-2 rounded-lg border border-surface-active text-sm focus:outline-none focus:border-[#FF6600] transition-colors bg-white text-text font-mono"
+                className="w-full px-3 py-2 rounded-lg border border-surface-active text-sm focus:outline-none focus:border-primary transition-colors bg-white text-text font-mono"
               />
               <p className="text-xs text-text-secondary mt-1">
                 Format: minute hour day month weekday (e.g., "0 9 * * *" = 9:00 AM daily)
@@ -426,7 +426,7 @@ export default function ScheduleConfigSection({
             value={schedule.timezone}
             onChange={(e) => setSchedule(prev => ({ ...prev, timezone: e.target.value }))}
             disabled={disabled}
-            className="w-full px-3 py-2 rounded-lg border border-surface-active text-sm focus:outline-none focus:border-[#FF6600] transition-colors bg-white text-text"
+            className="w-full px-3 py-2 rounded-lg border border-surface-active text-sm focus:outline-none focus:border-primary transition-colors bg-white text-text"
           >
             {TIMEZONES.map((tz) => (
               <option key={tz.id} value={tz.id}>
@@ -437,9 +437,9 @@ export default function ScheduleConfigSection({
         </div>
 
         {/* Preview */}
-        <div className="flex items-center gap-3 p-4 bg-[#FF6600]/5 border border-[#FF6600]/20 rounded-2xl">
-          <div className="w-8 h-8 rounded-xl bg-[#FF6600]/10 flex items-center justify-center shrink-0">
-            <Info className="w-4 h-4 text-[#FF6600]" />
+        <div className="flex items-center gap-3 p-4 bg-primary/5 border border-primary/20 rounded-2xl">
+          <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+            <Info className="w-4 h-4 text-primary" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-sm text-text">{formatNextRun()}</div>
@@ -457,7 +457,7 @@ export default function ScheduleConfigSection({
             checked={schedule.enabled}
             onCheckedChange={(enabled) => setSchedule(prev => ({ ...prev, enabled }))}
             disabled={disabled}
-            className="data-[state=checked]:bg-[#FF6600]"
+            className="data-[state=checked]:bg-primary"
           />
         </div>
 

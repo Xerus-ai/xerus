@@ -30,7 +30,7 @@ export function SkillCard({ skill, onClick, agents = [], onInstall, onUninstall,
         >
             {/* Name + Description */}
             <div className="mb-4 flex-1">
-                <h3 className="font-serif text-xl text-text group-hover:text-[#F97316] transition-colors line-clamp-1 mb-2" title={skill.name}>
+                <h3 className="font-serif text-xl text-text group-hover:text-primary transition-colors line-clamp-1 mb-2" title={skill.name}>
                     {skill.name}
                 </h3>
                 <p className="text-sm text-text-secondary leading-relaxed line-clamp-3">
@@ -48,7 +48,7 @@ export function SkillCard({ skill, onClick, agents = [], onInstall, onUninstall,
                         </span>
                     )}
                     {skill.category && (
-                        <span className="text-[10px] font-medium px-2 py-1 rounded-md bg-[#FF6600]/10 text-[#FF6600] capitalize">
+                        <span className="text-[10px] font-medium px-2 py-1 rounded-md bg-primary/10 text-primary capitalize">
                             {skill.category}
                         </span>
                     )}
@@ -67,7 +67,7 @@ export function SkillCard({ skill, onClick, agents = [], onInstall, onUninstall,
                 {showInstall && !isInstalled && (
                     <button
                         onClick={handleInstallClick}
-                        className="flex items-center justify-center gap-2 bg-[#FF6600] hover:bg-[#E65C00] text-white font-medium py-2.5 rounded-xl text-sm shadow-sm transition-all"
+                        className="flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white font-medium py-2.5 rounded-xl text-sm shadow-sm transition-all"
                     >
                         Install
                     </button>

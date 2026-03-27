@@ -48,7 +48,7 @@ export function MarkdownPreview({ content, className }: MarkdownPreviewProps) {
         'prose-strong:text-text prose-strong:font-semibold',
         'prose-li:text-text prose-li:leading-[1.8]',
         // Links
-        'prose-a:text-[#FF6600] prose-a:no-underline hover:prose-a:underline',
+        'prose-a:text-primary prose-a:no-underline hover:prose-a:underline',
         // Inline code — warm bg, no backtick quotes
         'prose-code:bg-surface-hover prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:text-sm prose-code:font-mono prose-code:text-text',
         'prose-code:before:content-none prose-code:after:content-none',
@@ -59,7 +59,7 @@ export function MarkdownPreview({ content, className }: MarkdownPreviewProps) {
         // HR
         'prose-hr:border-surface-active prose-hr:my-8',
         // Blockquote
-        'prose-blockquote:border-l-[#FF6600] prose-blockquote:bg-[#FF6600]/5 prose-blockquote:py-1 prose-blockquote:rounded-r-lg',
+        'prose-blockquote:border-l-primary prose-blockquote:bg-primary/5 prose-blockquote:py-1 prose-blockquote:rounded-r-lg',
         // Tables
         'prose-table:text-sm [&_th]:bg-surface [&_th]:p-2 [&_td]:p-2 [&_tr]:border-b [&_tr]:border-surface-active',
       )}>

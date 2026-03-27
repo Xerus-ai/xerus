@@ -160,7 +160,7 @@ export default function ProfilePage() {
             {planType === 'free' && (
               <Link
                 href="/settings/billing"
-                className="text-xs font-medium text-[#FF6600] hover:text-[#E65C00] transition-colors"
+                className="text-xs font-medium text-primary hover:text-primary/90 transition-colors"
               >
                 Upgrade
               </Link>
@@ -182,14 +182,14 @@ export default function ProfilePage() {
             type="text"
             value={displayNameInput}
             onChange={(e) => setDisplayNameInput(e.target.value)}
-            className="flex-1 max-w-sm px-4 py-2.5 bg-white border border-surface-active rounded-xl text-sm text-text placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-[#FF6600]/15 focus:border-[#FF6600]/40 transition-all"
+            className="flex-1 max-w-sm px-4 py-2.5 bg-white border border-surface-active rounded-xl text-sm text-text placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary/40 transition-all"
             maxLength={32}
             placeholder="Enter your display name"
           />
           <button
             onClick={handleUpdateDisplayName}
             disabled={isSaving || !displayNameInput || displayNameInput === profile?.display_name}
-            className="px-5 py-2.5 bg-[#FF6600] text-white text-sm font-medium rounded-xl hover:bg-[#E65C00] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-5 py-2.5 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {isSaving ? 'Saving...' : 'Save'}
           </button>

@@ -59,9 +59,9 @@ export function AgentDesk({ agent, onClick }: AgentDeskProps) {
         'flex items-center gap-3 w-full rounded-2xl px-3 py-2.5',
         'transition-all duration-200 text-left',
         'hover:bg-surface-alt',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600]',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
         'active:scale-95',
-        isActive && 'border border-[#FF6600]/20',
+        isActive && 'border border-primary/20',
         isSleeping && 'opacity-60'
       )}
     >

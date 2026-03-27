@@ -56,13 +56,13 @@ export function AgentChannelsCard({ agentId, isEditable, isMarketplace = false }
     <div className="space-y-2">
       <div className="flex items-center justify-between px-1">
         <div className="flex items-center gap-2">
-          <Hash className="w-6 h-6 text-[#FF6600]" />
+          <Hash className="w-6 h-6 text-primary" />
           <h3 className="text-2xl font-serif text-text">Channels</h3>
         </div>
         {isEditable && (
           <button
             onClick={() => setShowPicker(!showPicker)}
-            className="p-2 hover:bg-[#FFF5EB] text-[#FF6600] rounded-full transition-colors"
+            className="p-2 hover:bg-[#FFF5EB] text-primary rounded-full transition-colors"
             aria-label={showPicker ? 'Close picker' : 'Add channel'}
           >
             {showPicker ? <X className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
@@ -78,8 +78,8 @@ export function AgentChannelsCard({ agentId, isEditable, isMarketplace = false }
                 key={ch.channel_id}
                 className="flex items-center gap-2.5 py-1.5 px-2 rounded-xl hover:bg-surface-hover group transition-colors"
               >
-                <div className="w-7 h-7 rounded-lg bg-[#FF6600]/10 flex items-center justify-center shrink-0">
-                  <Hash className="w-3.5 h-3.5 text-[#FF6600]" />
+                <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <Hash className="w-3.5 h-3.5 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-text truncate">{ch.channel_name}</p>
@@ -90,11 +90,11 @@ export function AgentChannelsCard({ agentId, isEditable, isMarketplace = false }
                 ) : (
                   <div className="flex items-center gap-1 shrink-0">
                     {ch.is_primary ? (
-                      <Star className="w-3.5 h-3.5 text-[#FF6600] fill-current" />
+                      <Star className="w-3.5 h-3.5 text-primary fill-current" />
                     ) : isEditable ? (
                       <button
                         onClick={() => handleSetPrimary(ch.channel_id)}
-                        className="w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-[#FFF5EB] text-text-secondary hover:text-[#FF6600] transition-all"
+                        className="w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-[#FFF5EB] text-text-secondary hover:text-primary transition-all"
                         title="Set as primary"
                       >
                         <Star className="w-3 h-3" />

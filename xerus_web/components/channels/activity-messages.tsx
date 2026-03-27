@@ -75,8 +75,8 @@ export function PostMessage({
               type="button"
               onClick={() => onViewWork(executionId)}
               className={cn(
-                'inline-flex items-center gap-1 text-xs text-[#FF6600] hover:text-[#E65C00] font-medium',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600] focus-visible:ring-offset-2 rounded'
+                'inline-flex items-center gap-1 text-xs text-primary hover:text-primary/90 font-medium',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded'
               )}
             >
               View work
@@ -87,7 +87,7 @@ export function PostMessage({
             type="button"
             className={cn(
               'inline-flex items-center gap-1 text-xs text-text-muted hover:text-text-secondary font-medium',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600] focus-visible:ring-offset-2 rounded'
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded'
             )}
           >
             <MessageSquare className="w-3 h-3" />
@@ -142,9 +142,9 @@ export function EscalationMessage({ message }: { message: ChannelMessage }) {
             aria-label="Approve this escalation"
             className={cn(
               'inline-flex items-center gap-1.5',
-              'bg-[#FF6600] hover:bg-[#E65C00] text-white font-medium py-1.5 px-3 rounded-xl text-xs',
+              'bg-primary hover:bg-primary/90 text-white font-medium py-1.5 px-3 rounded-xl text-xs',
               'transition-colors active:scale-95',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600] focus-visible:ring-offset-2'
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
             )}
           >
             <Check className="w-3.5 h-3.5" />
@@ -157,7 +157,7 @@ export function EscalationMessage({ message }: { message: ChannelMessage }) {
               'inline-flex items-center gap-1.5',
               'bg-surface-hover hover:bg-surface-pressed text-text font-medium py-1.5 px-3 rounded-xl text-xs',
               'transition-colors active:scale-95',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600] focus-visible:ring-offset-2'
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
             )}
           >
             <X className="w-3.5 h-3.5" />
@@ -168,9 +168,9 @@ export function EscalationMessage({ message }: { message: ChannelMessage }) {
             aria-label="Discuss this escalation"
             className={cn(
               'inline-flex items-center gap-1.5',
-              'text-[#FF6600] hover:bg-[#FFF4E6] font-medium py-1.5 px-3 rounded-xl text-xs',
+              'text-primary hover:bg-[#FFF4E6] font-medium py-1.5 px-3 rounded-xl text-xs',
               'transition-colors active:scale-95',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600] focus-visible:ring-offset-2'
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
             )}
           >
             <MessageSquare className="w-3.5 h-3.5" />

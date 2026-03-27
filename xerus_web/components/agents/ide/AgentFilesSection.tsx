@@ -54,7 +54,7 @@ export function AgentFilesSection({
       {/* Agent Files - Unified Section */}
       <div className="space-y-4">
         <div className="flex items-center gap-2 px-1">
-          <FileText className="w-6 h-6 text-[#FF6600]" />
+          <FileText className="w-6 h-6 text-primary" />
           <h3 className="text-2xl font-serif text-text">Agent Files</h3>
         </div>
 
@@ -75,7 +75,7 @@ export function AgentFilesSection({
             {isEditable ? (
               <Button
                 variant="ghost"
-                className="h-9 px-4 bg-text hover:bg-[#FF6600] rounded-xl text-white flex items-center gap-2 shrink-0"
+                className="h-9 px-4 bg-text hover:bg-primary rounded-xl text-white flex items-center gap-2 shrink-0"
               >
                 <Pencil className="w-3.5 h-3.5" />
                 <span className="text-sm font-medium">Edit</span>
@@ -135,7 +135,7 @@ export function AgentFilesSection({
                   isEditable ? (
                     <Button
                       variant="ghost"
-                      className="h-9 px-4 bg-text hover:bg-[#FF6600] rounded-xl text-white flex items-center gap-2 shrink-0"
+                      className="h-9 px-4 bg-text hover:bg-primary rounded-xl text-white flex items-center gap-2 shrink-0"
                     >
                       <Pencil className="w-3.5 h-3.5" />
                       <span className="text-sm font-medium">{hasContent ? 'Edit' : 'Create'}</span>

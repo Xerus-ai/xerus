@@ -173,7 +173,7 @@ export default function AgentDetailsClient({ agentId }: AgentDetailsClientProps)
         </div>
         <button
           onClick={() => router.push('/ai-agents')}
-          className="px-5 py-2.5 bg-[#FF6600] hover:bg-[#E65C00] text-white font-medium rounded-xl text-sm transition-colors"
+          className="px-5 py-2.5 bg-primary hover:bg-primary/90 text-white font-medium rounded-xl text-sm transition-colors"
         >
           Back to Agents
         </button>
@@ -200,7 +200,7 @@ export default function AgentDetailsClient({ agentId }: AgentDetailsClientProps)
               <button
                 onClick={handlePublish}
                 disabled={isPublishing}
-                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-[#FF6600] hover:bg-[#FF6600]/5 rounded-xl transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/5 rounded-xl transition-colors disabled:opacity-50"
               >
                 {isPublishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                 {isPublishing ? 'Publishing...' : 'Publish to marketplace'}
@@ -233,7 +233,7 @@ export default function AgentDetailsClient({ agentId }: AgentDetailsClientProps)
               <button
                 onClick={handleClone}
                 disabled={isCloning}
-                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-[#FF6600] hover:bg-[#FF6600]/5 rounded-xl transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/5 rounded-xl transition-colors disabled:opacity-50"
               >
                 {isCloning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
                 Clone this agent to edit

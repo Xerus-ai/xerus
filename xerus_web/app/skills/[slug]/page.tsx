@@ -110,7 +110,7 @@ export default function SkillDetailPage() {
                     <p className="text-sm text-text-secondary">Something went wrong. Please try again.</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <button onClick={() => mutateSkill()} className="px-5 py-2.5 bg-[#FF6600] hover:bg-[#E65C00] text-white font-medium rounded-xl text-sm transition-colors">
+                    <button onClick={() => mutateSkill()} className="px-5 py-2.5 bg-primary hover:bg-primary/90 text-white font-medium rounded-xl text-sm transition-colors">
                         Retry
                     </button>
                     <button onClick={() => router.push('/workspace')} className="px-5 py-2.5 bg-surface-hover hover:bg-surface-active text-text font-medium rounded-xl text-sm transition-colors">
@@ -129,7 +129,7 @@ export default function SkillDetailPage() {
                     <h1 className="text-lg font-serif text-text mb-1">Skill not found</h1>
                     <p className="text-sm text-text-secondary">The skill you are looking for does not exist or was removed.</p>
                 </div>
-                <button onClick={() => router.push('/workspace')} className="px-5 py-2.5 bg-[#FF6600] hover:bg-[#E65C00] text-white font-medium rounded-xl text-sm transition-colors">
+                <button onClick={() => router.push('/workspace')} className="px-5 py-2.5 bg-primary hover:bg-primary/90 text-white font-medium rounded-xl text-sm transition-colors">
                     Back to Skills
                 </button>
             </div>
@@ -196,7 +196,7 @@ export default function SkillDetailPage() {
                         {isInstalled && requiredEnvKeys.length > 0 && (
                             <div className="space-y-2">
                                 <h3 className="font-serif text-xl flex items-center gap-2 px-1">
-                                    <Shield className="w-5 h-5 text-[#FF6600]" />
+                                    <Shield className="w-5 h-5 text-primary" />
                                     Authentication
                                 </h3>
                                 <SkillSecretsCard skillSlug={skill.slug} envKeys={requiredEnvKeys} />
@@ -206,7 +206,7 @@ export default function SkillDetailPage() {
                         {/* Skill Files */}
                         <div className="space-y-2">
                             <div className="flex items-center gap-2 px-1">
-                                <FileText className="w-5 h-5 text-[#FF6600]" />
+                                <FileText className="w-5 h-5 text-primary" />
                                 <h3 className="text-2xl font-serif text-text">Skill Files</h3>
                             </div>
 
@@ -225,7 +225,7 @@ export default function SkillDetailPage() {
                                         </p>
                                     </div>
                                     {(isInstalled || isOwner) ? (
-                                        <button className="h-9 px-4 bg-text hover:bg-[#FF6600] rounded-xl text-white flex items-center gap-2 shrink-0 text-sm font-medium transition-colors">
+                                        <button className="h-9 px-4 bg-text hover:bg-primary rounded-xl text-white flex items-center gap-2 shrink-0 text-sm font-medium transition-colors">
                                             <Pencil className="w-3.5 h-3.5" />
                                             Edit
                                         </button>
@@ -253,7 +253,7 @@ export default function SkillDetailPage() {
                                                     </p>
                                                 </div>
                                                 {(isInstalled || isOwner) ? (
-                                                    <button className="h-9 px-4 bg-text hover:bg-[#FF6600] rounded-xl text-white flex items-center gap-2 shrink-0 text-sm font-medium transition-colors">
+                                                    <button className="h-9 px-4 bg-text hover:bg-primary rounded-xl text-white flex items-center gap-2 shrink-0 text-sm font-medium transition-colors">
                                                         <Pencil className="w-3.5 h-3.5" />
                                                         Edit
                                                     </button>
@@ -274,7 +274,7 @@ export default function SkillDetailPage() {
                         {readmeFile && (
                             <div className="space-y-2">
                                 <div className="flex items-center gap-2 px-1">
-                                    <FileText className="w-5 h-5 text-[#FF6600]" />
+                                    <FileText className="w-5 h-5 text-primary" />
                                     <h3 className="text-2xl font-serif text-text">README</h3>
                                 </div>
 
@@ -373,7 +373,7 @@ export default function SkillDetailPage() {
                                                 disabled={saving || editorMode === 'view'}
                                                 className={`w-9 h-9 rounded-[12px] flex items-center justify-center shadow-md transition-colors ${
                                                     editorMode === 'edit'
-                                                        ? 'bg-text text-white hover:bg-[#FF6600]'
+                                                        ? 'bg-text text-white hover:bg-primary'
                                                         : 'bg-surface text-text-secondary cursor-not-allowed'
                                                 }`}
                                             >
@@ -397,7 +397,7 @@ export default function SkillDetailPage() {
                         <div className="space-y-2">
                             <div className="flex items-center gap-2 px-1">
                                 <div className="flex items-center gap-2">
-                                    <Bot className="w-5 h-5 text-[#FF6600]" />
+                                    <Bot className="w-5 h-5 text-primary" />
                                     <h3 className="text-2xl font-serif text-text">Agents</h3>
                                 </div>
                             </div>
@@ -412,7 +412,7 @@ export default function SkillDetailPage() {
                         <div className="space-y-2">
                             <div className="flex items-center gap-2 px-1">
                                 <div className="flex items-center gap-2">
-                                    <Hash className="w-5 h-5 text-[#FF6600]" />
+                                    <Hash className="w-5 h-5 text-primary" />
                                     <h3 className="text-2xl font-serif text-text">Channels</h3>
                                 </div>
                             </div>

@@ -83,7 +83,7 @@ export function FileList({ files, selectedPath, onSelect, onContextMenu, classNa
                 onContextMenu={onContextMenu ? (e) => onContextMenu(e, node) : undefined}
                 className={cn(
                   'absolute left-0 w-full grid grid-cols-[1fr_100px_80px_100px_110px] gap-4 px-5 py-3 items-center text-left transition-colors border-b border-surface-active/50',
-                  isSelected ? 'bg-[#FF6600]/5' : 'hover:bg-surface-hover/50',
+                  isSelected ? 'bg-primary/5' : 'hover:bg-surface-hover/50',
                 )}
                 style={{
                   top: 0,

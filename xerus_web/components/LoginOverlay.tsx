@@ -58,10 +58,10 @@ export function LoginOverlay() {
           <button
             onClick={handleGoogleSignIn}
             disabled={isSigningIn}
-            className="group w-full flex items-center justify-center gap-3 py-4 px-6 bg-surface-hover border border-surface-active rounded-xl text-text font-medium hover:border-[#FF6600]/40 hover:shadow-[0_4px_20px_rgba(255,102,0,0.1)] transition-all duration-300 transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+            className="group w-full flex items-center justify-center gap-3 py-4 px-6 bg-surface-hover border border-surface-active rounded-xl text-text font-medium hover:border-primary/40 hover:shadow-[0_4px_20px_rgba(255,102,0,0.1)] transition-all duration-300 transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
           >
             {isSigningIn ? (
-              <div className="w-5 h-5 border-2 border-[#FF6600] border-t-transparent rounded-full animate-spin" />
+              <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             ) : (
               <svg className="h-5 w-5 transition-transform group-hover:scale-110 duration-300" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -77,11 +77,11 @@ export function LoginOverlay() {
         <div className="mt-8 text-center">
           <p className="text-xs text-text-muted font-sans">
             By signing in, you agree to our{' '}
-            <a href="https://www.xerus.ai/terms-of-service" target="_blank" rel="noopener noreferrer" className="text-[#FF6600] hover:text-[#E65C00] transition-colors hover:underline">
+            <a href="https://www.xerus.ai/terms-of-service" target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/90 transition-colors hover:underline">
               Terms of Service
             </a>
             {' '}and{' '}
-            <a href="https://www.xerus.ai/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-[#FF6600] hover:text-[#E65C00] transition-colors hover:underline">
+            <a href="https://www.xerus.ai/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/90 transition-colors hover:underline">
               Privacy Policy
             </a>
           </p>

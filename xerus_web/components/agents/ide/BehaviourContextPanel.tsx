@@ -74,7 +74,7 @@ export function BehaviourContextPanel({ activeSection }: BehaviourContextPanelPr
         <div className="bg-surface rounded-[24px] border border-surface-active p-6 shadow-sm">
             <div className="flex items-center gap-3 mb-4">
                 <div className="p-2 rounded-lg bg-surface-hover">
-                    <Icon className="w-4 h-4 text-[#FF6600]" />
+                    <Icon className="w-4 h-4 text-primary" />
                 </div>
                 <h3 className="text-sm font-semibold text-text">
                     {content.title}
@@ -92,13 +92,13 @@ export function BehaviourContextPanel({ activeSection }: BehaviourContextPanelPr
 
                 {/* Cost hint */}
                 <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-surface-hover rounded-lg">
-                    <Zap className="w-3 h-3 text-[#FF6600] shrink-0" />
+                    <Zap className="w-3 h-3 text-primary shrink-0" />
                     <span className="text-xs text-text-secondary">{content.cost}</span>
                 </div>
 
                 <div className="space-y-2.5">
                     <div className="flex items-center gap-2 mb-2">
-                        <Lightbulb className="w-3 h-3 text-[#FF6600]" />
+                        <Lightbulb className="w-3 h-3 text-primary" />
                         <span className="text-xs font-semibold text-text-secondary">
                             Tips
                         </span>
@@ -108,7 +108,7 @@ export function BehaviourContextPanel({ activeSection }: BehaviourContextPanelPr
                             key={index}
                             className="flex items-start gap-2 text-xs text-text-secondary leading-relaxed"
                         >
-                            <span className="text-[#FF6600] font-bold mt-px shrink-0">
+                            <span className="text-primary font-bold mt-px shrink-0">
                                 {index + 1}.
                             </span>
                             <span>{tip}</span>

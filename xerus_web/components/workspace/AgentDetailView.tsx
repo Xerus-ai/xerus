@@ -125,7 +125,7 @@ export function AgentDetailView({ agentId, onBack }: AgentDetailViewProps) {
           <h1 className="text-lg font-serif text-text mb-1">Agent not found</h1>
           <p className="text-sm text-text-secondary">This agent may have been deleted or is unavailable.</p>
         </div>
-        <button onClick={onBack} className="px-5 py-2.5 bg-[#FF6600] hover:bg-[#E65C00] text-white font-medium rounded-xl text-sm transition-colors">
+        <button onClick={onBack} className="px-5 py-2.5 bg-primary hover:bg-primary/90 text-white font-medium rounded-xl text-sm transition-colors">
           Back to Agents
         </button>
       </div>
@@ -143,7 +143,7 @@ export function AgentDetailView({ agentId, onBack }: AgentDetailViewProps) {
           </button>
           <div className="flex items-center gap-1">
             {canPublishAgent && (
-              <button onClick={handlePublish} disabled={isPublishing} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-[#FF6600] hover:bg-[#FF6600]/5 rounded-xl transition-colors disabled:opacity-50">
+              <button onClick={handlePublish} disabled={isPublishing} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/5 rounded-xl transition-colors disabled:opacity-50">
                 {isPublishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                 {isPublishing ? 'Publishing...' : 'Publish to marketplace'}
               </button>
@@ -161,7 +161,7 @@ export function AgentDetailView({ agentId, onBack }: AgentDetailViewProps) {
               </button>
             )}
             {!isEditable && (
-              <button onClick={handleClone} disabled={isCloning} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-[#FF6600] hover:bg-[#FF6600]/5 rounded-xl transition-colors disabled:opacity-50">
+              <button onClick={handleClone} disabled={isCloning} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/5 rounded-xl transition-colors disabled:opacity-50">
                 {isCloning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
                 Clone this agent to edit
               </button>

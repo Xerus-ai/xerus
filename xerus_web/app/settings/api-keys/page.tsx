@@ -146,7 +146,7 @@ export default function ApiKeysPage() {
                           [provider.id]: e.target.value,
                         }))
                       }
-                      className="w-full px-3 py-2.5 pr-9 bg-white border border-surface-active/70 rounded-xl text-sm text-text focus:outline-none focus:ring-2 focus:ring-[#FF6600]/15 focus:border-[#FF6600]/40 transition-all placeholder:text-text-secondary/60"
+                      className="w-full px-3 py-2.5 pr-9 bg-white border border-surface-active/70 rounded-xl text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary/40 transition-all placeholder:text-text-secondary/60"
                       placeholder={
                         isSet && maskedPreview
                           ? maskedPreview
@@ -177,7 +177,7 @@ export default function ApiKeysPage() {
                     <button
                       onClick={() => handleSave(provider.id)}
                       disabled={isSaving}
-                      className="px-4 py-2.5 bg-[#FF6600] text-white rounded-xl hover:bg-[#E65C00] disabled:opacity-40 text-xs font-medium flex items-center gap-1.5 transition-colors shrink-0"
+                      className="px-4 py-2.5 bg-primary text-white rounded-xl hover:bg-primary/90 disabled:opacity-40 text-xs font-medium flex items-center gap-1.5 transition-colors shrink-0"
                     >
                       {isSaving ? (
                         <>
@@ -206,7 +206,7 @@ export default function ApiKeysPage() {
                     href={provider.keyUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-[11px] text-[#FF6600] hover:text-[#E65C00] font-medium transition-colors"
+                    className="inline-flex items-center gap-1 text-[11px] text-primary hover:text-primary/90 font-medium transition-colors"
                   >
                     Get your API key
                     <ArrowUpRight className="h-2.5 w-2.5" />

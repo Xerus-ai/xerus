@@ -21,8 +21,8 @@ export function AgentPreviewCard({ frontmatter, markdownBody, files, warning }: 
     <div className="flex flex-col gap-4">
       {/* Detection badge */}
       <div className="flex items-center gap-2">
-        <div className="w-6 h-6 rounded-full bg-[#FF6600]/10 flex items-center justify-center">
-          <Bot className="w-3.5 h-3.5 text-[#FF6600]" />
+        <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
+          <Bot className="w-3.5 h-3.5 text-primary" />
         </div>
         <span className="text-sm font-semibold text-text">Agent Detected</span>
       </div>
@@ -50,7 +50,7 @@ export function AgentPreviewCard({ frontmatter, markdownBody, files, warning }: 
         {/* Meta row */}
         <div className="flex flex-wrap gap-2 mb-4">
           {category && (
-            <span className="text-[10px] font-medium px-2 py-1 rounded-md bg-[#FF6600]/10 text-[#FF6600] capitalize">
+            <span className="text-[10px] font-medium px-2 py-1 rounded-md bg-primary/10 text-primary capitalize">
               {category}
             </span>
           )}

@@ -49,7 +49,7 @@ export function ThinkingLevelSelector({ value, onChange }: ThinkingLevelSelector
                             onClick={() => onChange(option.id)}
                             className={`p-5 rounded-xl text-left transition-all ${
                                 isSelected
-                                    ? 'bg-surface-hover border border-[#FF6600]/30'
+                                    ? 'bg-surface-hover border border-primary/30'
                                     : 'bg-surface-hover border border-transparent hover:border-surface-active'
                             }`}
                         >
@@ -57,8 +57,8 @@ export function ThinkingLevelSelector({ value, onChange }: ThinkingLevelSelector
                             <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center gap-3">
                                     {isSelected ? (
-                                        <div className="w-4 h-4 rounded-full border-2 border-[#FF6600] flex items-center justify-center shrink-0">
-                                            <div className="w-2 h-2 rounded-full bg-[#FF6600]" />
+                                        <div className="w-4 h-4 rounded-full border-2 border-primary flex items-center justify-center shrink-0">
+                                            <div className="w-2 h-2 rounded-full bg-primary" />
                                         </div>
                                     ) : (
                                         <div className="w-4 h-4 rounded-full border-2 border-surface-active shrink-0" />
@@ -66,7 +66,7 @@ export function ThinkingLevelSelector({ value, onChange }: ThinkingLevelSelector
                                     <span className="text-sm font-semibold text-text">{option.label}</span>
                                 </div>
                                 {isSelected ? (
-                                    <div className="w-5 h-5 rounded-full bg-[#FF6600] flex items-center justify-center shrink-0">
+                                    <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center shrink-0">
                                         <Check className="w-3 h-3 text-white" strokeWidth={3} />
                                     </div>
                                 ) : (
@@ -82,7 +82,7 @@ export function ThinkingLevelSelector({ value, onChange }: ThinkingLevelSelector
                             {/* Tag */}
                             <span className={`inline-block ml-0 text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full ${
                                 isSelected
-                                    ? 'text-[#FF6600] bg-[#FF6600]/10'
+                                    ? 'text-primary bg-primary/10'
                                     : 'text-text bg-surface border border-surface-active'
                             }`}>
                                 {option.tag}

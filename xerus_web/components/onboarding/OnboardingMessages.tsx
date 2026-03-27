@@ -177,10 +177,10 @@ export function OnboardingMessages({
                           <button
                             key={reply.value}
                             onClick={() => onQuickReply?.(reply.value)}
-                            className="flex-1 p-4 rounded-2xl bg-surface border border-surface-active text-left transition-all duration-200 hover:border-[#FF6600]/30 hover:shadow-sm group"
+                            className="flex-1 p-4 rounded-2xl bg-surface border border-surface-active text-left transition-all duration-200 hover:border-primary/30 hover:shadow-sm group"
                           >
                             {Icon && (
-                              <Icon className="w-5 h-5 text-[#FF6600]/70 mb-2.5 transition-transform duration-200 group-hover:scale-110 group-hover:text-[#FF6600]" />
+                              <Icon className="w-5 h-5 text-primary/70 mb-2.5 transition-transform duration-200 group-hover:scale-110 group-hover:text-primary" />
                             )}
                             <div className="text-sm font-medium text-text">{reply.label}</div>
                             {reply.subtitle && (

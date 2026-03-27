@@ -120,7 +120,7 @@ export function FileEditor({ path, name, size, onDirtyChange, className }: FileE
               setLoading(false)
             })
           }}
-          className="text-sm text-[#FF6600] font-medium hover:underline"
+          className="text-sm text-primary font-medium hover:underline"
         >
           Retry
         </button>
@@ -142,9 +142,9 @@ export function FileEditor({ path, name, size, onDirtyChange, className }: FileE
 
       {/* Read-only notice — matching agent IDE pattern */}
       {!isEditable && (
-        <div className="mx-8 mt-6 mb-4 flex items-center gap-3 p-4 bg-[#FF6600]/5 border border-[#FF6600]/20 rounded-2xl shrink-0">
-          <div className="w-8 h-8 rounded-xl bg-[#FF6600]/10 flex items-center justify-center shrink-0">
-            <Lock className="w-4 h-4 text-[#FF6600]" />
+        <div className="mx-8 mt-6 mb-4 flex items-center gap-3 p-4 bg-primary/5 border border-primary/20 rounded-2xl shrink-0">
+          <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+            <Lock className="w-4 h-4 text-primary" />
           </div>
           <span className="text-sm text-text">This file is read-only</span>
         </div>
@@ -226,7 +226,7 @@ export function FileEditor({ path, name, size, onDirtyChange, className }: FileE
               className={cn(
                 'w-9 h-9 rounded-[12px] flex items-center justify-center shadow-md transition-colors',
                 mode === 'edit' && isDirty
-                  ? 'bg-text text-white hover:bg-[#FF6600]'
+                  ? 'bg-text text-white hover:bg-primary'
                   : 'bg-surface text-text-secondary cursor-not-allowed',
               )}
             >

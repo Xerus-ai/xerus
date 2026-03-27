@@ -17,7 +17,7 @@ function MentionText({ children }: { children: ReactNode }) {
     <>
       {parts.map((part, i) =>
         /^@[\w-]+$/.test(part) ? (
-          <span key={i} className="text-[#FF6600] font-medium cursor-default hover:underline">{part}</span>
+          <span key={i} className="text-primary font-medium cursor-default hover:underline">{part}</span>
         ) : (
           <span key={i}>{part}</span>
         )
@@ -52,11 +52,11 @@ const PROSE_CLASSES = cn(
   'prose-headings:font-semibold prose-headings:text-black prose-headings:mt-4 prose-headings:mb-2',
   'prose-h2:text-lg prose-h3:text-base',
   'prose-strong:text-black prose-strong:font-semibold',
-  'prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-lg prose-code:bg-surface prose-code:text-[#FF6600] prose-code:font-mono prose-code:text-sm',
+  'prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-lg prose-code:bg-surface prose-code:text-primary prose-code:font-mono prose-code:text-sm',
   'prose-code:before:content-none prose-code:after:content-none',
   'prose-pre:bg-[#1E1E1E] prose-pre:rounded-2xl prose-pre:shadow-sm prose-pre:border prose-pre:border-gray-800',
   'prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-li:text-black prose-li:text-[15px]',
-  'prose-a:text-[#FF6600] prose-a:no-underline hover:prose-a:underline prose-a:font-medium',
+  'prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-a:font-medium',
   'prose-table:text-sm prose-th:text-left prose-th:text-black prose-th:font-semibold prose-th:pb-2',
   'prose-td:text-black prose-td:py-1.5',
   'prose-tr:border-b prose-tr:border-surface-active',
@@ -99,7 +99,7 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
                 </SyntaxHighlighter>
               </div>
             ) : (
-              <code className="px-1.5 py-0.5 rounded-lg bg-surface font-mono text-sm text-[#FF6600]" {...props}>
+              <code className="px-1.5 py-0.5 rounded-lg bg-surface font-mono text-sm text-primary" {...props}>
                 {children}
               </code>
             )

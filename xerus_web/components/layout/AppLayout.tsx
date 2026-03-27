@@ -37,13 +37,13 @@ function LoadingScreen({ title, subtitle }: { title?: string; subtitle?: string 
               <p className="text-sm text-text-secondary">{subtitle}</p>
             )}
             <div className="w-56 h-1.5 bg-surface-active rounded-full overflow-hidden mt-1">
-              <div className="h-full bg-[#FF6600] rounded-full animate-[loading_1.5s_ease-in-out_infinite]" />
+              <div className="h-full bg-primary rounded-full animate-[loading_1.5s_ease-in-out_infinite]" />
             </div>
           </div>
         ) : (
           /* Minimal: no text — used during hydration & login auth check */
           <div className="w-40 h-1 bg-surface-active rounded-full overflow-hidden">
-            <div className="h-full bg-[#FF6600]/70 rounded-full animate-[loading_1.5s_ease-in-out_infinite]" />
+            <div className="h-full bg-primary/70 rounded-full animate-[loading_1.5s_ease-in-out_infinite]" />
           </div>
         )}
       </div>
@@ -137,7 +137,7 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
         <GradientBackground />
         <a
           href="#main-content"
-          className="absolute -top-full left-2 z-[100] px-4 py-2 bg-[#FF6600] text-white rounded-xl text-sm font-medium focus:top-2 focus:outline-none transition-[top]"
+          className="absolute -top-full left-2 z-[100] px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium focus:top-2 focus:outline-none transition-[top]"
         >
           Skip to main content
         </a>
@@ -156,7 +156,7 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
       <GradientBackground />
       <a
         href="#main-content"
-        className="absolute -top-full left-2 z-[100] px-4 py-2 bg-[#FF6600] text-white rounded-xl text-sm font-medium focus:top-2 focus:outline-none transition-[top]"
+        className="absolute -top-full left-2 z-[100] px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium focus:top-2 focus:outline-none transition-[top]"
       >
         Skip to main content
       </a>

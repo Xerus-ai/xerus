@@ -77,7 +77,7 @@ export function SchedulesTab({
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <Calendar className="w-6 h-6 text-[#FF6600]" />
+                    <Calendar className="w-6 h-6 text-primary" />
                     <h2 className="text-2xl font-serif text-text">Schedules</h2>
                     <span className="text-sm text-text-secondary bg-surface px-3 py-1 rounded-full">
                         {schedules.length} {schedules.length === 1 ? 'schedule' : 'schedules'}

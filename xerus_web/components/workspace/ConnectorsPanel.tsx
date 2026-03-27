@@ -81,7 +81,7 @@ export function ConnectorsPanel() {
         <p className="text-sm text-text-secondary max-w-xs">{error}</p>
         <button
           onClick={() => window.location.reload()}
-          className="px-5 py-2.5 bg-[#FF6600] hover:bg-[#E65C00] text-white font-medium rounded-xl text-sm transition-colors"
+          className="px-5 py-2.5 bg-primary hover:bg-primary/90 text-white font-medium rounded-xl text-sm transition-colors"
         >
           Try Again
         </button>
@@ -109,7 +109,7 @@ export function ConnectorsPanel() {
           <div className="w-full mb-12">
             <div className="flex items-center gap-3 mb-6">
               <h2 className="font-serif text-2xl text-text">Active Connections</h2>
-              <span className="bg-[#FF6600]/10 text-[#FF6600] text-xs font-bold px-2 py-1 rounded-md">
+              <span className="bg-primary/10 text-primary text-xs font-bold px-2 py-1 rounded-md">
                 {activeTools.length} Active
               </span>
             </div>

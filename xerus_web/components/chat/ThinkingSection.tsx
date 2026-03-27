@@ -19,7 +19,7 @@ export function ThinkingSection({ content, defaultExpanded = false }: ThinkingSe
       className={cn(
         'w-full text-left rounded-xl border border-surface-active bg-surface-alt/50',
         'hover:bg-surface-hover/80 transition-colors duration-150',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600]'
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
       )}
     >
       <div className="flex items-center gap-2.5 px-3 py-2">

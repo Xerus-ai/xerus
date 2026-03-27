@@ -222,7 +222,7 @@ export function ChatInput({
                   className={cn(
                     'flex items-center gap-3 w-full px-3 py-2 text-left text-sm transition-colors',
                     idx === selectedIdx
-                      ? 'bg-[#FF6600]/8 text-[#FF6600]'
+                      ? 'bg-primary/8 text-primary'
                       : 'text-text hover:bg-surface-hover'
                   )}
                   onMouseDown={(e) => {
@@ -235,7 +235,7 @@ export function ChatInput({
                     className={cn(
                       'w-7 h-7 rounded-xl overflow-hidden shrink-0 flex items-center justify-center',
                       idx === selectedIdx
-                        ? 'bg-[#FF6600]/15 text-[#FF6600]'
+                        ? 'bg-primary/15 text-primary'
                         : 'bg-surface-alt text-text-secondary'
                     )}
                   >
@@ -265,7 +265,7 @@ export function ChatInput({
           className={cn(
             'rounded-2xl border bg-white dark:bg-white/95 transition-all duration-200',
             focused
-              ? 'border-[#FF6600]/40 shadow-[0_2px_12px_rgba(255,102,0,0.08)]'
+              ? 'border-primary/40 shadow-[0_2px_12px_rgba(255,102,0,0.08)]'
               : 'border-surface-active shadow-sm hover:shadow-md hover:border-surface-hover'
           )}
         >
@@ -317,8 +317,8 @@ export function ChatInput({
                 aria-label="Mention an agent"
                 className={cn(
                   'p-1.5 rounded-lg text-text-muted transition-colors',
-                  'hover:text-[#FF6600] hover:bg-[#FF6600]/8',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600]',
+                  'hover:text-primary hover:bg-primary/8',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
                   'disabled:opacity-40 disabled:cursor-not-allowed'
                 )}
               >
@@ -333,7 +333,7 @@ export function ChatInput({
                 className={cn(
                   'p-1.5 rounded-lg text-text-muted transition-colors',
                   'hover:text-text-secondary hover:bg-surface-hover',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600]',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
                   'disabled:opacity-40 disabled:cursor-not-allowed'
                 )}
               >
@@ -349,10 +349,10 @@ export function ChatInput({
                   aria-label="Open sandbox terminal"
                   className={cn(
                     'p-1.5 rounded-lg transition-colors',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600]',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
                     isTerminalOpen
-                      ? 'text-[#FF6600] bg-[#FF6600]/8'
-                      : 'text-text-muted hover:text-[#FF6600] hover:bg-[#FF6600]/8',
+                      ? 'text-primary bg-primary/8'
+                      : 'text-text-muted hover:text-primary hover:bg-primary/8',
                     isTerminalLoading && 'opacity-40 cursor-not-allowed'
                   )}
                 >
@@ -369,10 +369,10 @@ export function ChatInput({
                   aria-label="Open sandbox browser"
                   className={cn(
                     'p-1.5 rounded-lg transition-colors',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600]',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
                     isBrowserOpen
-                      ? 'text-[#FF6600] bg-[#FF6600]/8'
-                      : 'text-text-muted hover:text-[#FF6600] hover:bg-[#FF6600]/8',
+                      ? 'text-primary bg-primary/8'
+                      : 'text-text-muted hover:text-primary hover:bg-primary/8',
                     isBrowserLoading && 'opacity-40 cursor-not-allowed'
                   )}
                 >
@@ -405,11 +405,11 @@ export function ChatInput({
                 aria-label="Send message"
                 className={cn(
                   'flex items-center justify-center w-8 h-8 rounded-xl',
-                  'bg-[#FF6600] text-white',
-                  'hover:bg-[#E65C00] active:scale-90',
+                  'bg-primary text-white',
+                  'hover:bg-primary/90 active:scale-90',
                   'transition-all duration-150',
                   'disabled:opacity-40 disabled:cursor-not-allowed',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600] focus-visible:ring-offset-1'
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1'
                 )}
               >
                 <ArrowUp className="w-4 h-4" strokeWidth={2.5} />

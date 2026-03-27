@@ -3,7 +3,7 @@
 import React from 'react'
 import type { Assistant } from "@/lib/api/types"
 import { AgentAvatarWithModel, ModelIcon } from './AgentAvatar'
-import { Loader2, Lock, Users, Plus, Wrench, Settings, Copy, ArrowRight } from 'lucide-react'
+import { Loader2, Lock, Users, Plus, Upload, Wrench, Settings, Copy, ArrowRight } from 'lucide-react'
 import { canCloneAgent, getAgentVisibilityClass } from "@/utils/agentLabels"
 import { formatModelName } from "@/utils/models"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -190,7 +190,11 @@ const AgentCardComponent = ({ agent, onClone, onChat, onClick, isCloning, isOwne
     )
 }
 
-export const AgentCard = React.memo(AgentCardComponent)
+export const AgentCard = React.memo(AgentCardComponent, (prev, next) =>
+  prev.agent === next.agent &&
+  prev.isOwner === next.isOwner &&
+  prev.isCloning === next.isCloning
+)
 
 interface CreateAgentCardProps {
     onClick?: () => void
@@ -203,13 +207,13 @@ export function CreateAgentCard({ onClick }: CreateAgentCardProps) {
             className="rounded-[32px] border-2 border-dashed border-surface-active hover:border-primary p-6 flex flex-col items-center justify-center text-center h-full min-h-[280px] hover:bg-surface-hover/50 transition-all duration-300 cursor-pointer group"
         >
             <div className="w-16 h-16 bg-surface rounded-full flex items-center justify-center shadow-sm mb-4 group-hover:scale-110 transition-transform duration-300">
-                <Plus className="w-7 h-7 text-primary" />
+                <Upload className="w-7 h-7 text-primary" />
             </div>
             <h3 className="font-serif text-xl text-text group-hover:text-primary transition-colors">
-                Create New
+                Import Agent
             </h3>
             <p className="text-sm text-text-secondary mt-2 max-w-[200px]">
-                Build a custom agent from scratch
+                Import an agent from files
             </p>
         </div>
     )

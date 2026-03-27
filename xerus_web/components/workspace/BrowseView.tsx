@@ -274,7 +274,7 @@ export function BrowseView({
                       }}
                       placeholder="New folder"
                       className={cn(
-                        'w-full text-center text-sm px-3 py-2 rounded-lg border bg-white focus:outline-none focus:border-[#FF6600] transition-colors',
+                        'w-full text-center text-sm px-3 py-2 rounded-lg border bg-white focus:outline-none focus:border-primary transition-colors',
                         folderError ? 'border-red-500' : 'border-surface-active',
                       )}
                     />
@@ -292,7 +292,7 @@ export function BrowseView({
                       <button
                         onClick={handleConfirmFolder}
                         disabled={folderCreating}
-                        className="px-3 py-1.5 rounded-full text-xs font-medium bg-[#FF6600] text-white hover:bg-[#e55b00] transition-colors"
+                        className="px-3 py-1.5 rounded-full text-xs font-medium bg-primary text-white hover:bg-primary/90 transition-colors"
                       >
                         {folderCreating ? 'Creating...' : 'Create'}
                       </button>
@@ -310,7 +310,7 @@ export function BrowseView({
                   delay={`${index * 50}ms`}
                   onClick={() => onDirClick(dir)}
                   onContextMenu={(e) => handleFolderContextMenu(e, dir)}
-                  className={selectedPath === dir.path ? 'ring-2 ring-[#FF6600]' : ''}
+                  className={selectedPath === dir.path ? 'ring-2 ring-primary' : ''}
                 />
               ))}
             </div>

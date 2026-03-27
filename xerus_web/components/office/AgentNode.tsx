@@ -63,7 +63,7 @@ export function AgentNode({ state, labelHidden = false }: AgentNodeProps) {
   return (
     <motion.button
       type="button"
-      className="absolute flex flex-col items-center cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600] rounded-xl"
+      className="absolute flex flex-col items-center cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-xl"
       style={{
         left: `${position.x}%`,
         top: `${position.y}%`,

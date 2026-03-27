@@ -176,7 +176,7 @@ export default function BillingPage() {
           <>
             <div className="w-full h-1.5 bg-surface-hover rounded-full overflow-hidden mb-2">
               <div
-                className="h-full rounded-full bg-[#FF6600]/70 transition-all duration-500"
+                className="h-full rounded-full bg-primary/70 transition-all duration-500"
                 style={{ width: `${creditsPercent}%` }}
               />
             </div>
@@ -241,16 +241,16 @@ export default function BillingPage() {
                 className={cn(
                   'relative bg-surface/60 rounded-2xl border p-6 flex flex-col transition-all duration-200',
                   plan.highlighted
-                    ? 'border-[#FF6600]/30 shadow-sm'
+                    ? 'border-primary/30 shadow-sm'
                     : 'border-surface-active/60',
-                  isCurrentPlan && 'ring-2 ring-[#FF6600]/20'
+                  isCurrentPlan && 'ring-2 ring-primary/20'
                 )}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: 0.15 + index * 0.05 }}
               >
                 {plan.highlighted && (
-                  <span className="absolute -top-2.5 left-5 bg-[#FF6600] text-white text-[9px] uppercase font-bold px-2.5 py-0.5 rounded-full tracking-wider">
+                  <span className="absolute -top-2.5 left-5 bg-primary text-white text-[9px] uppercase font-bold px-2.5 py-0.5 rounded-full tracking-wider">
                     Recommended
                   </span>
                 )}
@@ -285,7 +285,7 @@ export default function BillingPage() {
                     isCurrentPlan
                       ? 'bg-surface-hover text-text-secondary cursor-default'
                       : plan.highlighted
-                        ? 'bg-[#FF6600] text-white hover:bg-[#E65C00] shadow-sm'
+                        ? 'bg-primary text-white hover:bg-primary/90 shadow-sm'
                         : 'bg-[#261E1B] text-white hover:bg-[#1a1412]'
                   )}
                 >
@@ -299,7 +299,7 @@ export default function BillingPage() {
                       <Check
                         className={cn(
                           'w-3.5 h-3.5 shrink-0 mt-0.5',
-                          plan.highlighted ? 'text-[#FF6600]' : 'text-text-secondary'
+                          plan.highlighted ? 'text-primary' : 'text-text-secondary'
                         )}
                       />
                       <span className="text-xs text-text-secondary leading-snug">{feature}</span>

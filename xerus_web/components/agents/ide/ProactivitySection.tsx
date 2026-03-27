@@ -178,13 +178,13 @@ export function ProactivitySection({
           onClick={isProactive ? handleToggleProactive : undefined}
           className={`relative p-5 rounded-xl text-left transition-all ${
             !isProactive
-              ? 'bg-surface-hover border border-[#FF6600]/30'
+              ? 'bg-surface-hover border border-primary/30'
               : 'bg-surface-hover border border-transparent hover:border-surface-active cursor-pointer'
           }`}
         >
           <div className="absolute top-4 right-4">
             {!isProactive ? (
-              <div className="w-5 h-5 rounded-full bg-[#FF6600] flex items-center justify-center">
+              <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
                 <Check className="w-3 h-3 text-white" strokeWidth={3} />
               </div>
             ) : (
@@ -194,8 +194,8 @@ export function ProactivitySection({
 
           <div className="flex items-center gap-3 mb-3">
             {!isProactive ? (
-              <div className="w-4 h-4 rounded-full border-2 border-[#FF6600] flex items-center justify-center shrink-0">
-                <div className="w-2 h-2 rounded-full bg-[#FF6600]" />
+              <div className="w-4 h-4 rounded-full border-2 border-primary flex items-center justify-center shrink-0">
+                <div className="w-2 h-2 rounded-full bg-primary" />
               </div>
             ) : (
               <div className="w-4 h-4 rounded-full border-2 border-surface-active shrink-0" />
@@ -209,7 +209,7 @@ export function ProactivitySection({
 
           <span className={`inline-block ml-0 text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full ${
             !isProactive
-              ? 'text-[#FF6600] bg-[#FF6600]/10'
+              ? 'text-primary bg-primary/10'
               : 'text-text bg-surface border border-surface-active'
           }`}>
             ON DEMAND
@@ -221,13 +221,13 @@ export function ProactivitySection({
           onClick={!isProactive ? handleToggleProactive : undefined}
           className={`relative p-5 rounded-xl text-left transition-all ${
             isProactive
-              ? 'bg-surface-hover border border-[#FF6600]/30'
+              ? 'bg-surface-hover border border-primary/30'
               : 'bg-surface-hover border border-transparent hover:border-surface-active cursor-pointer'
           }`}
         >
           <div className="absolute top-4 right-4">
             {isProactive ? (
-              <div className="w-5 h-5 rounded-full bg-[#FF6600] flex items-center justify-center">
+              <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
                 <Check className="w-3 h-3 text-white" strokeWidth={3} />
               </div>
             ) : (
@@ -237,8 +237,8 @@ export function ProactivitySection({
 
           <div className="flex items-center gap-3 mb-3">
             {isProactive ? (
-              <div className="w-4 h-4 rounded-full border-2 border-[#FF6600] flex items-center justify-center shrink-0">
-                <div className="w-2 h-2 rounded-full bg-[#FF6600]" />
+              <div className="w-4 h-4 rounded-full border-2 border-primary flex items-center justify-center shrink-0">
+                <div className="w-2 h-2 rounded-full bg-primary" />
               </div>
             ) : (
               <div className="w-4 h-4 rounded-full border-2 border-surface-active shrink-0" />
@@ -252,7 +252,7 @@ export function ProactivitySection({
 
           <span className={`inline-block ml-0 text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full ${
             isProactive
-              ? 'text-[#FF6600] bg-[#FF6600]/10'
+              ? 'text-primary bg-primary/10'
               : 'text-text bg-surface border border-surface-active'
           }`}>
             SCHEDULED
@@ -344,12 +344,12 @@ export function ProactivitySection({
                       onClick={() => handlePresetChange(preset.cron)}
                       className={`p-3 rounded-xl border text-left transition-all ${
                         selectedPreset === preset.cron
-                          ? 'border-[#FF6600] bg-[#FFF5EB]'
-                          : 'border-surface-active bg-white hover:border-[#FF6600]/50'
+                          ? 'border-primary bg-[#FFF5EB]'
+                          : 'border-surface-active bg-white hover:border-primary/50'
                       }`}
                     >
                       <div className={`font-medium text-sm ${
-                        selectedPreset === preset.cron ? 'text-[#FF6600]' : 'text-text'
+                        selectedPreset === preset.cron ? 'text-primary' : 'text-text'
                       }`}>
                         {preset.label}
                       </div>
@@ -372,7 +372,7 @@ export function ProactivitySection({
                         markDirty()
                       }}
                       placeholder="*/30 * * * *"
-                      className="w-full px-3 py-2 rounded-lg border border-surface-active text-sm focus:outline-none focus:border-[#FF6600] transition-colors bg-white text-text font-mono placeholder:text-[#9CA3AF]"
+                      className="w-full px-3 py-2 rounded-lg border border-surface-active text-sm focus:outline-none focus:border-primary transition-colors bg-white text-text font-mono placeholder:text-[#9CA3AF]"
                     />
                     <p className="text-xs text-text-secondary mt-1">
                       Format: minute hour day month weekday (e.g., "0 9 * * *" = 9:00 AM daily)
@@ -412,7 +412,7 @@ export function ProactivitySection({
                             setActiveHoursStart(e.target.value)
                             markDirty()
                           }}
-                          className="w-full px-3 py-2 rounded-lg border border-surface-active text-sm focus:outline-none focus:border-[#FF6600] transition-colors bg-white text-text"
+                          className="w-full px-3 py-2 rounded-lg border border-surface-active text-sm focus:outline-none focus:border-primary transition-colors bg-white text-text"
                         />
                       </div>
                       <div>
@@ -427,7 +427,7 @@ export function ProactivitySection({
                             setActiveHoursEnd(e.target.value)
                             markDirty()
                           }}
-                          className="w-full px-3 py-2 rounded-lg border border-surface-active text-sm focus:outline-none focus:border-[#FF6600] transition-colors bg-white text-text"
+                          className="w-full px-3 py-2 rounded-lg border border-surface-active text-sm focus:outline-none focus:border-primary transition-colors bg-white text-text"
                         />
                       </div>
                     </div>
@@ -443,7 +443,7 @@ export function ProactivitySection({
                           setTimezone(e.target.value)
                           markDirty()
                         }}
-                        className="w-full px-3 py-2 rounded-lg border border-surface-active text-sm focus:outline-none focus:border-[#FF6600] transition-colors bg-white text-text"
+                        className="w-full px-3 py-2 rounded-lg border border-surface-active text-sm focus:outline-none focus:border-primary transition-colors bg-white text-text"
                       >
                         {TIMEZONES.map((tz) => (
                           <option key={tz.id} value={tz.id}>
@@ -472,9 +472,9 @@ export function ProactivitySection({
               </div>
 
               {/* Preview */}
-              <div className="flex items-center gap-3 p-4 bg-[#FF6600]/5 border border-[#FF6600]/20 rounded-2xl">
-                <div className="w-8 h-8 rounded-xl bg-[#FF6600]/10 flex items-center justify-center shrink-0">
-                  <Info className="w-4 h-4 text-[#FF6600]" />
+              <div className="flex items-center gap-3 p-4 bg-primary/5 border border-primary/20 rounded-2xl">
+                <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                  <Info className="w-4 h-4 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm text-text">{previewText}</div>

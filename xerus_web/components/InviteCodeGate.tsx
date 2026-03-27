@@ -105,7 +105,7 @@ export function InviteCodeGate({ email }: InviteCodeGateProps) {
                     placeholder="your@email.com"
                     required
                     aria-label="Email address"
-                    className="w-full py-3.5 px-5 text-[15px] text-center border border-surface-active rounded-xl bg-surface-hover transition-all duration-300 outline-none focus:border-[#FF6600]/40 focus:shadow-[0_4px_20px_rgba(255,102,0,0.1)]"
+                    className="w-full py-3.5 px-5 text-[15px] text-center border border-surface-active rounded-xl bg-surface-hover transition-all duration-300 outline-none focus:border-primary/40 focus:shadow-[0_4px_20px_rgba(255,102,0,0.1)]"
                   />
 
                   <button
@@ -117,7 +117,7 @@ export function InviteCodeGate({ email }: InviteCodeGateProps) {
                 </form>
               ) : (
                 <div className="flex items-center justify-center gap-2 py-2">
-                  <svg className="w-5 h-5 text-[#FF6600]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                   </svg>
                   <span className="text-text-secondary text-[15px]">Check your inbox</span>
@@ -126,7 +126,7 @@ export function InviteCodeGate({ email }: InviteCodeGateProps) {
 
               <button
                 onClick={() => setShowRequestAccess(false)}
-                className="w-full text-center mt-4 text-[13px] text-[#FF6600] hover:text-[#E65C00] transition-colors hover:underline"
+                className="w-full text-center mt-4 text-[13px] text-primary hover:text-primary/90 transition-colors hover:underline"
               >
                 I have an invite code
               </button>
@@ -160,7 +160,7 @@ export function InviteCodeGate({ email }: InviteCodeGateProps) {
                 className={`w-full py-4 px-5 font-mono text-3xl font-bold tracking-[0.3em] text-center uppercase border rounded-xl bg-surface-hover transition-all duration-300 outline-none ${
                   error
                     ? 'border-red-400 focus:border-red-400 focus:shadow-[0_4px_20px_rgba(239,68,68,0.1)]'
-                    : 'border-surface-active focus:border-[#FF6600]/40 focus:shadow-[0_4px_20px_rgba(255,102,0,0.1)]'
+                    : 'border-surface-active focus:border-primary/40 focus:shadow-[0_4px_20px_rgba(255,102,0,0.1)]'
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
               />
 
@@ -190,7 +190,7 @@ export function InviteCodeGate({ email }: InviteCodeGateProps) {
                 onClick={() => setShowRequestAccess(true)}
                 className="w-full text-center mt-4 text-[13px] text-text-secondary hover:text-text transition-colors"
               >
-                Don't have a code? <span className="text-[#FF6600] hover:underline">Request access</span>
+                Don't have a code? <span className="text-primary hover:underline">Request access</span>
               </button>
             </form>
           )}
@@ -202,7 +202,7 @@ export function InviteCodeGate({ email }: InviteCodeGateProps) {
             Not you?{' '}
             <button
               onClick={handleLogout}
-              className="text-[#FF6600] hover:text-[#E65C00] transition-colors hover:underline"
+              className="text-primary hover:text-primary/90 transition-colors hover:underline"
             >
               Sign out
             </button>

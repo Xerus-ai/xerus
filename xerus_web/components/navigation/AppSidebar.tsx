@@ -76,10 +76,10 @@ export function AppSidebar() {
             return (
               <Tooltip key={tab.name}>
                 <TooltipTrigger asChild>
-                  <Link href={tab.href} className={cn('relative flex items-center justify-center w-10 h-10 rounded-2xl transition-colors', active ? 'bg-[#FF6600]/10 text-[#FF6600]' : 'text-text-secondary hover:bg-surface-hover hover:text-text')} aria-label={tab.name} aria-current={active ? 'page' : undefined}>
+                  <Link href={tab.href} className={cn('relative flex items-center justify-center w-10 h-10 rounded-2xl transition-colors', active ? 'bg-primary/10 text-primary' : 'text-text-secondary hover:bg-surface-hover hover:text-text')} aria-label={tab.name} aria-current={active ? 'page' : undefined}>
                     <tab.icon className="w-5 h-5" />
                     {tab.name === 'Inbox' && totalUnread > 0 && (
-                      <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-[#FF6600] text-white text-[9px] font-semibold">{totalUnread > 99 ? '99+' : totalUnread}</span>
+                      <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-primary text-white text-[9px] font-semibold">{totalUnread > 99 ? '99+' : totalUnread}</span>
                     )}
                   </Link>
                 </TooltipTrigger>
@@ -123,7 +123,7 @@ export function AppSidebar() {
               href={tab.href}
               className={cn(
                 'relative flex items-center gap-2 rounded-2xl transition-all duration-150',
-                active ? 'bg-[#FF6600]/10 text-[#FF6600] px-3.5 py-2' : 'text-text-secondary hover:bg-surface-hover/50 hover:text-text p-2'
+                active ? 'bg-primary/10 text-primary px-3.5 py-2' : 'text-text-secondary hover:bg-surface-hover/50 hover:text-text p-2'
               )}
               aria-current={active ? 'page' : undefined}
               aria-label={tab.name}
@@ -131,7 +131,7 @@ export function AppSidebar() {
               <tab.icon className="w-5 h-5" />
               {active && <span className="text-[14px] font-medium">{tab.name}</span>}
               {tab.name === 'Inbox' && totalUnread > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-0.5 flex items-center justify-center rounded-full bg-[#FF6600] text-white text-[10px] font-semibold">{totalUnread > 99 ? '99+' : totalUnread}</span>
+                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-0.5 flex items-center justify-center rounded-full bg-primary text-white text-[10px] font-semibold">{totalUnread > 99 ? '99+' : totalUnread}</span>
               )}
             </Link>
           )
@@ -164,7 +164,7 @@ export function AppSidebar() {
             href="/settings"
             className={cn(
               'flex items-center justify-center w-9 h-9 rounded-xl shrink-0 transition-colors',
-              pathname.startsWith('/settings') ? 'bg-[#FF6600]/10 text-[#FF6600]' : 'text-text-secondary hover:bg-surface-hover hover:text-text'
+              pathname.startsWith('/settings') ? 'bg-primary/10 text-primary' : 'text-text-secondary hover:bg-surface-hover hover:text-text'
             )}
             aria-label="Settings"
           >
@@ -217,7 +217,7 @@ function HomeSidebarBody({ activeSection, isOnWorkspace, onSectionClick, onPathC
               className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-[15px] font-medium text-text hover:bg-surface-hover transition-colors group"
             >
               {isExpanded ? <ChevronDown className="w-4 h-4 text-text-secondary shrink-0" /> : <ChevronRight className="w-4 h-4 text-text-secondary shrink-0" />}
-              {isExpanded ? <FolderOpen className="w-5 h-5 text-[#FF6600] shrink-0" /> : <Folder className="w-5 h-5 text-text-secondary shrink-0" />}
+              {isExpanded ? <FolderOpen className="w-5 h-5 text-primary shrink-0" /> : <Folder className="w-5 h-5 text-text-secondary shrink-0" />}
               <span className="flex-1 text-left truncate">{project.name}</span>
               <span className="text-[11px] font-medium text-text-secondary bg-surface-hover rounded-full px-2 py-0.5">{project.channels.length}</span>
             </button>
@@ -278,10 +278,10 @@ function HomeSidebarBody({ activeSection, isOnWorkspace, onSectionClick, onPathC
                 onClick={() => onSectionClick(item.id)}
                 className={cn(
                   'flex items-center w-full gap-3 px-3 py-2.5 rounded-xl text-[15px] transition-all duration-150',
-                  active ? 'bg-[#FF6600]/10 text-[#FF6600] font-medium' : 'text-text-secondary hover:bg-surface-hover/60 hover:text-text'
+                  active ? 'bg-primary/10 text-primary font-medium' : 'text-text-secondary hover:bg-surface-hover/60 hover:text-text'
                 )}
               >
-                <Icon className={cn('w-5 h-5', active ? 'text-[#FF6600]' : 'text-text-secondary')} />
+                <Icon className={cn('w-5 h-5', active ? 'text-primary' : 'text-text-secondary')} />
                 {item.label}
                 {item.count !== undefined && item.count > 0 && (
                   <span className="ml-auto text-[11px] font-medium text-text-secondary">{item.count}</span>
@@ -300,10 +300,10 @@ function HomeSidebarBody({ activeSection, isOnWorkspace, onSectionClick, onPathC
             onClick={() => onSectionClick('files')}
             className={cn(
               'flex items-center w-full gap-3 px-3 py-2.5 rounded-xl text-[15px] transition-all duration-150',
-              isOnWorkspace && activeSection === 'files' ? 'bg-[#FF6600]/10 text-[#FF6600] font-medium' : 'text-text-secondary hover:bg-surface-hover/60 hover:text-text'
+              isOnWorkspace && activeSection === 'files' ? 'bg-primary/10 text-primary font-medium' : 'text-text-secondary hover:bg-surface-hover/60 hover:text-text'
             )}
           >
-            <Files className={cn('w-5 h-5', isOnWorkspace && activeSection === 'files' ? 'text-[#FF6600]' : 'text-text-secondary')} />
+            <Files className={cn('w-5 h-5', isOnWorkspace && activeSection === 'files' ? 'text-primary' : 'text-text-secondary')} />
             All Files
           </button>
         </div>
@@ -373,10 +373,10 @@ function InboxSidebarBody({ counts, markRead }: {
             <div key={domain.id} className="mb-1">
               <button onClick={() => toggleDomain(domain.id)} className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-sm font-medium text-text hover:bg-surface-hover transition-colors group">
                 {isExpanded ? <ChevronDown className="w-4 h-4 text-text-secondary shrink-0" /> : <ChevronRight className="w-4 h-4 text-text-secondary shrink-0" />}
-                {isExpanded ? <FolderOpen className="w-[18px] h-[18px] text-[#FF6600] shrink-0" /> : <Folder className="w-[18px] h-[18px] text-text-secondary shrink-0" />}
+                {isExpanded ? <FolderOpen className="w-[18px] h-[18px] text-primary shrink-0" /> : <Folder className="w-[18px] h-[18px] text-text-secondary shrink-0" />}
                 <span className="flex-1 text-left truncate">{domain.name}</span>
                 {domainUnread > 0 ? (
-                  <span className="min-w-[18px] h-5 px-1.5 flex items-center justify-center rounded-full bg-[#FF6600] text-white text-[10px] font-semibold">{domainUnread > 99 ? '99+' : domainUnread}</span>
+                  <span className="min-w-[18px] h-5 px-1.5 flex items-center justify-center rounded-full bg-primary text-white text-[10px] font-semibold">{domainUnread > 99 ? '99+' : domainUnread}</span>
                 ) : (
                   <span className="text-[11px] font-medium text-text-secondary bg-surface-hover rounded-full px-2 py-0.5">{domain.channels.length}</span>
                 )}
@@ -387,11 +387,11 @@ function InboxSidebarBody({ counts, markRead }: {
                     const isActive = pathname === `/inbox/${domain.slug}/${channel.slug}`
                     const unread = counts[channel.id] ?? 0
                     return (
-                      <Link key={channel.id} href={`/inbox/${domain.slug}/${channel.slug}`} onClick={() => unread > 0 && markRead(channel.id)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm transition-colors', isActive ? 'bg-[#FF6600]/10 text-[#FF6600] font-medium' : unread > 0 ? 'text-text font-semibold hover:bg-surface-hover' : 'text-text-secondary hover:bg-surface-hover hover:text-text')}>
+                      <Link key={channel.id} href={`/inbox/${domain.slug}/${channel.slug}`} onClick={() => unread > 0 && markRead(channel.id)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm transition-colors', isActive ? 'bg-primary/10 text-primary font-medium' : unread > 0 ? 'text-text font-semibold hover:bg-surface-hover' : 'text-text-secondary hover:bg-surface-hover hover:text-text')}>
                         <Hash className="w-4 h-4 shrink-0" />
                         <span className="flex-1 truncate">{channel.name}</span>
                         {unread > 0 && !isActive && (
-                          <span className="min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-[#FF6600] text-white text-[10px] font-semibold">{unread > 99 ? '99+' : unread}</span>
+                          <span className="min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-primary text-white text-[10px] font-semibold">{unread > 99 ? '99+' : unread}</span>
                         )}
                       </Link>
                     )
@@ -433,7 +433,7 @@ function CreateProjectInline({ onCreated }: { onCreated: () => Promise<void> }) 
 
   if (!isOpen) {
     return (
-      <button onClick={() => setIsOpen(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white bg-[#FF6600] hover:bg-[#E65C00] transition-colors">
+      <button onClick={() => setIsOpen(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white bg-primary hover:bg-primary/90 transition-colors">
         <Plus className="w-4 h-4" /> Create project
       </button>
     )
@@ -447,11 +447,11 @@ function CreateProjectInline({ onCreated }: { onCreated: () => Promise<void> }) 
         onChange={(e) => setName(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') setIsOpen(false) }}
         placeholder="Project name"
-        className="w-full px-3 py-2 rounded-xl bg-surface border border-surface-active text-sm text-text placeholder:text-text-muted outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 focus:border-[#FF6600]/40 focus:shadow-[0_2px_12px_rgba(255,102,0,0.08)]"
+        className="w-full px-3 py-2 rounded-xl bg-surface border border-surface-active text-sm text-text placeholder:text-text-muted outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 focus:border-primary/40 focus:shadow-[0_2px_12px_rgba(255,102,0,0.08)]"
         disabled={isCreating}
       />
       <div className="flex gap-2 mt-2">
-        <button onClick={handleCreate} disabled={isCreating || !name.trim()} className="flex-1 px-3 py-1.5 rounded-xl text-sm font-medium text-white bg-[#FF6600] hover:bg-[#E65C00] disabled:opacity-50 transition-colors">
+        <button onClick={handleCreate} disabled={isCreating || !name.trim()} className="flex-1 px-3 py-1.5 rounded-xl text-sm font-medium text-white bg-primary hover:bg-primary/90 disabled:opacity-50 transition-colors">
           {isCreating ? 'Creating...' : 'Create'}
         </button>
         <button onClick={() => { setIsOpen(false); setName('') }} className="px-3 py-1.5 rounded-xl text-sm text-text-muted hover:bg-surface-hover transition-colors">

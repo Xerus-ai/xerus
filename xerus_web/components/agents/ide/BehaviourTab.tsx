@@ -206,7 +206,7 @@ export function BehaviourTab({
           className={cn(
             "bg-surface rounded-[24px] border shadow-sm p-4 cursor-pointer transition-all",
             activeSection === 'heartbeat'
-              ? 'border-[#FF6600]/30 ring-1 ring-[#FF6600]/10'
+              ? 'border-primary/30 ring-1 ring-primary/10'
               : 'border-surface-active'
           )}
           onClick={() => {
@@ -247,7 +247,7 @@ export function BehaviourTab({
               isEditable ? (
                 <Button
                   variant="ghost"
-                  className="h-9 px-4 bg-text hover:bg-[#FF6600] rounded-xl text-white flex items-center gap-2 shrink-0"
+                  className="h-9 px-4 bg-text hover:bg-primary rounded-xl text-white flex items-center gap-2 shrink-0"
                 >
                   <Pencil className="w-3.5 h-3.5" />
                   <span className="text-sm font-medium">{heartbeatContent ? 'Edit' : 'Create'}</span>
@@ -369,7 +369,7 @@ export function BehaviourTab({
                       onClick={handleSaveFile}
                       disabled={isSaving}
                       className={cn(
-                        "w-9 h-9 bg-text text-white rounded-[12px] flex items-center justify-center hover:bg-[#FF6600] transition-colors shadow-md",
+                        "w-9 h-9 bg-text text-white rounded-[12px] flex items-center justify-center hover:bg-primary transition-colors shadow-md",
                         isSaving && "opacity-50 cursor-not-allowed"
                       )}
                       aria-label="Save"

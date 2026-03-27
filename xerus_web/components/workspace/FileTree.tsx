@@ -99,9 +99,9 @@ function FileTreeNode({
         {/* Icon */}
         {isDir ? (
           isExpanded ? (
-            <FolderOpen className="w-4 h-4 shrink-0 text-[#FF6600]/70" />
+            <FolderOpen className="w-4 h-4 shrink-0 text-primary/70" />
           ) : (
-            <Folder className="w-4 h-4 shrink-0 text-[#FF6600]/70" />
+            <Folder className="w-4 h-4 shrink-0 text-primary/70" />
           )
         ) : (
           <FileText className="w-4 h-4 shrink-0 text-text-muted" />
@@ -124,7 +124,7 @@ function FileTreeNode({
                 e.stopPropagation()
                 onUploadClick(node.path)
               }}
-              className="w-4 h-4 rounded flex items-center justify-center text-text-muted hover:text-[#FF6600] hover:bg-[#FF6600]/10 transition-colors opacity-0 group-hover:opacity-100"
+              className="w-4 h-4 rounded flex items-center justify-center text-text-muted hover:text-primary hover:bg-primary/10 transition-colors opacity-0 group-hover:opacity-100"
               title="Upload file"
             >
               <Plus className="w-3 h-3" />
