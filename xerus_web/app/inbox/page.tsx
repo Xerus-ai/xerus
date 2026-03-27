@@ -1,10 +1,9 @@
 'use client'
 
-import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useDomains } from '@/hooks/useDomains'
-import { apiCall } from '@/lib/api/client'
 import { Plus } from 'lucide-react'
+import { CreateProjectPopover } from '@/components/channels/CreateProjectPopover'
 
 // ---------------------------------------------------------------------------
 // Mini inbox preview — mirrors the real inbox layout precisely
@@ -170,29 +169,7 @@ function MiniMessage({
 export default function InboxPage() {
   const { domains, isLoading, refetch } = useDomains()
   const router = useRouter()
-  const [projectName, setProjectName] = useState('')
-  const [isCreating, setIsCreating] = useState(false)
-  const [showInput, setShowInput] = useState(false)
   const hasProjects = domains.length > 0
-
-  const handleCreateProject = async () => {
-    const trimmed = projectName.trim()
-    if (!trimmed) return
-    setIsCreating(true)
-    try {
-      await apiCall('/company/domains', {
-        method: 'POST',
-        body: JSON.stringify({ name: trimmed }),
-      })
-      setProjectName('')
-      setShowInput(false)
-      await refetch()
-    } catch {
-      // apiCall shows toast
-    } finally {
-      setIsCreating(false)
-    }
-  }
 
   if (isLoading) {
     return (
@@ -245,45 +222,14 @@ export default function InboxPage() {
             and watch them collaborate, report progress, and request your approval.
           </p>
 
-          {!showInput ? (
+          <CreateProjectPopover onCreated={refetch} side="top" align="center">
             <button
-              onClick={() => setShowInput(true)}
               className="inline-flex items-center gap-2 px-6 py-[11px] rounded-[14px] text-[13px] font-medium text-white bg-[#FF6600] hover:bg-[#E65C00] shadow-[0_2px_16px_rgba(255,102,0,0.22)] hover:shadow-[0_4px_24px_rgba(255,102,0,0.32)] hover:-translate-y-px active:scale-[0.98] transition-all"
             >
               <Plus className="w-4 h-4" />
               Create your first project
             </button>
-          ) : (
-            <div className="max-w-[320px] mx-auto">
-              <input
-                autoFocus
-                value={projectName}
-                onChange={(e) => setProjectName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleCreateProject()
-                  if (e.key === 'Escape') { setShowInput(false); setProjectName('') }
-                }}
-                placeholder="Project name..."
-                disabled={isCreating}
-                className="w-full px-4 py-2.5 rounded-xl bg-surface-alt border border-surface-active text-sm text-text text-center placeholder:text-text-muted outline-none focus-visible:ring-2 focus-visible:ring-[#FF6600] focus:border-[#FF6600]/40 focus:shadow-[0_2px_12px_rgba(255,102,0,0.08)] transition-all"
-              />
-              <div className="flex gap-2 mt-2 justify-center">
-                <button
-                  onClick={handleCreateProject}
-                  disabled={isCreating || !projectName.trim()}
-                  className="px-5 py-2 rounded-xl text-sm font-medium text-white bg-[#FF6600] hover:bg-[#E65C00] disabled:opacity-50 transition-colors"
-                >
-                  {isCreating ? 'Creating...' : 'Create'}
-                </button>
-                <button
-                  onClick={() => { setShowInput(false); setProjectName('') }}
-                  className="px-4 py-2 rounded-xl text-sm text-text-muted hover:bg-surface-hover transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
+          </CreateProjectPopover>
         </div>
       </div>
     </div>

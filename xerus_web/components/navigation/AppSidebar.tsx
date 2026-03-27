@@ -20,6 +20,7 @@ import { useSidebarSlotContent } from '@/components/layout/SidebarSlotContext'
 import { useDomains } from '@/hooks/useDomains'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { CreateProjectPopover } from '@/components/channels/CreateProjectPopover'
 import { getWorkspaceOverview, type WorkspaceOverview } from '@/lib/api/workspace'
 
 const TABS = [
@@ -36,8 +37,8 @@ export function AppSidebar() {
   const { totalUnread, counts, markRead } = useUnreadCounts()
   const { activeSection, setActiveSection, navigateToPath } = useWorkspaceSection()
   const SlotComponent = useSidebarSlotContent()
+  const { refetch: refreshDomains } = useDomains()
   const [collapsed, setCollapsed] = useState(false)
-  const [showInboxCreate, setShowInboxCreate] = useState(false)
 
   const activeTab = pathname === '/' ? null // Office dashboard — logo is the indicator, no tab active
     : pathname.startsWith('/chat') ? 'chat'
@@ -139,13 +140,14 @@ export function AppSidebar() {
         })}
         {/* + button for creating projects — visible when on inbox tab */}
         {activeTab === 'inbox' && (
-          <button
-            onClick={() => setShowInboxCreate(prev => !prev)}
-            className="ml-auto p-1 rounded-lg hover:bg-primary/10 text-primary transition-colors"
-            title="Create project"
-          >
-            <Plus className="w-5 h-5" />
-          </button>
+          <CreateProjectPopover onCreated={refreshDomains} align="end">
+            <button
+              className="ml-auto p-1 rounded-lg hover:bg-primary/10 text-primary transition-colors"
+              title="Create project"
+            >
+              <Plus className="w-5 h-5" />
+            </button>
+          </CreateProjectPopover>
         )}
       </div>
 
@@ -161,7 +163,7 @@ export function AppSidebar() {
         ) : activeTab === 'chat' ? (
           SlotComponent ? <SlotComponent /> : <ChatSidebarFallback />
         ) : activeTab === 'inbox' ? (
-          <InboxSidebarBody counts={counts} markRead={markRead} showCreateInput={showInboxCreate} setShowCreateInput={setShowInboxCreate} />
+          <InboxSidebarBody counts={counts} markRead={markRead} />
         ) : null}
       </div>
 
@@ -333,11 +335,9 @@ function ChatSidebarFallback() {
 }
 
 /* ---- Inbox body ---- */
-function InboxSidebarBody({ counts, markRead, showCreateInput, setShowCreateInput }: {
+function InboxSidebarBody({ counts, markRead }: {
   counts: Record<string, number>
   markRead: (channelId: string) => void
-  showCreateInput: boolean
-  setShowCreateInput: (v: boolean | ((prev: boolean) => boolean)) => void
 }) {
   const pathname = usePathname()
   const router = useRouter()
@@ -358,28 +358,6 @@ function InboxSidebarBody({ counts, markRead, showCreateInput, setShowCreateInpu
     })
   }
 
-  const [newProjectName, setNewProjectName] = useState('')
-  const [isCreatingProject, setIsCreatingProject] = useState(false)
-
-  const handleCreateProject = async () => {
-    const trimmed = newProjectName.trim()
-    if (!trimmed) return
-    setIsCreatingProject(true)
-    try {
-      await apiCall('/company/domains', {
-        method: 'POST',
-        body: JSON.stringify({ name: trimmed }),
-      })
-      setNewProjectName('')
-      setShowCreateInput(false)
-      await refreshDomains()
-    } catch {
-      // apiCall shows toast
-    } finally {
-      setIsCreatingProject(false)
-    }
-  }
-
   if (isLoading) {
     return (
       <div className="px-4 py-6 space-y-3">
@@ -391,24 +369,6 @@ function InboxSidebarBody({ counts, markRead, showCreateInput, setShowCreateInpu
   if (domains.length === 0) {
     return (
       <div className="px-4 py-2">
-        {/* Inline create input */}
-        {showCreateInput && (
-          <div className="px-2 pb-3">
-            <input
-              autoFocus
-              value={newProjectName}
-              onChange={(e) => setNewProjectName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleCreateProject()
-                if (e.key === 'Escape') { setShowCreateInput(false); setNewProjectName('') }
-              }}
-              placeholder="Project name..."
-              disabled={isCreatingProject}
-              className="w-full px-3 py-1.5 rounded-xl bg-surface border border-surface-active text-sm text-text placeholder:text-text-muted outline-none focus-visible:ring-2 focus-visible:ring-primary focus:border-primary/40 focus:shadow-[0_2px_12px_rgba(255,102,0,0.08)]"
-            />
-          </div>
-        )}
-
         {/* Ghost preview — shows what populated sidebar looks like */}
         <div className="opacity-30 pointer-events-none select-none" aria-hidden="true">
           <div className="mb-1">
@@ -448,24 +408,6 @@ function InboxSidebarBody({ counts, markRead, showCreateInput, setShowCreateInpu
 
   return (
     <ScrollArea className="flex-1">
-      {/* Inline create input when + is clicked */}
-      {showCreateInput && (
-        <div className="px-5 pt-2 pb-1">
-          <input
-            autoFocus
-            value={newProjectName}
-            onChange={(e) => setNewProjectName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleCreateProject()
-              if (e.key === 'Escape') { setShowCreateInput(false); setNewProjectName('') }
-            }}
-            placeholder="Project name..."
-            disabled={isCreatingProject}
-            className="w-full px-3 py-1.5 rounded-xl bg-surface border border-surface-active text-sm text-text placeholder:text-text-muted outline-none focus-visible:ring-2 focus-visible:ring-primary focus:border-primary/40 focus:shadow-[0_2px_12px_rgba(255,102,0,0.08)]"
-          />
-        </div>
-      )}
-
       <div className="px-4 py-3">
         {domains.map((domain) => {
           const isExpanded = expandedDomains.has(domain.id)
