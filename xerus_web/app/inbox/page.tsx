@@ -4,7 +4,9 @@ import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useDomains } from '@/hooks/useDomains'
 import { apiCall } from '@/lib/api/client'
-import { Plus, FolderOpen, ChevronRight } from 'lucide-react'
+import { Plus, FolderOpen, ChevronRight, MessageSquare } from 'lucide-react'
+import { ErrorBoundary } from '@/components/common/ErrorBoundary'
+import { XerusLoader } from '@/components/common/XerusLoader'
 
 // ---------------------------------------------------------------------------
 // Mini inbox preview — mirrors the real inbox layout precisely
@@ -20,12 +22,12 @@ function MiniInboxPreview() {
           <span className="text-[10px] text-text-muted">+</span>
         </div>
 
-        <div className="flex items-center gap-1 px-1.5 py-1 rounded-lg bg-[#FF6600]/8 text-[#FF6600] text-[10px] font-medium mb-0.5">
-          <svg className="w-[11px] h-[11px] shrink-0 rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-          <svg className="w-[11px] h-[11px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2v11z"/></svg>
+        <div className="flex items-center gap-1 px-1.5 py-1 rounded-lg bg-primary/8 text-primary text-[10px] font-medium mb-0.5">
+          <ChevronRight className="w-[11px] h-[11px] shrink-0 rotate-90" />
+          <FolderOpen className="w-[11px] h-[11px] shrink-0" />
           Product
         </div>
-        <div className="py-[3px] px-1.5 pl-[22px] text-[9px] rounded-[5px] bg-[#FF6600]/6 text-[#FF6600] font-medium mb-px">
+        <div className="py-[3px] px-1.5 pl-[22px] text-[9px] rounded-[5px] bg-primary/6 text-primary font-medium mb-px">
           <span className="font-semibold mr-0.5">#</span> Onboarding
         </div>
         <div className="py-[3px] px-1.5 pl-[22px] text-[9px] text-text-secondary rounded-[5px] mb-px">
@@ -36,8 +38,8 @@ function MiniInboxPreview() {
         </div>
 
         <div className="flex items-center gap-1 px-1.5 py-1 rounded-lg text-text-muted text-[10px] font-medium mt-1.5">
-          <svg className="w-[11px] h-[11px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-          <svg className="w-[11px] h-[11px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2v11z"/></svg>
+          <ChevronRight className="w-[11px] h-[11px] shrink-0" />
+          <FolderOpen className="w-[11px] h-[11px] shrink-0" />
           Engineering
         </div>
       </div>
@@ -90,9 +92,9 @@ function MiniInboxPreview() {
             <div className="text-[7.5px] text-text-secondary leading-[1.5] mt-0.5">Based on the engagement analysis, I recommend shifting 40% of the opinion piece budget to tutorial content production.</div>
             <div className="text-[7.5px] text-text-secondary mt-0.5">Estimated impact: <strong className="text-text">+1.5% average engagement rate</strong>.</div>
             <div className="flex gap-1.5 mt-1.5">
-              <span className="flex items-center gap-0.5 px-2 py-[2px] rounded-full text-[7px] font-semibold bg-[#FF6600] text-white">Approve</span>
+              <span className="flex items-center gap-0.5 px-2 py-[2px] rounded-full text-[7px] font-semibold bg-primary text-white">Approve</span>
               <span className="flex items-center gap-0.5 px-2 py-[2px] rounded-full text-[7px] font-semibold bg-surface-hover text-text-muted">Reject</span>
-              <span className="flex items-center gap-0.5 px-2 py-[2px] rounded-full text-[7px] font-semibold text-[#FF6600]">Discuss</span>
+              <span className="flex items-center gap-0.5 px-2 py-[2px] rounded-full text-[7px] font-semibold text-primary">Discuss</span>
             </div>
           </MiniMessage>
 
@@ -151,7 +153,7 @@ function MiniMessage({
         <div className="flex items-center gap-1.5">
           <span className="text-[9px] font-semibold" style={{ color: nameColor }}>{name}</span>
           {badge && (
-            <span className="text-[7px] font-bold px-[5px] py-px rounded bg-[#FF6600]/10 text-[#FF6600]">
+            <span className="text-[7px] font-bold px-[5px] py-px rounded bg-primary/10 text-primary">
               {badge}
             </span>
           )}
@@ -167,7 +169,7 @@ function MiniMessage({
 // Main page
 // ---------------------------------------------------------------------------
 
-export default function InboxPage() {
+function InboxPageContent() {
   const { domains, isLoading, refetch } = useDomains()
   const router = useRouter()
   const hasProjects = domains.length > 0
@@ -180,7 +182,7 @@ export default function InboxPage() {
     if (showCreate) setTimeout(() => inputRef.current?.focus(), 50)
   }, [showCreate])
 
-  const handleCreate = async () => {
+  const handleCreateProject = async () => {
     const trimmed = projectName.trim()
     if (!trimmed) return
     setIsCreating(true)
@@ -192,8 +194,8 @@ export default function InboxPage() {
       setProjectName('')
       setShowCreate(false)
       await refetch()
-    } catch {
-      // apiCall shows toast
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') console.error(error)
     } finally {
       setIsCreating(false)
     }
@@ -202,7 +204,7 @@ export default function InboxPage() {
   if (isLoading) {
     return (
       <div className="flex-1 h-full flex items-center justify-center">
-        <div className="h-10 w-10 rounded-2xl animate-shimmer" />
+        <XerusLoader variant="inline" />
       </div>
     )
   }
@@ -215,9 +217,7 @@ export default function InboxPage() {
     return (
       <div className="flex-1 h-full flex flex-col items-center justify-center text-center px-6">
         <div className="w-14 h-14 rounded-2xl bg-surface-hover flex items-center justify-center mb-4">
-          <svg className="w-7 h-7 text-text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2v10z"/>
-          </svg>
+          <MessageSquare className="w-7 h-7 text-text-muted" />
         </div>
         <h2 className="font-serif text-xl text-text mb-1">Select a channel</h2>
         <p className="text-sm text-text-muted max-w-xs mb-5">
@@ -226,7 +226,7 @@ export default function InboxPage() {
         {firstChannel && (
           <button
             onClick={() => router.push(`/inbox/${firstDomain.slug}/${firstChannel.slug}`)}
-            className="px-5 py-2.5 rounded-xl text-sm font-medium text-[#FF6600] bg-[#FF6600]/8 hover:bg-[#FF6600]/12 transition-colors"
+            className="px-5 py-2.5 rounded-xl text-sm font-medium text-primary bg-primary/8 hover:bg-primary/12 transition-colors"
           >
             Go to #{firstChannel.name}
           </button>
@@ -253,7 +253,7 @@ export default function InboxPage() {
           {!showCreate ? (
             <button
               onClick={() => setShowCreate(true)}
-              className="inline-flex items-center gap-2 px-6 py-[11px] rounded-[14px] text-[13px] font-medium text-white bg-[#FF6600] hover:bg-[#E65C00] shadow-[0_2px_16px_rgba(255,102,0,0.22)] hover:shadow-[0_4px_24px_rgba(255,102,0,0.32)] hover:-translate-y-px active:scale-[0.98] transition-all"
+              className="inline-flex items-center gap-2 px-6 py-[11px] rounded-[14px] text-[13px] font-medium text-white bg-primary hover:bg-primary/90 shadow-[0_2px_16px_rgba(255,102,0,0.22)] hover:shadow-[0_4px_24px_rgba(255,102,0,0.32)] hover:-translate-y-px active:scale-[0.98] transition-all"
             >
               <Plus className="w-4 h-4" />
               Create your first project
@@ -267,7 +267,7 @@ export default function InboxPage() {
                 value={projectName}
                 onChange={(e) => setProjectName(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleCreate()
+                  if (e.key === 'Enter') handleCreateProject()
                   if (e.key === 'Escape') { setShowCreate(false); setProjectName('') }
                 }}
                 onBlur={() => { if (!projectName.trim()) { setShowCreate(false); setProjectName('') } }}
@@ -281,5 +281,13 @@ export default function InboxPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function InboxPage() {
+  return (
+    <ErrorBoundary label="Inbox">
+      <InboxPageContent />
+    </ErrorBoundary>
   )
 }

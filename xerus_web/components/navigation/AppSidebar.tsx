@@ -9,7 +9,7 @@ import {
   MessageSquare, Inbox, Home,
   Bot, Puzzle, Unplug, FileText, Files, Settings,
   PanelLeftClose, PanelLeftOpen,
-  Plus, Hash, ChevronDown, ChevronRight, FolderOpen, Folder, FolderPlus,
+  Plus, Hash, ChevronDown, ChevronRight, FolderOpen, Folder,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { apiCall } from '@/lib/api/client'
@@ -20,6 +20,7 @@ import { useSidebarSlotContent } from '@/components/layout/SidebarSlotContext'
 import { useDomains } from '@/hooks/useDomains'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { InboxSidebarBody } from './InboxSidebarBody'
 import { getWorkspaceOverview, type WorkspaceOverview } from '@/lib/api/workspace'
 
 const TABS = [
@@ -159,7 +160,7 @@ export function AppSidebar() {
             onPathClick={handlePathClick}
           />
         ) : activeTab === 'chat' ? (
-          SlotComponent ? <SlotComponent /> : <ChatSidebarFallback />
+          SlotComponent ? <SlotComponent /> : <ChatSidebarLoading />
         ) : activeTab === 'inbox' ? (
           <InboxSidebarBody counts={counts} markRead={markRead} showNewRow={showNewProjectRow} onNewRowDone={() => setShowNewProjectRow(false)} />
         ) : null}
@@ -323,238 +324,11 @@ function HomeSidebarBody({ activeSection, isOnWorkspace, onSectionClick, onPathC
   )
 }
 
-/* ---- Chat fallback ---- */
-function ChatSidebarFallback() {
+/* ---- Chat loading ---- */
+function ChatSidebarLoading() {
   return (
     <div className="px-4 py-10 text-center">
       <p className="text-sm text-text-secondary">Loading sessions...</p>
-    </div>
-  )
-}
-
-/* ---- Inbox body ---- */
-function InboxSidebarBody({ counts, markRead, showNewRow, onNewRowDone }: {
-  counts: Record<string, number>
-  markRead: (channelId: string) => void
-  showNewRow: boolean
-  onNewRowDone: () => void
-}) {
-  const pathname = usePathname()
-  const router = useRouter()
-  const { domains, isLoading, refetch: refreshDomains } = useDomains()
-  const [expandedDomains, setExpandedDomains] = useState<Set<string>>(new Set())
-  const [newName, setNewName] = useState('')
-  const [isCreating, setIsCreating] = useState(false)
-  const newRowRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    if (domains.length > 0 && expandedDomains.size === 0) {
-      setExpandedDomains(new Set(domains.map((d) => d.id)))
-    }
-  }, [domains, expandedDomains.size])
-
-  useEffect(() => {
-    if (showNewRow) {
-      setNewName('')
-      setTimeout(() => newRowRef.current?.focus(), 50)
-    }
-  }, [showNewRow])
-
-  const toggleDomain = (domainId: string) => {
-    setExpandedDomains((prev) => {
-      const next = new Set(prev)
-      next.has(domainId) ? next.delete(domainId) : next.add(domainId)
-      return next
-    })
-  }
-
-  const handleCreateProject = async () => {
-    const trimmed = newName.trim()
-    if (!trimmed) return
-    setIsCreating(true)
-    try {
-      await apiCall('/company/domains', {
-        method: 'POST',
-        body: JSON.stringify({ name: trimmed }),
-      })
-      setNewName('')
-      onNewRowDone()
-      await refreshDomains()
-    } catch {
-      // apiCall shows toast
-    } finally {
-      setIsCreating(false)
-    }
-  }
-
-  const newProjectRow = showNewRow ? (
-    <div className="mb-1 animate-[fadeInUp_0.15s_ease-out]">
-      <div className="flex items-center gap-2 w-full px-3 py-2 rounded-xl">
-        <ChevronRight className="w-4 h-4 text-text-secondary shrink-0" />
-        <FolderOpen className="w-[18px] h-[18px] text-primary shrink-0" />
-        <input
-          ref={newRowRef}
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') handleCreateProject()
-            if (e.key === 'Escape') { onNewRowDone(); setNewName('') }
-          }}
-          onBlur={() => { if (!newName.trim()) { onNewRowDone(); setNewName('') } }}
-          placeholder="Project name..."
-          disabled={isCreating}
-          className="flex-1 bg-transparent border-none outline-none text-sm font-medium text-text placeholder:text-text-muted caret-primary"
-        />
-        <span className="text-[10px] text-text-muted bg-surface rounded px-1.5 py-0.5 shrink-0">↵</span>
-      </div>
-    </div>
-  ) : null
-
-  if (isLoading) {
-    return (
-      <div className="px-4 py-6 space-y-3">
-        {[0, 1, 2].map((i) => <div key={i} className="h-9 rounded-xl animate-shimmer" />)}
-      </div>
-    )
-  }
-
-  if (domains.length === 0) {
-    return (
-      <div className="px-4 py-2">
-        {newProjectRow}
-        {/* Ghost preview — shows what populated sidebar looks like */}
-        <div className="opacity-30 pointer-events-none select-none" aria-hidden="true">
-          <div className="mb-1">
-            <div className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-sm font-medium text-text">
-              <ChevronDown className="w-4 h-4 text-text-secondary shrink-0" />
-              <FolderOpen className="w-[18px] h-[18px] text-primary shrink-0" />
-              <span className="flex-1 text-left truncate">Product</span>
-              <span className="text-[11px] font-medium text-text-secondary bg-surface-hover rounded-full px-2 py-0.5">3</span>
-            </div>
-            <div className="pl-6 pr-2 py-0.5 space-y-0.5">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm text-text-secondary">
-                <Hash className="w-4 h-4 shrink-0" />
-                <span>Onboarding</span>
-              </div>
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm text-text-secondary">
-                <Hash className="w-4 h-4 shrink-0" />
-                <span>Analytics</span>
-              </div>
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm text-text-secondary">
-                <Hash className="w-4 h-4 shrink-0" />
-                <span>Design</span>
-              </div>
-            </div>
-          </div>
-          <div className="mb-1">
-            <div className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-sm font-medium text-text">
-              <ChevronRight className="w-4 h-4 text-text-secondary shrink-0" />
-              <Folder className="w-[18px] h-[18px] text-text-secondary shrink-0" />
-              <span className="flex-1 text-left truncate">Engineering</span>
-              <span className="text-[11px] font-medium text-text-secondary bg-surface-hover rounded-full px-2 py-0.5">2</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <ScrollArea className="flex-1">
-      <div className="px-4 py-3">
-        {newProjectRow}
-        {domains.map((domain) => {
-          const isExpanded = expandedDomains.has(domain.id)
-          const domainUnread = domain.channels.reduce((sum, ch) => sum + (counts[ch.id] ?? 0), 0)
-          return (
-            <div key={domain.id} className="mb-1">
-              <button onClick={() => toggleDomain(domain.id)} className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-sm font-medium text-text hover:bg-surface-hover transition-colors group">
-                {isExpanded ? <ChevronDown className="w-4 h-4 text-text-secondary shrink-0" /> : <ChevronRight className="w-4 h-4 text-text-secondary shrink-0" />}
-                {isExpanded ? <FolderOpen className="w-[18px] h-[18px] text-primary shrink-0" /> : <Folder className="w-[18px] h-[18px] text-text-secondary shrink-0" />}
-                <span className="flex-1 text-left truncate">{domain.name}</span>
-                {domainUnread > 0 ? (
-                  <span className="min-w-[18px] h-5 px-1.5 flex items-center justify-center rounded-full bg-primary text-white text-[10px] font-semibold">{domainUnread > 99 ? '99+' : domainUnread}</span>
-                ) : (
-                  <span className="text-[11px] font-medium text-text-secondary bg-surface-hover rounded-full px-2 py-0.5">{domain.channels.length}</span>
-                )}
-              </button>
-              <div className={cn('overflow-hidden transition-all duration-200', isExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0')}>
-                <div className="pl-6 pr-2 py-0.5 space-y-0.5">
-                  {domain.channels.map((channel) => {
-                    const isActive = pathname === `/inbox/${domain.slug}/${channel.slug}`
-                    const unread = counts[channel.id] ?? 0
-                    return (
-                      <Link key={channel.id} href={`/inbox/${domain.slug}/${channel.slug}`} onClick={() => unread > 0 && markRead(channel.id)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm transition-colors', isActive ? 'bg-primary/10 text-primary font-medium' : unread > 0 ? 'text-text font-semibold hover:bg-surface-hover' : 'text-text-secondary hover:bg-surface-hover hover:text-text')}>
-                        <Hash className="w-4 h-4 shrink-0" />
-                        <span className="flex-1 truncate">{channel.name}</span>
-                        {unread > 0 && !isActive && (
-                          <span className="min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-primary text-white text-[10px] font-semibold">{unread > 99 ? '99+' : unread}</span>
-                        )}
-                      </Link>
-                    )
-                  })}
-                </div>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </ScrollArea>
-  )
-}
-
-// Inline project creation form for sidebar empty state
-function CreateProjectInline({ onCreated }: { onCreated: () => Promise<void> }) {
-  const [isOpen, setIsOpen] = useState(false)
-  const [name, setName] = useState('')
-  const [isCreating, setIsCreating] = useState(false)
-
-  const handleCreate = async () => {
-    const trimmed = name.trim()
-    if (!trimmed) return
-    setIsCreating(true)
-    try {
-      await apiCall('/company/domains', {
-        method: 'POST',
-        body: JSON.stringify({ name: trimmed }),
-      })
-      setName('')
-      setIsOpen(false)
-      await onCreated()
-    } catch {
-      // apiCall already shows toast on error
-    } finally {
-      setIsCreating(false)
-    }
-  }
-
-  if (!isOpen) {
-    return (
-      <button onClick={() => setIsOpen(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white bg-primary hover:bg-primary/90 transition-colors">
-        <Plus className="w-4 h-4" /> Create project
-      </button>
-    )
-  }
-
-  return (
-    <div className="w-full px-2">
-      <input
-        autoFocus
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') setIsOpen(false) }}
-        placeholder="Project name"
-        className="w-full px-3 py-2 rounded-xl bg-surface border border-surface-active text-sm text-text placeholder:text-text-muted outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 focus:border-primary/40 focus:shadow-[0_2px_12px_rgba(255,102,0,0.08)]"
-        disabled={isCreating}
-      />
-      <div className="flex gap-2 mt-2">
-        <button onClick={handleCreate} disabled={isCreating || !name.trim()} className="flex-1 px-3 py-1.5 rounded-xl text-sm font-medium text-white bg-primary hover:bg-primary/90 disabled:opacity-50 transition-colors">
-          {isCreating ? 'Creating...' : 'Create'}
-        </button>
-        <button onClick={() => { setIsOpen(false); setName('') }} className="px-3 py-1.5 rounded-xl text-sm text-text-muted hover:bg-surface-hover transition-colors">
-          Cancel
-        </button>
-      </div>
     </div>
   )
 }
