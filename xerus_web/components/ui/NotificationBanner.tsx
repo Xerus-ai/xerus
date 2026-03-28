@@ -79,17 +79,17 @@ export function NotificationBanner({
     if (!isVisible || !autoCloseSeconds) return
 
     const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          handleClose()
-          return 0
-        }
-        return prev - 1
-      })
+      setCountdown((prev) => (prev <= 1 ? 0 : prev - 1))
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [isVisible, autoCloseSeconds, handleClose])
+  }, [isVisible, autoCloseSeconds])
+
+  useEffect(() => {
+    if (countdown === 0 && isVisible && autoCloseSeconds) {
+      handleClose()
+    }
+  }, [countdown, isVisible, autoCloseSeconds, handleClose])
 
   if (!isVisible) return null
 

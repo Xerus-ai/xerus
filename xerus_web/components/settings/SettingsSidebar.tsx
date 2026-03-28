@@ -99,6 +99,7 @@ export function SettingsSidebar() {
           </div>
           <button
             onClick={handleLogout}
+            data-testid="settings-sign-out"
             className="flex items-center gap-2.5 px-3 py-[7px] text-[13px] text-text-secondary hover:text-text rounded-lg hover:bg-surface-hover/40 transition-all duration-150 w-full"
           >
             <LogOut className="w-[15px] h-[15px] text-text-secondary" />

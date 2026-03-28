@@ -93,7 +93,7 @@ export function AgentsPanel({ onSelect, onCountChange }: AgentsPanelProps) {
         />
 
         {/* My Agents */}
-        <div className="w-full mb-12">
+        <div data-testid="my-agents-section" className="w-full mb-12">
           <div className="flex items-center gap-3 mb-6">
             <h2 className="font-serif text-2xl text-text">My Agents</h2>
             <span className="bg-primary/10 text-primary text-xs font-bold px-2 py-1 rounded-md">
@@ -115,7 +115,7 @@ export function AgentsPanel({ onSelect, onCountChange }: AgentsPanelProps) {
         </div>
 
         {/* Marketplace */}
-        <div className="w-full">
+        <div data-testid="marketplace-section" className="w-full">
           <div className="flex items-center gap-3 mb-6">
             <h2 className="font-serif text-2xl text-text">Agent Marketplace</h2>
             <span className="bg-text-secondary/10 text-text-secondary text-xs font-bold px-2 py-1 rounded-md">

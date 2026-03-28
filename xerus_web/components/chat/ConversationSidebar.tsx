@@ -236,6 +236,7 @@ const SessionRow = memo(function SessionRow({
     <button
       type="button"
       onClick={handleSelect}
+      data-testid="session-row"
       className={cn(
         'group relative flex items-center gap-2 w-full text-left px-3 py-2 rounded-lg transition-all duration-150',
         isActive
@@ -448,6 +449,7 @@ export function ConversationSidebar({
             placeholder="Search sessions..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            data-testid="session-search"
             className={cn(
               'w-full pl-8 pr-3 py-1.5 rounded-lg text-sm',
               'bg-surface border border-surface-active',
@@ -460,7 +462,7 @@ export function ConversationSidebar({
       </div>
 
       {/* Project groups */}
-      <ScrollArea className="flex-1 px-2 pt-1">
+      <ScrollArea data-testid="session-list" className="flex-1 px-2 pt-1">
         {filteredProjects.length === 0 ? (
           <div className="px-3 py-8 text-center">
             {isLoading ? (
@@ -522,6 +524,7 @@ export function ConversationSidebar({
         <button
           type="button"
           onClick={() => setIsChannelPickerOpen((prev) => !prev)}
+          data-testid="channel-button"
           className={cn(
             'flex items-center justify-center gap-1.5 flex-1 px-3 py-2 rounded-xl text-sm',
             selectedChannel
@@ -537,6 +540,7 @@ export function ConversationSidebar({
         <button
           type="button"
           onClick={onNewConversation}
+          data-testid="new-session-button"
           className={cn(
             'flex items-center justify-center gap-1.5 flex-1 px-3 py-2 rounded-xl text-sm',
             'text-text-secondary hover:text-primary hover:bg-primary/8',

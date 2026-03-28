@@ -1,0 +1,26 @@
+{
+  "name": "xerus-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "E2E tests for the Xerus platform",
+  "scripts": {
+    "test": "npx playwright test",
+    "test:ui": "npx playwright test ui/",
+    "test:api": "npx playwright test api/",
+    "test:mobile": "npx playwright test --project=mobile",
+    "test:tablet": "npx playwright test --project=tablet",
+    "test:desktop": "npx playwright test --project=desktop",
+    "report": "npx playwright show-report",
+    "install:browsers": "npx playwright install chromium"
+  },
+  "dependencies": {
+    "@playwright/test": "^1.50.0",
+    "dotenv": "^16.4.7",
+    "firebase-admin": "^13.0.0",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.10",
+    "typescript": "^5.7.0"
+  }
+}

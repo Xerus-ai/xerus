@@ -22,7 +22,7 @@ import { getWorkspaceOverview } from '@/lib/api/workspace'
 
 export function MobileHeader() {
   return (
-    <div className="fixed top-0 left-0 right-0 z-40 pointer-events-none">
+    <div data-testid="mobile-header" className="fixed top-0 left-0 right-0 z-40 pointer-events-none">
       <div className="flex items-center justify-between px-3 pt-[env(safe-area-inset-top,0.5rem)]">
         {/* Left: Logo → Office */}
         <Link

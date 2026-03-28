@@ -237,6 +237,7 @@ export function MentionInput({
             placeholder={placeholder}
             rows={1}
             aria-label="Message input"
+            data-testid="channel-message-input"
             className={cn(
               'w-full resize-none bg-transparent px-4 pt-3 pb-1',
               'text-sm text-text placeholder:text-text-muted/60',
@@ -299,6 +300,7 @@ export function MentionInput({
                 }}
                 disabled={!hasContent}
                 aria-label="Send message"
+                data-testid="channel-send-button"
                 className={cn(
                   'flex items-center justify-center w-7 h-7 rounded-lg',
                   'bg-primary text-white',

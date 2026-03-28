@@ -401,6 +401,9 @@ function InboxSidebarBody({ counts, markRead }: {
             </div>
           )
         })}
+        <div className="mt-3 px-1">
+          <CreateProjectInline onCreated={refreshDomains} />
+        </div>
       </div>
     </ScrollArea>
   )
@@ -433,7 +436,7 @@ function CreateProjectInline({ onCreated }: { onCreated: () => Promise<void> }) 
 
   if (!isOpen) {
     return (
-      <button onClick={() => setIsOpen(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white bg-primary hover:bg-primary/90 transition-colors">
+      <button onClick={() => setIsOpen(true)} data-testid="create-project-button" className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white bg-primary hover:bg-primary/90 transition-colors">
         <Plus className="w-4 h-4" /> Create project
       </button>
     )
@@ -447,14 +450,15 @@ function CreateProjectInline({ onCreated }: { onCreated: () => Promise<void> }) 
         onChange={(e) => setName(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') setIsOpen(false) }}
         placeholder="Project name"
+        data-testid="project-name-input"
         className="w-full px-3 py-2 rounded-xl bg-surface border border-surface-active text-sm text-text placeholder:text-text-muted outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 focus:border-primary/40 focus:shadow-[0_2px_12px_rgba(255,102,0,0.08)]"
         disabled={isCreating}
       />
       <div className="flex gap-2 mt-2">
-        <button onClick={handleCreate} disabled={isCreating || !name.trim()} className="flex-1 px-3 py-1.5 rounded-xl text-sm font-medium text-white bg-primary hover:bg-primary/90 disabled:opacity-50 transition-colors">
+        <button onClick={handleCreate} disabled={isCreating || !name.trim()} data-testid="project-create-submit" className="flex-1 px-3 py-1.5 rounded-xl text-sm font-medium text-white bg-primary hover:bg-primary/90 disabled:opacity-50 transition-colors">
           {isCreating ? 'Creating...' : 'Create'}
         </button>
-        <button onClick={() => { setIsOpen(false); setName('') }} className="px-3 py-1.5 rounded-xl text-sm text-text-muted hover:bg-surface-hover transition-colors">
+        <button onClick={() => { setIsOpen(false); setName('') }} data-testid="project-cancel-button" className="px-3 py-1.5 rounded-xl text-sm text-text-muted hover:bg-surface-hover transition-colors">
           Cancel
         </button>
       </div>

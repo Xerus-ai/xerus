@@ -43,10 +43,12 @@ export function useChannelMessages(channelId: string): UseChannelMessagesReturn 
     setIsLoading(true)
     setError(null)
     try {
-      const data = await apiGet<{ messages: ChannelMessage[] }>(
+      const result = await apiGet<{ data?: { messages: ChannelMessage[] }; messages?: ChannelMessage[] }>(
         `/company/channels/${channelId}/messages`
       )
-      setMessages(data.messages)
+      // Backend wraps response in { success, data: { messages }, meta }
+      const payload = result.data ?? result
+      setMessages(payload.messages ?? [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch messages')
     } finally {
@@ -71,10 +73,13 @@ export function useChannelMessages(channelId: string): UseChannelMessagesReturn 
     setMessages(prev => [...prev, optimistic])
 
     try {
-      const saved = await apiPost<ChannelMessage>(
+      const result = await apiPost<{ data?: { message: ChannelMessage }; message?: ChannelMessage }>(
         `/company/channels/${channelId}/messages`,
         { content, sender_type: 'human' }
       )
+      // Backend wraps response in { success, data: { message }, meta }
+      const savedPayload = result.data ?? result
+      const saved = savedPayload.message ?? optimistic
       setMessages(prev =>
         prev.map(m => (m.id === optimistic.id ? saved : m))
       )
@@ -109,10 +114,12 @@ export function useChannelTasks(channelId: string): UseChannelTasksReturn {
     setIsLoading(true)
     setError(null)
     try {
-      const data = await apiGet<{ tasks: KanbanTask[] }>(
+      const result = await apiGet<{ data?: { tasks: KanbanTask[] }; tasks?: KanbanTask[] }>(
         `/channels/${channelId}/tasks`
       )
-      setTasks(data.tasks)
+      // Backend wraps response in { success, data: { tasks }, meta }
+      const payload = result.data ?? result
+      setTasks(payload.tasks ?? [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch tasks')
     } finally {
@@ -157,10 +164,12 @@ export function useChannelDeliverables(channelId: string): UseChannelDeliverable
     setIsLoading(true)
     setError(null)
     try {
-      const data = await apiGet<{ deliverables: Deliverable[] }>(
+      const raw = await apiGet<{ data?: { deliverables: Deliverable[] }; deliverables?: Deliverable[] }>(
         `/channels/${channelId}/deliverables`
       )
-      setDeliverables(data.deliverables)
+      // Backend wraps response in { success, data: { deliverables }, meta }
+      const payload = raw.data ?? raw
+      setDeliverables(payload.deliverables ?? [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch deliverables')
     } finally {
