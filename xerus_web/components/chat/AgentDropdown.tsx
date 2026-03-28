@@ -149,6 +149,7 @@ export function AgentDropdown({
           role="combobox"
           aria-expanded={open}
           aria-label="Select agent"
+          data-testid="agent-dropdown"
           className={cn("w-auto justify-between h-9 px-2 bg-gray-50/50 border-transparent hover:bg-gray-100/50 text-sm font-normal", className)}
           disabled={disabled}
         >
@@ -208,6 +209,7 @@ export function AgentDropdown({
                 )}
                 role="option"
                 aria-selected={isSelected}
+                data-testid="agent-option"
               >
                 <div className="flex items-center gap-2">
                   <div className="relative w-8 h-8">
@@ -262,6 +264,7 @@ export function AgentDropdown({
                   )}
                   role="option"
                   aria-selected={selectedAgent?.id === agent.id}
+                  data-testid="agent-option"
                 >
                   <div className="flex items-center gap-2">
                     <div className="relative w-8 h-8">

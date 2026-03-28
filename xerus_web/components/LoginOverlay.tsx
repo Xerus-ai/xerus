@@ -29,7 +29,7 @@ export function LoginOverlay() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-surface-alt">
+    <div data-testid="login-overlay" className="fixed inset-0 z-50 flex items-center justify-center bg-surface-alt">
       <GradientBackground />
 
       {/* Login Content */}

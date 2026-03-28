@@ -43,6 +43,17 @@ xerus_backend/PROMPT.md
 # ─── Database migrations (keep connection.ts tracked, ignore migration artifacts) ─────
 # xerus_backend/src/database/  # REMOVED — connection.ts must be in repo for CI to work
 
+# ─── E2E Auth Page (dev-only, must never reach production) ──────────────────
+xerus_web/app/e2e-auth/
+
+# ─── E2E Test Artifacts ─────────────────────────────────────────────────────
+e2e/node_modules/
+e2e/test-results/
+e2e/playwright-report/
+e2e/blob-report/
+e2e/screenshots/
+e2e/ui/.auth/
+
 # ─── Test Data & Artifacts ───────────────────────────────────────────────────
 xerus_backend/TEST_DATA.md
 xerus_backend/sandboxes_tmp.json

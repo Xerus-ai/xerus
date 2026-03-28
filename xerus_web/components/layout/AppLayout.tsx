@@ -63,20 +63,22 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
 
   const isLoginPage = pathname === '/login'
   const isOnboardingPage = pathname === '/onboarding'
+  // E2E auth page bypass — dev only, stripped from production by dead code elimination
+  const isE2EAuthPage = process.env.NODE_ENV !== 'production' && pathname === '/e2e-auth'
 
   // Redirect unauthenticated users to login
   useEffect(() => {
-    if (isAuthReady && !user && !isLoginPage) {
+    if (isAuthReady && !user && !isLoginPage && !isE2EAuthPage) {
       router.push('/login')
     }
-  }, [isAuthReady, user, isLoginPage, router])
+  }, [isAuthReady, user, isLoginPage, isE2EAuthPage, router])
 
   // Redirect users without a workspace to onboarding
   useEffect(() => {
-    if (isAuthReady && user && !hasWorkspace && !isOnboardingPage && !isLoginPage) {
+    if (isAuthReady && user && !hasWorkspace && !isOnboardingPage && !isLoginPage && !isE2EAuthPage) {
       router.push('/onboarding')
     }
-  }, [isAuthReady, user, hasWorkspace, isOnboardingPage, isLoginPage, router])
+  }, [isAuthReady, user, hasWorkspace, isOnboardingPage, isLoginPage, isE2EAuthPage, router])
 
   // Redirect authenticated users away from /login
   useEffect(() => {
@@ -97,6 +99,11 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
     return isLoginPage
       ? <LoadingScreen />
       : <LoadingScreen title="Loading your workspace" subtitle="Verifying your session..." />
+  }
+
+  // E2E auth page: render children directly
+  if (isE2EAuthPage) {
+    return <>{children}</>
   }
 
   // Not authenticated — show loading while redirect to /login fires

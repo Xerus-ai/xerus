@@ -169,6 +169,7 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
   // ---- Parallel initial load: agents + conversations + workspace (async-parallel rule) ----
   // Ref prevents double-fire in React Strict Mode and on dependency changes
   const hasLoadedRef = useRef(false)
+  const hasAutoSentRef = useRef(false)
   const loadConversationDetailsRef = useRef(loadConversationDetails)
   loadConversationDetailsRef.current = loadConversationDetails
 
@@ -344,10 +345,11 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
   )
 
   useEffect(() => {
-    if (initialMessage && isAuthReady && !state.isLoading && state.messages.length === 0) {
-      const timer = setTimeout(() => sendMessageRef(initialMessage), 500)
-      return () => clearTimeout(timer)
-    }
+    if (!initialMessage || !isAuthReady || hasAutoSentRef.current) return
+    if (state.isLoading || state.messages.length > 0) return
+    hasAutoSentRef.current = true
+    const timer = setTimeout(() => sendMessageRef(initialMessage), 500)
+    return () => clearTimeout(timer)
   }, [initialMessage, isAuthReady, sendMessageRef, state.isLoading, state.messages.length])
 
   // ---- Action handlers ----

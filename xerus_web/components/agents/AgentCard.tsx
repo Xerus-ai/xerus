@@ -35,6 +35,7 @@ const AgentCardComponent = ({ agent, onClone, onChat, onClick, isCloning, isOwne
 
     return (
         <div
+            data-testid="agent-card"
             className="bg-surface hover:bg-surface-hover rounded-[32px] p-6 shadow-sm relative group h-full transition-all duration-300 cursor-pointer flex flex-col"
             onClick={onClick}
         >
@@ -160,6 +161,7 @@ const AgentCardComponent = ({ agent, onClone, onChat, onClick, isCloning, isOwne
                             onClone(e);
                         }}
                         disabled={isCloning}
+                        data-testid="agent-clone-button"
                         className="flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white font-medium py-2.5 rounded-xl text-sm shadow-sm transition-all disabled:opacity-50"
                     >
                         {isCloning ? (
@@ -204,6 +206,7 @@ export function CreateAgentCard({ onClick }: CreateAgentCardProps) {
     return (
         <div
             onClick={onClick}
+            data-testid="create-agent-card"
             className="rounded-[32px] border-2 border-dashed border-surface-active hover:border-primary p-6 flex flex-col items-center justify-center text-center h-full min-h-[280px] hover:bg-surface-hover/50 transition-all duration-300 cursor-pointer group"
         >
             <div className="w-16 h-16 bg-surface rounded-full flex items-center justify-center shadow-sm mb-4 group-hover:scale-110 transition-transform duration-300">

@@ -89,13 +89,13 @@ export function ChannelHeader({
       <Tabs defaultValue="activity" className="flex flex-col flex-1 min-h-0">
         <div className="flex-shrink-0">
           <TabsList className={TAB_LIST_CLASSES} aria-label="Channel views">
-            <TabsTrigger value="tasks" className={TAB_TRIGGER_CLASSES}>
+            <TabsTrigger value="tasks" className={TAB_TRIGGER_CLASSES} data-testid="channel-tab-tasks">
               Tasks
             </TabsTrigger>
-            <TabsTrigger value="activity" className={TAB_TRIGGER_CLASSES}>
+            <TabsTrigger value="activity" className={TAB_TRIGGER_CLASSES} data-testid="channel-tab-activity">
               Activity
             </TabsTrigger>
-            <TabsTrigger value="deliverables" className={TAB_TRIGGER_CLASSES}>
+            <TabsTrigger value="deliverables" className={TAB_TRIGGER_CLASSES} data-testid="channel-tab-deliverables">
               Deliverables
             </TabsTrigger>
           </TabsList>

@@ -94,7 +94,7 @@ export function MessageList({
   }
 
   return (
-    <div className={cn('flex-1 overflow-y-auto scrollbar-thin [contain:layout_style]', className)}>
+    <div data-testid="message-list" className={cn('flex-1 overflow-y-auto scrollbar-thin [contain:layout_style]', className)}>
       <div className="max-w-3xl mx-auto pb-4 animate-[fadeInUp_0.4s_ease-out]">
         {/* Messages */}
         <div className="divide-y divide-surface-active/50">
