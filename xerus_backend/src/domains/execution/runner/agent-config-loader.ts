@@ -113,13 +113,21 @@ export class AgentConfigLoader {
                 system_prompt = { type: 'preset' as const, preset: 'claude_code' as const, append };
             }
 
+            // Auto-inject platform MCP server for master orchestrator.
+            // The 'stdio' marker is resolved to an in-process SDK MCP server
+            // by ProcessManager.resolveMcpServers() at execution time.
+            const baseMcpServers = parsed.mcp_servers as Record<string, unknown> | undefined;
+            const mcp_servers = isMaster
+                ? { ...baseMcpServers, 'xerus-platform': { type: 'stdio' } }
+                : baseMcpServers;
+
             return {
                 agent_slug: agentSlug,
                 system_prompt,
                 model: String(parsed.model || DEFAULT_SDK_MODEL),
                 tools,
                 max_turns: Number(parsed.max_turns) || 50,
-                mcp_servers: parsed.mcp_servers as Record<string, unknown> | undefined,
+                mcp_servers,
                 cwd,
                 name: parsed.name as string | undefined,
                 description: parsed.description as string | undefined,
