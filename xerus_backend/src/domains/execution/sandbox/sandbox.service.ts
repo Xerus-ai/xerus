@@ -30,6 +30,8 @@ export interface SandboxDatabase {
 }
 
 export class SandboxService {
+    // In-memory session cache. Assumes single Node.js process — if horizontally scaled,
+    // use the SandboxRegistry (DB-backed with 3s TTL) as the authoritative source instead.
     private sessions: Map<string, SandboxSession> = new Map();
     private creating: Map<string, Promise<SandboxSession>> = new Map();
     private db: SandboxDatabase;
@@ -279,6 +281,12 @@ export class SandboxService {
     }
 
     getActiveSessions(): SandboxSession[] { return Array.from(this.sessions.values()).filter((s) => s.status === 'running'); }
+
+    /** Clear in-memory session and registry cache for a user. Called by cleanup jobs that kill/pause sandboxes externally. */
+    clearCachedSession(userId: string): void {
+        this.sessions.delete(userId);
+        this.registry.invalidate(userId);
+    }
 
     async getOrCreateRunner(
         userId: string,

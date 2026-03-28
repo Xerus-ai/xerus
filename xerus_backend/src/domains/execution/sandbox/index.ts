@@ -66,6 +66,6 @@ export type {
     CleanupResult,
     FullCleanupResult,
     CleanupDatabase,
-    CleanupSandboxKiller,
+    CleanupSandboxControl,
     CleanupUserLookup,
 } from './lifecycle-cleanup.service';
