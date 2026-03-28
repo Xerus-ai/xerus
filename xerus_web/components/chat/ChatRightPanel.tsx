@@ -29,6 +29,7 @@ export function ChatRightPanel({
 
   return (
     <div
+      data-testid="chat-right-panel"
       className={cn(
         'hidden md:flex flex-col shrink-0 overflow-hidden',
         'h-full',

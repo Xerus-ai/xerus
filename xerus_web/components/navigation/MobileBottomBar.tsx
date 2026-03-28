@@ -34,6 +34,7 @@ export function MobileBottomBar() {
 
   return (
     <nav
+      data-testid="mobile-bottom-bar"
       className="fixed bottom-0 left-0 right-0 z-50 bg-surface border-t border-surface-active pb-[env(safe-area-inset-bottom)]"
       role="navigation"
       aria-label="Mobile navigation"

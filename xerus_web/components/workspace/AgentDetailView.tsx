@@ -133,11 +133,11 @@ export function AgentDetailView({ agentId, onBack }: AgentDetailViewProps) {
   }
 
   return (
-    <div className="h-full overflow-y-auto scrollbar-thin text-text font-sans">
+    <div data-testid="agent-detail-view" className="h-full overflow-y-auto scrollbar-thin text-text font-sans">
       <div className="max-w-5xl mx-auto px-6 py-8">
         {/* Navigation */}
         <div className="flex items-center justify-between mb-8">
-          <button onClick={onBack} className="inline-flex items-center gap-2 text-text-secondary hover:text-text transition-colors text-sm">
+          <button data-testid="agent-back-button" onClick={onBack} className="inline-flex items-center gap-2 text-text-secondary hover:text-text transition-colors text-sm">
             <ArrowLeft className="w-4 h-4" />
             Back to Agents
           </button>
@@ -149,7 +149,7 @@ export function AgentDetailView({ agentId, onBack }: AgentDetailViewProps) {
               </button>
             )}
             {canDeleteAgent && (
-              <button onClick={handleDelete} disabled={isDeleting} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-text-secondary hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors disabled:opacity-50">
+              <button data-testid="agent-delete-button" onClick={handleDelete} disabled={isDeleting} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-text-secondary hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors disabled:opacity-50">
                 {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                 {isDeleting ? 'Deleting...' : 'Delete'}
               </button>

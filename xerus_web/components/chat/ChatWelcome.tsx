@@ -364,7 +364,7 @@ export function ChatWelcome({
   const suggestions = useMemo(() => buildSuggestions(agents), [agents])
 
   return (
-    <div className={cn('flex flex-col items-center h-full px-6 pt-16 pb-8 overflow-y-auto scrollbar-thin', className)}>
+    <div data-testid="chat-welcome" className={cn('flex flex-col items-center h-full px-6 pt-16 pb-8 overflow-y-auto scrollbar-thin', className)}>
       <div className="max-w-3xl w-full text-center my-auto relative">
         {/* Warm radial glow behind content */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/4 w-[500px] h-[400px] bg-[radial-gradient(ellipse_at_center,_rgba(255,102,0,0.08)_0%,_transparent_70%)] pointer-events-none" />

@@ -57,12 +57,15 @@ export function useChatExecution({ setState }: UseChatExecutionOptions) {
   const pendingStatusLabelsRef = useRef<string[]>([])
   // Debounce disconnect reset to allow EventSource auto-reconnect
   const disconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Prevent duplicate onDone processing from SSE reconnect replays
+  const doneReceivedRef = useRef(false)
 
   const resetStreamContent = useCallback(() => {
     rawTextRef.current = ''
     respondingAgentRef.current = {}
     toolStartTimesRef.current.clear()
     pendingStatusLabelsRef.current = []
+    doneReceivedRef.current = false
     if (disconnectTimerRef.current) {
       clearTimeout(disconnectTimerRef.current)
       disconnectTimerRef.current = null
@@ -305,6 +308,8 @@ export function useChatExecution({ setState }: UseChatExecutionOptions) {
       }
     }, [setState]),
     onDone: useCallback((event: StreamEvent<'done'>) => {
+      if (doneReceivedRef.current) return
+      doneReceivedRef.current = true
       const content = event.content as DoneEventContent
       const finalText = content.finalResponse ?? rawTextRef.current
 

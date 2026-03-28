@@ -163,6 +163,7 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter') handleBlur('name')
                             }}
+                            data-testid="agent-name-input"
                             className="font-serif !text-3xl text-text bg-transparent border-none shadow-none !h-auto focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none placeholder:text-text-secondary/50 w-auto min-w-[280px] p-0"
                             placeholder="Agent Name"
                         />

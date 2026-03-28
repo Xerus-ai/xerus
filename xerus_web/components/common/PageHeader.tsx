@@ -105,6 +105,7 @@ export function PageHeader({
                                 placeholder={searchPlaceholder}
                                 value={inputValue}
                                 onChange={(e) => setInputValue(e.target.value)}
+                                data-testid="agent-search"
                                 className="w-full pl-10 pr-4 py-3 bg-white/60 border border-surface-active rounded-full text-sm focus:outline-none focus:border-primary transition-colors placeholder:text-text-secondary/60"
                             />
                         </div>

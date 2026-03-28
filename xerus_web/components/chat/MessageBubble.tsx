@@ -323,7 +323,9 @@ export const MessageBubble = memo(function MessageBubble({
     })
 
   return (
-    <div className={cn(
+    <div
+      data-testid={isUser ? 'user-message' : 'agent-message'}
+      className={cn(
       'group py-4 px-6 min-w-0 overflow-hidden',
       !isUser && 'hover:bg-black/[0.02]',
       'transition-colors duration-100'
