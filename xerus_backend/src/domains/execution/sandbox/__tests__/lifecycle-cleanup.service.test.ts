@@ -56,11 +56,17 @@ class InMemoryCleanupDatabase {
 
 class InMemorySandboxKiller {
     public killed: string[] = [];
+    public paused: string[] = [];
     public shouldFail = false;
 
     async kill(sandboxId: string): Promise<void> {
         if (this.shouldFail) throw new Error('Kill failed');
         this.killed.push(sandboxId);
+    }
+
+    async pause(sandboxId: string): Promise<void> {
+        if (this.shouldFail) throw new Error('Pause failed');
+        this.paused.push(sandboxId);
     }
 }
 
@@ -102,7 +108,7 @@ describe('LifecycleCleanupService', () => {
     });
 
     describe('cleanupStaleSandboxes', () => {
-        it('should kill sandboxes idle for more than threshold', async () => {
+        it('should pause sandboxes idle for more than threshold', async () => {
             db.registryRows.push({
                 sandbox_id: 'sbx-stale',
                 user_id: 'user-1',
@@ -113,15 +119,16 @@ describe('LifecycleCleanupService', () => {
             const result = await service.cleanupStaleSandboxes();
 
             expect(result.cleaned).toBe(1);
-            expect(killer.killed).toContain('sbx-stale');
+            expect(killer.paused).toContain('sbx-stale');
+            expect(killer.killed).toHaveLength(0);
             expect(db.updatedStatuses).toContainEqual({
                 table: 'workspaces',
                 id: 'sbx-stale',
-                status: 'killed',
+                status: 'paused',
             });
         });
 
-        it('should not kill recently active sandboxes', async () => {
+        it('should not pause recently active sandboxes', async () => {
             db.registryRows.push({
                 sandbox_id: 'sbx-active',
                 user_id: 'user-1',
@@ -132,7 +139,7 @@ describe('LifecycleCleanupService', () => {
             const result = await service.cleanupStaleSandboxes();
 
             expect(result.cleaned).toBe(0);
-            expect(killer.killed).toHaveLength(0);
+            expect(killer.paused).toHaveLength(0);
         });
 
         it('should handle multiple stale sandboxes', async () => {
@@ -147,10 +154,10 @@ describe('LifecycleCleanupService', () => {
 
             const result = await service.cleanupStaleSandboxes();
             expect(result.cleaned).toBe(5);
-            expect(killer.killed).toHaveLength(5);
+            expect(killer.paused).toHaveLength(5);
         });
 
-        it('should continue on individual kill failure', async () => {
+        it('should continue on individual pause failure', async () => {
             db.registryRows.push(
                 {
                     sandbox_id: 'sbx-fail',
@@ -167,10 +174,10 @@ describe('LifecycleCleanupService', () => {
             );
 
             let callCount = 0;
-            killer.kill = async (sandboxId: string) => {
+            killer.pause = async (sandboxId: string) => {
                 callCount++;
-                if (callCount === 1) throw new Error('First kill failed');
-                killer.killed.push(sandboxId);
+                if (callCount === 1) throw new Error('First pause failed');
+                killer.paused.push(sandboxId);
             };
 
             const result = await service.cleanupStaleSandboxes();
@@ -263,6 +270,9 @@ describe('LifecycleCleanupService', () => {
             expect(result.stale_sandboxes.cleaned).toBe(1);
             expect(result.stuck_sessions.cleaned).toBe(1);
             expect(result.orphaned_sandboxes.cleaned).toBe(0);
+            // Stale sandboxes are paused (not killed) for active users
+            expect(killer.paused).toContain('sbx-stale');
+            expect(killer.killed).toHaveLength(0);
         });
 
         it('should return zero for clean system', async () => {

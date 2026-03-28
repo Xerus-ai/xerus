@@ -30,8 +30,8 @@ export function startAllJobs(deps: JobDependencies = {}): void {
 
     try {
         startSyncPipedreamAppsJob();
-        startSandboxSchedulerJob(deps.provider);
-        startSandboxCleanupJob(deps.provider);
+        startSandboxSchedulerJob(deps.provider, deps.sandboxService);
+        startSandboxCleanupJob(deps.provider, deps.sandboxService);
         if (deps.sandboxService && deps.db) {
             startHeartbeatSchedulerJob(deps.sandboxService, deps.db);
         } else {

@@ -63,7 +63,7 @@ export interface SchedulerStats {
 export interface SandboxSchedulerDeps {
     db: SchedulerDatabase;
     wakeHandler: (sandboxId: string) => Promise<void>;
-    sleepHandler: (sandboxId: string) => Promise<void>;
+    sleepHandler: (sandboxId: string, userId?: string) => Promise<void>;
     inactivityTimeoutMinutes?: number;
     heartbeatProximityMinutes?: number;
 }
@@ -79,7 +79,7 @@ export class SandboxSchedulerService {
 
     private readonly db: SchedulerDatabase;
     private readonly wakeHandler: (sandboxId: string) => Promise<void>;
-    private readonly sleepHandler: (sandboxId: string) => Promise<void>;
+    private readonly sleepHandler: (sandboxId: string, userId?: string) => Promise<void>;
     private readonly inactivityTimeoutMs: number;
     private readonly heartbeatProximityMs: number;
 
@@ -207,7 +207,7 @@ export class SandboxSchedulerService {
 
             // All conditions met: put sandbox to sleep
             try {
-                await this.sleepHandler(sandbox.sandbox_id);
+                await this.sleepHandler(sandbox.sandbox_id, sandbox.user_id);
                 result.slept++;
                 console.log(
                     `[SandboxScheduler] Slept sandbox ${sandbox.sandbox_id} ` +

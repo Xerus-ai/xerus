@@ -1,6 +1,8 @@
 // Sandbox Lifecycle Cleanup Service
-// Garbage collection for stale Daytona sandboxes
-// Handles: stale sandbox kill, orphan detection, stuck session cleanup
+// Manages idle Daytona sandboxes for paid users:
+// - PAUSE stale sandboxes (idle 24h+) — preserves disk, quick resume
+// - KILL only for deactivated users (no active subscription)
+// - Clean up stuck execution sessions
 // Spec: xerus-y5v.4.112
 
 // -----------------------------------------------------------------------------
@@ -50,7 +52,8 @@ export interface CleanupDatabase {
 }
 
 export interface CleanupSandboxKiller {
-    kill(sandboxId: string): Promise<void>;
+    kill(sandboxId: string, userId?: string): Promise<void>;
+    pause(sandboxId: string, userId?: string): Promise<void>;
 }
 
 export interface CleanupUserLookup {
@@ -87,7 +90,8 @@ export class LifecycleCleanupService {
     }
 
     // -------------------------------------------------------------------------
-    // Stale Sandbox Cleanup
+    // Stale Sandbox Cleanup — PAUSE (not kill) for active users
+    // Users pay for their Pod; pausing preserves disk and allows quick resume.
     // -------------------------------------------------------------------------
 
     async cleanupStaleSandboxes(): Promise<CleanupResult> {
@@ -100,12 +104,12 @@ export class LifecycleCleanupService {
 
         for (const row of staleRows) {
             try {
-                await this.deps.sandboxKiller.kill(row.sandbox_id);
-                await this.deps.database.updateSandboxStatus(row.sandbox_id, 'killed', row.user_id);
+                await this.deps.sandboxKiller.pause(row.sandbox_id, row.user_id);
+                await this.deps.database.updateSandboxStatus(row.sandbox_id, 'paused', row.user_id);
                 cleaned++;
             } catch (err) {
                 const msg = err instanceof Error ? err.message : String(err);
-                console.error(`[LifecycleCleanup] Failed to kill stale sandbox ${row.sandbox_id}: ${msg}`);
+                console.error(`[LifecycleCleanup] Failed to pause stale sandbox ${row.sandbox_id}: ${msg}`);
                 errors++;
             }
         }
@@ -114,7 +118,8 @@ export class LifecycleCleanupService {
     }
 
     // -------------------------------------------------------------------------
-    // Orphaned Sandbox Cleanup
+    // Orphaned Sandbox Cleanup — KILL sandboxes for deactivated users only
+    // These users no longer have active accounts; safe to reclaim resources.
     // -------------------------------------------------------------------------
 
     async cleanupOrphanedSandboxes(): Promise<CleanupResult> {
@@ -126,7 +131,7 @@ export class LifecycleCleanupService {
 
         for (const row of orphanRows) {
             try {
-                await this.deps.sandboxKiller.kill(row.sandbox_id);
+                await this.deps.sandboxKiller.kill(row.sandbox_id, row.user_id);
                 await this.deps.database.updateSandboxStatus(row.sandbox_id, 'killed', row.user_id);
                 cleaned++;
             } catch (err) {

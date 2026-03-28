@@ -280,6 +280,11 @@ export class SandboxService {
 
     getActiveSessions(): SandboxSession[] { return Array.from(this.sessions.values()).filter((s) => s.status === 'running'); }
 
+    /** Clear in-memory session for a user. Called by cleanup jobs that kill sandboxes externally. */
+    invalidateSession(userId: string): void {
+        this.sessions.delete(userId);
+    }
+
     async getOrCreateRunner(
         userId: string,
         sandboxId: string,
