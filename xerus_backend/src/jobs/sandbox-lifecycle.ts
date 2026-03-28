@@ -34,12 +34,12 @@ export function startSandboxSchedulerJob(provider?: SandboxProvider, sandboxServ
             }
             console.log(`[Job:SandboxScheduler] Wake completed for ${sandboxId}`);
         },
-        sleepHandler: async (sandboxId: string, userId?: string) => {
+        sleepHandler: async (sandboxId: string, userId: string) => {
             if (provider) {
                 await provider.pause(sandboxId);
             }
-            if (sandboxService && userId) {
-                sandboxService.invalidateSession(userId);
+            if (sandboxService) {
+                sandboxService.clearCachedSession(userId);
             }
             console.log(`[Job:SandboxScheduler] Sleep completed for ${sandboxId}`);
         },
@@ -84,6 +84,16 @@ export function startSandboxCleanupJob(provider?: SandboxProvider, sandboxServic
                 );
                 return result.rows;
             },
+            async findLongPausedSandboxes(pausedThresholdMs: number) {
+                const result = await query<RegistryRow>(
+                    `SELECT sandbox_id, user_id, sandbox_status AS status, sandbox_last_activity_at AS last_activity_at
+                     FROM workspaces
+                     WHERE sandbox_status = 'paused'
+                       AND sandbox_paused_at < NOW() - make_interval(secs => $1::numeric / 1000)`,
+                    [pausedThresholdMs]
+                );
+                return result.rows;
+            },
             async findOrphanedSandboxes(activeUserIds: string[]) {
                 if (activeUserIds.length === 0) {
                     const result = await query<RegistryRow>(
@@ -111,6 +121,8 @@ export function startSandboxCleanupJob(provider?: SandboxProvider, sandboxServic
                 );
                 return result.rows;
             },
+            // Registry cache invalidation handled by SandboxService.clearCachedSession() in kill/pause handlers.
+            // The 3-second registry TTL also self-heals before any active query.
             async updateSandboxStatus(sandboxId: string, status: string, _userId?: string) {
                 await query(
                     `UPDATE workspaces SET sandbox_status = $1, sandbox_last_activity_at = NOW(), updated_at = NOW()
@@ -126,21 +138,21 @@ export function startSandboxCleanupJob(provider?: SandboxProvider, sandboxServic
             },
         },
         sandboxKiller: {
-            async kill(sandboxId: string, userId?: string) {
+            async kill(sandboxId: string, userId: string) {
                 if (provider) {
                     await provider.kill(sandboxId);
                 }
-                if (sandboxService && userId) {
-                    sandboxService.invalidateSession(userId);
+                if (sandboxService) {
+                    sandboxService.clearCachedSession(userId);
                 }
                 console.log(`[Job:SandboxCleanup] Killed sandbox ${sandboxId}`);
             },
-            async pause(sandboxId: string, userId?: string) {
+            async pause(sandboxId: string, userId: string) {
                 if (provider) {
                     await provider.pause(sandboxId);
                 }
-                if (sandboxService && userId) {
-                    sandboxService.invalidateSession(userId);
+                if (sandboxService) {
+                    sandboxService.clearCachedSession(userId);
                 }
                 console.log(`[Job:SandboxCleanup] Paused sandbox ${sandboxId}`);
             },

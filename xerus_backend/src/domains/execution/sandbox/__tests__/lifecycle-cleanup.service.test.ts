@@ -24,7 +24,14 @@ class InMemoryCleanupDatabase {
     async findStaleSandboxes(idleThresholdMs: number): Promise<RegistryRow[]> {
         const cutoff = new Date(Date.now() - idleThresholdMs);
         return this.registryRows.filter(
-            (r) => (r.status === 'paused' || r.status === 'running') && r.last_activity_at < cutoff
+            (r) => r.status === 'running' && r.last_activity_at < cutoff
+        );
+    }
+
+    async findLongPausedSandboxes(pausedThresholdMs: number): Promise<RegistryRow[]> {
+        const cutoff = new Date(Date.now() - pausedThresholdMs);
+        return this.registryRows.filter(
+            (r) => r.status === 'paused' && r.last_activity_at < cutoff
         );
     }
 
@@ -82,6 +89,7 @@ function createConfig(overrides?: Partial<CleanupConfig>): CleanupConfig {
     return {
         idle_threshold_ms: 24 * 60 * 60 * 1000,
         stuck_session_threshold_ms: 2 * 60 * 60 * 1000,
+        paused_threshold_ms: 30 * 24 * 60 * 60 * 1000,
         max_sandboxes_per_user: 1,
         ...overrides,
     };
@@ -112,7 +120,7 @@ describe('LifecycleCleanupService', () => {
             db.registryRows.push({
                 sandbox_id: 'sbx-stale',
                 user_id: 'user-1',
-                status: 'paused',
+                status: 'running',
                 last_activity_at: new Date(Date.now() - 25 * 60 * 60 * 1000),
             });
 
@@ -132,8 +140,22 @@ describe('LifecycleCleanupService', () => {
             db.registryRows.push({
                 sandbox_id: 'sbx-active',
                 user_id: 'user-1',
-                status: 'paused',
+                status: 'running',
                 last_activity_at: new Date(),
+            });
+
+            const result = await service.cleanupStaleSandboxes();
+
+            expect(result.cleaned).toBe(0);
+            expect(killer.paused).toHaveLength(0);
+        });
+
+        it('should not pause already-paused sandboxes', async () => {
+            db.registryRows.push({
+                sandbox_id: 'sbx-already-paused',
+                user_id: 'user-1',
+                status: 'paused',
+                last_activity_at: new Date(Date.now() - 25 * 60 * 60 * 1000),
             });
 
             const result = await service.cleanupStaleSandboxes();
@@ -147,7 +169,7 @@ describe('LifecycleCleanupService', () => {
                 db.registryRows.push({
                     sandbox_id: `sbx-${i}`,
                     user_id: `user-${i}`,
-                    status: 'paused',
+                    status: 'running',
                     last_activity_at: new Date(Date.now() - 48 * 60 * 60 * 1000),
                 });
             }
@@ -162,13 +184,13 @@ describe('LifecycleCleanupService', () => {
                 {
                     sandbox_id: 'sbx-fail',
                     user_id: 'user-1',
-                    status: 'paused',
+                    status: 'running',
                     last_activity_at: new Date(Date.now() - 25 * 60 * 60 * 1000),
                 },
                 {
                     sandbox_id: 'sbx-ok',
                     user_id: 'user-2',
-                    status: 'paused',
+                    status: 'running',
                     last_activity_at: new Date(Date.now() - 25 * 60 * 60 * 1000),
                 },
             );
@@ -183,6 +205,56 @@ describe('LifecycleCleanupService', () => {
             const result = await service.cleanupStaleSandboxes();
             expect(result.cleaned).toBe(1);
             expect(result.errors).toBe(1);
+        });
+    });
+
+    describe('cleanupLongPausedSandboxes', () => {
+        it('should kill sandboxes paused for longer than threshold', async () => {
+            db.registryRows.push({
+                sandbox_id: 'sbx-long-paused',
+                user_id: 'user-1',
+                status: 'paused',
+                last_activity_at: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000),
+            });
+
+            const result = await service.cleanupLongPausedSandboxes();
+
+            expect(result.cleaned).toBe(1);
+            expect(killer.killed).toContain('sbx-long-paused');
+            expect(killer.paused).toHaveLength(0);
+            expect(db.updatedStatuses).toContainEqual({
+                table: 'workspaces',
+                id: 'sbx-long-paused',
+                status: 'killed',
+            });
+        });
+
+        it('should not kill recently paused sandboxes', async () => {
+            db.registryRows.push({
+                sandbox_id: 'sbx-recent-pause',
+                user_id: 'user-1',
+                status: 'paused',
+                last_activity_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+            });
+
+            const result = await service.cleanupLongPausedSandboxes();
+
+            expect(result.cleaned).toBe(0);
+            expect(killer.killed).toHaveLength(0);
+        });
+
+        it('should not kill running sandboxes', async () => {
+            db.registryRows.push({
+                sandbox_id: 'sbx-running-old',
+                user_id: 'user-1',
+                status: 'running',
+                last_activity_at: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000),
+            });
+
+            const result = await service.cleanupLongPausedSandboxes();
+
+            expect(result.cleaned).toBe(0);
+            expect(killer.killed).toHaveLength(0);
         });
     });
 
@@ -250,12 +322,20 @@ describe('LifecycleCleanupService', () => {
 
     describe('runFullCleanup', () => {
         it('should run all cleanup phases and aggregate results', async () => {
-            db.registryRows.push({
-                sandbox_id: 'sbx-stale',
-                user_id: 'user-active',
-                status: 'paused',
-                last_activity_at: new Date(Date.now() - 25 * 60 * 60 * 1000),
-            });
+            db.registryRows.push(
+                {
+                    sandbox_id: 'sbx-stale',
+                    user_id: 'user-active',
+                    status: 'running',
+                    last_activity_at: new Date(Date.now() - 25 * 60 * 60 * 1000),
+                },
+                {
+                    sandbox_id: 'sbx-long-paused',
+                    user_id: 'user-active',
+                    status: 'paused',
+                    last_activity_at: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000),
+                },
+            );
 
             db.sessionRows.push({
                 id: 'session-stuck',
@@ -268,11 +348,13 @@ describe('LifecycleCleanupService', () => {
             const result = await service.runFullCleanup();
 
             expect(result.stale_sandboxes.cleaned).toBe(1);
+            expect(result.long_paused_sandboxes.cleaned).toBe(1);
             expect(result.stuck_sessions.cleaned).toBe(1);
             expect(result.orphaned_sandboxes.cleaned).toBe(0);
             // Stale sandboxes are paused (not killed) for active users
             expect(killer.paused).toContain('sbx-stale');
-            expect(killer.killed).toHaveLength(0);
+            // Long-paused sandboxes are killed
+            expect(killer.killed).toContain('sbx-long-paused');
         });
 
         it('should return zero for clean system', async () => {
@@ -280,6 +362,7 @@ describe('LifecycleCleanupService', () => {
             const result = await service.runFullCleanup();
 
             expect(result.stale_sandboxes.cleaned).toBe(0);
+            expect(result.long_paused_sandboxes.cleaned).toBe(0);
             expect(result.orphaned_sandboxes.cleaned).toBe(0);
             expect(result.stuck_sessions.cleaned).toBe(0);
         });
