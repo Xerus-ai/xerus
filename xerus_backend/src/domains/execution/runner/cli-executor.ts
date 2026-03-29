@@ -19,7 +19,7 @@ import { ClaudeCodeAdapter } from './cli-adapters/claudecode';
 import { CodexAdapter } from './cli-adapters/codex';
 import { parseClaudeStreamLine, parseCodexStreamLine, clearAccumulator } from './stream-parser';
 import { detectAuthForAdapter } from './auth-detector';
-import type { CLIAdapter, AdapterType, AgentConfig } from './cli-adapters/types';
+import type { CLIAdapter, AdapterType, AgentConfig, AgentRole } from './cli-adapters/types';
 
 // -----------------------------------------------------------------------------
 // Configuration
@@ -27,6 +27,7 @@ import type { CLIAdapter, AdapterType, AgentConfig } from './cli-adapters/types'
 
 const WORKSPACE_ROOT = process.env.XERUS_WORKSPACE_ROOT || '/home/daytona/workspace';
 const AGENTS_DIR = join(WORKSPACE_ROOT, 'agents');
+const POLICIES_DIR = join(WORKSPACE_ROOT, 'shared', 'policies');
 
 // -----------------------------------------------------------------------------
 // Global State
@@ -49,6 +50,53 @@ const startTime = Date.now();
 // Cache for agent configs: slug -> { config, timestamp }
 const configCache = new Map<string, { config: AgentConfig; timestamp: number }>();
 const CONFIG_CACHE_TTL_MS = 60_000; // 1 minute TTL
+
+// Cache for role policies: role -> policy text
+const policyCache = new Map<string, string>();
+
+// -----------------------------------------------------------------------------
+// Role Policy Loader
+// -----------------------------------------------------------------------------
+
+async function loadRolePolicies(role: AgentRole): Promise<string> {
+    // Check cache
+    const cached = policyCache.get(role);
+    if (cached) return cached;
+
+    const policyFiles = [
+        'ROLE_CAPABILITIES.md',
+        'TOOL_AUTHORIZATION.md',
+        'DELEGATION_POLICY.md',
+    ];
+
+    const sections: string[] = [];
+
+    for (const file of policyFiles) {
+        const filePath = join(POLICIES_DIR, file);
+        try {
+            const content = await readFile(filePath, 'utf-8');
+            sections.push(content);
+        } catch {
+            // Policy file not found - skip silently
+        }
+    }
+
+    if (sections.length === 0) {
+        return '';
+    }
+
+    // Build role-specific policy section
+    const policy = `
+## Your Role: ${role.toUpperCase()}
+
+${sections.join('\n\n---\n\n')}
+
+**You MUST follow these policies. Violations will be logged and may result in task termination.**
+`;
+
+    policyCache.set(role, policy);
+    return policy;
+}
 
 async function loadAgentConfig(agentSlug: string): Promise<AgentConfig> {
     const configPath = join(AGENTS_DIR, agentSlug, 'config.json');
@@ -73,6 +121,7 @@ async function loadAgentConfig(agentSlug: string): Promise<AgentConfig> {
         slug: agentSlug,
         model: raw.model || raw.ai_model,
         adapter_type: (raw.adapter_type as AdapterType) || 'claudecode',
+        role: (raw.role as AgentRole) || 'specialist',
         autonomy_level: raw.autonomy_level || 'supervised',
         thinking_level: raw.thinking_level,
         max_budget_usd: raw.max_budget_usd,
@@ -117,6 +166,14 @@ async function handleExecute(cmd: ExecuteCommand): Promise<void> {
     if (cmd.config?.model) config.model = cmd.config.model as string;
     if (cmd.config?.system_prompt) config.system_prompt = cmd.config.system_prompt as string;
     if (cmd.config?.cwd) config.cwd = cmd.config.cwd as string;
+
+    // Load and inject role policies into system prompt
+    const rolePolicies = await loadRolePolicies(config.role);
+    if (rolePolicies) {
+        config.system_prompt = config.system_prompt
+            ? `${config.system_prompt}\n\n${rolePolicies}`
+            : rolePolicies;
+    }
 
     const adapter = adapters[config.adapter_type];
     if (!adapter) {

@@ -6,6 +6,8 @@ export type AdapterType = 'claudecode' | 'codex';
 
 export type BillingType = 'subscription' | 'api' | 'platform';
 
+export type AgentRole = 'master' | 'cto' | 'specialist' | 'domain' | 'autonomous';
+
 export interface AuthResult {
     authenticated: boolean;
     method: 'credentials_file' | 'env_var' | 'cli_status' | 'none';
@@ -17,6 +19,7 @@ export interface AgentConfig {
     slug: string;
     model?: string;
     adapter_type: AdapterType;
+    role: AgentRole;
     autonomy_level: string;
     thinking_level?: string;
     max_budget_usd?: number;
