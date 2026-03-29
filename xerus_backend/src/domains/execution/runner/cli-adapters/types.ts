@@ -6,7 +6,9 @@ export type AdapterType = 'claudecode' | 'codex';
 
 export type BillingType = 'subscription' | 'api' | 'platform';
 
-export type AgentRole = 'master' | 'cto' | 'specialist' | 'domain' | 'autonomous';
+// orchestrator = xerus-master (creates agents, manages workspace)
+// agent = all other agents (workers, first in channel also leads)
+export type AgentRole = 'orchestrator' | 'agent';
 
 export interface AuthResult {
     authenticated: boolean;
