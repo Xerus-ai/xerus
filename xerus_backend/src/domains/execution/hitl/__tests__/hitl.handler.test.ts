@@ -24,7 +24,7 @@ import {
     PauseStateAlreadyResolvedError,
     NoPendingApprovalError,
 } from '../hitl.errors';
-import type { PauseResolution } from '../../../history/sessions/session.types';
+import type { PauseResolution } from '../../../../shared/types/execution-shared.types';
 import { StreamEvent } from '../../types';
 
 // -----------------------------------------------------------------------------

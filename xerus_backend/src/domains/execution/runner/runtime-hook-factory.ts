@@ -169,8 +169,13 @@ export function buildRuntimeHookHandlers(
                     try {
                         await fs.access(fullPath);
                         return true;
-                    } catch {
-                        return false;
+                    } catch (error) {
+                        // ENOENT = file doesn't exist, which is expected behavior for exists()
+                        if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+                            return false;
+                        }
+                        // Other errors (EACCES, EPERM, etc.) indicate system problems - rethrow
+                        throw error;
                     }
                 },
             },

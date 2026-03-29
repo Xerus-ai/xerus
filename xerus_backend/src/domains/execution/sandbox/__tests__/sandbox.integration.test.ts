@@ -589,7 +589,7 @@ describe('SANDBOX_CONFIG', () => {
     it('has runner directory configured', () => {
         const root = process.env.XERUS_WORKSPACE_ROOT;
         expect(SANDBOX_CONFIG.runnerDir).toBe(`${root}/.xerus/runner`);
-        expect(SANDBOX_CONFIG.runnerScriptPath).toBe(`${root}/.xerus/runner/agent-runner.js`);
+        expect(SANDBOX_CONFIG.runnerScriptPath).toBe(`${root}/.xerus/runner/cli-executor.js`);
     });
 
     it('has auto-lifecycle intervals', () => {

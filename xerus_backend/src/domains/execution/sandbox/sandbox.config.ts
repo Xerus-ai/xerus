@@ -47,8 +47,8 @@ export const SANDBOX_CONFIG = {
     // Directory containing runner module in sandbox (derived from workspacePath)
     runnerDir: `${workspacePath}/.xerus/runner`,
 
-    // Agent runner script path inside sandbox (derived from workspacePath)
-    runnerScriptPath: `${workspacePath}/.xerus/runner/agent-runner.js`,
+    // CLI executor script path inside sandbox (derived from workspacePath)
+    runnerScriptPath: `${workspacePath}/.xerus/runner/cli-executor.js`,
 
     // Git repository URL for workspace template (cloned on new sandbox creation)
     workspaceTemplateUrl: process.env.XERUS_WORKSPACE_TEMPLATE_URL || 'https://github.com/xerus-ai/xerus-workspace.git',
@@ -87,12 +87,16 @@ export const BACKUP_TAR_EXCLUDE_FLAGS = BACKUP_TAR_EXCLUDES
 // Only these patterns are passed to the SDK process
 // Security: Narrow allowlist to prevent env var injection
 export const ENV_ALLOWLIST = [
-    'ANTHROPIC_API_KEY',       // SDK auth - API key
-    'ANTHROPIC_BASE_URL',      // SDK auth - custom base URL
-    'ANTHROPIC_AUTH_TOKEN',    // SDK auth - bearer token
+    'ANTHROPIC_API_KEY',       // Claude Code CLI auth - API key
+    'ANTHROPIC_BASE_URL',      // Claude Code CLI - custom base URL (OpenRouter)
+    'ANTHROPIC_AUTH_TOKEN',    // Claude Code CLI - bearer token
+    'OPENAI_API_KEY',          // Codex CLI auth - API key
+    'OPENAI_BASE_URL',         // Codex CLI - custom base URL (OpenRouter)
+    'OPENROUTER_API_KEY',      // Platform billing fallback
     'XERUS_RUNNER_*',          // Our config (XERUS_RUNNER_CONFIG, XERUS_RUNNER_PROMPT)
-    'PATH',                    // Required for node/npm executables
-    'HOME',                    // Required for npm cache directory
+    'XERUS_WORKSPACE_ROOT',    // Workspace base path
+    'PATH',                    // Required for CLI executables
+    'HOME',                    // Required for CLI credential files
     'NODE_PATH',               // Node.js module resolution
     'LANG',                    // Locale for proper text encoding
     'LC_*',                    // Locale settings (LC_ALL, LC_CTYPE, etc.)

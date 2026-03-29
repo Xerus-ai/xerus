@@ -15,8 +15,8 @@ import { SANDBOX_CONFIG } from './sandbox.config';
 import type { DaytonaProvider } from './providers/daytona.provider';
 
 const BUNDLE_DIR = path.join(__dirname, '..', '..', '..', '..', 'dist', 'runner-bundle');
-const RUNNER_BUNDLE_PATH = path.join(BUNDLE_DIR, 'agent-runner.js');
-const PLATFORM_MCP_BUNDLE_PATH = path.join(BUNDLE_DIR, 'platform-mcp-server.js');
+const RUNNER_BUNDLE_PATH = path.join(BUNDLE_DIR, 'cli-executor.js');
+const MINIMAL_MCP_BUNDLE_PATH = path.join(BUNDLE_DIR, 'minimal-mcp-server.js');
 
 // Snapshot names where runner deps are pre-installed via Dockerfile
 const PREINSTALLED_SNAPSHOTS = new Set(['xerus-sandbox']);
@@ -27,7 +27,6 @@ const RUNNER_PACKAGE_JSON = {
     version: '1.0.0',
     private: true,
     dependencies: {
-        '@anthropic-ai/claude-agent-sdk': '^0.2.37',
         '@modelcontextprotocol/sdk': '^1.26.0',
     },
 };
@@ -67,10 +66,10 @@ export async function installRunnerBundle(
     await sandboxFs.mkdir(runnerDir);
     await sandboxFs.writeFile(SANDBOX_CONFIG.runnerScriptPath, bundleContent);
 
-    // Upload platform MCP server bundle (used by Xerus master agent)
-    if (fs.existsSync(PLATFORM_MCP_BUNDLE_PATH)) {
-        const mcpContent = fs.readFileSync(PLATFORM_MCP_BUNDLE_PATH, 'utf-8');
-        await sandboxFs.writeFile(`${runnerDir}/platform-mcp-server.js`, mcpContent);
+    // Upload minimal MCP server bundle (9 backend-coupled tools)
+    if (fs.existsSync(MINIMAL_MCP_BUNDLE_PATH)) {
+        const mcpContent = fs.readFileSync(MINIMAL_MCP_BUNDLE_PATH, 'utf-8');
+        await sandboxFs.writeFile(`${runnerDir}/minimal-mcp-server.js`, mcpContent);
     }
 
     // Verify node_modules exists for pre-installed snapshots.

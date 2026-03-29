@@ -10,7 +10,7 @@ import { RunnerConfig, RunnerEvent, ErrorEvent, AgentOutputEvent, RUNNER_ENV } f
 import { shellEscape } from '../../../../utils/shell-safety';
 import { sleep } from '../sandbox.retry';
 
-const SESSION_ID = 'agent-runner';
+const SESSION_ID = 'cli-executor';
 const RECONNECT_MAX_ATTEMPTS = 3;
 const RECONNECT_BASE_DELAY_MS = 2000;
 
@@ -259,8 +259,8 @@ export async function createRunnerSession(
 
     const runnerDir = SANDBOX_CONFIG.runnerDir;
     const command = envExports
-        ? `${envExports} && exec node ${runnerDir}/agent-runner.js`
-        : `exec node ${runnerDir}/agent-runner.js`;
+        ? `${envExports} && exec node ${runnerDir}/cli-executor.js`
+        : `exec node ${runnerDir}/cli-executor.js`;
 
     const envKeys = Object.keys(envVars);
     console.log(`[RunnerSession] Executing runner command with ${envKeys.length} env vars: ${envKeys.join(', ')}`);

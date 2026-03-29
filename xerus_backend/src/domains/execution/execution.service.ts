@@ -39,13 +39,16 @@ import type {
 import { sendCommand } from './sandbox';
 import { DomainError } from '../../utils/errors';
 import { resolveApiKey, type ResolvedKey } from './key-resolver.service';
-import { buildSDKEnvironment } from './sdk/sdk.config';
+import { buildSDKEnvironment, type UserCliKeys } from './sdk/sdk.config';
 import type { SessionHandle } from './sandbox/providers/daytona-runner';
 import { skillSecretsService } from '../skills/secrets.service';
 import { createAnnounceQueueService } from './queue/announce-queue.service';
 import { createWorkspaceInboxWriter } from './queue/database-inbox-writer';
 import { checkHookHealth } from './sandbox/hook-health';
 import { SANDBOX_CONFIG } from './sandbox/sandbox.config';
+// TECH DEBT: Cross-domain import. Should use interface injection.
+// See: docs/planning/execution/sqlite-neon-sync.md#cross-domain-dependencies
+import { apiKeyService } from '../users/api-key-service';
 
 interface ActiveExecution {
     handle: SessionHandle;
@@ -118,6 +121,7 @@ export class ExecutionService {
         let preSandbox: Promise<string> | null = null;
         let preApiKey: Promise<ResolvedKey> | null = null;
         let preSecrets: Promise<Record<string, string>> | null = null;
+        let preCliKeys: Promise<UserCliKeys> | null = null;
 
         try {
             // -----------------------------------------------------------------
@@ -125,7 +129,7 @@ export class ExecutionService {
             // -----------------------------------------------------------------
             const tag = `${LOG_PREFIX} [${executionId.slice(0,8)}]`;
             const T = () => `T+${Date.now() - startedAt}ms`;
-            console.log(`${tag} ${T()} Preflight: agent + API key + sandbox + skills`);
+            console.log(`${tag} ${T()} Preflight: agent + API key + sandbox + skills + CLI keys`);
             stream.send('progress', { phase: 'sandbox', message: 'Preparing sandbox', percent: 10 });
 
             const preAgent = loadAgent(resolved, request.agentSlug, request.userId);
@@ -135,6 +139,9 @@ export class ExecutionService {
                 .then(r => { console.log(`${tag} ${T()} preSandbox resolved`); return r; });
             preSecrets = skillSecretsService.resolveAllSecrets(request.userId)
                 .then(r => { console.log(`${tag} ${T()} preSecrets resolved (${Object.keys(r).length} keys)`); return r; });
+            // Fetch user's BYOK CLI keys (anthropic/openai) for sandbox env injection
+            preCliKeys = this.resolveUserCliKeys(request.userId)
+                .then(r => { console.log(`${tag} ${T()} preCliKeys resolved (anthropic=${!!r.anthropicKey}, openai=${!!r.openaiKey})`); return r; });
 
             // -----------------------------------------------------------------
             // Await agent first — needed for lane acquisition
@@ -150,10 +157,11 @@ export class ExecutionService {
             // -----------------------------------------------------------------
             // Await remaining preflight (started at T=0, likely settled by now)
             // -----------------------------------------------------------------
-            const [resolvedKey, sandboxId, skillSecrets] = await Promise.all([
+            const [resolvedKey, sandboxId, skillSecrets, userCliKeys] = await Promise.all([
                 preApiKey,
                 preSandbox,
                 preSecrets,
+                preCliKeys,
             ]);
             ctx.keySource = resolvedKey.source;
             ctx.sandboxId = sandboxId;
@@ -165,8 +173,8 @@ export class ExecutionService {
 
             const daytonaProvider = resolved.sandboxService.getDaytonaProvider();
 
-            // Build runner environment with the resolved API key + skill secrets
-            const runnerEnvVars = buildSDKEnvironment(resolvedKey.apiKey, skillSecrets);
+            // Build runner environment with the resolved API key + skill secrets + CLI BYOK keys
+            const runnerEnvVars = buildSDKEnvironment(resolvedKey.apiKey, skillSecrets, userCliKeys);
 
             console.log(`${tag} ${T()} Getting/creating runner`);
             const handle = await resolved.sandboxService.getOrCreateRunner(
@@ -275,9 +283,25 @@ export class ExecutionService {
             // Catch dangling preflight promises to prevent unhandled rejections
             if (preApiKey) preApiKey.catch(() => {});
             if (preSecrets) preSecrets.catch(() => {});
+            if (preCliKeys) preCliKeys.catch(() => {});
             this.activeExecutions.delete(executionId);
             this.cleanup(resolved, ctx);
         }
+    }
+
+    /**
+     * Resolve user's BYOK CLI keys (anthropic/openai) from user_api_keys table.
+     * These are injected into sandbox env vars so CLI auth-detector sees 'api' billing.
+     */
+    private async resolveUserCliKeys(userId: string): Promise<UserCliKeys> {
+        const [anthropicKey, openaiKey] = await Promise.all([
+            apiKeyService.get(userId, 'anthropic'),
+            apiKeyService.get(userId, 'openai'),
+        ]);
+        return {
+            anthropicKey: anthropicKey || undefined,
+            openaiKey: openaiKey || undefined,
+        };
     }
 
     /**

@@ -10,7 +10,7 @@ import type {
     TriggerRegistrationResult,
     TriggerDefinition,
     EventNormalizationMetadata,
-} from '../../heartbeat/normalized-event.types';
+} from '../trigger.types';
 
 // Test implementation of BaseTriggerAdapter
 class TestAdapter extends BaseTriggerAdapter {

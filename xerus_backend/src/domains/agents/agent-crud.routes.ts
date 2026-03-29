@@ -11,11 +11,6 @@ import { AgentUnauthorizedError, AgentNotFoundError } from './errors';
 import { agentRegistryRepository } from './agent-registry.repository';
 import { formatPromptWithAI } from './prompt-formatter';
 import { resolveAgentParam } from './resolve-agent-param';
-import {
-    syncConfigToWorkspace,
-    deleteAgent,
-} from './agent-workspace-sync';
-import { getSyncDeps } from './routes';
 
 const router = Router();
 const auth = authenticateFirebaseToken;
@@ -200,12 +195,6 @@ router.patch('/:id', auth, async (req: AuthenticatedRequest, res: Response, next
         const resolved = await resolveAgentParam(req.params.id, req.user.uid);
         const agent = await agentService.update(resolved.id, req.body, req.user.uid);
 
-        // Sync Module CLAUDE.md for behaviour field changes (best-effort)
-        syncConfigToWorkspace(req.user.uid, agent, req.body, getSyncDeps()).catch((error) => {
-            const message = error instanceof Error ? error.message : 'Unknown error';
-            console.warn(`[agents] Config workspace sync failed for agent ${resolved.id} (best-effort): ${message}`);
-        });
-
         sendResponse(res, 200, { agent }, startTime);
     } catch (err) {
         next(err);
@@ -221,15 +210,7 @@ router.delete('/:id', auth, async (req: AuthenticatedRequest, res: Response, nex
         }
 
         const resolved = await resolveAgentParam(req.params.id, req.user.uid);
-        const deleted = await agentService.delete(resolved.id, req.user.uid);
-
-        // Best-effort filesystem cleanup (agent already gone from registry)
-        if (deleted.slug) {
-            deleteAgent(req.user.uid, deleted.slug, getSyncDeps()).catch((error) => {
-                const message = error instanceof Error ? error.message : 'Unknown error';
-                console.warn(`[agents] Filesystem cleanup failed for ${deleted.slug}: ${message}`);
-            });
-        }
+        await agentService.delete(resolved.id, req.user.uid);
 
         sendResponse(res, 200, { deleted: true, id: resolved.id }, startTime);
     } catch (err) {

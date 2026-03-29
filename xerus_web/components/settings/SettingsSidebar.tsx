@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { User, Key, Server, HardDrive, CreditCard, LogOut, ExternalLink } from 'lucide-react'
+import { User, Key, Server, HardDrive, CreditCard, LogOut, ExternalLink, Shield } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { logout } from '@/lib/api/user'
 import { toast } from '@/lib/toast'
@@ -12,7 +12,7 @@ const NAV_SECTIONS = [
     label: 'Account',
     items: [
       { href: '/settings', label: 'Profile', icon: User },
-      { href: '/settings/api-keys', label: 'API Keys', icon: Key },
+      { href: '/settings/api-keys', label: 'Authentication', icon: Shield, note: 'CLI auth auto-detected' },
     ],
   },
   {
@@ -69,7 +69,12 @@ export function SettingsSidebar() {
                       )}
                     >
                       <Icon className={cn('w-[15px] h-[15px]', isActive ? 'text-text' : 'text-text-secondary')} />
-                      {item.label}
+                      <span className="flex flex-col">
+                        <span>{item.label}</span>
+                        {'note' in item && item.note && (
+                          <span className="text-[10px] text-text-secondary/70 font-normal leading-tight">{item.note}</span>
+                        )}
+                      </span>
                     </Link>
                   )
                 })}

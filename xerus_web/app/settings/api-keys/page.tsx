@@ -1,13 +1,27 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ExternalLink, Eye, EyeOff, RefreshCw, Network, Shield, ArrowUpRight } from 'lucide-react'
+import { ExternalLink, Eye, EyeOff, RefreshCw, Network, Shield, ArrowUpRight, Cpu, Sparkles, Terminal } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { toast } from '@/lib/toast'
 import { useRedirectIfNotAuth } from '@/utils/AuthContext'
-import { saveApiKey, checkApiKeyStatus, deleteApiKey, getAllApiKeys } from '@/lib/api/user'
+import { saveApiKey, checkApiKeyStatus, deleteApiKey, getAllApiKeys, getCliAuthStatus, type CliAuthStatus } from '@/lib/api/user'
 
 const PROVIDERS = [
+  {
+    id: 'anthropic',
+    name: 'Anthropic (Claude Code)',
+    description: 'Direct API access for Claude Code CLI',
+    Icon: Sparkles,
+    keyUrl: 'https://console.anthropic.com/settings/keys',
+  },
+  {
+    id: 'openai',
+    name: 'OpenAI (Codex)',
+    description: 'Direct API access for Codex CLI',
+    Icon: Cpu,
+    keyUrl: 'https://platform.openai.com/api-keys',
+  },
   {
     id: 'openrouter',
     name: 'OpenRouter',
@@ -28,12 +42,15 @@ export default function ApiKeysPage() {
   const [apiKeyStatus, setApiKeyStatus] = useState<Record<string, boolean>>({})
   const [apiKeys, setApiKeys] = useState<Record<string, string | null>>({})
   const [isHydrated, setIsHydrated] = useState(false)
+  const [cliAuthStatus, setCliAuthStatus] = useState<CliAuthStatus | null>(null)
 
   const updateApiKeyStatus = (newStatus: Record<string, boolean>) => {
     setApiKeyStatus(newStatus)
     try {
       localStorage.setItem('apiKeyStatus', JSON.stringify(newStatus))
-    } catch {}
+    } catch (e) {
+      console.warn('Failed to persist API key status:', e)
+    }
   }
 
   useEffect(() => {
@@ -41,13 +58,18 @@ export default function ApiKeysPage() {
     try {
       const stored = localStorage.getItem('apiKeyStatus')
       if (stored) setApiKeyStatus(JSON.parse(stored))
-    } catch {}
+    } catch (e) {
+      console.warn('Failed to read API key status from localStorage:', e)
+    }
   }, [])
 
   useEffect(() => {
     if (!user) return
     checkApiKeyStatus().then(updateApiKeyStatus)
     getAllApiKeys().then(setApiKeys)
+    getCliAuthStatus().then(setCliAuthStatus).catch(() => {
+      // CLI auth status endpoint may not be available yet
+    })
   }, [user])
 
   const getMaskedPreview = (provider: string): string | undefined => {
@@ -99,6 +121,71 @@ export default function ApiKeysPage() {
         <p className="text-sm text-text-secondary mb-8">
           Connect your provider keys to power agent execution
         </p>
+      </motion.div>
+
+      {/* CLI Authentication Status Section */}
+      <motion.div
+        className="mb-8 bg-surface/50 rounded-2xl border border-surface-active/50 p-5"
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.05 }}
+      >
+        <div className="flex items-center gap-2.5 mb-1">
+          <div className="relative w-8 h-8 bg-surface-hover rounded-lg flex items-center justify-center shrink-0">
+            <Terminal className="w-4 h-4 text-text-secondary" />
+          </div>
+          <div>
+            <h2 className="text-sm font-medium text-text">CLI Authentication</h2>
+            <p className="text-xs text-text-secondary">Your agent execution environment</p>
+          </div>
+        </div>
+
+        <div className="mt-4 space-y-3 ml-[42px]">
+          {/* Claude Code status */}
+          <div className="flex items-center gap-2">
+            <span
+              className={`w-2 h-2 rounded-full ${
+                cliAuthStatus?.claudecode?.authenticated ? 'bg-emerald-500' : 'bg-red-400'
+              }`}
+            />
+            <span className="text-sm text-text">
+              Claude Code: {cliAuthStatus?.claudecode?.details || 'Checking...'}
+            </span>
+            {cliAuthStatus?.claudecode?.method === 'platform' && (
+              <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
+                Using credits
+              </span>
+            )}
+          </div>
+
+          {/* Codex status */}
+          <div className="flex items-center gap-2">
+            <span
+              className={`w-2 h-2 rounded-full ${
+                cliAuthStatus?.codex?.authenticated ? 'bg-emerald-500' : 'bg-red-400'
+              }`}
+            />
+            <span className="text-sm text-text">
+              Codex: {cliAuthStatus?.codex?.details || 'Checking...'}
+            </span>
+            {cliAuthStatus?.codex?.method === 'platform' && (
+              <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
+                Using credits
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* CLI auth instructions */}
+        <div className="mt-4 ml-[42px] p-3 bg-surface-hover/50 rounded-xl">
+          <p className="text-xs text-text-secondary mb-1">Prefer your existing subscription?</p>
+          <p className="text-xs text-text-secondary">
+            Open terminal in sandbox and run:{' '}
+            <code className="bg-surface-active/50 px-1.5 py-0.5 rounded text-text font-mono">
+              claude auth login
+            </code>
+          </p>
+        </div>
       </motion.div>
 
       <div className="space-y-5">
@@ -214,53 +301,55 @@ export default function ApiKeysPage() {
                 </div>
               </div>
 
-              {/* OpenRouter info panel */}
-              <div className="border-t border-surface-active/30 bg-surface-hover/20 px-5 py-4">
-                <p className="text-[11px] font-medium text-text-secondary mb-2">
-                  Available Models
-                </p>
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  {['Claude 4.5', 'GPT-5', 'Gemini 2.5', 'DeepSeek V3', 'Qwen 3'].map(
-                    (model) => (
-                      <span
-                        key={model}
-                        className="text-[10px] font-medium text-text-secondary bg-white/80 border border-surface-active/40 px-2 py-0.5 rounded-md"
-                      >
-                        {model}
-                      </span>
-                    )
-                  )}
-                  <span className="text-[10px] font-medium text-text-secondary px-1 py-0.5">
-                    +230 more
-                  </span>
+              {/* OpenRouter info panel - only show for OpenRouter */}
+              {provider.id === 'openrouter' && (
+                <div className="border-t border-surface-active/30 bg-surface-hover/20 px-5 py-4">
+                  <p className="text-[11px] font-medium text-text-secondary mb-2">
+                    Available Models
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    {['Claude 4.5', 'GPT-5', 'Gemini 2.5', 'DeepSeek V3', 'Qwen 3'].map(
+                      (model) => (
+                        <span
+                          key={model}
+                          className="text-[10px] font-medium text-text-secondary bg-white/80 border border-surface-active/40 px-2 py-0.5 rounded-md"
+                        >
+                          {model}
+                        </span>
+                      )
+                    )}
+                    <span className="text-[10px] font-medium text-text-secondary px-1 py-0.5">
+                      +230 more
+                    </span>
+                  </div>
+                  <div className="flex gap-4">
+                    <a
+                      href="https://openrouter.ai/models"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-text-secondary hover:text-text-secondary transition-colors inline-flex items-center gap-1"
+                    >
+                      View all models <ExternalLink className="w-2.5 h-2.5" />
+                    </a>
+                    <a
+                      href="https://openrouter.ai/activity"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-text-secondary hover:text-text-secondary transition-colors inline-flex items-center gap-1"
+                    >
+                      Check usage <ExternalLink className="w-2.5 h-2.5" />
+                    </a>
+                    <a
+                      href="https://openrouter.ai/docs"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-text-secondary hover:text-text-secondary transition-colors inline-flex items-center gap-1"
+                    >
+                      Docs <ExternalLink className="w-2.5 h-2.5" />
+                    </a>
+                  </div>
                 </div>
-                <div className="flex gap-4">
-                  <a
-                    href={provider.modelsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[11px] text-text-secondary hover:text-text-secondary transition-colors inline-flex items-center gap-1"
-                  >
-                    View all models <ExternalLink className="w-2.5 h-2.5" />
-                  </a>
-                  <a
-                    href={provider.usageUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[11px] text-text-secondary hover:text-text-secondary transition-colors inline-flex items-center gap-1"
-                  >
-                    Check usage <ExternalLink className="w-2.5 h-2.5" />
-                  </a>
-                  <a
-                    href={provider.docsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[11px] text-text-secondary hover:text-text-secondary transition-colors inline-flex items-center gap-1"
-                  >
-                    Docs <ExternalLink className="w-2.5 h-2.5" />
-                  </a>
-                </div>
-              </div>
+              )}
             </motion.div>
           )
         })}

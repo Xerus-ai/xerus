@@ -12,7 +12,7 @@ import type {
     ListTriggersResult,
     DeregisterTriggerResult,
     TriggerResult,
-} from '../../agents/xerus-master.types';
+} from '../platform-tool.inlined-types';
 import type { TriggerServicePort } from '../platform-tool.types';
 import { AgentNotFoundError } from '../../../agents/errors';
 import { TriggerNotFoundError, TriggerAlreadyExistsError } from '../../../triggers/trigger.errors';

@@ -104,7 +104,7 @@ describe('createRunnerSession', () => {
 
         const handle = await createRunnerSession(sandbox, { KEY: 'value' });
 
-        expect(handle.sessionId).toBe('agent-runner');
+        expect(handle.sessionId).toBe('cli-executor');
         expect(handle.commandId).toBe('cmd-abc');
         expect(typeof handle.sendInput).toBe('function');
         expect(typeof handle.streamLogs).toBe('function');
@@ -176,7 +176,7 @@ describe('createRunnerSession', () => {
 
         expect(capturedCommand).toContain("export MY_VAR='hello world'");
         expect(capturedCommand).toContain("export ANOTHER='test'");
-        expect(capturedCommand).toContain(`exec node ${SANDBOX_CONFIG.runnerDir}/agent-runner.js`);
+        expect(capturedCommand).toContain(`exec node ${SANDBOX_CONFIG.runnerDir}/cli-executor.js`);
     });
 
     it('escapes single quotes in environment values', async () => {

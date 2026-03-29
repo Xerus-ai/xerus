@@ -2,7 +2,7 @@
 // Types for pause/resume approval workflows triggered by PreToolUse 'ask' decisions
 // Matches: execution_pause_states table (migration 022_execution_domain.sql)
 
-import type { PauseReason, PauseResolution } from '../../history/sessions/session.types';
+import type { PauseReason, PauseResolution } from '../../../shared/types/execution-shared.types';
 
 // -----------------------------------------------------------------------------
 // HITL Request (sent to frontend for user approval)

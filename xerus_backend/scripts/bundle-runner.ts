@@ -1,6 +1,6 @@
-// Bundle the agent runner + platform MCP server into JS files for sandbox deployment
+// Bundle the CLI executor + minimal MCP server into JS files for sandbox deployment
 // Usage: npx ts-node scripts/bundle-runner.ts
-// Output: dist/runner-bundle/agent-runner.js, dist/runner-bundle/platform-mcp-server.js
+// Output: dist/runner-bundle/cli-executor.js, dist/runner-bundle/minimal-mcp-server.js
 
 import { build, type BuildOptions } from 'esbuild';
 import path from 'path';
@@ -17,11 +17,8 @@ const SHARED_OPTIONS: BuildOptions = {
     sourcemap: false,
     minify: false,
     external: [
-        '@anthropic-ai/claude-agent-sdk',
         '@modelcontextprotocol/sdk',
         '@modelcontextprotocol/sdk/*',
-        'zod',
-        'zod/*',
     ],
     treeShaking: true,
     logLevel: 'info',
@@ -31,13 +28,13 @@ async function bundleRunner(): Promise<void> {
     const results = await Promise.all([
         build({
             ...SHARED_OPTIONS,
-            entryPoints: [path.join(RUNNER_DIR, 'agent-runner.ts')],
-            outfile: path.join(OUT_DIR, 'agent-runner.js'),
+            entryPoints: [path.join(RUNNER_DIR, 'cli-executor.ts')],
+            outfile: path.join(OUT_DIR, 'cli-executor.js'),
         }),
         build({
             ...SHARED_OPTIONS,
-            entryPoints: [path.join(RUNNER_DIR, 'platform-mcp-server.ts')],
-            outfile: path.join(OUT_DIR, 'platform-mcp-server.js'),
+            entryPoints: [path.join(RUNNER_DIR, 'minimal-mcp-server.ts')],
+            outfile: path.join(OUT_DIR, 'minimal-mcp-server.js'),
         }),
     ]);
 
@@ -48,8 +45,8 @@ async function bundleRunner(): Promise<void> {
     }
 
     console.log('Runner bundles created:');
-    console.log('  dist/runner-bundle/agent-runner.js');
-    console.log('  dist/runner-bundle/platform-mcp-server.js');
+    console.log('  dist/runner-bundle/cli-executor.js');
+    console.log('  dist/runner-bundle/minimal-mcp-server.js');
 }
 
 bundleRunner().catch((err) => {

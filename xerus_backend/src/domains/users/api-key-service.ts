@@ -13,6 +13,8 @@ import { VALID_API_PROVIDERS } from './types';
 const ENV_KEY_MAP: Record<ApiProvider, string> = {
     openrouter: 'OPENROUTER_API_KEY',
     daytona: 'DAYTONA_API_KEY',
+    anthropic: 'ANTHROPIC_API_KEY',
+    openai: 'OPENAI_API_KEY',
 };
 
 function hasEnvKey(provider: ApiProvider): boolean {

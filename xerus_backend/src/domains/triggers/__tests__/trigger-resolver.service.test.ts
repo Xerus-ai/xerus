@@ -2,7 +2,7 @@
 import { pool } from '../../../database/connection';
 import { TriggerResolver } from '../trigger-resolver.service';
 import { TriggerResolutionError, TriggerProviderNotFoundError } from '../trigger.errors';
-import type { TriggerProvider } from '../../heartbeat/normalized-event.types';
+import type { TriggerProvider } from '../trigger.types';
 
 describe('TriggerResolver', () => {
     let resolver: TriggerResolver;

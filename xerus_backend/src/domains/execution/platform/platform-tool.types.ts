@@ -2,9 +2,7 @@
 // Service port interfaces for platform.* tool handlers.
 // Domain services implement these contracts.
 
-import {
-    PLATFORM_TOOLS,
-} from '../agents/xerus-master.types';
+import { PLATFORM_TOOLS } from './platform-tool.inlined-types';
 import type {
     CreateAgentInput,
     CloneAgentInput,
@@ -33,7 +31,7 @@ import type {
     ListTriggersInput,
     DeregisterTriggerInput,
     SearchOutputsInput,
-} from '../agents/xerus-master.types';
+} from './platform-tool.inlined-types';
 
 // -----------------------------------------------------------------------------
 // Tool Categories

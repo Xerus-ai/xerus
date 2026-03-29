@@ -11,27 +11,25 @@ export * from './streaming';
 export * from './workspace';
 export * from './queue';
 export * from './hooks';
-export * from './agents';
 export * from './orchestrator';
 // knowledge module: KB docs written directly to Daytona workspace via Drive API
 export * from './credits';
 export * from './ace';
 // Modules with selective exports to avoid name conflicts
 export {
-    AgentRunnerProcess,
-    createPlatformMcpServer,
     RunnerHealthMonitor,
     createRunnerHealthMonitor,
     SessionManager,
-    ProcessManager,
-    InboxWatcher,
-    ChannelWatcher,
-    HeartbeatRunner,
-    isWithinActiveHours,
+    ProcessRegistry,
     StdinParser,
     StdoutEmitter,
-    bridgeToSDKHooks,
     RUNNER_ENV,
+    detectAllAuth,
+    detectAuthForAdapter,
+    resolveBillingType,
+    parseClaudeStreamLine,
+    parseCodexStreamLine,
+    clearAccumulator,
 } from './runner';
 
 export type {
@@ -45,8 +43,12 @@ export type {
     RunnerCrashEvent,
     SandboxHealthStatus,
     HealthCheckResult,
-    SDKHooksRecord,
     RuntimeHookContext,
+    PlatformAuthStatus,
+    CLIAgentConfig,
+    AdapterType,
+    AuthResult,
+    BillingType,
 } from './runner';
 
 export { HITLHandler, HITLPauseRepositoryImpl, ActiveStreamEmitter } from './hitl';

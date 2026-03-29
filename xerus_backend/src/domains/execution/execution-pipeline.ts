@@ -13,10 +13,7 @@
 import { randomUUID } from 'crypto';
 import { ExecutionSummary, STREAM_EVENT_TYPES, StreamEventType } from './types';
 import { DEFAULT_MODEL } from '../agents/types';
-import {
-    createConversation,
-    incrementMessageCount,
-} from '../history/conversations/conversation.service';
+import { query } from '../../database/connection';
 import type { TriggerType } from './queue/execution-lane.types';
 import {
     SDKExecutionError,
@@ -501,6 +498,32 @@ export function buildSummary(ctx: PipelineContext): ExecutionSummary {
         toolCalls: ctx.toolCallCount,
         agentsUsed: Math.max(ctx.agentSessionCount, 1),
     };
+}
+
+// -----------------------------------------------------------------------------
+// Conversation Helpers (inlined from deleted history domain)
+// -----------------------------------------------------------------------------
+
+async function createConversation(
+    userId: string,
+    agentSlug: string | null,
+    title: string,
+): Promise<{ id: string }> {
+    const result = await query<{ id: string }>(
+        `INSERT INTO conversations (user_id, agent_slug, title)
+         VALUES ($1, $2, $3) RETURNING id`,
+        [userId, agentSlug, title],
+    );
+    return result.rows[0];
+}
+
+async function incrementMessageCount(conversationId: string): Promise<void> {
+    await query(
+        `UPDATE conversations
+         SET message_count = message_count + 1, last_message_at = NOW()
+         WHERE id = $1`,
+        [conversationId],
+    );
 }
 
 // -----------------------------------------------------------------------------

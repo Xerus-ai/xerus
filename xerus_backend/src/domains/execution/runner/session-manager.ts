@@ -47,12 +47,12 @@ export class SessionManager {
         }
     }
 
-    getSession(agentSlug: string): SessionState | undefined {
-        return this.sessions.get(agentSlug);
+    getSession(agentSlug: string): SessionState | null {
+        return this.sessions.get(agentSlug) ?? null;
     }
 
-    getSessionId(agentSlug: string): string | undefined {
-        return this.sessions.get(agentSlug)?.session_id;
+    getSessionId(agentSlug: string): string | null {
+        return this.sessions.get(agentSlug)?.session_id ?? null;
     }
 
     isActive(agentSlug: string): boolean {

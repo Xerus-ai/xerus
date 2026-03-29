@@ -3,7 +3,6 @@
 
 import { startSyncPipedreamAppsJob } from './sync-pipedream-apps';
 import { startSandboxSchedulerJob, startSandboxCleanupJob } from './sandbox-lifecycle';
-import { startHeartbeatSchedulerJob } from './heartbeat-scheduler';
 import { startDigestSchedulerJob } from './digest-scheduler';
 import { startBackupSchedulerJob } from './s3-backup-job';
 import type { SandboxProvider } from '../domains/execution/sandbox/providers';
@@ -32,11 +31,6 @@ export function startAllJobs(deps: JobDependencies = {}): void {
         startSyncPipedreamAppsJob();
         startSandboxSchedulerJob(deps.provider, deps.sandboxService);
         startSandboxCleanupJob(deps.provider, deps.sandboxService);
-        if (deps.sandboxService && deps.db) {
-            startHeartbeatSchedulerJob(deps.sandboxService, deps.db);
-        } else {
-            console.warn('[Jobs] Heartbeat scheduler skipped (missing sandboxService or db)');
-        }
         startDigestSchedulerJob(deps.db);
 
         if (deps.sandboxService && deps.backupService) {

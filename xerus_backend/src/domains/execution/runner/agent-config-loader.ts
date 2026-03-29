@@ -4,18 +4,44 @@
 
 import fs from 'fs';
 import path from 'path';
-import type { AgentConfig } from './process-manager';
 import { StdoutEmitter } from './stdout-emitter';
 import { buildSoulAppend } from './soul-append-builder';
 import { buildHookHandlers } from '../hooks/hooks.registry';
-import { bridgeToSDKHooks } from './hook-sdk-bridge';
 import { buildRuntimeHookHandlers } from './runtime-hook-factory';
-import type { HookAgentContext, HookTriggerContext, HookEvent, HookHandler } from '../hooks/hooks.types';
+import type { HookAgentContext, HookTriggerContext } from '../hooks/hooks.types';
 import { AgentConfigLoadError } from '../errors';
 import { NATIVE_SDK_TOOLS } from '../types';
 import { sanitizeSubagentTools } from '../orchestrator/tool.filter';
-import { XERUS_MASTER_SLUG, XERUS_CTO_SLUG } from '../agents/xerus-master.types';
 import { DEFAULT_SDK_MODEL } from '../../agents/types';
+
+// Inlined from deleted xerus-master.types.ts
+const XERUS_MASTER_SLUG = 'xerus-master';
+const XERUS_CTO_SLUG = 'xerus-cto';
+
+// Inlined from deleted process-manager.ts
+export interface PresetSystemPrompt {
+    type: 'preset';
+    preset: 'claude_code';
+    append?: string;
+}
+
+export type SystemPrompt = string | PresetSystemPrompt;
+
+export interface AgentConfig {
+    agent_slug: string;
+    system_prompt: SystemPrompt;
+    model: string;
+    tools: string[];
+    max_turns: number;
+    mcp_servers?: Record<string, unknown>;
+    cwd?: string;
+    name?: string;
+    description?: string;
+    domain?: string;
+    heartbeat?: Record<string, unknown>;
+    hooks?: Record<string, unknown>;
+    autonomy_level?: string;
+}
 
 export interface SubagentDefinition {
     description: string;
@@ -94,17 +120,15 @@ export class AgentConfigLoader {
                 team_id: parsed.team_id as string | undefined,
             };
 
+            // CLI-native pivot: CLIs have native hooks. Build handler map for
+            // runtime hook factory but skip SDK bridge (deleted in Block 7).
             const handlerMap = buildHookHandlers(agentContext, triggerContext, runtimeHandlers);
-            const sdkHooks = bridgeToSDKHooks(
-                handlerMap as Partial<Record<HookEvent, HookHandler[]>>,
-                this.emitter,
-                agentSlug,
-            );
+            const hooks = Object.keys(handlerMap).length > 0 ? handlerMap : undefined;
 
             // Xerus master: agent.md IS the full system prompt (no claude_code preset)
             // CTO: bare claude_code preset (no append — pure Claude Code)
             // Other agents: claude_code preset + soul files + agent.md appended
-            let system_prompt: import('./process-manager').SystemPrompt;
+            let system_prompt: SystemPrompt;
             if (isMaster) {
                 system_prompt = append;
             } else if (isCTO) {
@@ -133,7 +157,7 @@ export class AgentConfigLoader {
                 description: parsed.description as string | undefined,
                 domain: parsed.domain as string | undefined,
                 heartbeat: parsed.heartbeat as Record<string, unknown> | undefined,
-                hooks: Object.keys(sdkHooks).length > 0 ? sdkHooks : undefined,
+                hooks,
                 autonomy_level: String(parsed.autonomy_level || 'supervised'),
             };
         } catch (error) {

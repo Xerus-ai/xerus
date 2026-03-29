@@ -2,8 +2,7 @@
 // Generates standup (AM) and report (PM) digests via Xerus master agent heartbeat
 // Source: docs/planning/execution/heartbeat-system.md (Daily Digest section)
 
-import { HeartbeatExecutionRepository, heartbeatExecutionRepository } from '../../heartbeat/heartbeat-execution.repository';
-import type { HeartbeatExecution, HeartbeatOutcome } from '../../heartbeat/types';
+import { query } from '../../../database/connection';
 import type {
     DigestVariant,
     DigestActivityData,
@@ -19,14 +18,27 @@ import { DigestExecutionRecordError } from './daily-digest.errors';
 // Digest Execution Record Input
 // -----------------------------------------------------------------------------
 
+type DigestOutcome = 'success' | 'failure' | 'timeout' | 'suppressed' | 'skipped';
+
 interface RecordDigestExecutionInput {
     agent_id: number;
     heartbeat_config_id: number | null;
     variant: DigestVariant;
-    outcome: HeartbeatOutcome;
+    outcome: DigestOutcome;
     tokens_used: number;
     inbox_posts: number;
     error_message?: string;
+}
+
+// Minimal digest execution record (replaces deleted HeartbeatExecution)
+interface DigestExecutionRecord {
+    id: string;
+    agent_id: number;
+    trigger_type: string;
+    status: string;
+    outcome: DigestOutcome | null;
+    tokens_used: number;
+    created_at: Date;
 }
 
 // -----------------------------------------------------------------------------
@@ -34,9 +46,7 @@ interface RecordDigestExecutionInput {
 // -----------------------------------------------------------------------------
 
 export class DailyDigestService {
-    constructor(
-        private executionRepository: HeartbeatExecutionRepository = heartbeatExecutionRepository
-    ) {}
+    constructor() {}
 
     /**
      * Check if there is any activity worth reporting.
@@ -188,33 +198,47 @@ export class DailyDigestService {
     }
 
     /**
-     * Record a digest execution in the heartbeat_executions table.
+     * Record a digest execution in execution_sessions.
+     * Replaces the deleted heartbeat_executions table approach.
      */
-    async recordDigestExecution(input: RecordDigestExecutionInput): Promise<HeartbeatExecution> {
+    async recordDigestExecution(input: RecordDigestExecutionInput): Promise<DigestExecutionRecord> {
         const now = new Date();
+        const status = input.outcome === 'success' ? 'completed' : 'failed';
 
-        const execution = await this.executionRepository.create({
-            agent_id: input.agent_id,
-            heartbeat_config_id: input.heartbeat_config_id,
-            trigger_type: 'scheduled',
-            event_payload: { digest_variant: input.variant },
-            scheduled_at: now,
-        });
+        const result = await query<{ id: string; created_at: Date }>(
+            `INSERT INTO execution_sessions
+             (workspace_id, agent_slug, status, trigger_type, user_prompt,
+              input_tokens, started_at, completed_at, created_at)
+             SELECT w.id, ar.slug, $2, 'heartbeat', $3,
+                    $4, $5, $5, $5
+             FROM agent_registry ar
+             JOIN workspaces w ON w.user_id = ar.user_id
+             WHERE ar.id = $1
+             LIMIT 1
+             RETURNING id, created_at`,
+            [
+                input.agent_id,
+                status,
+                `Digest: ${input.variant}`,
+                input.tokens_used,
+                now,
+            ]
+        );
 
-        const updated = await this.executionRepository.updateStatus(execution.id, 'completed', {
-            started_at: now,
-            completed_at: now,
-            outcome: input.outcome,
-            tokens_used: input.tokens_used,
-            inbox_posts: input.inbox_posts,
-            error_message: input.error_message,
-        });
-
-        if (!updated) {
-            throw new DigestExecutionRecordError(execution.id);
+        if (result.rows.length === 0) {
+            throw new DigestExecutionRecordError(`agent_id=${input.agent_id}`);
         }
 
-        return updated;
+        const row = result.rows[0];
+        return {
+            id: row.id,
+            agent_id: input.agent_id,
+            trigger_type: 'heartbeat',
+            status,
+            outcome: input.outcome,
+            tokens_used: input.tokens_used,
+            created_at: row.created_at,
+        };
     }
 
     /**

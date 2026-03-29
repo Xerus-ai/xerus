@@ -8,7 +8,8 @@
 
 import { WorkspaceManager, SandboxFileSystem } from './workspace.manager';
 import { WORKSPACE_DIRECTORIES } from './workspace.types';
-import { XERUS_MASTER_SLUG, XERUS_CTO_SLUG } from '../agents/xerus-master.types';
+const XERUS_MASTER_SLUG = 'xerus-master';
+const XERUS_CTO_SLUG = 'xerus-cto';
 import { PLATFORM_HOOKS, PLATFORM_PERMISSIONS } from './platform-settings';
 
 export interface WorkspacePersonalizeOptions {

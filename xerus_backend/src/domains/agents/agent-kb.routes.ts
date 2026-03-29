@@ -9,8 +9,6 @@ import { authenticateFirebaseToken } from '../../middleware/auth';
 import { agentKBService } from './service';
 import { AgentUnauthorizedError } from './errors';
 import { resolveAgentParam } from './resolve-agent-param';
-import { syncModuleClaudeMdToWorkspace } from './agent-workspace-sync';
-import { getSyncDeps } from './routes';
 
 const router = Router();
 const auth = authenticateFirebaseToken;
@@ -49,11 +47,6 @@ router.post('/:id/knowledge-bases', auth, async (req: AuthenticatedRequest, res:
 
         const kb = await agentKBService.addKnowledgeBase(resolved.id, knowledge_base_id, kb_name, access_mode || 'read', req.user.uid);
 
-        syncModuleClaudeMdToWorkspace(req.user.uid, resolved.id, getSyncDeps()).catch((error) => {
-            const message = error instanceof Error ? error.message : 'Unknown error';
-            console.warn(`[agents] CLAUDE.md workspace sync failed for agent ${resolved.id} (best-effort): ${message}`);
-        });
-
         sendResponse(res, 201, { knowledge_base: kb }, startTime);
     } catch (err) {
         next(err);
@@ -71,11 +64,6 @@ router.delete('/:id/knowledge-bases/:kbId', auth, async (req: AuthenticatedReque
         const resolved = await resolveAgentParam(req.params.id, req.user.uid);
 
         await agentKBService.removeKnowledgeBase(resolved.id, req.params.kbId, req.user.uid);
-
-        syncModuleClaudeMdToWorkspace(req.user.uid, resolved.id, getSyncDeps()).catch((error) => {
-            const message = error instanceof Error ? error.message : 'Unknown error';
-            console.warn(`[agents] CLAUDE.md workspace sync failed for agent ${resolved.id} (best-effort): ${message}`);
-        });
 
         sendResponse(res, 200, { removed: true, knowledge_base_id: req.params.kbId }, startTime);
     } catch (err) {

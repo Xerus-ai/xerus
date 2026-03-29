@@ -11,11 +11,12 @@ import { startAllJobs } from './jobs';
 import { StorageService } from './domains/execution/storage/storage.service';
 import { S3BackupService } from './domains/execution/storage/s3-backup.service';
 
-import usersRoutes from './domains/users/routes';
+import usersRoutes, { setUserRoutesDeps } from './domains/users/routes';
 import adminRoutes from './routes/admin.routes';
 import agentRoutes, { setAgentRoutesDeps } from './domains/agents/routes';
 import { toolsRouter } from './domains/tools/routes';
 import executeRoutes, { setExecutionService } from './domains/execution/execution.routes';
+import { internalMcpRouter } from './domains/execution/internal-mcp';
 import { setAgentFilesDeps } from './domains/execution/agent-files.routes';
 import { webhookReceiverRouter } from './domains/triggers';
 import { ExecutionService } from './domains/execution/execution.service';
@@ -30,13 +31,11 @@ import { DatabaseUsageStore } from './domains/execution/credits/usage-store';
 import { inboxRoutes } from './domains/inbox';
 import { companyRoutes, setCompanyRoutesDeps, taskRoutes, setTaskRoutesDeps } from './domains/company';
 import { onboardingRoutes, setOnboardingDeps } from './domains/onboarding';
-import { historyRoutes } from './domains/history';
 import { memoryRoutes } from './domains/memory';
 import { modelsRoutes } from './domains/models';
 import { driveRouter, setDriveDeps, DriveService } from './domains/drive';
 import skillRoutes, { setSkillRoutesDeps, agentSkillsRouter } from './domains/skills/routes';
 import { agentChannelsRouter, setAgentChannelsDeps } from './domains/agents/agent-channels.routes';
-import { scheduleRoutes } from './domains/schedules';
 import inviteCodeRoutes from './domains/invite-codes/routes';
 import { createMessageBridgeService } from './domains/inbox/messaging/message-bridge.service';
 import { MessageBridgeRepository } from './domains/inbox/messaging/message-bridge.repository';
@@ -104,13 +103,12 @@ app.use('/api/v1/inbox', inboxRoutes);
 app.use('/api/v1/company', companyRoutes);
 app.use('/api/v1', taskRoutes);
 app.use('/api/v1/onboarding', onboardingRoutes);
-app.use('/api/v1/history', historyRoutes);
 app.use('/api/v1/memory', memoryRoutes);
 app.use('/api/v1/models', modelsRoutes);
 app.use('/api/v1/workspace', driveRouter);
 app.use('/api/v1/skills', skillRoutes);
-app.use('/api/v1/schedules', scheduleRoutes);
 app.use('/api/v1/invite-codes', inviteCodeRoutes);
+app.use('/api/v1/internal/mcp', internalMcpRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
@@ -249,6 +247,7 @@ async function startServer(): Promise<void> {
         setTaskRoutesDeps({ sandboxService });
         setCompanyRoutesDeps({ sandboxService });
         setOnboardingDeps({ sandboxService });
+        setUserRoutesDeps({ sandboxService });
 
         setDriveDeps(new DriveService(sandboxService, backupService));
 

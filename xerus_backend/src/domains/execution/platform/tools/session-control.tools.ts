@@ -12,7 +12,7 @@ import type {
     ResumeExecutionResult,
     SessionStateResult,
     CompleteSessionResult,
-} from '../../agents/xerus-master.types';
+} from '../platform-tool.inlined-types';
 import type { SessionControlServicePort } from '../platform-tool.types';
 
 // -----------------------------------------------------------------------------

@@ -10,7 +10,6 @@ import { authenticateFirebaseToken } from '../../middleware/auth';
 import { agentChannelService } from './agent-channel.service';
 import { AgentUnauthorizedError } from './errors';
 import { resolveAgentParam } from './resolve-agent-param';
-import { syncModuleClaudeMdToWorkspace, type WorkspaceSyncDeps } from './agent-workspace-sync';
 import type { SandboxService } from '../execution/sandbox/sandbox.service';
 import { getSharedFsRepo } from './routes';
 import { query } from '../../database/connection';
@@ -23,19 +22,9 @@ export interface AgentChannelsDeps {
     sandboxService: SandboxService;
 }
 
-let channelsDeps: AgentChannelsDeps | null = null;
-
-export function setAgentChannelsDeps(d: AgentChannelsDeps): void {
-    channelsDeps = d;
+export function setAgentChannelsDeps(_d: AgentChannelsDeps): void {
     agentChannelService.setFilesystemRepo(getSharedFsRepo());
     agentChannelService.setDb({ query });
-}
-
-function getSyncDeps(): WorkspaceSyncDeps {
-    if (!channelsDeps) {
-        throw new Error('Agent channels deps not initialized. Call setAgentChannelsDeps() at startup.');
-    }
-    return { sandboxService: channelsDeps.sandboxService, db: { query } };
 }
 
 const router = Router();
@@ -72,11 +61,6 @@ router.post('/:id/channels', auth, async (req: AuthenticatedRequest, res: Respon
         const resolved = await resolveAgentParam(req.params.id, req.user.uid);
         const result = await agentChannelService.assignChannel(resolved.id, channel_id, req.user.uid);
 
-        syncModuleClaudeMdToWorkspace(req.user.uid, resolved.id, getSyncDeps()).catch((error) => {
-            const message = error instanceof Error ? error.message : 'Unknown error';
-            console.warn(`[agents] CLAUDE.md sync failed for agent ${resolved.id} after channel assign (best-effort): ${message}`);
-        });
-
         sendResponse(res, 201, result, startTime);
     } catch (err) {
         next(err);
@@ -92,11 +76,6 @@ router.delete('/:id/channels/:channelId', auth, async (req: AuthenticatedRequest
         const resolved = await resolveAgentParam(req.params.id, req.user.uid);
         const result = await agentChannelService.removeChannel(resolved.id, req.params.channelId, req.user.uid);
 
-        syncModuleClaudeMdToWorkspace(req.user.uid, resolved.id, getSyncDeps()).catch((error) => {
-            const message = error instanceof Error ? error.message : 'Unknown error';
-            console.warn(`[agents] CLAUDE.md sync failed for agent ${resolved.id} after channel remove (best-effort): ${message}`);
-        });
-
         sendResponse(res, 200, result, startTime);
     } catch (err) {
         next(err);
@@ -111,11 +90,6 @@ router.post('/:id/channels/:channelId/primary', auth, async (req: AuthenticatedR
 
         const resolved = await resolveAgentParam(req.params.id, req.user.uid);
         const result = await agentChannelService.setPrimaryChannel(resolved.id, req.params.channelId, req.user.uid);
-
-        syncModuleClaudeMdToWorkspace(req.user.uid, resolved.id, getSyncDeps()).catch((error) => {
-            const message = error instanceof Error ? error.message : 'Unknown error';
-            console.warn(`[agents] CLAUDE.md sync failed for agent ${resolved.id} after set-primary (best-effort): ${message}`);
-        });
 
         sendResponse(res, 200, result, startTime);
     } catch (err) {

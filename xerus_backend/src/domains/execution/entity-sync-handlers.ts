@@ -5,7 +5,7 @@
 
 import type { PipelineContext, ResolvedExecutionDeps } from './execution-pipeline.types';
 import { requireAgent } from './pipeline-guards';
-import type { MemoryScope } from './agents/xerus-master.types';
+import type { MemoryScope } from '../memory/memory.types';
 import { getSessionControlService, getMemoryService } from './platform/tools';
 
 const LOG_PREFIX = '[EventRouter]';

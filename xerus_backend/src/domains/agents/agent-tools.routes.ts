@@ -9,8 +9,6 @@ import { authenticateFirebaseToken } from '../../middleware/auth';
 import { agentToolsService } from './service';
 import { AgentUnauthorizedError } from './errors';
 import { resolveAgentParam } from './resolve-agent-param';
-import { syncModuleClaudeMdToWorkspace } from './agent-workspace-sync';
-import { getSyncDeps } from './routes';
 
 const router = Router();
 const auth = authenticateFirebaseToken;
@@ -48,11 +46,6 @@ router.post('/:id/tools', auth, async (req: AuthenticatedRequest, res: Response,
 
         const tools = await agentToolsService.addTool(resolved.id, appSlug, req.user.uid);
 
-        syncModuleClaudeMdToWorkspace(req.user.uid, resolved.id, getSyncDeps()).catch((error) => {
-            const message = error instanceof Error ? error.message : 'Unknown error';
-            console.warn(`[agents] CLAUDE.md workspace sync failed for agent ${resolved.id} (best-effort): ${message}`);
-        });
-
         sendResponse(res, 201, { tools, added: appSlug }, startTime);
     } catch (err) {
         next(err);
@@ -69,11 +62,6 @@ router.delete('/:id/tools/:appSlug', auth, async (req: AuthenticatedRequest, res
 
         const resolved = await resolveAgentParam(req.params.id, req.user.uid);
         const tools = await agentToolsService.removeTool(resolved.id, req.params.appSlug, req.user.uid);
-
-        syncModuleClaudeMdToWorkspace(req.user.uid, resolved.id, getSyncDeps()).catch((error) => {
-            const message = error instanceof Error ? error.message : 'Unknown error';
-            console.warn(`[agents] CLAUDE.md workspace sync failed for agent ${resolved.id} (best-effort): ${message}`);
-        });
 
         sendResponse(res, 200, { tools, removed: req.params.appSlug }, startTime);
     } catch (err) {

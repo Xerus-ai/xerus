@@ -11,7 +11,7 @@
 import type { InboxWriter } from './announce-queue.service';
 import type { ExecutionDatabase } from '../execution-pipeline.types';
 import { SANDBOX_CONFIG } from '../sandbox/sandbox.config';
-import { XERUS_MASTER_SLUG } from '../agents/xerus-master.types';
+const XERUS_MASTER_SLUG = 'xerus-master';
 
 export interface WorkspaceWriterDeps {
     writeFile: (sandboxId: string, filePath: string, content: string) => Promise<void>;

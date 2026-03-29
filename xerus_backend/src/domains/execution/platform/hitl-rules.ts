@@ -14,10 +14,12 @@
 import {
     PLATFORM_TOOLS,
     PLATFORM_TOOL_HITL,
-    type HITLRequirement,
-    type PlatformTool,
     PLATFORM_TOOL_LIST,
-} from '../agents/xerus-master.types';
+} from './platform-tool.inlined-types';
+import type {
+    HITLRequirement,
+    PlatformTool,
+} from './platform-tool.inlined-types';
 import type { PreToolUseInput, PreToolUseOutput } from '../hooks/hooks.types';
 
 // -----------------------------------------------------------------------------

@@ -30,7 +30,6 @@ import {
     validateCancelBody,
 } from './execution.validators';
 import agentFilesRouter from './agent-files.routes';
-import conversationRouter from '../history/conversations/conversation.routes';
 
 // -----------------------------------------------------------------------------
 // Constants
@@ -64,9 +63,6 @@ const auth = authenticateFirebaseToken;
 
 // Mount agent file API sub-routes
 router.use('/agents', agentFilesRouter);
-
-// Mount conversation CRUD routes
-router.use('/conversations', conversationRouter);
 
 // POST /api/v1/execute/sse-token - Issue a short-lived, single-use token for SSE auth
 router.post('/sse-token', auth, createSseTokenHandler());

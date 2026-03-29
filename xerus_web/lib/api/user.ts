@@ -195,3 +195,26 @@ export const getAllApiKeys = async (): Promise<{ [provider: string]: string | nu
   return result;
 };
 
+// ============================================================
+// CLI AUTH STATUS ENDPOINT (/api/v1/users/cli-auth-status)
+// ============================================================
+
+export interface CliAuthStatus {
+  claudecode: {
+    authenticated: boolean;
+    method: 'subscription' | 'api' | 'platform';
+    details: string;
+  };
+  codex: {
+    authenticated: boolean;
+    method: 'subscription' | 'api' | 'platform';
+    details: string;
+  };
+}
+
+export const getCliAuthStatus = async (): Promise<CliAuthStatus> => {
+  const response = await apiCall('/users/cli-auth-status', { method: 'GET' });
+  const json = await response.json();
+  return json.data || json;
+};
+

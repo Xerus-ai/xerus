@@ -18,7 +18,7 @@ import {
     HITLScenario,
     DEFAULT_HITL_TIMEOUT_SECONDS,
 } from './hitl.types';
-import type { PauseReason, PauseResolution } from '../../history/sessions/session.types';
+import type { PauseReason, PauseResolution } from '../../../shared/types/execution-shared.types';
 import { StreamEvent, GuidanceEventContent } from '../types';
 import {
     PauseStateNotFoundError,

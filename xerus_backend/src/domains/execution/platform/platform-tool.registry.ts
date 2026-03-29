@@ -2,7 +2,7 @@
 // Metadata registry and lookup functions for platform and system tools
 // Source: docs/planning/tools/system-tools.md
 
-import { PLATFORM_TOOLS } from '../agents/xerus-master.types';
+import { PLATFORM_TOOLS } from './platform-tool.inlined-types';
 import type { ToolSchema, ToolMetadata, ToolCategory } from './platform-tool.types';
 import { ALL_TOOL_SCHEMAS } from './platform-tool.schemas';
 

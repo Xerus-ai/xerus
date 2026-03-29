@@ -6,7 +6,7 @@
 // Re-exported for backward compatibility with existing imports
 // -----------------------------------------------------------------------------
 
-export type { ThinkingLevel, AutonomyLevel, PermissionMode } from '../../shared/types/agent-shared.types';
+export type { ThinkingLevel, AutonomyLevel, PermissionMode, AdapterType } from '../../shared/types/agent-shared.types';
 export {
     THINKING_LEVELS,
     AUTONOMY_LEVELS,
@@ -15,6 +15,8 @@ export {
     THINKING_TOKENS,
     DEFAULT_THINKING_LEVEL,
     DEFAULT_AUTONOMY_LEVEL,
+    ADAPTER_TYPES,
+    DEFAULT_ADAPTER_TYPE,
 } from '../../shared/types/agent-shared.types';
 
 import type { ThinkingLevel } from '../../shared/types/agent-shared.types';
@@ -46,11 +48,6 @@ export { EXECUTION_STATUSES } from '../../shared/types/execution-shared.types';
 
 // Local alias for use within this file
 type ExecutionStatus = _ExecutionStatus;
-
-// -----------------------------------------------------------------------------
-// NOTE: Heartbeat types are defined in heartbeat/types.ts (canonical source)
-// Import them via: import { HeartbeatConfig, ... } from './heartbeat'
-// -----------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------
 // Stream Event Types (12 types from streaming.md)

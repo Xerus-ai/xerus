@@ -12,8 +12,8 @@ import { BadRequestError } from '../../utils/errors';
 import { triggerAdapterRegistry } from './trigger-source.adapter';
 import { TriggerProviderNotFoundError } from './trigger.errors';
 import { eventRouterService } from './event-router.service';
-import type { TriggerProvider, EventNormalizationMetadata } from '../heartbeat/normalized-event.types';
-import { TRIGGER_PROVIDERS } from '../heartbeat/normalized-event.types';
+import type { TriggerProvider, EventNormalizationMetadata } from './trigger.types';
+import { TRIGGER_PROVIDERS } from './trigger.types';
 
 // -----------------------------------------------------------------------------
 // Constants

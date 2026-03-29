@@ -323,8 +323,8 @@ export type RunnerEvent =
     | MetadataSyncEvent
     | HitlRequestEvent;
 
-// Re-export configuration types
-export type { AgentConfig, PresetSystemPrompt, SystemPrompt } from './process-manager';
+// Re-export configuration types (inlined in agent-config-loader after process-manager deletion)
+export type { AgentConfig, PresetSystemPrompt, SystemPrompt } from './agent-config-loader';
 export type {
     HeartbeatConfig,
     ActiveHoursConfig,

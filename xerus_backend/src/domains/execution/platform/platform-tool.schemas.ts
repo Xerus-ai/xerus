@@ -2,7 +2,7 @@
 // 27 platform tools. Delegation handled by SDK-native tools (Task, TeamCreate, etc.)
 // Metadata in platform-tool.registry.ts
 
-import { PLATFORM_TOOLS } from '../agents/xerus-master.types';
+import { PLATFORM_TOOLS } from './platform-tool.inlined-types';
 import type { ToolSchema } from './platform-tool.types';
 
 // -- Agent Management (4) ----------------------------------------------------

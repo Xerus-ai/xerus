@@ -4,10 +4,19 @@
 
 import { pool, transaction } from '../../database/connection';
 import type { PoolClient } from 'pg';
-import { parseHeartbeatMd, type ParsedEventEntry } from '../heartbeat/heartbeat-md-parser';
 import { TriggerResolver } from './trigger-resolver.service';
-import type { AgentTriggerRow } from '../heartbeat/normalized-event.types';
+import type { AgentTriggerRow } from './trigger.types';
 import { TriggerResolutionError } from './trigger.errors';
+
+// -----------------------------------------------------------------------------
+// Parsed Event Entry (inlined from deleted heartbeat-md-parser)
+// -----------------------------------------------------------------------------
+
+export interface ParsedEventEntry {
+    app: string;
+    event_type: string;
+    filter: string | null;
+}
 
 // -----------------------------------------------------------------------------
 // Types
@@ -38,16 +47,15 @@ export class TriggerRegistrationService {
     }
 
     /**
-     * Full sync from raw HEARTBEAT.md content.
-     * Parses the markdown, extracts events, and reconciles with DB.
+     * Sync triggers from a list of desired events.
+     * Previously parsed from HEARTBEAT.md; now accepts events directly.
      */
-    async syncFromHeartbeatMd(
+    async syncFromEvents(
         agentId: number,
         userId: string,
-        heartbeatMdContent: string
+        events: ParsedEventEntry[]
     ): Promise<ReconcileResult> {
-        const parsed = parseHeartbeatMd(heartbeatMdContent);
-        return this.reconcileTriggers(agentId, userId, parsed.events);
+        return this.reconcileTriggers(agentId, userId, events);
     }
 
     /**

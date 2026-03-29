@@ -3,7 +3,7 @@
 // Uses DigestDispatcher to prepare prompts, then dispatches to Xerus agent
 // via HeartbeatRunnerService and records execution via DailyDigestService.
 //
-// Architecture: Digest is a separate job from heartbeat — it has its own
+// Architecture: Digest is a separate job — it has its own
 // cron schedules (standup_cron, report_cron) per user, independent of
 // agent heartbeat intervals.
 

@@ -1,0 +1,51 @@
+// Internal MCP Routes
+// Backend API endpoints called by minimal-mcp-server.ts from sandbox
+// These routes handle the 9 backend-coupled tools that require platform state
+//
+// Tools:
+// 1. pause_execution     - Session control (needs backend state machine)
+// 2. resume_execution    - HITL approval (needs backend state)
+// 3. get_session_state   - Distributed state query (needs backend DB)
+// 4. complete_session    - Termination signal (needs backend cleanup)
+// 5. connect_tool        - OAuth flow (needs Pipedream integration)
+// 6. register_trigger    - Webhook provisioning (needs backend registration)
+// 7. deregister_trigger  - Webhook cleanup (needs backend)
+// 8. send_notification   - User notification (needs backend push)
+// 9. search_tools        - Query connected accounts (needs Pipedream DB)
+
+import { Router, Request, Response, NextFunction } from 'express';
+import { authenticateInternalMcp } from './middleware';
+import { sessionControlRoutes } from './session-control.routes';
+import { triggerRoutes } from './trigger.routes';
+import { notificationRoutes } from './notification.routes';
+import { toolConnectionRoutes } from './tool-connection.routes';
+import { McpToolResult } from './types';
+
+const router = Router();
+
+// Apply internal auth to all routes
+router.use(authenticateInternalMcp);
+
+// Mount route modules
+router.use(sessionControlRoutes);
+router.use(triggerRoutes);
+router.use(notificationRoutes);
+router.use(toolConnectionRoutes);
+
+// Error Handler
+router.use((error: Error, _req: Request, res: Response, _next: NextFunction) => {
+    console.error('[Internal MCP] Error:', error.message);
+
+    const mcpResult: McpToolResult = {
+        success: false,
+        error: error.message,
+    };
+
+    const statusCode = (error as { statusCode?: number }).statusCode || 500;
+    res.status(statusCode).json(mcpResult);
+});
+
+export { router as internalMcpRouter };
+
+// Re-export types for consumers
+export type { InternalMcpRequest, McpToolResult } from './types';

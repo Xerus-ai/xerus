@@ -5,7 +5,7 @@
 
 export type PlanType = 'free' | 'starter' | 'advanced' | 'prodigy';
 export type UserRole = 'admin' | 'user';
-export type ApiProvider = 'openrouter' | 'daytona';
+export type ApiProvider = 'openrouter' | 'daytona' | 'anthropic' | 'openai';
 
 export const PLAN_CREDITS: Record<PlanType, number> = {
     free: 0,
@@ -14,7 +14,7 @@ export const PLAN_CREDITS: Record<PlanType, number> = {
     prodigy: 100000,
 };
 
-export const VALID_API_PROVIDERS: ApiProvider[] = ['openrouter', 'daytona'];
+export const VALID_API_PROVIDERS: ApiProvider[] = ['openrouter', 'daytona', 'anthropic', 'openai'];
 
 // ===== CORE ENTITIES =====
 

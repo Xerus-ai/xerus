@@ -12,6 +12,7 @@ import { useAuth } from '@/utils/AuthContext'
 import { canEditAgent } from '@/utils/agentLabels'
 import { formatModelName } from '@/utils/models'
 import { getFeaturedModels, type ModelEntry } from '@/lib/api/models'
+import type { AdapterType } from '@/lib/api/types'
 
 interface Agent {
     id: number
@@ -29,6 +30,7 @@ interface Agent {
     isVerified?: boolean
     cloneCount?: number
     tags?: string[]
+    adapter_type?: AdapterType
 }
 
 interface AgentProfileCardProps {
@@ -94,6 +96,24 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
         await onUpdate({ ai_model: value })
     }
 
+    const handleAdapterTypeChange = async (value: string) => {
+        const adapterType = value as AdapterType
+        setLocalAgent(prev => ({ ...prev, adapter_type: adapterType }))
+        await onUpdate({ adapter_type: adapterType })
+    }
+
+    // Filter models based on adapter_type
+    const filteredModels = models.filter((m) => {
+        const adapterType = localAgent.adapter_type || 'claudecode'
+        if (adapterType === 'claudecode') {
+            return m.provider === 'anthropic' || m.provider === 'openrouter'
+        }
+        if (adapterType === 'codex') {
+            return m.provider === 'openai' || m.provider === 'openrouter'
+        }
+        return true
+    })
+
     return (
         <div className="flex items-start gap-6">
             {/* Icon Box with Model Badge - matches AgentCard layout */}
@@ -125,12 +145,12 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                                     <SelectItem value="__loading" disabled>
                                         <span className="text-xs text-text-secondary">Loading models...</span>
                                     </SelectItem>
-                                ) : models.length === 0 ? (
+                                ) : filteredModels.length === 0 ? (
                                     <SelectItem value="__empty" disabled>
                                         <span className="text-xs text-text-secondary">No models available</span>
                                     </SelectItem>
                                 ) : (
-                                    models.map((m) => (
+                                    filteredModels.map((m) => (
                                         <SelectItem key={m.id} value={m.id}>
                                             <div className="flex items-center gap-1.5">
                                                 <ModelIcon model={m.id} size="sm" />
@@ -152,6 +172,30 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
 
             {/* Content - shifted right to avoid model badge overlap */}
             <div className="flex-1 min-w-0 ml-6">
+                {/* Adapter Type Selector */}
+                <div className="flex items-center gap-2 mb-2">
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Type</span>
+                    {isEditable ? (
+                        <Select value={localAgent.adapter_type || 'claudecode'} onValueChange={handleAdapterTypeChange}>
+                            <SelectTrigger className="h-7 w-[140px] text-xs bg-white border border-surface-active rounded-md shadow-sm focus:ring-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-white border border-surface-active rounded-md shadow-lg">
+                                <SelectItem value="claudecode">
+                                    <span className="text-xs">Claude Code</span>
+                                </SelectItem>
+                                <SelectItem value="codex">
+                                    <span className="text-xs">Codex</span>
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    ) : (
+                        <span className="text-xs text-text-secondary">
+                            {localAgent.adapter_type === 'codex' ? 'Codex' : 'Claude Code'}
+                        </span>
+                    )}
+                </div>
+
                 {/* Name & Status Row */}
                 <div className="flex items-center gap-3 mb-2">
                     {isEditingName && isEditable ? (

@@ -7,7 +7,7 @@ import type {
     SearchOutputsInput,
     SearchOutputsResult,
     OutputEntry,
-} from '../../agents/xerus-master.types';
+} from '../platform-tool.inlined-types';
 import type { OutputServicePort } from '../platform-tool.types';
 import { WorkspaceNotFoundError } from '../../errors';
 
