@@ -12,6 +12,7 @@ import { useAuth } from '@/utils/AuthContext'
 import { canEditAgent } from '@/utils/agentLabels'
 import { formatModelName } from '@/utils/models'
 import { getFeaturedModels, type ModelEntry } from '@/lib/api/models'
+import { getCliAuthStatus, type CliAuthStatus } from '@/lib/api/user'
 import type { AdapterType } from '@/lib/api/types'
 
 interface Agent {
@@ -46,6 +47,7 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
     const [isEditingDesc, setIsEditingDesc] = useState(false)
     const [models, setModels] = useState<ModelEntry[]>([])
     const [isLoadingModels, setIsLoadingModels] = useState(true)
+    const [cliAuth, setCliAuth] = useState<CliAuthStatus | null>(null)
     const nameInputRef = useRef<HTMLInputElement>(null)
     const descInputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -63,6 +65,9 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
             .then(data => { if (!cancelled) setModels(data) })
             .catch(() => { /* models fetch failed — fallback list used */ })
             .finally(() => { if (!cancelled) setIsLoadingModels(false) })
+        getCliAuthStatus()
+            .then(data => { if (!cancelled) setCliAuth(data) })
+            .catch(() => { /* auth status fetch failed — buttons hidden */ })
         return () => { cancelled = true }
     }, [])
 
@@ -172,7 +177,7 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
 
             {/* Content - shifted right to avoid model badge overlap */}
             <div className="flex-1 min-w-0 ml-6">
-                {/* Adapter Type Selector */}
+                {/* Adapter Type Selector + Auth Status */}
                 <div className="flex items-center gap-2 mb-2">
                     <span className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Type</span>
                     {isEditable ? (
@@ -194,6 +199,25 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                             {localAgent.adapter_type === 'codex' ? 'Codex' : 'Claude Code'}
                         </span>
                     )}
+                    {cliAuth && (() => {
+                        const adapterKey = (localAgent.adapter_type || 'claudecode') as keyof CliAuthStatus
+                        const status = cliAuth[adapterKey]
+                        if (!status) return null
+                        const isConnected = status.authenticated && status.method !== 'platform'
+                        return isConnected ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium text-green-700 bg-green-50 border border-green-200 rounded-md">
+                                <span className="w-1.5 h-1.5 bg-green-500 rounded-full" />
+                                Connected
+                            </span>
+                        ) : (
+                            <button
+                                onClick={() => window.open('/settings/api-keys', '_blank')}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-md hover:bg-amber-100 transition-colors"
+                            >
+                                Connect {adapterKey === 'codex' ? 'Codex' : 'Claude Code'}
+                            </button>
+                        )
+                    })()}
                 </div>
 
                 {/* Name & Status Row */}

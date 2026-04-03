@@ -93,6 +93,7 @@ describe('SandboxRegistry', () => {
                 lastActivityAt: new Date(),
                 wasResumed: false,
                 activeExecutionCount: 0,
+                agentSessions: new Map(),
             });
 
             await registry.getByUserId('user-1');

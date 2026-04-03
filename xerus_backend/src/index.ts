@@ -18,10 +18,11 @@ import { toolsRouter } from './domains/tools/routes';
 import executeRoutes, { setExecutionService } from './domains/execution/execution.routes';
 import { internalMcpRouter } from './domains/execution/internal-mcp';
 import { setAgentFilesDeps } from './domains/execution/agent-files.routes';
+import { setConversationRoutesDeps } from './domains/execution/conversations/conversation.routes';
 import { webhookReceiverRouter } from './domains/triggers';
 import { ExecutionService } from './domains/execution/execution.service';
 import { query } from './database/connection';
-import { SDKService } from './domains/execution/sdk/sdk.service';
+import { PricingService } from './domains/execution/sdk/sdk.service';
 import { SandboxService } from './domains/execution/sandbox/sandbox.service';
 import type { SandboxProvider } from './domains/execution/sandbox/providers';
 import { ExecutionQueueService } from './domains/execution/queue/execution-queue.service';
@@ -159,7 +160,7 @@ async function startServer(): Promise<void> {
             },
         };
 
-        const sdkService = new SDKService(executionDb);
+        const sdkService = new PricingService(executionDb);
         await sdkService.loadPricing();
         const queueService = new ExecutionQueueService();
         queueService.startPeriodicCleanup();
@@ -223,6 +224,16 @@ async function startServer(): Promise<void> {
         const messageBridgeRepo = new MessageBridgeRepository(executionDb);
         const messageBridge = createMessageBridgeService({ repository: messageBridgeRepo });
 
+        // Wire SessionDispatcher: bridges inbox messaging -> execution sandbox sessions
+        messageBridge.setSessionDispatcher({
+            async sendToAgent(userId: string, agentSlug: string, message: string): Promise<boolean> {
+                const handle = sandboxService.getAgentHandle(userId, agentSlug);
+                if (!handle) return false;
+                await handle.sendInput(message + '\n');
+                return true;
+            },
+        });
+
         const activeStreamEmitter = new ActiveStreamEmitter();
         const hitlHandler = new HITLHandler({
             pauseRepository: new HITLPauseRepositoryImpl(),
@@ -242,10 +253,11 @@ async function startServer(): Promise<void> {
         });
         setExecutionService(executionService);
         setAgentFilesDeps({ sandboxService });
+        setConversationRoutesDeps({ sandboxService });
         setAgentRoutesDeps({ sandboxService });
         setAgentChannelsDeps({ sandboxService });
         setTaskRoutesDeps({ sandboxService });
-        setCompanyRoutesDeps({ sandboxService });
+        setCompanyRoutesDeps({ sandboxService, messageBridge });
         setOnboardingDeps({ sandboxService });
         setUserRoutesDeps({ sandboxService });
 

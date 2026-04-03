@@ -79,6 +79,7 @@ export function mapAgentToAssistant(agent: BackendAgent): Assistant {
     avatarUrl: agent.avatar_url || null,
     thinkingLevel: agent.thinking_level || 'medium',
     autonomyLevel: agent.autonomy_level || 'supervised',
+    adapter_type: agent.adapter_type,
   };
 }
 

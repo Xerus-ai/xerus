@@ -2,12 +2,8 @@
 // Tests the Git-based memory repository service
 // Uses real in-memory implementations (no mocks)
 
-import {
-    GitMemoryRepository,
-    GitMemoryError,
-    CommitLockError,
-    GitCommandError,
-} from '../git-memory.repository';
+import { GitMemoryRepository } from '../git-memory.repository';
+import { GitMemoryError, CommitLockError, GitCommandError } from '../errors';
 import {
     GIT_MEMORY_ROOT,
     GIT_MEMORY_CONFIG,
@@ -47,6 +43,12 @@ class InMemoryFileSystem implements GitMemoryFileSystem {
 
     async exists(path: string): Promise<boolean> {
         return this.files.has(path) || this.directories.has(path);
+    }
+
+    async tryExclusiveCreate(path: string, content: string): Promise<boolean> {
+        if (this.files.has(path)) return false;
+        this.files.set(path, content);
+        return true;
     }
 
     // Test helpers

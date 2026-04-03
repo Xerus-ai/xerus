@@ -16,6 +16,7 @@ import {
     updateSessionRecord,
     buildSummary,
     resolveConversation,
+    resolveAdapterType,
     LOG_PREFIX,
 } from './execution-pipeline';
 import { requireAgent } from './pipeline-guards';
@@ -103,6 +104,7 @@ export class ExecutionService {
             status: 'pending',
             streamOffset: 0,
             conversationId: request.conversationId ?? null,
+            sdkSessionId: null,
             responseText: '',
             responseChunks: [],
             creditsUsed: 0,
@@ -176,32 +178,35 @@ export class ExecutionService {
             // Build runner environment with the resolved API key + skill secrets + CLI BYOK keys
             const runnerEnvVars = buildSDKEnvironment(resolvedKey.apiKey, skillSecrets, userCliKeys);
 
-            console.log(`${tag} ${T()} Getting/creating runner`);
+            // Resolve conversation first to get sdk_session_id for --resume
+            await reserveCredits(resolved, ctx);
+            console.log(`${tag} ${T()} Credits reserved`);
+
+            const conversation = await resolveConversation(resolved, ctx);
+            ctx.conversationId = conversation.id;
+            ctx.sdkSessionId = conversation.sdkSessionId;
+            console.log(`${tag} ${T()} Conversation resolved (sdkSessionId=${ctx.sdkSessionId ? 'yes' : 'none'})`);
+
+            // Resolve adapter_type from agent's config.json on sandbox filesystem
+            const agentForTracking = requireAgent(ctx);
+            const adapterType = await resolveAdapterType(resolved, ctx.sandboxId, agentForTracking.slug);
+            agentForTracking.adapter_type = adapterType;
+            console.log(`${tag} ${T()} Adapter type resolved: ${adapterType}`);
+
+            // Create per-agent session (direct CLI, no cli-executor middleman)
+            console.log(`${tag} ${T()} Getting/creating agent session for ${agentForTracking.slug}`);
             const handle = await resolved.sandboxService.getOrCreateRunner(
                 request.userId, ctx.sandboxId, runnerEnvVars,
+                agentForTracking.slug, adapterType,
             );
             ctx.sessionHandle = handle;
-            console.log(`${tag} ${T()} Runner ready, sessionId=${handle.sessionId}`);
+            console.log(`${tag} ${T()} Agent session ready, sessionId=${handle.sessionId}`);
 
-            // Track active execution so cancelExecution() can send interrupt
-            const agentForTracking = requireAgent(ctx);
             this.activeExecutions.set(executionId, {
                 handle,
                 agentSlug: agentForTracking.slug,
                 stream,
             });
-
-            // Runner reads agents/{slug}/config.json locally (microseconds).
-            // No scaffold check or hydrate needed — workspace-health syncs agent
-            // files on sandbox create/resume, and syncConfigToWorkspace keeps
-            // config.json updated on agent edits. Meta SSE is deferred to
-            // session_started event (runner emits the real model).
-
-            await reserveCredits(resolved, ctx);
-            console.log(`${tag} ${T()} Credits reserved`);
-
-            ctx.conversationId = await resolveConversation(resolved, ctx);
-            console.log(`${tag} ${T()} Conversation resolved`);
             stream.send('progress', { phase: 'executing', message: 'Starting agent', percent: 20 });
             ctx.sessionId = await createSessionRecord(resolved, ctx);
             console.log(`${tag} ${T()} Session record created`);

@@ -10,6 +10,7 @@ import { authenticateFirebaseToken } from '../../middleware/auth';
 import { query } from '../../database/connection';
 import { SANDBOX_CONFIG } from '../execution';
 import type { SandboxService, DaytonaProvider } from '../execution';
+import type { MessageBridgeService } from '../inbox/messaging/message-bridge.service';
 import { shellEscape, shellEscapePath } from '../../utils/shell-safety';
 import { slugify, sanitizeSlug } from '../../shared/slugify';
 import { strictRateLimit } from '../../middleware/rate-limit';
@@ -24,7 +25,7 @@ const auth = authenticateFirebaseToken;
 // Dependency Injection (set from index.ts at startup)
 // -------------------------------------------------------------------------
 
-interface CompanyRoutesDeps { sandboxService: SandboxService }
+interface CompanyRoutesDeps { sandboxService: SandboxService; messageBridge?: MessageBridgeService | null }
 let companyDeps: CompanyRoutesDeps | null = null;
 export function setCompanyRoutesDeps(d: CompanyRoutesDeps): void { companyDeps = d; }
 
@@ -344,6 +345,17 @@ router.post('/channels/:channelId/messages', auth, async (req: AuthenticatedRequ
         syncMessageToSandbox(userId, channelTag, messageEntry).catch(err =>
             console.warn(`[CompanyRoutes] Sandbox sync failed for message: ${err instanceof Error ? err.message : String(err)}`),
         );
+
+        // Forward message to running agent's CLI stdin (best-effort, non-blocking)
+        if (companyDeps?.messageBridge) {
+            companyDeps.messageBridge.dispatchInbound({
+                user_id: userId,
+                channel_id: channelId,
+                content: content.trim(),
+            }).catch(err =>
+                console.warn(`[CompanyRoutes] Runner dispatch failed: ${err instanceof Error ? err.message : String(err)}`),
+            );
+        }
 
         sendResponse(res, 201, {
             message: {

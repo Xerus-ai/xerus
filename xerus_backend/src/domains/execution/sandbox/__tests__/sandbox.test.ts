@@ -311,6 +311,7 @@ describe('SandboxSession type', () => {
             lastActivityAt: new Date(),
             wasResumed: false,
             activeExecutionCount: 0,
+            agentSessions: new Map(),
         };
 
         expect(session.sandboxId).toBe('sandbox-123');

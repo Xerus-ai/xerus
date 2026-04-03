@@ -93,6 +93,9 @@ export interface AgentKnowledgeBase {
     created_at: Date;
 }
 
+// Adapter type for CLI execution (claudecode or codex)
+export type AdapterType = 'claudecode' | 'codex';
+
 // DTOs for CRUD operations
 export interface CreateAgentDTO {
     name: string;
@@ -106,6 +109,7 @@ export interface CreateAgentDTO {
     public_metadata?: PublicMetadata | null;
     thinking_level?: ThinkingLevel; // Default: 'medium'
     autonomy_level?: AutonomyLevel; // Default: 'supervised'
+    adapter_type?: AdapterType; // Default: 'claudecode'
 }
 
 export interface UpdateAgentDTO {
@@ -121,6 +125,7 @@ export interface UpdateAgentDTO {
     is_default?: boolean;
     thinking_level?: ThinkingLevel;
     autonomy_level?: AutonomyLevel;
+    adapter_type?: AdapterType;
 }
 
 export interface CloneAgentDTO {

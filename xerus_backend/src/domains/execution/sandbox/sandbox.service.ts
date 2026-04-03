@@ -156,6 +156,7 @@ export class SandboxService {
             lastActivityAt: new Date(),
             wasResumed: false,
             activeExecutionCount: 0,
+            agentSessions: new Map(),
             setupReport,
         };
 
@@ -288,16 +289,30 @@ export class SandboxService {
         this.registry.invalidate(userId);
     }
 
+    /**
+     * Look up an existing agent session handle by slug.
+     * Returns null if no session exists for the agent (does NOT create one).
+     * Used by inbound message routing to forward human messages to a running agent.
+     */
+    getAgentHandle(userId: string, agentSlug: string): SessionHandle | null {
+        const session = this.sessions.get(userId);
+        if (!session || session.status !== 'running') return null;
+        const entry = session.agentSessions.get(agentSlug);
+        return entry?.handle ?? null;
+    }
+
     async getOrCreateRunner(
         userId: string,
         sandboxId: string,
         envVars: Record<string, string>,
+        agentSlug?: string,
+        adapterType?: import('./providers').AgentSessionOptions['adapterType'],
     ): Promise<SessionHandle> {
         const session = this.sessions.get(userId);
         if (!session || session.status !== 'running') {
             throw new Error('No running sandbox for user');
         }
-        return getOrCreateRunnerSession(session, sandboxId, envVars, this.getDaytonaProvider());
+        return getOrCreateRunnerSession(session, sandboxId, envVars, this.getDaytonaProvider(), agentSlug, adapterType);
     }
 
     /**
@@ -486,6 +501,7 @@ export class SandboxService {
             lastActivityAt: new Date(),
             wasResumed: true,
             activeExecutionCount: 0,
+            agentSessions: new Map(),
         };
 
         this.sessions.set(userId, session);

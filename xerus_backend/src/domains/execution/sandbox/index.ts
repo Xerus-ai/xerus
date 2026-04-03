@@ -49,8 +49,11 @@ export { verifyWorkspaceHealth, ensureWorkspaceIntegrity } from './workspace-hea
 export type { HealthCheckResult } from './workspace-health';
 
 // Session transport exports (for bidirectional communication)
-export type { SessionHandle } from './providers';
-export { PersistentLogBuffer, sendCommand, createRunnerSession, streamEvents } from './providers';
+export type { SessionHandle, AgentSessionOptions } from './providers';
+export { PersistentLogBuffer, sendCommand, sendMessage, createAgentSession, createRunnerSession, streamEvents } from './providers';
+
+// Session dispatcher (bridges MessageBridge -> SandboxService agent sessions)
+export { createSessionDispatcher } from './session-dispatcher';
 
 // Snapshot helpers
 export { createWorkspaceTar, restoreWorkspaceTar } from './snapshot-helpers';

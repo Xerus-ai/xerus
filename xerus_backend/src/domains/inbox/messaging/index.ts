@@ -24,6 +24,7 @@ export {
     NoChannelLeadError,
     createMessageBridgeService,
 } from './message-bridge.service';
+export type { RunnerSessionHandle } from './message-bridge.service';
 export {
     MessageBridgeRepository,
     MessageBridgeDatabase,
@@ -40,6 +41,7 @@ export type {
     InboundMessage,
     RunnerCommand,
     QueryMessagesOptions,
+    SessionDispatcher,
 } from './message-bridge.types';
 export {
     SENDER_TYPES,

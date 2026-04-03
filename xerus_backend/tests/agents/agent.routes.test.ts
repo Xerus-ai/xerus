@@ -42,7 +42,6 @@ Successfully test all agent API endpoints.
       name: 'Gmail',
       description: 'Email',
       auth_type: 'oauth',
-      img_src: null,
       categories: ['email'],
       featured_weight: 1,
     });

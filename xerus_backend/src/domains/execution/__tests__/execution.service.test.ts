@@ -4,7 +4,7 @@
 
 import { EventEmitter } from 'events';
 import { ExecutionService, ExecutionServiceDeps, AgentRow, ExecutionDatabase } from '../execution.service';
-import { SDKService } from '../sdk/sdk.service';
+import { PricingService } from '../sdk/sdk.service';
 import { SandboxService } from '../sandbox/sandbox.service';
 import {
     SandboxProvider,
@@ -35,6 +35,7 @@ function createTestAgent(overrides?: Partial<AgentRow>): AgentRow {
         ai_model: 'anthropic/claude-sonnet-4',
         thinking_level: 'medium' as ThinkingLevel,
         autonomy_level: 'supervised' as AutonomyLevel,
+        adapter_type: 'claudecode',
         primary_use_case: 'testing',
         workspace_id: 'ws-123',
         user_id: 'user-123',
@@ -120,8 +121,8 @@ function createTestSandboxDb(): { query: <T>(sql: string, params?: unknown[]) =>
     };
 }
 
-// SDKService is now credit-only (estimateCredits, calculateActualCredits).
-// Execution flows through the v2 pipeline, not through SDKService.executeAgent().
+// PricingService is now credit-only (estimateCredits, calculateActualCredits).
+// Execution flows through the v2 pipeline, not through PricingService.executeAgent().
 
 function createTestSdkDb() {
     return {
@@ -169,7 +170,7 @@ function createTestStream(): TestStreamState {
 // v2 deps: sdkService, sandboxService, queueService, creditTracker, db, hitlHandler, activeStreamEmitter
 function createTestDeps(overrides?: Partial<ExecutionServiceDeps>): ExecutionServiceDeps {
     return {
-        sdkService: new SDKService(createTestSdkDb()),
+        sdkService: new PricingService(createTestSdkDb()),
         sandboxService: new SandboxService(createTestSandboxDb(), new TestSandboxProvider()),
         queueService: new ExecutionQueueService(),
         creditTracker: new CreditTracker(createTestCreditTrackerDeps()),

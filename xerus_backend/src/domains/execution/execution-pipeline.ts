@@ -11,7 +11,8 @@
 // See: docs/planning/execution/EXECUTION_ARCHITECTURE_v2.md Section 10
 
 import { randomUUID } from 'crypto';
-import { ExecutionSummary, STREAM_EVENT_TYPES, StreamEventType } from './types';
+import { BillingType, ExecutionSummary, STREAM_EVENT_TYPES, StreamEventType, type AdapterType } from './types';
+import { SANDBOX_CONFIG } from './sandbox/sandbox.config';
 import { DEFAULT_MODEL } from '../agents/types';
 import { query } from '../../database/connection';
 import type { TriggerType } from './queue/execution-lane.types';
@@ -19,7 +20,7 @@ import {
     SDKExecutionError,
 } from './errors';
 import { AgentAlreadyRunningError, QueueFullError } from './queue/execution-queue.errors';
-import { sendCommand, streamEvents } from './sandbox';
+import { sendCommand, sendMessage, streamEvents } from './sandbox';
 import type { SessionHandle } from './sandbox';
 import { routeEventToBackend } from './runner-event-router';
 
@@ -122,6 +123,7 @@ export async function loadAgent(
     // The runner reads config.json locally and reports the real model via session_started event,
     // which updates ctx.agent.ai_model in handleSessionStarted.
     // Defaults here are overridden by the runner — they are NOT fabricated stubs.
+    // adapter_type defaults to 'claudecode' — resolved from config.json by resolveAdapterType().
     return {
         id: entry.id,
         name: entry.slug,
@@ -130,10 +132,32 @@ export async function loadAgent(
         ai_model: DEFAULT_MODEL,
         thinking_level: 'medium',
         autonomy_level: 'supervised',
+        adapter_type: 'claudecode',
         primary_use_case: '',
         workspace_id: workspaceId,
         user_id: entry.user_id || userId,
     };
+}
+
+/**
+ * Read agent's adapter_type from config.json on the sandbox filesystem.
+ * Falls back to 'claudecode' if config is missing or unreadable.
+ * Must be called after sandbox is available (sandboxId resolved).
+ */
+export async function resolveAdapterType(
+    deps: ResolvedExecutionDeps,
+    sandboxId: string,
+    agentSlug: string,
+): Promise<AdapterType> {
+    try {
+        const configPath = `${SANDBOX_CONFIG.workspacePath}/agents/${agentSlug}/config.json`;
+        const raw = await deps.sandboxService.getDaytonaProvider().readFile(sandboxId, configPath);
+        const config = JSON.parse(raw) as { adapter_type?: string };
+        if (config.adapter_type === 'codex') return 'codex';
+    } catch {
+        // Config not found or unreadable — use default
+    }
+    return 'claudecode';
 }
 
 export async function acquireExecutionLane(
@@ -250,16 +274,13 @@ export async function sendExecuteCommand(
     handle: SessionHandle,
     ctx: PipelineContext,
 ): Promise<void> {
-    const agent = requireAgent(ctx);
-
-    // Runner reads model, tools, and all config from local config.json (microseconds).
-    // No backend override needed — filesystem is the source of truth.
-    await sendCommand(handle, {
-        type: 'execute',
-        agent_slug: agent.slug,
-        content: ctx.request.task,
-        context: ctx.request.context,
-    });
+    // CLI runs directly (no cli-executor middleman).
+    // Send the user's message as plain text to the CLI's stdin.
+    // Claude/Codex in interactive mode read from stdin.
+    const prompt = ctx.request.context
+        ? `${ctx.request.task}\n\nContext:\n${ctx.request.context}`
+        : ctx.request.task;
+    await sendMessage(handle, prompt);
 }
 
 export async function streamRunnerEvents(
@@ -377,9 +398,9 @@ export async function createSessionRecord(
     const sessionId = randomUUID();
 
     await deps.db.query(
-        `INSERT INTO execution_sessions (id, workspace_id, agent_slug, sandbox_id, status, trigger_type, conversation_id, user_prompt, started_at, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())`,
-        [sessionId, agent.workspace_id, agent.slug, ctx.sandboxId, 'running', ctx.triggerType, ctx.conversationId, ctx.request.task],
+        `INSERT INTO execution_sessions (id, workspace_id, agent_slug, sandbox_id, status, trigger_type, conversation_id, user_prompt, key_source, started_at, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())`,
+        [sessionId, agent.workspace_id, agent.slug, ctx.sandboxId, 'running', ctx.triggerType, ctx.conversationId, ctx.request.task, ctx.keySource],
     );
 
     deps.creditTracker.setSessionId(sessionId);
@@ -497,6 +518,7 @@ export function buildSummary(ctx: PipelineContext): ExecutionSummary {
         durationMs: Date.now() - ctx.startedAt,
         toolCalls: ctx.toolCallCount,
         agentsUsed: Math.max(ctx.agentSessionCount, 1),
+        billingType: ctx.keySource as BillingType | undefined,
     };
 }
 
@@ -531,20 +553,28 @@ async function incrementMessageCount(conversationId: string): Promise<void> {
 // If conversationId is provided, verify it exists. Otherwise create one.
 // -----------------------------------------------------------------------------
 
+export interface ResolvedConversation {
+    id: string;
+    sdkSessionId: string | null;
+}
+
 export async function resolveConversation(
     deps: ResolvedExecutionDeps,
     ctx: PipelineContext,
-): Promise<string> {
+): Promise<ResolvedConversation> {
     const { userId, agentSlug, conversationId, task } = ctx.request;
 
     if (conversationId) {
-        // Verify the conversation exists and belongs to this user
-        const result = await deps.db.query<{ id: string }>(
-            `SELECT id FROM conversations WHERE id = $1 AND user_id = $2`,
+        // Verify the conversation exists and fetch sdk_session_id for resume
+        const result = await deps.db.query<{ id: string; sdk_session_id: string | null }>(
+            `SELECT id, sdk_session_id FROM conversations WHERE id = $1 AND user_id = $2`,
             [conversationId, userId],
         );
         if (result.rows.length > 0) {
-            return conversationId;
+            return {
+                id: conversationId,
+                sdkSessionId: result.rows[0].sdk_session_id,
+            };
         }
         throw new SDKExecutionError(`Conversation ${conversationId} not found or access denied`);
     }
@@ -552,7 +582,7 @@ export async function resolveConversation(
     // Create new conversation with title from first ~60 chars of task
     const title = task.length > 60 ? task.slice(0, 57) + '...' : task;
     const conv = await createConversation(userId, agentSlug, title);
-    return conv.id;
+    return { id: conv.id, sdkSessionId: null };
 }
 
 // -----------------------------------------------------------------------------

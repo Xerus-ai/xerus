@@ -1,4 +1,4 @@
-// Claude Agent SDK Service
+// Pricing Service (formerly SDKService)
 // Credit estimation utilities for the execution pipeline.
 // Pricing loaded from model_registry table (not hardcoded).
 // See docs/planning/execution/EXECUTION_ARCHITECTURE_v2.md
@@ -16,15 +16,15 @@ interface ModelPricing {
     output: number; // cents per 1K output tokens
 }
 
-interface SDKDatabase {
+interface PricingDatabase {
     query<T>(sql: string, params?: unknown[]): Promise<{ rows: T[] }>;
 }
 
-export class SDKService {
-    private db: SDKDatabase;
+export class PricingService {
+    private db: PricingDatabase;
     private pricingCache: Map<string, ModelPricing> | null = null;
 
-    constructor(db: SDKDatabase) {
+    constructor(db: PricingDatabase) {
         this.db = db;
     }
 
@@ -54,12 +54,12 @@ export class SDKService {
             }
         }
         this.pricingCache = cache;
-        console.log(`[SDKService] Loaded pricing for ${cache.size} models from model_registry`);
+        console.log(`[PricingService] Loaded pricing for ${cache.size} models from model_registry`);
     }
 
     getModelPricing(model: string): ModelPricing {
         if (!this.pricingCache) {
-            throw new Error('SDKService pricing not loaded. Call loadPricing() at startup.');
+            throw new Error('PricingService pricing not loaded. Call loadPricing() at startup.');
         }
         const pricing = this.pricingCache.get(model);
         if (!pricing) {
@@ -94,7 +94,7 @@ export class SDKService {
 
     /** Conservative estimate using Opus-tier pricing (worst-case for Claude SDK agents). */
     estimateCreditsConservative(estimatedInputTokens: number): CreditEstimate {
-        const pricing = SDKService.OPUS_CEILING;
+        const pricing = PricingService.OPUS_CEILING;
         const estimatedOutputTokens = estimatedInputTokens * 2;
         const inputCredits = (estimatedInputTokens / 1000) * pricing.input;
         const outputCredits = (estimatedOutputTokens / 1000) * pricing.output;

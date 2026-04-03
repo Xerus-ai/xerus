@@ -15,7 +15,6 @@ import { SANDBOX_CONFIG } from './sandbox.config';
 import type { DaytonaProvider } from './providers/daytona.provider';
 
 const BUNDLE_DIR = path.join(__dirname, '..', '..', '..', '..', 'dist', 'runner-bundle');
-const RUNNER_BUNDLE_PATH = path.join(BUNDLE_DIR, 'cli-executor.js');
 const MINIMAL_MCP_BUNDLE_PATH = path.join(BUNDLE_DIR, 'minimal-mcp-server.js');
 
 // Snapshot names where runner deps are pre-installed via Dockerfile
@@ -53,18 +52,10 @@ export async function installRunnerBundle(
     const snapshot = SANDBOX_CONFIG.snapshot;
     const depsPreinstalled = PREINSTALLED_SNAPSHOTS.has(snapshot);
 
-    // Read the pre-built bundles from disk
-    if (!fs.existsSync(RUNNER_BUNDLE_PATH)) {
-        throw new Error(
-            `Runner bundle not found at ${RUNNER_BUNDLE_PATH}. Run 'npm run build:runner' first.`,
-        );
-    }
-    const bundleContent = fs.readFileSync(RUNNER_BUNDLE_PATH, 'utf-8');
-
-    // Always upload bundle (overwrite any stale version from snapshot)
+    // CLI executors (claude, codex) run directly — no bundled runner needed.
+    // Only the minimal MCP server bundle is uploaded for backend-coupled tools.
     const sandboxFs = await provider.createFileSystem(sandboxId);
     await sandboxFs.mkdir(runnerDir);
-    await sandboxFs.writeFile(SANDBOX_CONFIG.runnerScriptPath, bundleContent);
 
     // Upload minimal MCP server bundle (9 backend-coupled tools)
     if (fs.existsSync(MINIMAL_MCP_BUNDLE_PATH)) {

@@ -23,6 +23,12 @@ export interface SandboxRegistryEntry {
     sandbox_novnc_url: string | null;
 }
 
+// Per-agent session handle with its env vars snapshot
+export interface AgentSessionEntry {
+    handle: SessionHandle;
+    envVars: Record<string, string>;
+}
+
 // In-memory sandbox session
 export interface SandboxSession {
     sandboxId: string;
@@ -32,7 +38,9 @@ export interface SandboxSession {
     lastActivityAt: Date;
     wasResumed: boolean;
     activeExecutionCount: number;
-    // Persistent runner handle (kept alive between executions)
+    // Per-agent session handles (keyed by agent slug)
+    agentSessions: Map<string, AgentSessionEntry>;
+    // Legacy: single runner handle for backward compat during migration
     runnerHandle?: SessionHandle;
     // Env vars baked into the runner process at creation time.
     // Used to detect stale keys on reuse (M12).

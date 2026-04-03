@@ -1,5 +1,5 @@
-// SDK Service Tests
-// Unit tests for SDK configuration, types, credit calculation
+// Pricing Service Tests (formerly SDK Service Tests)
+// Unit tests for pricing configuration, types, credit calculation
 // Target: >80% coverage for sdk.service.ts
 
 import {
@@ -21,7 +21,7 @@ import {
     ExecuteAgentOptions,
     SDKStreamEvent,
 } from '../sdk.types';
-import { SDKService } from '../sdk.service';
+import { PricingService } from '../sdk.service';
 import { SDKExecutionError } from '../../errors';
 
 // Test DB that returns pricing data matching model_registry
@@ -45,9 +45,9 @@ const STANDARD_PRICING = [
     { id: 'deepseek/deepseek-chat-v3', pricing_input_cents: '270', pricing_output_cents: '1100' },
 ];
 
-async function createLoadedService(pricing = STANDARD_PRICING): Promise<SDKService> {
+async function createLoadedService(pricing = STANDARD_PRICING): Promise<PricingService> {
     const db = createTestDb(pricing);
-    const service = new SDKService(db);
+    const service = new PricingService(db);
     await service.loadPricing();
     return service;
 }
@@ -291,11 +291,11 @@ describe('Type Guards', () => {
 });
 
 // -----------------------------------------------------------------------------
-// SDKService Unit Tests
+// PricingService Unit Tests
 // -----------------------------------------------------------------------------
 
-describe('SDKService', () => {
-    let service: SDKService;
+describe('PricingService', () => {
+    let service: PricingService;
 
     beforeEach(async () => {
         service = await createLoadedService();
@@ -310,9 +310,9 @@ describe('SDKService', () => {
 
         it('throws if pricing not loaded', () => {
             const db = createTestDb([]);
-            const unloaded = new SDKService(db);
+            const unloaded = new PricingService(db);
             expect(() => unloaded.getModelPricing('anthropic/claude-sonnet-4')).toThrow(
-                'SDKService pricing not loaded'
+                'PricingService pricing not loaded'
             );
         });
 

@@ -9,7 +9,8 @@ import { withRetry } from '../sandbox.retry';
 import { SandboxNotFoundError, SandboxPreviewError, UnknownSandboxStateError } from '../../errors';
 import { SandboxState } from '../../types';
 import { RunnerConfig, RunnerEvent } from '../../runner/runner.types';
-import { runAgentInSandbox, sendCommand, streamEvents, createRunnerSession } from './daytona-runner';
+import { runAgentInSandbox, sendCommand, sendMessage, streamEvents, createAgentSession } from './daytona-runner';
+import type { AgentSessionOptions } from './daytona-runner';
 import { createDaytonaFileSystem } from './daytona-filesystem';
 import type { SandboxFileSystem } from '../../workspace/workspace.manager';
 
@@ -382,9 +383,7 @@ cat /tmp/chromium.log 2>/dev/null | head -20`;
         const { sandboxId, config, prompt, openRouterApiKey, abortSignal } = options;
         const sandbox = await this.getSandboxInstance(sandboxId);
 
-        const envVars: Record<string, string> = {
-            XERUS_RUNNER_CONFIG: JSON.stringify(config),
-        };
+        const envVars: Record<string, string> = {};
 
         if (openRouterApiKey) {
             envVars.ANTHROPIC_BASE_URL = 'https://openrouter.ai/api';
@@ -392,10 +391,16 @@ cat /tmp/chromium.log 2>/dev/null | head -20`;
             envVars.ANTHROPIC_API_KEY = '';
         }
 
-        const handle = await createRunnerSession(sandbox, envVars);
+        const agentOpts: AgentSessionOptions = {
+            agentSlug: config.agentSlug,
+            adapterType: 'claudecode',
+            model: config.model,
+        };
 
-        // Send initial message
-        await sendCommand(handle, { type: 'message', content: prompt });
+        const handle = await createAgentSession(sandbox, envVars, agentOpts);
+
+        // Send initial prompt as plain text to CLI stdin
+        await sendMessage(handle, prompt);
 
         return {
             events: streamEvents(handle, abortSignal),

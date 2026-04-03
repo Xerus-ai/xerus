@@ -4,14 +4,14 @@
 import {
     RunAgentInSandboxOptions,
     SessionHandle,
+    AgentSessionOptions,
     PersistentLogBuffer,
-    createRunnerSession,
+    createAgentSession,
     sendCommand,
     streamEvents,
     runAgentInSandbox,
 } from '../daytona-runner';
-import { RunnerEvent, RUNNER_ENV, AgentOutputEvent } from '../../../runner/runner.types';
-import { SANDBOX_CONFIG } from '../../sandbox.config';
+import { RunnerEvent, AgentOutputEvent } from '../../../runner/runner.types';
 
 // Build a SessionHandle with a real PersistentLogBuffer.
 // streamLogs callback feeds the logBuffer via start().
@@ -28,8 +28,9 @@ function buildTestHandle(opts: {
         await new Promise<void>(() => {}); // keep buffer open
     });
     return {
-        sessionId: 'test',
+        sessionId: 'agent-test',
         commandId: 'cmd-1',
+        agentSlug: 'test',
         sendInput: opts.sendInput || (async () => {}),
         streamLogs: streamLogsFn,
         logBuffer,
@@ -96,16 +97,22 @@ function buildFakeSandbox(overrides?: {
     } as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
-describe('createRunnerSession', () => {
+const defaultAgentOpts: AgentSessionOptions = {
+    agentSlug: 'test-agent',
+    adapterType: 'claudecode',
+};
+
+describe('createAgentSession', () => {
     it('creates a session and returns a handle with sessionId and commandId', async () => {
         const sandbox = buildFakeSandbox({
             executeSessionCommandResult: { cmdId: 'cmd-abc' },
         });
 
-        const handle = await createRunnerSession(sandbox, { KEY: 'value' });
+        const handle = await createAgentSession(sandbox, { KEY: 'value' }, defaultAgentOpts);
 
-        expect(handle.sessionId).toBe('cli-executor');
+        expect(handle.sessionId).toBe('agent-test-agent');
         expect(handle.commandId).toBe('cmd-abc');
+        expect(handle.agentSlug).toBe('test-agent');
         expect(typeof handle.sendInput).toBe('function');
         expect(typeof handle.streamLogs).toBe('function');
     });
@@ -117,7 +124,7 @@ describe('createRunnerSession', () => {
         });
         sandbox.process.deleteSession = async () => { deleteSessionCalled = true; };
 
-        const handle = await createRunnerSession(sandbox, {});
+        const handle = await createAgentSession(sandbox, {}, defaultAgentOpts);
         expect(deleteSessionCalled).toBe(true);
         expect(handle.commandId).toBe('cmd-fresh');
     });
@@ -128,7 +135,7 @@ describe('createRunnerSession', () => {
         });
         sandbox.process.deleteSession = async () => { throw new Error('Session not found'); };
 
-        const handle = await createRunnerSession(sandbox, {});
+        const handle = await createAgentSession(sandbox, {}, defaultAgentOpts);
         expect(handle.commandId).toBe('cmd-no-stale');
     });
 
@@ -137,7 +144,7 @@ describe('createRunnerSession', () => {
             createSessionError: new Error('Session creation failed'),
         });
 
-        await expect(createRunnerSession(sandbox, {})).rejects.toThrow('Session creation failed');
+        await expect(createAgentSession(sandbox, {}, defaultAgentOpts)).rejects.toThrow('Session creation failed');
     });
 
     it('throws when executeSessionCommand returns no cmdId', async () => {
@@ -145,8 +152,8 @@ describe('createRunnerSession', () => {
             executeSessionCommandResult: { cmdId: '' },
         });
 
-        await expect(createRunnerSession(sandbox, {})).rejects.toThrow(
-            'Session command returned no command ID',
+        await expect(createAgentSession(sandbox, {}, defaultAgentOpts)).rejects.toThrow(
+            'returned no command ID',
         );
     });
 
@@ -155,7 +162,7 @@ describe('createRunnerSession', () => {
             executeSessionCommandError: new Error('Command failed'),
         });
 
-        await expect(createRunnerSession(sandbox, {})).rejects.toThrow('Command failed');
+        await expect(createAgentSession(sandbox, {}, defaultAgentOpts)).rejects.toThrow('Command failed');
     });
 
     it('passes environment variables as shell exports in the command', async () => {
@@ -169,14 +176,17 @@ describe('createRunnerSession', () => {
             return { cmdId: 'cmd-env' };
         };
 
-        await createRunnerSession(sandbox, {
+        await createAgentSession(sandbox, {
             MY_VAR: 'hello world',
             ANOTHER: 'test',
-        });
+        }, defaultAgentOpts);
 
         expect(capturedCommand).toContain("export MY_VAR='hello world'");
         expect(capturedCommand).toContain("export ANOTHER='test'");
-        expect(capturedCommand).toContain(`exec node ${SANDBOX_CONFIG.runnerDir}/cli-executor.js`);
+        // Should spawn claude directly (no cli-executor)
+        expect(capturedCommand).toContain('claude');
+        expect(capturedCommand).toContain('--output-format');
+        expect(capturedCommand).toContain('stream-json');
     });
 
     it('escapes single quotes in environment values', async () => {
@@ -190,9 +200,31 @@ describe('createRunnerSession', () => {
             return { cmdId: 'cmd-escape' };
         };
 
-        await createRunnerSession(sandbox, { VAL: "it's a test" });
+        await createAgentSession(sandbox, { VAL: "it's a test" }, defaultAgentOpts);
 
         expect(capturedCommand).toContain("export VAL='it'\\''s a test'");
+    });
+
+    it('creates codex session with correct adapter', async () => {
+        let capturedCommand = '';
+        const sandbox = buildFakeSandbox();
+        sandbox.process.executeSessionCommand = async (
+            _sessionId: string,
+            req: { command: string },
+        ) => {
+            capturedCommand = req.command;
+            return { cmdId: 'cmd-codex' };
+        };
+
+        const codexOpts: AgentSessionOptions = {
+            agentSlug: 'code-helper',
+            adapterType: 'codex',
+        };
+        const handle = await createAgentSession(sandbox, {}, codexOpts);
+
+        expect(handle.sessionId).toBe('agent-code-helper');
+        expect(capturedCommand).toContain('codex');
+        expect(capturedCommand).toContain('full-auto');
     });
 });
 
@@ -430,7 +462,7 @@ describe('runAgentInSandbox', () => {
         expect(collected[1].event).toBe('session_ended');
     });
 
-    it('sends initial message with prompt via stdin', async () => {
+    it('sends initial message as plain text to stdin', async () => {
         const captured: string[] = [];
         const sandbox = buildFakeSandbox({
             sendInputCapture: captured,
@@ -443,9 +475,8 @@ describe('runAgentInSandbox', () => {
         }
 
         expect(captured.length).toBeGreaterThanOrEqual(1);
-        const firstMsg = JSON.parse(captured[0].trim());
-        expect(firstMsg.type).toBe('message');
-        expect(firstMsg.content).toBe('What is 2+2?');
+        // Plain text message sent to CLI stdin (not JSON)
+        expect(captured[0].trim()).toBe('What is 2+2?');
     });
 
     it('passes OpenRouter API key as env vars', async () => {
@@ -511,16 +542,16 @@ describe('runAgentInSandbox', () => {
         expect((errorEvent as any).message).toContain('Sandbox not reachable');
     }, 30000);
 
-    it('passes runner config as XERUS_RUNNER_CONFIG env var', async () => {
-        let capturedCommand = '';
+    it('spawns CLI directly with agent slug in session name', async () => {
+        let capturedSessionId = '';
         const sandbox = buildFakeSandbox({
             logChunks: { stdout: [JSON.stringify({ event: 'session_started', agent: 'test', session_id: 's1' }) + '\n'] },
         });
+        sandbox.process.createSession = async (sessionId: string) => { capturedSessionId = sessionId; };
         sandbox.process.executeSessionCommand = async (
             _sessionId: string,
-            req: { command: string },
+            _req: { command: string },
         ) => {
-            capturedCommand = req.command;
             return { cmdId: 'cmd-config' };
         };
 
@@ -536,13 +567,12 @@ describe('runAgentInSandbox', () => {
 
         const options = buildOptions({ sandbox, config });
 
-        // capturedCommand is set during createRunnerSession, just consume first event
         for await (const _event of runAgentInSandbox(options)) {
             break;
         }
 
-        expect(capturedCommand).toContain(RUNNER_ENV.CONFIG);
-        expect(capturedCommand).toContain('my-agent');
+        // Session name follows agent-{slug} pattern
+        expect(capturedSessionId).toBe('agent-my-agent');
     });
 });
 

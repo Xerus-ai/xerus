@@ -249,12 +249,15 @@ export interface ExecutionErrorInfo {
     details?: Record<string, unknown>;
 }
 
+export type BillingType = 'byok' | 'platform';
+
 export interface ExecutionSummary {
     totalTokens: number;
     durationMs: number;
     toolCalls: number;
     agentsUsed: number;
     artifacts?: string[];
+    billingType?: BillingType;
 }
 
 export interface ExecutionResult {

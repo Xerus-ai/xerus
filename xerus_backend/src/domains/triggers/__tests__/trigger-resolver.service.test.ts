@@ -108,13 +108,13 @@ describe('TriggerResolver', () => {
         // For now, we only test the error case since no adapters are registered yet
 
         it('should throw TriggerProviderNotFoundError when adapter not registered', () => {
-            expect(() => resolver.getAdapter('zapier'))
+            expect(() => resolver.getAdapter('zapier' as TriggerProvider))
                 .toThrow(TriggerProviderNotFoundError);
         });
 
         it('should throw error with correct provider name', () => {
             try {
-                resolver.getAdapter('custom');
+                resolver.getAdapter('custom' as TriggerProvider);
                 fail('Expected TriggerProviderNotFoundError');
             } catch (error) {
                 expect(error).toBeInstanceOf(TriggerProviderNotFoundError);

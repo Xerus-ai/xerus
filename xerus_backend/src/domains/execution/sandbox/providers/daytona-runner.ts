@@ -1,16 +1,19 @@
-// Daytona Agent Runner - Sessions API Transport
-// Uses Daytona Sessions API (createSession + sendSessionCommandInput + getSessionCommandLogs)
-// Replaces codeInterpreter.runCode() for bidirectional communication
+// Daytona Agent Runner - Direct CLI Sessions
+// Each agent gets its own Daytona session running the CLI directly.
+// No cli-executor middleman: Backend -> Daytona Session "agent-{slug}" -> claude/codex (PERSISTENT)
+// Backend sends messages via sendSessionCommandInput() to CLI's stdin.
 // See: docs/planning/execution/EXECUTION_ARCHITECTURE_v2.md Section 4
 
 import { setMaxListeners } from 'events';
 import { Sandbox } from '@daytonaio/sdk';
 import { SANDBOX_CONFIG } from '../sandbox.config';
-import { RunnerConfig, RunnerEvent, ErrorEvent, AgentOutputEvent, RUNNER_ENV } from '../../runner/runner.types';
+import { RunnerEvent, ErrorEvent, AgentOutputEvent } from '../../runner/runner.types';
 import { shellEscape } from '../../../../utils/shell-safety';
 import { sleep } from '../sandbox.retry';
+import { ClaudeCodeAdapter } from '../../runner/cli-adapters/claudecode';
+import { CodexAdapter } from '../../runner/cli-adapters/codex';
+import type { AdapterType, AgentConfig } from '../../runner/cli-adapters/types';
 
-const SESSION_ID = 'cli-executor';
 const RECONNECT_MAX_ATTEMPTS = 3;
 const RECONNECT_BASE_DELAY_MS = 2000;
 
@@ -36,16 +39,31 @@ export interface RunAgentInSandboxOptions {
     abortSignal?: AbortSignal;
 }
 
+// Re-export RunnerConfig for external use
+import type { RunnerConfig } from '../../runner/runner-config.types';
+export type { RunnerConfig };
+
+export interface AgentSessionOptions {
+    agentSlug: string;
+    adapterType: AdapterType;
+    sessionId?: string;
+    model?: string;
+    autonomyLevel?: string;
+    maxBudgetUsd?: number;
+    allowedTools?: string[];
+    systemPrompt?: string;
+}
+
 export interface SessionHandle {
     sessionId: string;
     commandId: string;
+    agentSlug: string;
     sendInput(data: string): Promise<void>;
     streamLogs(
         onStdout: (chunk: string) => void,
         onStderr: (chunk: string) => void,
     ): Promise<void>;
     logBuffer: PersistentLogBuffer;
-    // Timestamp of last successful use (for health check grace period)
     lastUsedAt?: number;
 }
 
@@ -109,13 +127,8 @@ export class PersistentLogBuffer {
     }
 
     private onStdout(chunk: string): void {
-        // Daytona's getSessionCommandLogs delivers stdout in arbitrary chunks
-        // that may not align with newline boundaries. Buffer partial lines so
-        // large JSON payloads (e.g. tool_result with ls output) are not split
-        // across chunks and misrouted as agent_output.
         this.lineBuffer += chunk;
         const lines = this.lineBuffer.split('\n');
-        // Last element is either empty (chunk ended with \n) or incomplete
         this.lineBuffer = lines.pop() || '';
 
         for (const line of lines) {
@@ -123,7 +136,6 @@ export class PersistentLogBuffer {
             if (!trimmed) continue;
             this.pushLine(trimmed);
         }
-        // Force-flush if lineBuffer grows beyond limit (malformed stream without newlines)
         if (this.lineBuffer.length > MAX_LINE_BUFFER_SIZE) {
             const overflow = this.lineBuffer.trim();
             if (overflow) this.pushLine(overflow);
@@ -144,7 +156,6 @@ export class PersistentLogBuffer {
 
     private close(): void {
         if (this.closed) return;
-        // Flush any remaining partial line before closing
         const remaining = this.lineBuffer.trim();
         if (remaining) {
             this.pushLine(remaining);
@@ -161,10 +172,6 @@ export class PersistentLogBuffer {
         for (const fn of fns) fn();
     }
 
-    /**
-     * Trim the front half of the buffer when it exceeds MAX_BUFFER_SIZE.
-     * Adjusts trimOffset so logical positions remain stable.
-     */
     private trimIfNeeded(): void {
         if (this.buffer.length > MAX_BUFFER_SIZE) {
             const trimCount = Math.floor(this.buffer.length / 2);
@@ -173,37 +180,22 @@ export class PersistentLogBuffer {
         }
     }
 
-    /** Convert logical position to physical buffer index. */
     private toPhysical(logicalPos: number): number {
         return logicalPos - this.trimOffset;
     }
 
-    /**
-     * Synchronous peek at a specific buffer position (logical).
-     * Returns the event at `pos`, null if buffer is closed, or undefined if not yet available.
-     */
     peek(pos: number): RunnerEvent | null | undefined {
         const physical = this.toPhysical(pos);
-        if (physical < 0) {
-            // Position was trimmed — treat as consumed
-            return undefined;
-        }
-        if (physical < this.buffer.length) {
-            return this.buffer[physical];
-        }
-        if (this.closed) {
-            return null;
-        }
+        if (physical < 0) return undefined;
+        if (physical < this.buffer.length) return this.buffer[physical];
+        if (this.closed) return null;
         return undefined;
     }
 
     async *readFrom(offset: number, abortSignal?: AbortSignal): AsyncGenerator<RunnerEvent> {
-        // Multiple concurrent readers (scaffold check + event stream) each add abort
-        // listeners in the wait loop. Increase limit to prevent MaxListenersExceededWarning.
         if (abortSignal) {
             try { setMaxListeners(50, abortSignal); } catch { /* Node < 19 fallback */ }
         }
-        // If offset was trimmed, skip ahead to earliest available
         let pos = Math.max(offset, this.trimOffset);
         while (true) {
             const physical = this.toPhysical(pos);
@@ -226,54 +218,108 @@ export class PersistentLogBuffer {
     }
 }
 
+// Adapter instances (reused across sessions)
+const adapters = {
+    claudecode: new ClaudeCodeAdapter(),
+    codex: new CodexAdapter(),
+} as const;
+
 /**
- * Create a Daytona session and start the runner process.
- * Returns a handle for sending input and streaming output.
+ * Build the session name for a given agent slug.
  */
-export async function createRunnerSession(
-    sandbox: Sandbox,
+function agentSessionName(agentSlug: string): string {
+    return `agent-${agentSlug}`;
+}
+
+/**
+ * Build the CLI command string for a Daytona session.
+ * Combines env exports + CLI args into a single shell command.
+ */
+function buildSessionCommand(
     envVars: Record<string, string>,
-): Promise<SessionHandle> {
-    const t0 = Date.now();
+    agentOpts: AgentSessionOptions,
+): string {
+    const adapter = adapters[agentOpts.adapterType];
 
-    // Delete any stale session from previous runs, then create fresh.
-    // Stale sessions have dead pipes that cause "failed to open input pipe" errors.
-    console.log(`[RunnerSession] Deleting stale session '${SESSION_ID}'...`);
-    try {
-        await sandbox.process.deleteSession(SESSION_ID);
-    } catch {
-        // Session doesn't exist yet — expected on first run
-    }
-    const t1 = Date.now();
-    console.log(`[RunnerSession] deleteSession: ${t1 - t0}ms`);
+    const agentConfig: AgentConfig = {
+        slug: agentOpts.agentSlug,
+        adapter_type: agentOpts.adapterType,
+        role: 'agent',
+        autonomy_level: agentOpts.autonomyLevel || 'autonomous',
+        model: agentOpts.model,
+        max_budget_usd: agentOpts.maxBudgetUsd,
+        allowed_tools: agentOpts.allowedTools,
+        system_prompt: agentOpts.systemPrompt,
+        session_id: agentOpts.sessionId,
+        cwd: SANDBOX_CONFIG.workspacePath,
+    };
 
-    console.log(`[RunnerSession] Creating session '${SESSION_ID}'...`);
-    await sandbox.process.createSession(SESSION_ID);
-    const t2 = Date.now();
-    console.log(`[RunnerSession] createSession: ${t2 - t1}ms`);
+    const cliArgs = adapter.buildCommand('', agentConfig);
 
-    // Build environment export command
+    // Build environment export prefix
     const envExports = Object.entries(envVars)
         .map(([k, v]) => `export ${k}=${shellEscape(v)}`)
         .join(' && ');
 
-    const runnerDir = SANDBOX_CONFIG.runnerDir;
-    const command = envExports
-        ? `${envExports} && exec node ${runnerDir}/cli-executor.js`
-        : `exec node ${runnerDir}/cli-executor.js`;
+    const cliCommand = cliArgs.map(a => shellEscape(a)).join(' ');
+
+    return envExports
+        ? `${envExports} && cd ${shellEscape(SANDBOX_CONFIG.workspacePath)} && exec ${cliCommand}`
+        : `cd ${shellEscape(SANDBOX_CONFIG.workspacePath)} && exec ${cliCommand}`;
+}
+
+/**
+ * Create a Daytona session for a specific agent, running the CLI directly.
+ * Session name: "agent-{slug}"
+ * The CLI runs persistently; backend sends messages via sendSessionCommandInput().
+ */
+export async function createAgentSession(
+    sandbox: Sandbox,
+    envVars: Record<string, string>,
+    agentOpts: AgentSessionOptions,
+): Promise<SessionHandle> {
+    const sessionName = agentSessionName(agentOpts.agentSlug);
+    const t0 = Date.now();
+
+    // Delete any stale session from previous runs.
+    // Stale sessions have dead pipes that cause "failed to open input pipe" errors.
+    console.log(`[AgentSession] Deleting stale session '${sessionName}'...`);
+    try {
+        await sandbox.process.deleteSession(sessionName);
+    } catch {
+        // Session doesn't exist yet — expected on first run
+    }
+    const t1 = Date.now();
+
+    console.log(`[AgentSession] Creating session '${sessionName}'...`);
+    await sandbox.process.createSession(sessionName);
+    const t2 = Date.now();
+
+    // Write Codex config.toml to sandbox if needed (platform billing, no BYOK).
+    // buildSDKEnvironment() stores the OpenRouter key in ANTHROPIC_AUTH_TOKEN.
+    // When no OPENAI_API_KEY is set (no BYOK), Codex needs config.toml for OpenRouter routing.
+    const openRouterKey = envVars.ANTHROPIC_AUTH_TOKEN;
+    if (agentOpts.adapterType === 'codex' && openRouterKey && !envVars.OPENAI_API_KEY) {
+        const codexHome = '/home/daytona/.codex';
+        const configToml = `model_provider = "openrouter"\napi_key = "${openRouterKey}"\n`;
+        await sandbox.process.executeCommand(`mkdir -p ${codexHome}`);
+        await sandbox.fs.uploadFile(Buffer.from(configToml, 'utf-8'), `${codexHome}/config.toml`);
+    }
+
+    const command = buildSessionCommand(envVars, agentOpts);
 
     const envKeys = Object.keys(envVars);
-    console.log(`[RunnerSession] Executing runner command with ${envKeys.length} env vars: ${envKeys.join(', ')}`);
-    const response = await sandbox.process.executeSessionCommand(SESSION_ID, {
+    console.log(`[AgentSession] Executing ${agentOpts.adapterType} for ${agentOpts.agentSlug} with ${envKeys.length} env vars`);
+    const response = await sandbox.process.executeSessionCommand(sessionName, {
         command,
         runAsync: true,
     });
     const t3 = Date.now();
-    console.log(`[RunnerSession] Daytona timing: deleteSession=${t1 - t0}ms, createSession=${t2 - t1}ms, executeCommand=${t3 - t2}ms, total=${t3 - t0}ms`);
+    console.log(`[AgentSession] Daytona timing: delete=${t1 - t0}ms, create=${t2 - t1}ms, exec=${t3 - t2}ms, total=${t3 - t0}ms`);
 
     const commandId = response.cmdId || '';
     if (!commandId) {
-        throw new Error('Session command returned no command ID');
+        throw new Error(`Session command for ${sessionName} returned no command ID`);
     }
 
     const streamLogsFn = async (
@@ -281,7 +327,7 @@ export async function createRunnerSession(
         onStderr: (chunk: string) => void,
     ): Promise<void> => {
         await sandbox.process.getSessionCommandLogs(
-            SESSION_ID,
+            sessionName,
             commandId,
             onStdout,
             onStderr,
@@ -292,10 +338,11 @@ export async function createRunnerSession(
     logBuffer.start(streamLogsFn);
 
     return {
-        sessionId: SESSION_ID,
+        sessionId: sessionName,
         commandId,
+        agentSlug: agentOpts.agentSlug,
         async sendInput(data: string): Promise<void> {
-            await sandbox.process.sendSessionCommandInput(SESSION_ID, commandId, data);
+            await sandbox.process.sendSessionCommandInput(sessionName, commandId, data);
         },
         streamLogs: streamLogsFn,
         logBuffer,
@@ -303,7 +350,9 @@ export async function createRunnerSession(
 }
 
 /**
- * Send a JSON command to the runner via stdin.
+ * Send a JSON command to the CLI via stdin.
+ * For Claude: messages are piped as plain text (Claude reads from stdin).
+ * For structured commands (interrupt, health): JSON lines.
  */
 export async function sendCommand(
     handle: SessionHandle,
@@ -313,10 +362,19 @@ export async function sendCommand(
 }
 
 /**
+ * Send a plain text message to the CLI's stdin.
+ * Used for interactive Claude sessions where the prompt goes to stdin.
+ */
+export async function sendMessage(
+    handle: SessionHandle,
+    message: string,
+): Promise<void> {
+    await handle.sendInput(message + '\n');
+}
+
+/**
  * Stream runner events from the persistent log buffer.
  * Reads from the given offset so reused runners skip old events.
- * @param startOffset - Position in the log buffer to start reading from.
- *   Captured BEFORE sendExecuteCommand so all events from this execution are included.
  */
 export async function* streamEvents(
     handle: SessionHandle,
@@ -327,10 +385,12 @@ export async function* streamEvents(
     yield* handle.logBuffer.readFrom(offset, abortSignal);
 }
 
+// Keep backward-compatible export name for runner-session.ts
+export const createRunnerSession = createAgentSession;
+
 /**
  * Run an agent in the sandbox using Daytona Sessions API.
  * Creates a session, sends the initial message, and streams events.
- * Supports bidirectional communication via sendCommand().
  */
 export async function* runAgentInSandbox(
     options: RunAgentInSandboxOptions,
@@ -342,24 +402,26 @@ export async function* runAgentInSandbox(
         return;
     }
 
-    // Build environment variables for the runner
-    const envVars: Record<string, string> = {
-        [RUNNER_ENV.CONFIG]: JSON.stringify(config),
-    };
+    const envVars: Record<string, string> = {};
 
     if (openRouterApiKey) {
-        envVars[RUNNER_ENV.ANTHROPIC_BASE_URL] = 'https://openrouter.ai/api';
-        envVars[RUNNER_ENV.ANTHROPIC_AUTH_TOKEN] = openRouterApiKey;
-        envVars[RUNNER_ENV.ANTHROPIC_API_KEY] = '';
+        envVars.ANTHROPIC_BASE_URL = 'https://openrouter.ai/api';
+        envVars.ANTHROPIC_AUTH_TOKEN = openRouterApiKey;
+        envVars.ANTHROPIC_API_KEY = '';
     }
+
+    const agentOpts: AgentSessionOptions = {
+        agentSlug: config.agentSlug,
+        adapterType: 'claudecode',
+        model: config.model,
+    };
 
     let handle: SessionHandle;
     let lastError: Error | null = null;
 
-    // Create session with reconnect logic (sandbox may be waking from sleep)
     for (let attempt = 1; attempt <= RECONNECT_MAX_ATTEMPTS; attempt++) {
         try {
-            handle = await createRunnerSession(sandbox, envVars);
+            handle = await createAgentSession(sandbox, envVars, agentOpts);
             lastError = null;
             break;
         } catch (error) {
@@ -372,14 +434,12 @@ export async function* runAgentInSandbox(
     }
 
     if (lastError) {
-        yield transportError(`Failed to create runner session: ${lastError.message}`, 'SESSION_CREATE_FAILED');
+        yield transportError(`Failed to create agent session: ${lastError.message}`, 'SESSION_CREATE_FAILED');
         return;
     }
 
-    // Send initial message to runner
-    await sendCommand(handle!, { type: 'message', content: prompt });
+    // Send initial message to Claude's stdin
+    await sendMessage(handle!, prompt);
 
-    // Stream events back
     yield* streamEvents(handle!, abortSignal);
 }
-

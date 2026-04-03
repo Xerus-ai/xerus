@@ -306,7 +306,7 @@ describe('ToolsRepository - Real Database', () => {
 
         describe('category filtering', () => {
             it('should filter apps by category', async () => {
-                const result = await repository.listAppsFromDB({ category: 'productivity' });
+                const result = await repository.listAppsFromDB({ categories: ['productivity'] });
 
                 expect(result.apps.length).toBeGreaterThan(0);
                 result.apps.forEach(app => {
@@ -315,7 +315,7 @@ describe('ToolsRepository - Real Database', () => {
             });
 
             it('should filter apps by payment category', async () => {
-                const result = await repository.listAppsFromDB({ category: 'payment' });
+                const result = await repository.listAppsFromDB({ categories: ['payment'] });
 
                 expect(result.apps.length).toBeGreaterThan(0);
                 const stripeApp = result.apps.find(app => app.name_slug === 'test_stripe');
@@ -323,7 +323,7 @@ describe('ToolsRepository - Real Database', () => {
             });
 
             it('should return empty results for non-existing category', async () => {
-                const result = await repository.listAppsFromDB({ category: 'nonexistent_category' });
+                const result = await repository.listAppsFromDB({ categories: ['nonexistent_category'] });
 
                 expect(result.apps).toHaveLength(0);
                 expect(result.pagination.total).toBe(0);
@@ -332,7 +332,7 @@ describe('ToolsRepository - Real Database', () => {
 
         describe('combined filters', () => {
             it('should combine search and category filters', async () => {
-                const result = await repository.listAppsFromDB({ search: 'platform', category: 'productivity' });
+                const result = await repository.listAppsFromDB({ search: 'platform', categories: ['productivity'] });
 
                 expect(result.apps.length).toBeGreaterThan(0);
                 result.apps.forEach(app => {
@@ -343,7 +343,7 @@ describe('ToolsRepository - Real Database', () => {
             it('should combine search, category, and pagination', async () => {
                 const result = await repository.listAppsFromDB({
                     search: 'test',
-                    category: 'productivity',
+                    categories: ['productivity'],
                     page: 1,
                     limit: 2,
                 });

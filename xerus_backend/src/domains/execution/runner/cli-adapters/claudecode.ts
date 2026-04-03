@@ -1,5 +1,6 @@
 // Claude Code CLI Adapter
-// Spawns `claude` CLI with appropriate flags for agent execution
+// Interactive persistent Claude CLI sessions via Daytona Sessions API
+// Backend sends messages directly to Claude's stdin (no cli-executor middleman)
 // Reference: Paperclip claude-local/execute.ts, 9to5 claude.ts, Ductor auth.py
 
 import { existsSync, readFileSync } from 'fs';
@@ -13,20 +14,25 @@ export class ClaudeCodeAdapter implements CLIAdapter {
     readonly type: AdapterType = 'claudecode';
     readonly promptViaStdin = false;
 
-    buildCommand(prompt: string, config: AgentConfig): string[] {
+    /**
+     * Build command for interactive (persistent) Claude session.
+     * Claude stays alive, backend pipes messages to stdin.
+     * --resume is only used for crash recovery (existing session_id).
+     */
+    buildCommand(_prompt: string, config: AgentConfig): string[] {
         const args: string[] = [
             'claude',
-            '-p',
             '--output-format', 'stream-json',
-            '--permission-mode', this.resolvePermissionMode(config.autonomy_level),
+            '--dangerously-skip-permissions',
         ];
 
         if (config.model) {
             args.push('--model', config.model);
         }
 
+        // --resume for crash recovery: reattach to existing Claude session
         if (config.session_id) {
-            args.push('--session-id', config.session_id);
+            args.push('--resume', config.session_id);
         }
 
         if (config.max_budget_usd) {
@@ -40,8 +46,6 @@ export class ClaudeCodeAdapter implements CLIAdapter {
         if (config.system_prompt) {
             args.push('--append-system-prompt', config.system_prompt);
         }
-
-        args.push(prompt);
 
         return args;
     }
@@ -82,13 +86,5 @@ export class ClaudeCodeAdapter implements CLIAdapter {
         if (env.ANTHROPIC_API_KEY) return 'api';
         if (existsSync(CREDENTIALS_PATH)) return 'subscription';
         return 'platform';
-    }
-
-    private resolvePermissionMode(autonomyLevel: string): string {
-        switch (autonomyLevel) {
-            case 'autonomous': return 'bypassPermissions';
-            case 'semi_autonomous': return 'acceptEdits';
-            default: return 'default';
-        }
     }
 }

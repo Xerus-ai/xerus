@@ -56,7 +56,7 @@ function createTestConfig(overrides?: Partial<HealthMonitorConfig>): HealthMonit
         max_restart_attempts: 3,
         backoff_base_ms: 50,
         backoff_max_ms: 500,
-        runner_start_command: 'node /runner/cli-executor.js',
+        runner_start_command: 'claude --output-format stream-json --dangerously-skip-permissions',
         ...overrides,
     };
 }

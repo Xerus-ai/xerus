@@ -44,6 +44,7 @@ describe('mapAgentToAssistant', () => {
     avatar_url: 'https://example.com/avatar.png',
     thinking_level: 'high',
     autonomy_level: 'semi_autonomous',
+    adapter_type: 'claudecode',
   };
 
   it('maps all fields from a fully populated backend agent', () => {
@@ -72,6 +73,7 @@ describe('mapAgentToAssistant', () => {
     expect(result.avatarUrl).toBe('https://example.com/avatar.png');
     expect(result.thinkingLevel).toBe('high');
     expect(result.autonomyLevel).toBe('semi_autonomous');
+    expect(result.adapter_type).toBe('claudecode');
   });
 
   it('maps inactive agent status correctly', () => {
@@ -100,6 +102,7 @@ describe('mapAgentToAssistant', () => {
     expect(result.avatarUrl).toBeNull();
     expect(result.thinkingLevel).toBe('medium');
     expect(result.autonomyLevel).toBe('supervised');
+    expect(result.adapter_type).toBeUndefined();
   });
 
   it('handles agent with empty name', () => {

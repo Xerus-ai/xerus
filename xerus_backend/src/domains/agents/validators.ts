@@ -31,6 +31,7 @@ const publicMetadataSchema = Joi.object({
 // Behaviour configuration schemas (from behaviour-config.md)
 const thinkingLevelSchema = Joi.string().valid(...THINKING_LEVELS);
 const autonomyLevelSchema = Joi.string().valid(...AUTONOMY_LEVELS);
+const adapterTypeSchema = Joi.string().valid('claudecode', 'codex');
 
 // Create Agent Schema - system_prompt, capabilities, workflow_config live in workspace files
 const mascotPattern = /^mascot:[cp]\d+-\d+-\d+-\d+-\d+$/;
@@ -46,6 +47,7 @@ const createAgentSchema = Joi.object({
     public_metadata: publicMetadataSchema.allow(null).optional(),
     thinking_level: thinkingLevelSchema.default(DEFAULT_THINKING_LEVEL),
     autonomy_level: autonomyLevelSchema.default(DEFAULT_AUTONOMY_LEVEL),
+    adapter_type: adapterTypeSchema.default('claudecode'),
 });
 
 // Update Agent Schema
@@ -62,6 +64,7 @@ const updateAgentSchema = Joi.object({
     is_default: Joi.boolean().optional(),
     thinking_level: thinkingLevelSchema.optional(),
     autonomy_level: autonomyLevelSchema.optional(),
+    adapter_type: adapterTypeSchema.optional(),
 }).min(1);
 
 // Filter Schema

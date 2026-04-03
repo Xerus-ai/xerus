@@ -1,166 +1,106 @@
 /**
- * Schedules API Module
- * Operations for scheduled agent executions
+ * Schedules API Module (STUB)
+ *
+ * The schedules domain has been removed as part of the CLI-native pivot.
+ * Scheduling now happens via 9to5 on the sandbox.
+ * These stubs prevent runtime errors while the UI is updated.
  */
-import { toast } from '@/lib/toast';
-import { apiCall } from './client';
-import { mapScheduleToFrontend, mapScheduleToBackend, type BackendSchedule } from './mappers';
 import type { ScheduledExecution, ExecutionResult, ScheduleFilters } from './types';
 
 /**
  * Create a new scheduled execution
+ * @throws - schedules domain removed
  */
 export const createSchedule = async (
-  schedule: ScheduledExecution
+  _schedule: ScheduledExecution
 ): Promise<ScheduledExecution> => {
-  const response = await apiCall('/schedules', {
-    method: 'POST',
-    body: JSON.stringify(mapScheduleToBackend(schedule)),
-  });
-
-  const result = await response.json();
-  const data = result.data || result;
-  toast.success('Schedule created', { description: 'Your agent will run on the set schedule.' });
-  return mapScheduleToFrontend((data.schedule || data) as BackendSchedule);
+  console.warn('[Schedules] createSchedule called but schedules domain is removed');
+  throw new Error('Schedules feature is being migrated to sandbox-native 9to5');
 };
 
 /**
  * Get all schedules with optional filters
+ * @returns empty array - schedules domain removed
  */
 export const getSchedules = async (
-  filters?: ScheduleFilters
+  _filters?: ScheduleFilters
 ): Promise<ScheduledExecution[]> => {
-  const params = new URLSearchParams();
-
-  if (filters?.agentId) {
-    params.append('agent_id', filters.agentId.toString());
-  }
-  if (filters?.enabled !== undefined) {
-    params.append('enabled', filters.enabled.toString());
-  }
-
-  const queryString = params.toString();
-  const url = queryString ? `/schedules?${queryString}` : '/schedules';
-
-  const response = await apiCall(url, { method: 'GET' });
-  const result = await response.json();
-  const data = result.data || result;
-  return (Array.isArray(data) ? data : [] as BackendSchedule[]).map(mapScheduleToFrontend);
+  return [];
 };
 
 /**
  * Get a single schedule by ID
+ * @throws - schedules domain removed
  */
-export const getSchedule = async (id: string): Promise<ScheduledExecution> => {
-  const response = await apiCall(`/schedules/${id}`, { method: 'GET' });
-  const result = await response.json();
-  const data = result.data || result;
-  return mapScheduleToFrontend((data.schedule || data) as BackendSchedule);
+export const getSchedule = async (_id: string): Promise<ScheduledExecution> => {
+  throw new Error('Schedules feature is being migrated to sandbox-native 9to5');
 };
 
 /**
  * Update a schedule
+ * @throws - schedules domain removed
  */
 export const updateSchedule = async (
-  id: string,
-  updates: Partial<ScheduledExecution>
+  _id: string,
+  _updates: Partial<ScheduledExecution>
 ): Promise<ScheduledExecution> => {
-  const backendUpdates: Record<string, unknown> = {};
-
-  if (updates.name !== undefined) backendUpdates.name = updates.name;
-  if (updates.description !== undefined) backendUpdates.description = updates.description;
-  if (updates.agentId !== undefined) backendUpdates.agent_id = updates.agentId;
-  if (updates.workflowConfig !== undefined) backendUpdates.workflow_config = updates.workflowConfig;
-  if (updates.scheduleType !== undefined) backendUpdates.schedule_type = updates.scheduleType;
-  if (updates.scheduleConfig !== undefined) backendUpdates.schedule_config = updates.scheduleConfig;
-  if (updates.timezone !== undefined) backendUpdates.timezone = updates.timezone;
-  if (updates.enabled !== undefined) backendUpdates.enabled = updates.enabled;
-  if (updates.taskPrompt !== undefined) backendUpdates.task_prompt = updates.taskPrompt;
-  if (updates.taskContext !== undefined) backendUpdates.task_context = updates.taskContext;
-
-  const response = await apiCall(`/schedules/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(backendUpdates),
-  });
-
-  const result = await response.json();
-  const data = result.data || result;
-  toast.success('Schedule updated', { description: 'Your changes have been applied.' });
-  return mapScheduleToFrontend((data.schedule || data) as BackendSchedule);
+  console.warn('[Schedules] updateSchedule called but schedules domain is removed');
+  throw new Error('Schedules feature is being migrated to sandbox-native 9to5');
 };
 
 /**
  * Delete a schedule
+ * No-op - schedules domain removed
  */
-export const deleteSchedule = async (id: string): Promise<void> => {
-  await apiCall(`/schedules/${id}`, { method: 'DELETE' });
-  toast.success('Schedule deleted', { description: 'This schedule has been removed.' });
+export const deleteSchedule = async (_id: string): Promise<void> => {
+  console.warn('[Schedules] deleteSchedule called but schedules domain is removed');
 };
 
 /**
  * Enable a schedule
+ * @throws - schedules domain removed
  */
-export const enableSchedule = async (id: string): Promise<ScheduledExecution> => {
-  const response = await apiCall(`/schedules/${id}/enable`, { method: 'POST' });
-  const result = await response.json();
-  const data = result.data || result;
-  toast.success('Schedule enabled', { description: 'Your agent will resume running on schedule.' });
-  return mapScheduleToFrontend((data.schedule || data) as BackendSchedule);
+export const enableSchedule = async (_id: string): Promise<ScheduledExecution> => {
+  throw new Error('Schedules feature is being migrated to sandbox-native 9to5');
 };
 
 /**
  * Disable a schedule
+ * @throws - schedules domain removed
  */
-export const disableSchedule = async (id: string): Promise<ScheduledExecution> => {
-  const response = await apiCall(`/schedules/${id}/disable`, { method: 'POST' });
-  const result = await response.json();
-  const data = result.data || result;
-  toast.success('Schedule paused', { description: 'Your agent will stop running until re-enabled.' });
-  return mapScheduleToFrontend((data.schedule || data) as BackendSchedule);
+export const disableSchedule = async (_id: string): Promise<ScheduledExecution> => {
+  throw new Error('Schedules feature is being migrated to sandbox-native 9to5');
 };
 
 /**
  * Manually trigger a schedule execution
+ * @throws - schedules domain removed
  */
-export const triggerSchedule = async (id: string): Promise<ExecutionResult> => {
-  const response = await apiCall(`/schedules/${id}/trigger`, { method: 'POST' });
-  const result = await response.json();
-  const data = result.data || result;
-  toast.success('Schedule triggered', { description: 'Your agent is starting a new run now.' });
-  return data.execution || data;
+export const triggerSchedule = async (_id: string): Promise<ExecutionResult> => {
+  throw new Error('Schedules feature is being migrated to sandbox-native 9to5');
 };
 
 /**
  * Get execution history for a schedule
+ * @returns empty array - schedules domain removed
  */
 export const getScheduleExecutions = async (
-  scheduleId: string,
-  limit = 10
+  _scheduleId: string,
+  _limit = 10
 ): Promise<ExecutionResult[]> => {
-  const response = await apiCall(
-    `/schedules/${scheduleId}/executions?limit=${limit}`,
-    { method: 'GET' }
-  );
-  const result = await response.json();
-  const data = result.data || result;
-  return Array.isArray(data) ? data : [];
+  return [];
 };
 
 /**
  * Get a specific execution result
+ * This one proxies to the actual execute endpoint which still exists
  */
-export const getExecutionResult = async (executionId: string): Promise<ExecutionResult> => {
-  const response = await apiCall(`/execute/${executionId}/status`, { method: 'GET' });
-  const result = await response.json();
-  return result.data || result;
-};
+export { } // Placeholder - getExecutionResult should use execute.ts instead
 
 /**
  * Toggle schedule enabled state
+ * @throws - schedules domain removed
  */
-export const toggleSchedule = async (id: string, enabled: boolean): Promise<ScheduledExecution> => {
-  if (enabled) {
-    return enableSchedule(id);
-  }
-  return disableSchedule(id);
+export const toggleSchedule = async (_id: string, _enabled: boolean): Promise<ScheduledExecution> => {
+  throw new Error('Schedules feature is being migrated to sandbox-native 9to5');
 };

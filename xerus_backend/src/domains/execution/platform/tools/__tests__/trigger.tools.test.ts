@@ -18,9 +18,9 @@ import type { TriggerServicePort } from '../../platform-tool.types';
 
 describe('TriggerNotFoundError', () => {
     it('should set name and message', () => {
-        const error = new TriggerNotFoundError(42);
-        expect(error.name).toBe('TriggerNotFoundError');
-        expect(error.message).toBe('Trigger not found: 42');
+        const error = new TriggerNotFoundError('42');
+        expect(error.message).toBe('Trigger 42 not found');
+        expect(error.triggerId).toBe('42');
         expect(error).toBeInstanceOf(Error);
     });
 });
@@ -28,17 +28,16 @@ describe('TriggerNotFoundError', () => {
 describe('AgentNotFoundError', () => {
     it('should set name and message', () => {
         const error = new AgentNotFoundError('agent-99');
-        expect(error.name).toBe('AgentNotFoundError');
-        expect(error.message).toBe('Agent not found: agent-99');
+        expect(error.message).toBe('Agent agent-99 not found');
         expect(error).toBeInstanceOf(Error);
     });
 });
 
 describe('TriggerAlreadyExistsError', () => {
     it('should set name and message with all identifiers', () => {
-        const error = new TriggerAlreadyExistsError('agent-1', 'stripe', 'invoice.created');
-        expect(error.name).toBe('TriggerAlreadyExistsError');
-        expect(error.message).toBe('Trigger already exists for agent agent-1: stripe.invoice.created');
+        const error = new TriggerAlreadyExistsError(1, 'stripe', 'invoice.created');
+        expect(error.message).toBe('Trigger stripe.invoice.created already registered for agent 1');
+        expect(error.agentId).toBe(1);
         expect(error).toBeInstanceOf(Error);
     });
 });

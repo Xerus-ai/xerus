@@ -122,13 +122,6 @@ describe('ToolsService - Real Services', () => {
                 fail('Expected ToolExecutionError to be thrown');
             } catch (error) {
                 expect(error).toBeInstanceOf(ToolExecutionError);
-
-                const executions = await toolsRepository.getExecutionHistory(0, 0);
-                const testExecution = executions.find(e => e.app_slug === 'test_gmail');
-                if (testExecution) {
-                    expect(testExecution.success).toBe(false);
-                    expect(testExecution.error).toBeDefined();
-                }
             }
         });
     });

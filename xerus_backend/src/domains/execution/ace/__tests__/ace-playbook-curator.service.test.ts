@@ -48,6 +48,13 @@ function createRealFileSystem(): GitMemoryFileSystem {
         exists: async (filePath: string) => {
             return fs.existsSync(filePath);
         },
+        tryExclusiveCreate: async (filePath: string, content: string) => {
+            if (fs.existsSync(filePath)) return false;
+            const dir = path.dirname(filePath);
+            if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+            fs.writeFileSync(filePath, content, 'utf-8');
+            return true;
+        },
     };
 }
 

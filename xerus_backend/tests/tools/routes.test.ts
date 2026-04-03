@@ -103,7 +103,7 @@ describe('Tools API Routes', () => {
             name: 'Gmail',
             description: 'Email',
             auth_type: 'oauth',
-            img_src: null,
+            img_src: undefined,
             categories: ['email'],
             featured_weight: 1,
         });
@@ -113,7 +113,7 @@ describe('Tools API Routes', () => {
             name: 'Slack',
             description: 'Chat',
             auth_type: 'oauth',
-            img_src: null,
+            img_src: undefined,
             categories: ['communication'],
             featured_weight: 1,
         });

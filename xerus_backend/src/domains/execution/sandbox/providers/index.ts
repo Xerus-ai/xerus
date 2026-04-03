@@ -20,8 +20,8 @@ export type { DaytonaProvider, DaytonaCreateOptions, RunAgentOptions, RunAgentRe
 export { createDaytonaFileSystem } from './daytona-filesystem';
 
 // Session transport exports (for direct session control)
-export type { SessionHandle } from './daytona-runner';
-export { PersistentLogBuffer, sendCommand, createRunnerSession, streamEvents } from './daytona-runner';
+export type { SessionHandle, AgentSessionOptions } from './daytona-runner';
+export { PersistentLogBuffer, sendCommand, sendMessage, createAgentSession, createRunnerSession, streamEvents } from './daytona-runner';
 
 export {
     createProvider,

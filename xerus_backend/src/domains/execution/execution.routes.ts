@@ -1,10 +1,15 @@
 // Execution API Routes
 // REST endpoints for agent execution lifecycle:
-// - GET  /execute/conversations/:id/stream   -> Long-lived SSE stream per conversation
-// - POST /execute/conversations/:id/messages  -> Submit message (returns 202)
-// - POST /execute/:id/respond                -> HITL response
-// - POST /execute/:id/cancel                 -> Cancel execution
-// - GET  /execute/:id/status                 -> Get execution status
+// - GET    /execute/conversations              -> List conversations (workspace.db)
+// - GET    /execute/conversations/:id          -> Get conversation with messages
+// - POST   /execute/conversations              -> Create conversation
+// - PATCH  /execute/conversations/:id          -> Update conversation title
+// - DELETE /execute/conversations/:id          -> Delete conversation (soft)
+// - GET    /execute/conversations/:id/stream   -> Long-lived SSE stream per conversation
+// - POST   /execute/conversations/:id/messages -> Submit message (returns 202)
+// - POST   /execute/:id/respond                -> HITL response
+// - POST   /execute/:id/cancel                 -> Cancel execution
+// - GET    /execute/:id/status                 -> Get execution status
 
 import { Router, Response, NextFunction } from 'express';
 import rateLimit from 'express-rate-limit';
@@ -30,6 +35,7 @@ import {
     validateCancelBody,
 } from './execution.validators';
 import agentFilesRouter from './agent-files.routes';
+import conversationRouter from './conversations/conversation.routes';
 
 // -----------------------------------------------------------------------------
 // Constants
@@ -63,6 +69,10 @@ const auth = authenticateFirebaseToken;
 
 // Mount agent file API sub-routes
 router.use('/agents', agentFilesRouter);
+
+// Mount conversation CRUD routes (workspace.db queries)
+// MUST be before /conversations/:id/stream to ensure proper route matching
+router.use('/conversations', conversationRouter);
 
 // POST /api/v1/execute/sse-token - Issue a short-lived, single-use token for SSE auth
 router.post('/sse-token', auth, createSseTokenHandler());
@@ -304,7 +314,7 @@ router.get('/:id/status', auth, async (req: AuthenticatedRequest, res: Response,
 
         const result = await query<StatusRow>(
             `SELECT es.id, es.status, es.agent_slug, es.started_at, es.completed_at,
-                    es.input_tokens, es.output_tokens, es.credits_used, es.message_metadata
+                    es.input_tokens, es.output_tokens, es.credits_used, es.message_metadata, es.key_source
              FROM execution_sessions es
              JOIN workspaces w ON es.workspace_id = w.id
              WHERE es.id = $1::uuid AND w.user_id = $2`,
@@ -339,6 +349,7 @@ router.get('/:id/status', auth, async (req: AuthenticatedRequest, res: Response,
                     : 0,
                 toolCalls,
                 agentsUsed: 1,
+                billingType: row.key_source ?? undefined,
             } : undefined,
         });
 
@@ -362,6 +373,7 @@ interface StatusRow {
     output_tokens: number | null;
     credits_used: string | null;
     message_metadata: { tool_calls?: unknown[] } | null;
+    key_source: 'byok' | 'platform' | null;
 }
 
 // -----------------------------------------------------------------------------

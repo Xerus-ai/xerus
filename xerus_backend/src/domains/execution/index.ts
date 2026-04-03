@@ -19,8 +19,6 @@ export * from './ace';
 export {
     RunnerHealthMonitor,
     createRunnerHealthMonitor,
-    SessionManager,
-    ProcessRegistry,
     StdinParser,
     StdoutEmitter,
     RUNNER_ENV,

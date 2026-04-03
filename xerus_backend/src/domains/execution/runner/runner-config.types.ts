@@ -30,7 +30,7 @@ export interface McpServerConfig {
 }
 
 // -----------------------------------------------------------------------------
-// Session State (persisted to .xerus-sessions.json by runner)
+// Session State (tracked by Daytona sessions per agent)
 // -----------------------------------------------------------------------------
 
 export interface SessionState {

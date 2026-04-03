@@ -59,12 +59,7 @@ export type {
     StdoutEvent,
 } from './stdout-emitter';
 
-export { SessionManager } from './session-manager';
-
 export { buildSoulAppend } from './soul-append-builder';
-
-// CLI-native components (replacements for deleted SDK-based runner)
-export { ProcessRegistry } from './process-registry';
 
 export { detectAllAuth, detectAuthForAdapter, resolveBillingType } from './auth-detector';
 export type { PlatformAuthStatus } from './auth-detector';

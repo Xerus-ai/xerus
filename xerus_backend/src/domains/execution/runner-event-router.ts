@@ -8,8 +8,10 @@ import { STREAM_EVENT_TYPES, type StreamEventType, type RunnerEventType } from '
 import type { HITLRequest, HITLScenario, UIHint } from './hitl/hitl.types';
 import { handleMetadataSync } from './metadata-sync-router';
 import { handleTriggerIndexing } from './indexing-event-handler';
-import { ChannelNotFoundError } from '../inbox';
+import { ChannelNotFoundError, MentionParser } from '../inbox';
 import { workspaceSSEBroadcaster } from '../drive';
+
+const mentionParser = new MentionParser();
 
 export const EVENT_ROUTER_LOG_PREFIX = '[EventRouter]';
 
@@ -380,6 +382,17 @@ async function handleAgentMessage(
             return;
         }
         throw err;
+    }
+
+    // Route @mentions to target agent sessions (best-effort, non-blocking)
+    const mentions = mentionParser.parseMentions(content);
+    for (const mention of mentions) {
+        if (mention.target === agentSlug) continue; // skip self-mentions
+        deps.messageBridge.dispatchMention(
+            ctx.request.userId, agentSlug, mention.target, mention.message, project, channelName,
+        ).catch(err => {
+            console.warn(`${EVENT_ROUTER_LOG_PREFIX} agent_message: mention dispatch to @${mention.target} failed: ${(err as Error).message}`);
+        });
     }
 }
 

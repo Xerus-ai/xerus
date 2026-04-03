@@ -4,7 +4,6 @@
 // Spec: xerus-y5v.4.146
 
 import type { HealthCommand } from './stdin-parser';
-import { SANDBOX_CONFIG } from '../sandbox/sandbox.config';
 
 // -----------------------------------------------------------------------------
 // Types
@@ -82,7 +81,7 @@ const DEFAULT_CONFIG: HealthMonitorConfig = {
     max_restart_attempts: 3,
     backoff_base_ms: 1_000,
     backoff_max_ms: 30_000,
-    runner_start_command: `node ${SANDBOX_CONFIG.runnerScriptPath}`,
+    runner_start_command: 'claude --output-format stream-json --dangerously-skip-permissions',
 };
 
 // -----------------------------------------------------------------------------

@@ -15,6 +15,10 @@ export interface AuthResult {
     method: 'credentials_file' | 'env_var' | 'cli_status' | 'none';
     billingType: BillingType;
     credentialPath?: string;
+    /** ISO timestamp of when the credential file was last modified */
+    credentialAge?: string;
+    /** CLI is installed but not authenticated (Ductor pattern: INSTALLED vs NOT_FOUND) */
+    installed?: boolean;
 }
 
 export interface AgentConfig {

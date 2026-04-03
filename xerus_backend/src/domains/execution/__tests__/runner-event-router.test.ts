@@ -109,6 +109,7 @@ function createTestAgent(): AgentRow {
         ai_model: 'claude-sonnet-4-5-20250929',
         thinking_level: 'medium',
         autonomy_level: 'supervised',
+        adapter_type: 'claudecode',
         primary_use_case: 'testing',
         workspace_id: 'ws-001',
         user_id: 'user-123',
@@ -138,6 +139,7 @@ function createTestContext(overrides?: Partial<PipelineContext>): PipelineContex
         status: 'running',
         streamOffset: 0,
         conversationId: null,
+        sdkSessionId: null,
         responseText: '',
         responseChunks: [],
         creditsUsed: 0,
@@ -149,6 +151,7 @@ function createTestContext(overrides?: Partial<PipelineContext>): PipelineContex
         eventsFiltered: 0,
         setupReport: null,
         hookHealth: null,
+        triggerType: 'user_message',
         ...overrides,
     };
 }

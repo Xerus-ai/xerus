@@ -64,7 +64,7 @@ class FakeStream {
 function createAgent(slug: string): AgentRow {
     return {
         id: 1, name: slug, slug, description: '', ai_model: 'claude-sonnet-4-5-20250929',
-        thinking_level: 'medium', autonomy_level: 'supervised', primary_use_case: '',
+        thinking_level: 'medium', autonomy_level: 'supervised', adapter_type: 'claudecode', primary_use_case: '',
         workspace_id: 'ws-1', user_id: 'user-1',
     };
 }
@@ -79,7 +79,7 @@ function createContext(agentSlug: string, overrides?: Partial<PipelineContext>):
         toolCallCount: 0, status: 'running', streamOffset: 0, conversationId: null,
         responseText: '', responseChunks: [], creditsUsed: 0, keySource: null,
         agentSessionCount: 0, announceQueue: null, thinkingChunks: [], toolCallDetails: [],
-        eventsFiltered: 0, setupReport: null, hookHealth: null,
+        eventsFiltered: 0, setupReport: null, hookHealth: null, sdkSessionId: null, triggerType: 'user_message' as const,
         ...overrides,
     };
 }
@@ -102,7 +102,7 @@ function createDeps(): ResolvedExecutionDeps {
 
 function buildHandle(buffer: PersistentLogBuffer): SessionHandle {
     return {
-        sessionId: 'test', commandId: 'cmd-1',
+        sessionId: 'test', commandId: 'cmd-1', agentSlug: 'test-agent',
         sendInput: async () => {},
         streamLogs: async () => {},
         logBuffer: buffer,

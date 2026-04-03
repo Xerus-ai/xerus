@@ -99,6 +99,7 @@ export interface SetupReport {
     git_initialized: boolean;
     memory_git_initialized: boolean;
     sqlite_installed: boolean;
+    databases_initialized: boolean;
     node_verified: boolean;
     node_version: string;
     duration_ms: number;
@@ -116,6 +117,7 @@ export async function runFullWorkspaceSetup(
         git_initialized: false,
         memory_git_initialized: false,
         sqlite_installed: false,
+        databases_initialized: false,
         node_verified: false,
         node_version: '',
         duration_ms: 0,
@@ -187,6 +189,18 @@ export async function runFullWorkspaceSetup(
         );
         report.sqlite_installed = true;
         console.log(`[SandboxSetup] Installed sqlite3 in ${sandboxId}`);
+    }
+
+    // 4b. Initialize workspace databases (company.db + workspace.db)
+    // Run init-db.sh explicitly since CLI prompts mode may not trigger SessionStart hooks
+    const initDbScript = `${basePath}/.claude/hooks/scripts/init-db.sh`;
+    const initDbCheck = await provider.executeCommand(
+        sandboxId,
+        `[ -f '${initDbScript}' ] && XERUS_WORKSPACE_ROOT='${basePath}' bash '${initDbScript}' 2>&1 || echo 'init-db.sh not found or failed'`,
+    );
+    if (initDbCheck.exitCode === 0 && !(initDbCheck.result || '').includes('not found')) {
+        report.databases_initialized = true;
+        console.log(`[SandboxSetup] Initialized workspace databases in ${sandboxId}`);
     }
 
     // 5. Verify Node.js is available (required by agent runner)

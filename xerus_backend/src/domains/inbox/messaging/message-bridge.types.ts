@@ -77,3 +77,16 @@ export interface QueryMessagesOptions {
 
 export const DEFAULT_MESSAGE_LIMIT = 50;
 export const MAX_MESSAGE_LIMIT = 200;
+
+// -----------------------------------------------------------------------------
+// Session Dispatcher (injected from execution domain to avoid circular deps)
+// Used to route inbound/mention messages to Daytona agent sessions.
+// -----------------------------------------------------------------------------
+
+export interface SessionDispatcher {
+    /**
+     * Send a plain text message to a specific agent's Daytona session stdin.
+     * Returns true if the agent had an active session and the message was sent.
+     */
+    sendToAgent(userId: string, agentSlug: string, message: string): Promise<boolean>;
+}

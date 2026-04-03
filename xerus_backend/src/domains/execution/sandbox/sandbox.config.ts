@@ -47,9 +47,6 @@ export const SANDBOX_CONFIG = {
     // Directory containing runner module in sandbox (derived from workspacePath)
     runnerDir: `${workspacePath}/.xerus/runner`,
 
-    // CLI executor script path inside sandbox (derived from workspacePath)
-    runnerScriptPath: `${workspacePath}/.xerus/runner/cli-executor.js`,
-
     // Git repository URL for workspace template (cloned on new sandbox creation)
     workspaceTemplateUrl: process.env.XERUS_WORKSPACE_TEMPLATE_URL || 'https://github.com/xerus-ai/xerus-workspace.git',
 

@@ -125,6 +125,7 @@ export default function ApiKeysPage() {
 
       {/* CLI Authentication Status Section */}
       <motion.div
+        id="cli-auth"
         className="mb-8 bg-surface/50 rounded-2xl border border-surface-active/50 p-5"
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -136,55 +137,114 @@ export default function ApiKeysPage() {
           </div>
           <div>
             <h2 className="text-sm font-medium text-text">CLI Authentication</h2>
-            <p className="text-xs text-text-secondary">Your agent execution environment</p>
+            <p className="text-xs text-text-secondary">Auto-detected from your sandbox environment</p>
           </div>
         </div>
 
-        <div className="mt-4 space-y-3 ml-[42px]">
-          {/* Claude Code status */}
-          <div className="flex items-center gap-2">
-            <span
-              className={`w-2 h-2 rounded-full ${
-                cliAuthStatus?.claudecode?.authenticated ? 'bg-emerald-500' : 'bg-red-400'
-              }`}
-            />
-            <span className="text-sm text-text">
-              Claude Code: {cliAuthStatus?.claudecode?.details || 'Checking...'}
-            </span>
-            {cliAuthStatus?.claudecode?.method === 'platform' && (
-              <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
-                Using credits
-              </span>
+        <div className="mt-4 space-y-4 ml-[42px]">
+          {/* Claude Code auth card */}
+          <div className="p-3.5 bg-white rounded-xl border border-surface-active/50">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-text-secondary" />
+                <span className="text-sm font-medium text-text">Claude Code</span>
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    cliAuthStatus?.claudecode?.authenticated ? 'bg-emerald-500' : 'bg-red-400'
+                  }`}
+                />
+              </div>
+              {cliAuthStatus?.claudecode?.method === 'platform' && (
+                <span className="text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                  Using credits
+                </span>
+              )}
+              {cliAuthStatus?.claudecode?.method === 'subscription' && (
+                <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                  Subscription
+                </span>
+              )}
+              {cliAuthStatus?.claudecode?.method === 'api' && (
+                <span className="text-[10px] font-medium text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md">
+                  API Key (BYOK)
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-text-secondary mb-2">
+              {cliAuthStatus?.claudecode?.details || 'Checking...'}
+            </p>
+            {!cliAuthStatus?.claudecode?.authenticated && (
+              <div className="p-2.5 bg-surface-hover/50 rounded-lg">
+                <p className="text-[11px] text-text-secondary mb-1.5">Connect via sandbox terminal:</p>
+                <code className="block bg-surface-active/50 px-2.5 py-1.5 rounded text-xs text-text font-mono">
+                  claude auth login
+                </code>
+                <p className="text-[11px] text-text-secondary mt-1.5">
+                  Or add an Anthropic API key below to use BYOK billing.
+                </p>
+              </div>
             )}
           </div>
 
-          {/* Codex status */}
-          <div className="flex items-center gap-2">
-            <span
-              className={`w-2 h-2 rounded-full ${
-                cliAuthStatus?.codex?.authenticated ? 'bg-emerald-500' : 'bg-red-400'
-              }`}
-            />
-            <span className="text-sm text-text">
-              Codex: {cliAuthStatus?.codex?.details || 'Checking...'}
-            </span>
-            {cliAuthStatus?.codex?.method === 'platform' && (
-              <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
-                Using credits
-              </span>
+          {/* Codex auth card */}
+          <div className="p-3.5 bg-white rounded-xl border border-surface-active/50">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Cpu className="w-4 h-4 text-text-secondary" />
+                <span className="text-sm font-medium text-text">Codex</span>
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    cliAuthStatus?.codex?.authenticated ? 'bg-emerald-500' : 'bg-red-400'
+                  }`}
+                />
+              </div>
+              {cliAuthStatus?.codex?.method === 'platform' && (
+                <span className="text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                  Using credits
+                </span>
+              )}
+              {cliAuthStatus?.codex?.method === 'subscription' && (
+                <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                  Subscription
+                </span>
+              )}
+              {cliAuthStatus?.codex?.method === 'api' && (
+                <span className="text-[10px] font-medium text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md">
+                  API Key (BYOK)
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-text-secondary mb-2">
+              {cliAuthStatus?.codex?.details || 'Checking...'}
+            </p>
+            {!cliAuthStatus?.codex?.authenticated && (
+              <div className="p-2.5 bg-surface-hover/50 rounded-lg">
+                <p className="text-[11px] text-text-secondary mb-1.5">Connect via sandbox terminal:</p>
+                <code className="block bg-surface-active/50 px-2.5 py-1.5 rounded text-xs text-text font-mono">
+                  codex auth login
+                </code>
+                <p className="text-[11px] text-text-secondary mt-1.5">
+                  Or add an OpenAI API key below to use BYOK billing.
+                </p>
+              </div>
             )}
           </div>
         </div>
 
-        {/* CLI auth instructions */}
-        <div className="mt-4 ml-[42px] p-3 bg-surface-hover/50 rounded-xl">
-          <p className="text-xs text-text-secondary mb-1">Prefer your existing subscription?</p>
-          <p className="text-xs text-text-secondary">
-            Open terminal in sandbox and run:{' '}
-            <code className="bg-surface-active/50 px-1.5 py-0.5 rounded text-text font-mono">
-              claude auth login
-            </code>
-          </p>
+        {/* Billing explanation */}
+        <div className="mt-4 ml-[42px] p-3 bg-surface-hover/30 rounded-xl border border-surface-active/30">
+          <p className="text-[11px] font-medium text-text-secondary mb-1">How billing works</p>
+          <div className="space-y-1">
+            <p className="text-[11px] text-text-secondary">
+              <span className="font-medium text-emerald-700">Subscription (BYOS):</span> Login via sandbox terminal. Uses your Claude/OpenAI subscription directly.
+            </p>
+            <p className="text-[11px] text-text-secondary">
+              <span className="font-medium text-blue-700">API Key (BYOK):</span> Add your API key below. Billed to your provider account.
+            </p>
+            <p className="text-[11px] text-text-secondary">
+              <span className="font-medium text-amber-700">Credits:</span> No key needed. Uses Xerus credits via OpenRouter.
+            </p>
+          </div>
         </div>
       </motion.div>
 
