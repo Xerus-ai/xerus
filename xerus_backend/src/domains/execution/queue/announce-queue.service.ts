@@ -2,7 +2,10 @@
 // Batches subagent completion notifications for user inbox
 // Task: xerus-y5v.4.40
 
+import { logger } from '../../../utils/logger';
 import { AnnounceQueueDrainError } from './command-queue.errors';
+
+const log = logger('AnnounceQueueService');
 
 const XERUS_MASTER_SLUG = 'xerus-master';
 
@@ -165,7 +168,7 @@ export class AnnounceQueueService {
             } catch (error) {
                 // Scheduled drains are background operations - log error, don't crash
                 // Queue remains intact for retry on next scheduleDrain call
-                console.error('[AnnounceQueueService] Scheduled drain failed:', error);
+                log.error('Scheduled drain failed', { error: error instanceof Error ? error.message : String(error) });
             }
         }, delay);
     }

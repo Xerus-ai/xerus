@@ -16,6 +16,9 @@ import type { SandboxOperationResult, SandboxSession } from '../sandbox-infra';
 import type { S3BackupService, BackupResult } from '../sandbox-infra/storage/s3-backup.service';
 import type { StorageFile } from '../sandbox-infra/storage/storage.types';
 import { shellEscapePath } from '../../utils/shell-safety';
+import { logger } from '../../utils/logger';
+
+const log = logger('DriveService');
 
 export class DriveService {
     constructor(
@@ -102,7 +105,7 @@ export class DriveService {
         // Log failures but don't throw — previews are best-effort
         const failures = results.filter((r) => r.status === 'rejected');
         if (failures.length > 0) {
-            console.warn(`[drive] ${failures.length}/${files.length} preview fetches failed`);
+            log.warn('Preview fetches failed', { failed: failures.length, total: files.length });
         }
     }
 

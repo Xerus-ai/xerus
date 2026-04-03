@@ -2,6 +2,7 @@ import express, { Application } from 'express';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 
+import { logger } from './utils/logger';
 import { requestMeta } from './middleware/request-meta';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
 import { generalRateLimit } from './middleware/rate-limit';
@@ -48,6 +49,8 @@ import { sseRegistry } from './domains/execution/streaming/sse-registry';
 import { createMemorySearchIndexService } from './domains/memory/git-memory/memory-search-index.service';
 
 dotenv.config();
+
+const log = logger('Server');
 
 const app: Application = express();
 
@@ -122,8 +125,8 @@ async function startServer(): Promise<void> {
     await warmPool();
 
     const server = app.listen(PORT, () => {
-        console.log(`Server running on port ${PORT}`);
-        console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+        log.info('Server running', { port: PORT });
+        log.info('Environment', { env: process.env.NODE_ENV || 'development' });
     });
 
     // SSE streams are long-lived — disable Node.js timeouts that kill idle connections.
@@ -134,18 +137,17 @@ async function startServer(): Promise<void> {
 
     // Crash diagnostics — capture unhandled rejections before they kill the process
     process.on('unhandledRejection', (reason, promise) => {
-        console.error('[CRASH] Unhandled promise rejection:', reason);
-        console.error('[CRASH] Promise:', promise);
+        log.error('Unhandled promise rejection', { reason: String(reason), promise: String(promise) });
     });
 
     process.on('uncaughtException', (err) => {
-        console.error('[CRASH] Uncaught exception:', err.message, err.stack);
+        log.error('Uncaught exception', err);
         process.exit(1);
     });
 
     // Graceful shutdown: clean up SSE sweep timer and close server
     process.on('SIGTERM', () => {
-        console.log('[Shutdown] SIGTERM received, cleaning up...');
+        log.info('SIGTERM received, cleaning up...');
         shutdownSseAuth();
         sseRegistry.shutdown();
         server.close();
@@ -185,9 +187,9 @@ async function startServer(): Promise<void> {
                 delete: storageService.delete.bind(storageService),
                 list: storageService.list.bind(storageService),
             });
-            console.log('[Boot] S3BackupService initialized');
+            log.info('S3BackupService initialized');
         } else {
-            console.warn('[Boot] S3_BUCKET or S3_REGION not set - S3 backup disabled');
+            log.warn('S3_BUCKET or S3_REGION not set - S3 backup disabled');
         }
 
         const sandboxService = new SandboxService(executionDb, undefined, backupService);
@@ -217,9 +219,9 @@ async function startServer(): Promise<void> {
         let memorySearchIndex = null;
         if (process.env.OPENAI_API_KEY) {
             memorySearchIndex = createMemorySearchIndexService();
-            console.log('[Boot] MemorySearchIndexService initialized (pgvector indexing enabled)');
+            log.info('MemorySearchIndexService initialized (pgvector indexing enabled)');
         } else {
-            console.warn('[Boot] OPENAI_API_KEY not set - memory pgvector indexing disabled');
+            log.warn('OPENAI_API_KEY not set - memory pgvector indexing disabled');
         }
 
         const messageBridge = createMessageBridgeService();
@@ -272,7 +274,7 @@ async function startServer(): Promise<void> {
         setSkillRoutesDeps({ sandboxService });
 
         sandboxProvider = sandboxService.getProvider();
-        console.log('[Startup] ExecutionService initialized');
+        log.info('ExecutionService initialized');
 
         // Start background jobs with full dependencies
         try {
@@ -283,11 +285,11 @@ async function startServer(): Promise<void> {
                 db: executionDb,
             });
         } catch (error) {
-            console.error('Failed to start background jobs:', error);
+            log.error('Failed to start background jobs', error instanceof Error ? error : new Error(String(error)));
             throw error;
         }
     } catch (error) {
-        console.error('[Startup] Failed to initialize ExecutionService:', error);
+        log.error('Failed to initialize ExecutionService', error instanceof Error ? error : new Error(String(error)));
         throw error;
     }
 }

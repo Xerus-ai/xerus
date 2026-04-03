@@ -9,6 +9,9 @@ import type { SandboxProvider } from '../domains/sandbox-infra/sandbox/providers
 import type { SandboxService } from '../domains/sandbox-infra/sandbox/sandbox.service';
 import type { S3BackupService } from '../domains/sandbox-infra/storage/s3-backup.service';
 import type { ExecutionDatabase } from '../domains/execution/execution-pipeline.types';
+import { logger } from '../utils/logger';
+
+const log = logger('Jobs');
 
 export interface JobDependencies {
     provider?: SandboxProvider;
@@ -21,11 +24,11 @@ export function startAllJobs(deps: JobDependencies = {}): void {
     const enabled = process.env.ENABLE_CRON_JOBS !== 'false';
 
     if (!enabled) {
-        console.log('[Jobs] Cron jobs disabled (ENABLE_CRON_JOBS=false)');
+        log.info('Cron jobs disabled (ENABLE_CRON_JOBS=false)');
         return;
     }
 
-    console.log('[Jobs] Initializing background jobs...');
+    log.info('Initializing background jobs...');
 
     try {
         startSyncPipedreamAppsJob();
@@ -36,12 +39,12 @@ export function startAllJobs(deps: JobDependencies = {}): void {
         if (deps.sandboxService && deps.backupService) {
             startBackupSchedulerJob(deps.sandboxService, deps.backupService);
         } else {
-            console.warn('[Jobs] Backup scheduler skipped (missing sandboxService or backupService)');
+            log.warn('Backup scheduler skipped (missing sandboxService or backupService)');
         }
 
-        console.log('[Jobs] All jobs initialized successfully');
+        log.info('All jobs initialized successfully');
     } catch (error) {
-        console.error('[Jobs] Failed to initialize jobs:', error);
+        log.error('Failed to initialize jobs', error instanceof Error ? error : new Error(String(error)));
         throw error;
     }
 }

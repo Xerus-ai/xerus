@@ -4,6 +4,7 @@
 // Backend sends messages via sendSessionCommandInput() to CLI's stdin.
 // See: docs/planning/execution/EXECUTION_ARCHITECTURE_v2.md Section 4
 
+import { logger } from '../../../../utils/logger';
 import { Sandbox } from '@daytonaio/sdk';
 import { SANDBOX_CONFIG } from '../sandbox.config';
 import type { RunnerEvent, ErrorEvent } from '../../../execution/runner/runner.types';
@@ -16,6 +17,8 @@ import { PersistentLogBuffer } from './persistent-log-buffer';
 
 // Re-export PersistentLogBuffer for consumers that imported from this module
 export { PersistentLogBuffer } from './persistent-log-buffer';
+
+const log = logger('AgentSession');
 
 const RECONNECT_MAX_ATTEMPTS = 3;
 const RECONNECT_BASE_DELAY_MS = 2000;
@@ -126,7 +129,7 @@ export async function createAgentSession(
 
     // Delete any stale session from previous runs.
     // Stale sessions have dead pipes that cause "failed to open input pipe" errors.
-    console.log(`[AgentSession] Deleting stale session '${sessionName}'...`);
+    log.debug('Deleting stale session', { session_name: sessionName });
     try {
         await sandbox.process.deleteSession(sessionName);
     } catch {
@@ -134,7 +137,7 @@ export async function createAgentSession(
     }
     const t1 = Date.now();
 
-    console.log(`[AgentSession] Creating session '${sessionName}'...`);
+    log.debug('Creating session', { session_name: sessionName });
     await sandbox.process.createSession(sessionName);
     const t2 = Date.now();
 
@@ -152,13 +155,13 @@ export async function createAgentSession(
     const command = buildSessionCommand(envVars, agentOpts);
 
     const envKeys = Object.keys(envVars);
-    console.log(`[AgentSession] Executing ${agentOpts.adapterType} for ${agentOpts.agentSlug} with ${envKeys.length} env vars`);
+    log.info('Executing CLI', { adapter_type: agentOpts.adapterType, agent_slug: agentOpts.agentSlug, env_var_count: envKeys.length });
     const response = await sandbox.process.executeSessionCommand(sessionName, {
         command,
         runAsync: true,
     });
     const t3 = Date.now();
-    console.log(`[AgentSession] Daytona timing: delete=${t1 - t0}ms, create=${t2 - t1}ms, exec=${t3 - t2}ms, total=${t3 - t0}ms`);
+    log.debug('Daytona timing', { delete_ms: t1 - t0, create_ms: t2 - t1, exec_ms: t3 - t2, total_ms: t3 - t0 });
 
     const commandId = response.cmdId || '';
     if (!commandId) {

@@ -9,10 +9,13 @@
 // Bundle is ALWAYS uploaded (ensures latest code). npm install is skipped if
 // node_modules already exists (deps don't change often).
 
+import { logger } from '../../../utils/logger';
 import fs from 'fs';
 import path from 'path';
 import { SANDBOX_CONFIG } from './sandbox.config';
 import type { DaytonaProvider } from './providers/daytona.provider';
+
+const log = logger('RunnerInstaller');
 
 const BUNDLE_DIR = path.join(__dirname, '..', '..', '..', '..', 'dist', 'runner-bundle');
 const MINIMAL_MCP_BUNDLE_PATH = path.join(BUNDLE_DIR, 'minimal-mcp-server.js');
@@ -69,7 +72,7 @@ export async function installRunnerBundle(
     if (depsPreinstalled) {
         const nodeModulesExists = await sandboxFs.exists(`${runnerDir}/node_modules`);
         if (!nodeModulesExists) {
-            console.warn(`[RunnerInstaller] Snapshot '${snapshot}' claims pre-installed deps but node_modules missing. Falling back to npm install.`);
+            log.warn('Snapshot claims pre-installed deps but node_modules missing, falling back to npm install', { snapshot });
         } else {
             return { depsPreinstalled: true };
         }

@@ -7,6 +7,9 @@ import { toolValidator } from './validators';
 import { toolsCache } from '../../shared/cache/tools-cache';
 import { ToolNotConnectedError, ToolExecutionError, UnauthorizedAccessError } from './errors';
 import { NotFoundError } from '../../utils/errors';
+import { logger } from '../../utils/logger';
+
+const log = logger('ToolsService');
 import type {
     ListAppsInput,
     ListAppsResponse,
@@ -101,7 +104,7 @@ export class ToolsService {
                 token: token.token,
             };
         } catch (error) {
-            console.error('Failed to create connect token:', error);
+            log.error('Failed to create connect token', error instanceof Error ? error : new Error(String(error)));
             throw error;
         }
     }
@@ -136,7 +139,7 @@ export class ToolsService {
         try {
             await this.pipedream.deleteAccount(validated.pipedream_account_id);
         } catch (error) {
-            console.error('Failed to delete from Pipedream:', error);
+            log.error('Failed to delete from Pipedream', error instanceof Error ? error : new Error(String(error)));
             throw new Error('Failed to disconnect account from Pipedream. Please try again.');
         }
 
@@ -151,14 +154,14 @@ export class ToolsService {
         const cacheKey = `${validated.app_slug}:${validated.query || ''}:${validated.limit || ''}`;
         const cached = toolsCache.getActions(cacheKey);
         if (cached) {
-            console.log(`[Cache HIT] Actions for ${validated.app_slug}`);
+            log.debug('Cache HIT for actions', { app_slug: validated.app_slug });
             return {
                 actions: cached,
                 total: cached.length,
             };
         }
 
-        console.log(`[Cache MISS] Fetching actions for ${validated.app_slug}`);
+        log.debug('Cache MISS for actions', { app_slug: validated.app_slug });
         const response = await this.pipedream.getComponents({
             app: validated.app_slug,
             componentType: 'action',
@@ -179,14 +182,14 @@ export class ToolsService {
         const cacheKey = `${validated.app_slug}:${validated.query || ''}:${validated.limit || ''}`;
         const cached = toolsCache.getTriggers(cacheKey);
         if (cached) {
-            console.log(`[Cache HIT] Triggers for ${validated.app_slug}`);
+            log.debug('Cache HIT for triggers', { app_slug: validated.app_slug });
             return {
                 actions: cached,
                 total: cached.length,
             };
         }
 
-        console.log(`[Cache MISS] Fetching triggers for ${validated.app_slug}`);
+        log.debug('Cache MISS for triggers', { app_slug: validated.app_slug });
         const response = await this.pipedream.getComponents({
             app: validated.app_slug,
             componentType: 'trigger',
@@ -317,34 +320,34 @@ export class ToolsService {
                 if (lastSyncTime > staleCutoff) {
                     throw new Error('Sync already in progress');
                 }
-                console.log('[Sync] Detected stale sync (>30min), resetting before new sync');
+                log.info('Detected stale sync (>30min), resetting before new sync');
                 await toolsRepository.updateSyncMetadata('failed', undefined, 'Stale sync reset');
             }
             await toolsRepository.updateSyncMetadata('syncing');
-            console.log('[Sync] Starting Pipedream apps sync...');
+            log.info('Starting Pipedream apps sync...');
 
             const allApps = await this.fetchPaginatedApps();
-            console.log(`[Sync] Fetched ${allApps.length} apps from Pipedream`);
+            log.info('Fetched apps from Pipedream', { count: allApps.length });
 
             for (const app of allApps) {
                 try {
                     await toolsRepository.upsertApp(app);
                     syncedCount++;
                 } catch (error) {
-                    console.error(`[Sync] Failed to upsert app ${app.name_slug}:`, error);
+                    log.error('Failed to upsert app', { app_slug: app.name_slug, error: error instanceof Error ? error.message : String(error) });
                     failedCount++;
                 }
             }
 
             await toolsRepository.updateSyncMetadata('success', syncedCount);
             const duration_ms = Date.now() - startTime;
-            console.log(`[Sync] Completed. Synced: ${syncedCount}, Failed: ${failedCount}, Duration: ${duration_ms}ms`);
+            log.info('Sync completed', { synced: syncedCount, failed: failedCount, duration_ms });
 
             return { synced: syncedCount, failed: failedCount, duration_ms };
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             await toolsRepository.updateSyncMetadata('failed', undefined, errorMessage);
-            console.error('[Sync] Failed to sync Pipedream apps:', error);
+            log.error('Failed to sync Pipedream apps', error instanceof Error ? error : new Error(String(error)));
             throw error;
         }
     }

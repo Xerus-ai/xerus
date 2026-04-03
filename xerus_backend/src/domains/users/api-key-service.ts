@@ -7,6 +7,9 @@ import { encrypt, decrypt } from '../../utils/encryption';
 import { InvalidApiProviderError, ApiKeyNotFoundError, ApiKeyEncryptionError } from './errors';
 import type { ApiProvider, ApiKeyStatus, ApiKeySetInput } from './types';
 import { VALID_API_PROVIDERS } from './types';
+import { logger } from '../../utils/logger';
+
+const log = logger('ApiKeyService');
 
 // ===== ENVIRONMENT KEY MAPPING =====
 
@@ -93,7 +96,7 @@ export class ApiKeyService {
         try {
             encryptedKey = encrypt(validated.api_key);
         } catch (error) {
-            console.error('[API KEY SERVICE] Encryption failed:', error);
+            log.error('Encryption failed', error instanceof Error ? error : new Error(String(error)));
             throw new ApiKeyEncryptionError('encrypt');
         }
 
@@ -121,7 +124,7 @@ export class ApiKeyService {
         try {
             return decrypt(key.api_key_encrypted);
         } catch (error) {
-            console.error(`[API KEY SERVICE] Decryption failed for ${provider}:`, error);
+            log.error('Decryption failed', { provider, error: error instanceof Error ? error.message : String(error) });
             throw new ApiKeyEncryptionError('decrypt');
         }
     }

@@ -2,6 +2,7 @@
 // S3 operations for workspace persistence
 // Split: utility functions moved to storage.utils.ts
 
+import { logger } from '../../../utils/logger';
 import {
     S3Client,
     PutObjectCommand,
@@ -37,6 +38,8 @@ export {
 export type { StorageCategory, ParsedS3Key, DeleteMultipleResult } from './storage.utils';
 
 import { type StorageCategory, type DeleteMultipleResult, generateUserPaths, buildS3Key } from './storage.utils';
+
+const log = logger('StorageService');
 
 export class StorageService {
     private readonly client: S3Client;
@@ -385,9 +388,10 @@ export class StorageService {
             deleted += deleteResult.deletedCount;
 
             if (deleteResult.errors.length > 0) {
-                console.warn(
-                    `[storage] deletePrefix partial failures for '${prefix}': ${deleteResult.errors.map((e) => `${e.key}: ${e.error}`).join(', ')}`,
-                );
+                log.warn('deletePrefix partial failures', {
+                    prefix,
+                    failures: deleteResult.errors.map((e) => `${e.key}: ${e.error}`).join(', '),
+                });
             }
         }
 

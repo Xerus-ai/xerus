@@ -1,75 +1,112 @@
-# Xerus Custom Daytona Snapshot
-# CLI-native architecture: agents run via Claude Code CLI + Codex CLI (no Agent SDK)
+# Xerus Sandbox Daytona Snapshot Image
+# Pre-installs all CLIs and runtime dependencies for instant sandbox creation
 #
-# Extends the standard daytona sandbox image with:
+# Build: docker build -f Dockerfile.xerus-snapshot -t xerus-sandbox .
+# Register: Used by scripts/create-snapshot.ts
+#
+# Includes:
 # - Node.js 22 LTS (via nodesource)
-# - sqlite3 (company.db, beads task boards)
-# - @beads/bd CLI (task tracking across sessions)
+# - Python 3.12 + UV package manager
 # - Claude Code CLI (@anthropic-ai/claude-code)
 # - Codex CLI (@openai/codex)
-# - @modelcontextprotocol/sdk (Platform MCP server)
-# - Pre-created runner directory structure
-#
-# Build: npm run snapshot:create
-# This Dockerfile is used by scripts/create-snapshot.ts
+# - 9to5 scheduling daemon
+# - @beads/bd task tracking CLI
+# - claude-ipc-mcp (AI-to-AI IPC)
+# - sqlite3 (company.db, beads task boards)
+# - Pre-created .xerus directory structure
 
-FROM mcr.microsoft.com/devcontainers/python:3.14
+FROM ubuntu:24.04
 
-# System dependencies
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# System packages (Ubuntu 24.04 ships Python 3.12, ICU 74)
 RUN apt-get update && apt-get install -y \
     curl \
-    sudo \
-    python3-pip \
-    python3-venv \
-    ripgrep \
-    jq \
     git \
     sqlite3 \
+    python3 \
+    python3-pip \
+    python3-venv \
+    sudo \
+    ripgrep \
+    jq \
+    ca-certificates \
+    gnupg \
+    unzip \
+    libicu74 \
     && rm -rf /var/lib/apt/lists/*
 
-# Create daytona user
-RUN useradd -m daytona && echo "daytona ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/91-daytona
+# Create daytona user (standard Daytona sandbox user)
+# SECURITY: Restrict passwordless sudo to package-management commands only.
+RUN useradd -m -s /bin/bash daytona \
+    && echo "daytona ALL=(ALL) NOPASSWD: /usr/bin/apt-get, /usr/bin/apt, /usr/bin/dpkg, /usr/bin/npm, /usr/bin/pip3" > /etc/sudoers.d/91-daytona
 
-# Install Node.js 22 LTS via nodesource (reliable, adds to system PATH)
-RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+# Node.js 22.x LTS via nodesource (adds to system PATH)
+RUN mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
+       | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" \
+       > /etc/apt/sources.list.d/nodesource.list \
+    && apt-get update \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # Verify Node.js installation (fail-fast if broken)
 RUN node --version && npm --version
 
-# Install global Node.js tools
-RUN npm install -g ts-node@10.9.2 typescript@5.9.3 @beads/bd
+# UV Python package manager (Astral)
+RUN curl -LsSf https://astral.sh/uv/0.6.14/install.sh | sh
+ENV PATH="/root/.local/bin:${PATH}"
 
-# --- Xerus-specific additions ---
+# Claude Code CLI (Anthropic)
+RUN npm install -g @anthropic-ai/claude-code@latest
+
+# Codex CLI (OpenAI)
+RUN npm install -g @openai/codex@latest
+
+# 9to5 scheduling daemon
+RUN npm install -g 9to5@latest
+
+# Beads task tracking CLI
+RUN npm install -g @beads/bd
+
+# Global Node.js tools
+RUN npm install -g ts-node@10.9.2 typescript@5.9.3
+
+# --- Xerus-specific directory structure ---
 
 ENV XERUS_WORKSPACE_ROOT=/home/daytona \
     LANG=en_US.UTF-8 \
     LC_ALL=en_US.UTF-8
 
-# Pre-create runner directory and install npm deps
-RUN mkdir -p "$XERUS_WORKSPACE_ROOT/.xerus/runner" && chown -R daytona:daytona "$XERUS_WORKSPACE_ROOT/.xerus"
+# Create .xerus directory structure
+RUN mkdir -p /home/daytona/.xerus/runner \
+    && mkdir -p /home/daytona/.xerus/ipc \
+    && chown -R daytona:daytona /home/daytona/.xerus
 
-COPY runner-package.json "$XERUS_WORKSPACE_ROOT/.xerus/runner/package.json"
-RUN cd "$XERUS_WORKSPACE_ROOT/.xerus/runner" && npm install --production --no-audit --no-fund \
-    && chown -R daytona:daytona "$XERUS_WORKSPACE_ROOT/.xerus"
+# Runner package.json with MCP SDK dependency
+COPY runner-package.json /home/daytona/.xerus/runner/package.json
+RUN cd /home/daytona/.xerus/runner \
+    && npm install --production --no-audit --no-fund \
+    && chown -R daytona:daytona /home/daytona/.xerus
 
+# Switch to daytona user
 USER daytona
-RUN touch ~/.zshrc
+WORKDIR /home/daytona
 
-# CLI-native pivot: Install Claude Code CLI and Codex CLI
-RUN npm install -g @anthropic-ai/claude-code@latest
-RUN npm install -g @openai/codex@latest
+# Ensure UV is available for daytona user
+ENV PATH="/home/daytona/.local/bin:${PATH}"
+RUN curl -LsSf https://astral.sh/uv/0.6.14/install.sh | sh
 
-# IPC server for inter-CLI communication
-RUN pip install claude-ipc-mcp
+# Create shell config files
+RUN touch ~/.bashrc ~/.zshrc
 
-# 9to5 scheduling daemon
-RUN npm install -g 9to5-cli@latest
+# Claude IPC MCP server is installed from workspace clone (.xerus/ipc/)
 
 # Bun runtime (scheduler daemon uses bun:sqlite and Bun.spawn)
-RUN curl -fsSL https://bun.sh/install | bash && \
-    ln -s /home/daytona/.bun/bin/bun /usr/local/bin/bun
+RUN curl -fsSL https://bun.sh/install | bash -s "bun-v1.2.5"
 ENV PATH="/home/daytona/.bun/bin:${PATH}"
 
-ENTRYPOINT [ "sleep", "infinity" ]
+# Keep container running
+ENTRYPOINT ["sleep", "infinity"]

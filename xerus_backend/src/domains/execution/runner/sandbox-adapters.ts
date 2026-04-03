@@ -7,6 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { logger } from '../../../utils/logger';
 import type { SandboxCommandExecutor, GitMemoryFileSystem } from '../../memory/git-memory/git-memory.types';
 import type { GitMemoryService, DRMCompressor } from '../hooks/session-end.types';
 import type { ExtractionResult, LLMClient } from '../../memory/git-memory/memory-extractor.service';
@@ -18,6 +19,7 @@ import type { StdoutEmitter } from './stdout-emitter';
 import { LEGACY_LIGHT_MODEL } from '../../agents/types';
 
 const execAsync = promisify(exec);
+const log = logger('SandboxAdapters');
 
 // -----------------------------------------------------------------------------
 // Sandbox Command Executor (child_process.exec)
@@ -136,11 +138,11 @@ export function createGitMemoryServiceAdapter(
                                 scope: inferMemoryScope(filePath),
                             });
                         } catch (fileErr) {
-                            console.error(`[triggerIndexing] Failed to read ${filePath}: ${(fileErr as Error).message}`);
+                            log.error('triggerIndexing: failed to read file', { file_path: filePath, error: (fileErr as Error).message });
                         }
                     }
                 } catch (err) {
-                    console.error(`[triggerIndexing] Failed to list changed files: ${(err as Error).message}`);
+                    log.error('triggerIndexing: failed to list changed files', { error: (err as Error).message });
                 }
             })();
         },

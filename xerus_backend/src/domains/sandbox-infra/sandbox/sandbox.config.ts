@@ -2,6 +2,10 @@
 // Daytona sandbox lifecycle and retry settings
 // Reference: xerus_backend/docs/daytona/guides/typescript/anthropic/
 
+import { logger } from '../../../utils/logger';
+
+const log = logger('SandboxConfig');
+
 // Base workspace path (all other sandbox paths derive from this)
 // Provider-specific: Daytona sets this in Dockerfile, local dev sets it in .env
 const workspacePath = process.env.XERUS_WORKSPACE_ROOT;
@@ -18,10 +22,7 @@ if (!workspacePath) {
 const snapshot = process.env.DAYTONA_SNAPSHOT || '';
 if (!snapshot && !process.env.XERUS_AGENT_SLUG) {
     // Only warn on the backend (not inside sandbox where XERUS_AGENT_SLUG is set)
-    console.warn(
-        '[SandboxConfig] DAYTONA_SNAPSHOT not set. Sandbox creation will fail. '
-        + 'Set it to the Daytona snapshot name (e.g. xerus-sandbox).'
-    );
+    log.warn('DAYTONA_SNAPSHOT not set. Sandbox creation will fail. Set it to the Daytona snapshot name (e.g. xerus-sandbox).');
 }
 
 export const SANDBOX_CONFIG = {
@@ -49,6 +50,9 @@ export const SANDBOX_CONFIG = {
 
     // Git repository URL for workspace template (cloned on new sandbox creation)
     workspaceTemplateUrl: process.env.XERUS_WORKSPACE_TEMPLATE_URL || 'https://github.com/xerus-ai/xerus-workspace.git',
+
+    // Git branch for workspace template (optional — uses repo default if not set)
+    workspaceTemplateBranch: process.env.XERUS_WORKSPACE_TEMPLATE_BRANCH || '',
 
     // Streaming queue limits (backpressure)
     queueSoftLimit: 500,   // Emit warning when exceeded

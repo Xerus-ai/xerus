@@ -1,6 +1,7 @@
 // Runner Event Router
 // Routes runner stdout events to backend services (DB writes, SSE, logging).
 
+import { logger } from '../../utils/logger';
 import type { PipelineContext, ResolvedExecutionDeps } from './execution-pipeline.types';
 import { requireAgent } from './pipeline-guards';
 import { validateWorkspacePath } from '../../utils/path-validation';
@@ -34,6 +35,7 @@ import {
 const mentionParser = new MentionParser();
 
 export const EVENT_ROUTER_LOG_PREFIX = '[EventRouter]';
+const log = logger('EventRouter');
 
 // Canonical allowlist: only events the frontend knows how to handle (from STREAM_EVENT_TYPES)
 export const VALID_SSE_FORWARD_EVENTS: ReadonlySet<string> = new Set(STREAM_EVENT_TYPES);
@@ -101,7 +103,7 @@ export async function routeEventToBackend(
         case 'update_agent_run':
             // agent_runs table dropped -- event should no longer be emitted by runner.
             // Log as warning so we notice if it still fires.
-            console.warn(`${EVENT_ROUTER_LOG_PREFIX} update_agent_run: deprecated event still being emitted`);
+            log.warn('update_agent_run: deprecated event still being emitted');
             break;
         case 'sse_forward':
             handleSseForward(d, ctx);
@@ -129,7 +131,7 @@ export async function routeEventToBackend(
 
         // ----- Category C: Structured log handlers -----
         case 'error':
-            console.error(`${EVENT_ROUTER_LOG_PREFIX} error: code=${d.code || 'unknown'} message=${d.message || ''}`);
+            log.error('Runner error event', { code: d.code || 'unknown', message: d.message || '' });
             break;
         case 'agent_output':
             handleAgentOutput(d, ctx);
@@ -159,7 +161,7 @@ export async function routeEventToBackend(
             await handleHitlRequest(d, ctx, deps);
             break;
         default:
-            console.warn(`${EVENT_ROUTER_LOG_PREFIX} unknown event: ${eventType}`);
+            log.warn('Unknown event type', { event_type: eventType });
             break;
     }
 }
@@ -226,12 +228,12 @@ async function handleSessionStarted(
     }
 
     if (!evt.session_id) {
-        console.warn(`${EVENT_ROUTER_LOG_PREFIX} session_started: missing session_id in event data`);
+        log.warn('session_started: missing session_id in event data');
         logEvent('session_started', d);
         return;
     }
     if (!ctx.conversationId) {
-        console.warn(`${EVENT_ROUTER_LOG_PREFIX} session_started: sdk_session_id received but ctx.conversationId is missing, cannot persist`);
+        log.warn('session_started: sdk_session_id received but conversationId missing, cannot persist');
         logEvent('session_started', d);
         return;
     }
@@ -265,7 +267,7 @@ async function handleSessionCompleted(
             [ctx.sessionId, data.reason || data.summary || null],
         );
     }
-    console.log(`${EVENT_ROUTER_LOG_PREFIX} session_completed: status=${data.status} reason=${data.reason}`);
+    log.info('session_completed', { status: data.status, reason: data.reason });
 }
 
 function handleCreditUsage(d: Record<string, unknown>, ctx: PipelineContext): void {
@@ -360,7 +362,7 @@ async function handleAgentMessage(
         });
     } catch (err) {
         if (err instanceof ChannelNotFoundError) {
-            console.warn(`${EVENT_ROUTER_LOG_PREFIX} agent_message: ${err.message}`);
+            log.warn('agent_message channel not found', { error: err.message });
             return;
         }
         throw err;
@@ -373,7 +375,7 @@ async function handleAgentMessage(
         deps.messageBridge.dispatchMention(
             ctx.request.userId, agentSlug, mention.target, mention.message, data.project || '', data.channel,
         ).catch(err => {
-            console.warn(`${EVENT_ROUTER_LOG_PREFIX} agent_message: mention dispatch to @${mention.target} failed: ${(err as Error).message}`);
+            log.warn('agent_message mention dispatch failed', { target: mention.target, error: (err as Error).message });
         });
     }
 }
@@ -383,10 +385,7 @@ async function handleHookLog(
 ): Promise<void> {
     if (!ctx.sessionId) { logEvent('hook_log', d); return; }
     const data = assertHookLogData(d);
-    console.log(
-        `${EVENT_ROUTER_LOG_PREFIX} hook_log: event=${data.hook_event} agent=${requireAgent(ctx).slug} ` +
-        `success=${data.success} duration=${data.duration_ms}ms`
-    );
+    log.info('hook_log', { hook_event: data.hook_event, agent_slug: requireAgent(ctx).slug, success: data.success, duration_ms: data.duration_ms });
 }
 
 async function handleSubagentFailure(d: Record<string, unknown>, ctx: PipelineContext): Promise<void> {
@@ -473,7 +472,7 @@ async function handleHitlRequest(
         [ctx.sessionId],
     );
 
-    console.log(`${EVENT_ROUTER_LOG_PREFIX} hitl_request: scenario=${request.scenario} tool=${data.tool_name}`);
+    log.info('hitl_request', { scenario: request.scenario, tool_name: data.tool_name });
 }
 
 const FILE_WRITE_TOOLS = new Set(['Write', 'Edit', 'NotebookEdit']);
@@ -512,5 +511,5 @@ function emitFileChangedFromToolCall(d: Record<string, unknown>, ctx: PipelineCo
 function logEvent(eventType: string, d: Record<string, unknown>): void {
     const agentSlug = d.agent_slug || '';
     const payload = d.data && typeof d.data === 'object' ? d.data : d;
-    console.log(`${EVENT_ROUTER_LOG_PREFIX} ${eventType}: agent=${agentSlug} data=${JSON.stringify(payload)}`);
+    log.debug(eventType, { agent_slug: agentSlug, data: payload });
 }

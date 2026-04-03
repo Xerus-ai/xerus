@@ -4,6 +4,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { logger } from '../../../utils/logger';
 import { StdoutEmitter } from './stdout-emitter';
 import { buildSoulAppend } from './soul-append-builder';
 import { buildHookHandlers } from '../hooks/hooks.registry';
@@ -15,6 +16,7 @@ import { sanitizeSubagentTools } from '../../platform-tools/orchestrator/tool.fi
 import { DEFAULT_SDK_MODEL } from '../../agents/types';
 
 // Inlined from deleted xerus-master.types.ts
+const log = logger('AgentConfigLoader');
 const XERUS_MASTER_SLUG = 'xerus-master';
 const XERUS_CTO_SLUG = 'xerus-cto';
 
@@ -254,9 +256,7 @@ export class AgentConfigLoader {
                 maxTurns: Number(parsed.max_turns) || 50,
             };
         } catch (error) {
-            console.warn(
-                `[AgentConfigLoader] Skipping agent '${slug}': ${error instanceof Error ? error.message : String(error)}`,
-            );
+            log.warn('Skipping agent definition', { slug, error: error instanceof Error ? error.message : String(error) });
             return null;
         }
     }

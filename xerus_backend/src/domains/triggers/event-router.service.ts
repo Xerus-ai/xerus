@@ -4,6 +4,9 @@
 
 import { query } from '../../database/connection';
 import type { NormalizedEvent, AgentTriggerRow } from './trigger.types';
+import { logger } from '../../utils/logger';
+
+const log = logger('EventRouter');
 
 // -----------------------------------------------------------------------------
 // Constants
@@ -68,9 +71,7 @@ export class EventRouterService {
         // 2. Check rate limit
         const maxPerHour = await this.getMaxEventsPerHour(agentId);
         if (this.isRateLimited(agentId, maxPerHour)) {
-            console.warn(
-                `[EventRouter] Rate limited: agent ${agentId} exceeded ${maxPerHour} events/hour`
-            );
+            log.warn('Rate limited', { agent_id: agentId, max_per_hour: maxPerHour });
             return { routed: false, reason: 'rate_limited' };
         }
 
@@ -230,10 +231,10 @@ export class EventRouterService {
 
         if (queue.length >= MAX_QUEUE_SIZE) {
             const dropped = queue.shift();
-            console.warn(
-                `[EventRouter] Queue full for agent ${agentId}, dropping oldest event: ` +
-                `${dropped?.event.app}.${dropped?.event.event_type}`
-            );
+            log.warn('Queue full, dropping oldest event', {
+                agent_id: agentId,
+                dropped_event: `${dropped?.event.app}.${dropped?.event.event_type}`,
+            });
         }
 
         queue.push({
@@ -256,10 +257,12 @@ export class EventRouterService {
         await this.updateTriggerStats(trigger.id);
 
         // Log event dispatch for traceability
-        console.log(
-            `[EventRouter] Dispatching ${event.app}.${event.event_type} to agent ${agentId} ` +
-            `(trigger ${trigger.id})`
-        );
+        log.info('Dispatching event', {
+            app: event.app,
+            event_type: event.event_type,
+            agent_id: agentId,
+            trigger_id: trigger.id,
+        });
 
         // Create a pending execution session for the triggered event.
         // The execution pipeline picks up pending sessions and runs them.
@@ -276,11 +279,12 @@ export class EventRouterService {
                 [agentId, trigger.id, `Event: ${event.app}.${event.event_type}`]
             );
         } catch (err) {
-            console.error(
-                `[EventRouter] Failed to create execution session for agent ${agentId} ` +
-                `(${event.app}.${event.event_type}):`,
-                err instanceof Error ? err.message : err
-            );
+            log.error('Failed to create execution session', {
+                agent_id: agentId,
+                app: event.app,
+                event_type: event.event_type,
+                error: err instanceof Error ? err.message : String(err),
+            });
         }
     }
 

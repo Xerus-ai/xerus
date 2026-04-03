@@ -2,9 +2,11 @@
 // Typed interfaces and assertion functions for runner event data.
 // Extracted from runner-event-router.ts to keep files under 400 lines.
 
+import { logger } from '../../utils/logger';
 import type { HITLScenario, UIHint } from './hitl/hitl.types';
 
-const LOG_PREFIX = '[EventRouter]';
+const log = logger('EventRouterGuards');
+const LOG_PREFIX = '[EventRouterGuards]';
 
 // ---------------------------------------------------------------------------
 // Typed event data interfaces (grouped by category)
@@ -171,7 +173,7 @@ export function assertSessionEndedData(d: Record<string, unknown>): SessionEnded
 
 export function assertSessionCompletedData(d: Record<string, unknown>): SessionCompletedEventData {
     if (typeof d.status !== 'string') {
-        console.warn(`${LOG_PREFIX} session_completed: missing status field, defaulting to unknown`);
+        log.warn('session_completed: missing status field, defaulting to unknown');
     }
     return {
         status: typeof d.status === 'string' ? d.status : 'unknown',
@@ -239,7 +241,7 @@ export function assertHookLogData(d: Record<string, unknown>): HookLogEventData 
 
 export function assertSubagentFailureData(d: Record<string, unknown>): SubagentFailureEventData {
     if (typeof d.subagent_type !== 'string') {
-        console.warn(`${LOG_PREFIX} subagent_failure: missing subagent_type field, defaulting to unknown`);
+        log.warn('subagent_failure: missing subagent_type field, defaulting to unknown');
     }
     return {
         subagent_type: typeof d.subagent_type === 'string' ? d.subagent_type : 'unknown',

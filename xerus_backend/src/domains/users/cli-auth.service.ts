@@ -16,6 +16,9 @@ import { userRepository } from './repository';
 import { decrypt } from '../../utils/encryption';
 import { shellEscapePath } from '../../utils/shell-safety';
 import type { SandboxService } from '../sandbox-infra/sandbox/sandbox.service';
+import { logger } from '../../utils/logger';
+
+const log = logger('CLIAuthService');
 
 export type AuthMethod = 'subscription' | 'api' | 'platform';
 
@@ -174,7 +177,7 @@ export class CLIAuthService {
             return exists ? { status: 'found' } : { status: 'not_found' };
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            console.warn(`[CLIAuthService] Failed to check sandbox file ${filePath} for user ${userId}:`, error);
+            log.warn('Failed to check sandbox file', { file_path: filePath, user_id: userId, error: errorMessage });
             return { status: 'unavailable', reason: 'sandbox_access_error', error: errorMessage };
         }
     }
@@ -192,12 +195,12 @@ export class CLIAuthService {
                 return decrypted.length > 0 ? { status: 'found' } : { status: 'not_found' };
             } catch (decryptError) {
                 const errorMessage = decryptError instanceof Error ? decryptError.message : String(decryptError);
-                console.warn(`[CLIAuthService] Failed to decrypt API key for user ${userId}, provider ${apiProvider}:`, decryptError);
+                log.warn('Failed to decrypt API key', { user_id: userId, provider: apiProvider, error: errorMessage });
                 return { status: 'unavailable', reason: 'decryption_failed', error: errorMessage };
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            console.warn(`[CLIAuthService] Failed to check API key for user ${userId}, provider ${apiProvider}:`, error);
+            log.warn('Failed to check API key', { user_id: userId, provider: apiProvider, error: errorMessage });
             return { status: 'unavailable', reason: 'query_error', error: errorMessage };
         }
     }
@@ -240,7 +243,7 @@ export class CLIAuthService {
             };
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            console.warn(`[CLIAuthService] Failed to trigger ${adapter} auth for user ${userId}:`, error);
+            log.warn('Failed to trigger auth', { adapter, user_id: userId, error: errorMessage });
             return { authUrl: null, message: `Failed to start auth: ${errorMessage}` };
         }
     }

@@ -14,6 +14,7 @@ const VALID_GIT_URL_PATTERN = /^https:\/\/[a-zA-Z0-9._-]+\/[a-zA-Z0-9_./-]+\.git
 export interface WorkspaceCloneResult {
     cloned: boolean;
     durationMs: number;
+    branch?: string;
 }
 
 /**
@@ -31,6 +32,7 @@ export async function cloneWorkspaceTemplate(
     const startTime = Date.now();
     const basePath = SANDBOX_CONFIG.workspacePath;
     const templateUrl = SANDBOX_CONFIG.workspaceTemplateUrl;
+    const branch = SANDBOX_CONFIG.workspaceTemplateBranch;
 
     if (!VALID_GIT_URL_PATTERN.test(templateUrl)) {
         throw new Error(`Invalid workspace template URL: ${templateUrl}`);
@@ -41,8 +43,9 @@ export async function cloneWorkspaceTemplate(
     // rm -rf removes both the temp clone and the workspace .git (template history)
     // git init creates a fresh .git so the SDK can detect project root from subdirectory CWDs.
     // Without .git, SDK cannot discover .claude/settings.json (shell hooks) or .claude/skills/.
+    const branchFlag = branch ? `-b '${branch}'` : '';
     const cloneCmd = [
-        `git clone --recurse-submodules --depth 1 '${templateUrl}' /tmp/xerus-workspace-clone`,
+        `git clone --recurse-submodules --depth 1 ${branchFlag} '${templateUrl}' /tmp/xerus-workspace-clone`,
         `cp -a /tmp/xerus-workspace-clone/. '${basePath}/'`,
         `rm -rf /tmp/xerus-workspace-clone '${basePath}/.git'`,
         `git -C '${basePath}' init`,

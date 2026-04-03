@@ -3,7 +3,10 @@
 // Monitors via stdout activity + health probes
 // Spec: xerus-y5v.4.146
 
+import { logger } from '../../../utils/logger';
 import type { HealthCommand } from './stdin-parser';
+
+const log = logger('HealthMonitor');
 
 // -----------------------------------------------------------------------------
 // Types
@@ -166,7 +169,7 @@ export class RunnerHealthMonitor {
             entry.last_probe_sent = Date.now();
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
-            console.error(`[HealthMonitor] Health probe failed for ${sandboxId}: ${msg}`);
+            log.error('Health probe failed', { sandbox_id: sandboxId, error: msg });
             entry.healthy = false;
         }
     }
@@ -218,7 +221,7 @@ export class RunnerHealthMonitor {
             await this.deps.sandboxManager.killSession(sandboxId);
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
-            console.error(`[HealthMonitor] killSession failed for ${sandboxId} (continuing restart): ${msg}`);
+            log.error('killSession failed (continuing restart)', { sandbox_id: sandboxId, error: msg });
         }
 
         // Start new session

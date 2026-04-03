@@ -3,11 +3,14 @@
 // Each agent gets its own Daytona session (agent-{slug}) running the CLI directly.
 // Extracted from SandboxService to keep file sizes under 400 lines.
 
+import { logger } from '../../../utils/logger';
 import type { DaytonaProvider } from './providers/daytona.provider';
 import type { SessionHandle, AgentSessionOptions } from './providers';
 import { sendCommand, createAgentSession } from './providers';
 import type { SandboxSession } from './sandbox.types';
 import type { AdapterType } from '../../execution/runner/cli-adapters/types';
+
+const log = logger('RunnerSession');
 
 // Skip health check if runner was used within this window (avoids Daytona HTTP round-trip)
 const HEALTH_CHECK_GRACE_MS = 30_000;
@@ -52,23 +55,23 @@ export async function getOrCreateRunnerSession(
     if (existing) {
         const envChanged = !envVarsEqual(existing.envVars, envVars);
         if (envChanged) {
-            console.log(`[RunnerSession] Env vars changed for agent ${slug} (user ${userId}), restarting session`);
+            log.info('Env vars changed, restarting session', { agent_slug: slug, user_id: userId });
             session.agentSessions.delete(slug);
         } else {
             const lastUsed = existing.handle.lastUsedAt ?? 0;
             const withinGrace = (Date.now() - lastUsed) < HEALTH_CHECK_GRACE_MS;
-            console.log(`[RunnerSession] Existing session for agent ${slug} (user ${userId}), withinGrace=${withinGrace}, lastUsed=${Date.now() - lastUsed}ms ago`);
+            log.debug('Existing session found', { agent_slug: slug, user_id: userId, within_grace: withinGrace, last_used_ms_ago: Date.now() - lastUsed });
             const healthy = withinGrace || await checkRunnerHealth(existing.handle);
             if (healthy) {
                 existing.handle.lastUsedAt = Date.now();
-                console.log(`[RunnerSession] Reusing existing session for agent ${slug}${withinGrace ? ' (grace)' : ''}`);
+                log.debug('Reusing existing session', { agent_slug: slug, grace: withinGrace });
                 return existing.handle;
             }
-            console.log(`[RunnerSession] Health check failed for agent ${slug} (user ${userId}), creating new session`);
+            log.info('Health check failed, creating new session', { agent_slug: slug, user_id: userId });
             session.agentSessions.delete(slug);
         }
     } else {
-        console.log(`[RunnerSession] No existing session for agent ${slug} (user ${userId}), creating new`);
+        log.debug('No existing session, creating new', { agent_slug: slug, user_id: userId });
     }
 
     // Also check legacy runnerHandle for backward compat
@@ -88,20 +91,20 @@ export async function getOrCreateRunnerSession(
     }
 
     const t0 = Date.now();
-    console.log(`[RunnerSession] Calling getSandboxInstance for ${sandboxId}`);
+    log.debug('Calling getSandboxInstance', { sandbox_id: sandboxId });
     const sandbox = await withTimeout(
         provider.getSandboxInstance(sandboxId),
         DAYTONA_CALL_TIMEOUT_MS,
         `getSandboxInstance(${sandboxId})`,
     );
-    console.log(`[RunnerSession] getSandboxInstance: ${Date.now() - t0}ms`);
+    log.debug('getSandboxInstance complete', { duration_ms: Date.now() - t0 });
 
     const agentOpts: AgentSessionOptions = {
         agentSlug: slug,
         adapterType: adapter,
     };
 
-    console.log(`[RunnerSession] Creating ${adapter} session for agent ${slug} in sandbox ${sandboxId}`);
+    log.info('Creating session', { adapter, agent_slug: slug, sandbox_id: sandboxId });
     const handle = await withTimeout(
         createAgentSession(sandbox, envVars, agentOpts),
         RUNNER_CREATION_TIMEOUT_MS,
@@ -116,7 +119,7 @@ export async function getOrCreateRunnerSession(
     session.runnerHandle = handle;
     session.runnerEnvVars = { ...envVars };
 
-    console.log(`[RunnerSession] Created new ${adapter} session for agent ${slug} (user ${userId}, total: ${Date.now() - t0}ms)`);
+    log.info('Created new session', { adapter, agent_slug: slug, user_id: userId, total_ms: Date.now() - t0 });
     return handle;
 }
 
@@ -131,7 +134,7 @@ async function checkRunnerHealth(handle: SessionHandle): Promise<boolean> {
             'sendCommand(health)',
         );
     } catch (err) {
-        console.log(`[RunnerSession] Health check sendCommand failed: ${(err as Error).message}`);
+        log.debug('Health check sendCommand failed', { error: (err as Error).message });
         return false;
     }
 
@@ -152,7 +155,7 @@ async function checkRunnerHealth(handle: SessionHandle): Promise<boolean> {
         pos++;
     }
 
-    console.log(`[RunnerSession] Health check timed out (no health event within ${HEALTH_TIMEOUT_MS}ms)`);
+    log.debug('Health check timed out', { timeout_ms: HEALTH_TIMEOUT_MS });
     return false;
 }
 

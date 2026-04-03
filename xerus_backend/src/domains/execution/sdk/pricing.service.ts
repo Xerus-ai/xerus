@@ -9,7 +9,10 @@
 //     credits = (tokens / 1000) * centsPerKToken
 //   produces the correct value in cents (= credits).
 
+import { logger } from '../../../utils/logger';
 import { CreditEstimate } from './sdk.types';
+
+const log = logger('PricingService');
 
 interface ModelPricing {
     input: number;  // cents per 1K input tokens
@@ -54,7 +57,7 @@ export class PricingService {
             }
         }
         this.pricingCache = cache;
-        console.log(`[PricingService] Loaded pricing for ${cache.size} models from model_registry`);
+        log.info('Loaded pricing from model_registry', { model_count: cache.size });
     }
 
     getModelPricing(model: string): ModelPricing {

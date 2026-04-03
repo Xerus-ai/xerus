@@ -6,8 +6,9 @@
 // Only agent_registry (slug/id mapping) and non-agent entities still sync.
 
 import { query } from '../../database/connection';
+import { logger } from '../../utils/logger';
 
-const LOG_PREFIX = '[reverse-sync]';
+const log = logger('ReverseSync');
 
 // -----------------------------------------------------------------------------
 // Types
@@ -100,16 +101,16 @@ async function syncAgentConfig(
              ON CONFLICT (slug, user_id) DO NOTHING`,
             [slug, userId],
         );
-        console.log(`${LOG_PREFIX} agent config create: slug=${slug} (registered in agent_registry)`);
+        log.debug('Agent config create', { slug, action: 'registered in agent_registry' });
     } else if (event === 'update') {
         // Config.json IS the source of truth — no DB sync needed
-        console.log(`${LOG_PREFIX} agent config update: slug=${slug} (filesystem is source of truth)`);
+        log.debug('Agent config update', { slug, action: 'filesystem is source of truth' });
     } else if (event === 'delete') {
         await query(
             `DELETE FROM agent_registry WHERE slug = $1 AND user_id = $2`,
             [slug, userId],
         );
-        console.log(`${LOG_PREFIX} agent config delete: slug=${slug}`);
+        log.debug('Agent config delete', { slug });
     }
 }
 
@@ -125,7 +126,7 @@ async function syncAgentSoul(
 ): Promise<void> {
     const slug = match[1];
     // SOUL.md lives in workspace files only. No DB column.
-    console.log(`${LOG_PREFIX} agent soul ${event}: slug=${slug} (file-only, no DB column)`);
+    log.debug('Agent soul sync', { event, slug, action: 'file-only, no DB column' });
 }
 
 // -----------------------------------------------------------------------------
@@ -140,7 +141,7 @@ async function syncAgentHeartbeat(
 ): Promise<void> {
     const slug = match[1];
     // Heartbeat tables deprecated in migration 081. HEARTBEAT.md is now a static template.
-    console.log(`${LOG_PREFIX} agent heartbeat ${event}: slug=${slug} (heartbeat tables deprecated, no DB sync)`);
+    log.debug('Agent heartbeat sync', { event, slug, action: 'heartbeat tables deprecated, no DB sync' });
 }
 
 // -----------------------------------------------------------------------------
@@ -158,7 +159,7 @@ async function syncAgentKB(
     const fileName = match[2];
     // KB data now lives in config.json knowledge_bases array.
     // No agent_knowledge_bases table to sync to.
-    console.log(`${LOG_PREFIX} agent kb ${event}: slug=${slug} file=${fileName} (filesystem is source of truth)`);
+    log.debug('Agent KB sync', { event, slug, file: fileName, action: 'filesystem is source of truth' });
 }
 
 // -----------------------------------------------------------------------------
@@ -173,7 +174,7 @@ async function syncDomain(
 ): Promise<void> {
     const domainSlug = match[1];
     // Domain data lives in workspace DB (source of truth). No Neon write needed.
-    console.log(`${LOG_PREFIX} domain ${event}: slug=${domainSlug} (workspace DB is source of truth, no Neon write)`);
+    log.debug('Domain sync', { event, slug: domainSlug, action: 'workspace DB is source of truth, no Neon write' });
 }
 
 // -----------------------------------------------------------------------------
@@ -189,5 +190,5 @@ async function syncChannel(
     const domainSlug = match[1];
     const channelSlug = match[2];
     // Channel data lives in workspace DB (source of truth). No Neon write needed.
-    console.log(`${LOG_PREFIX} channel ${event}: ${domainSlug}/${channelSlug} (workspace DB is source of truth, no Neon write)`);
+    log.debug('Channel sync', { event, domain: domainSlug, channel: channelSlug, action: 'workspace DB is source of truth, no Neon write' });
 }

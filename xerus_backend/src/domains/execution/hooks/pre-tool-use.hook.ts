@@ -8,11 +8,14 @@
 //   3. Evaluate HITL rules (platform tools only)
 //   4. Log hook execution
 
+import { logger } from '../../../utils/logger';
 import { PreToolUseInput, PreToolUseOutput, HookResult } from './hooks.types';
 import { validateToolAccess } from '../../platform-tools/orchestrator/tool.filter';
 import { evaluateHitlRule } from '../../platform-tools/platform/hitl-rules';
 import type { AgentType } from '../../platform-tools/orchestrator/tool.filter';
 import type { AutonomyLevel } from '../types';
+
+const log = logger('PreToolUseHook');
 
 // -----------------------------------------------------------------------------
 // Types
@@ -172,7 +175,7 @@ export class PreToolUseHandler {
         } catch (error) {
             // Logging is auxiliary - do not fail hook execution
             const message = error instanceof Error ? error.message : 'Unknown error';
-            console.error('[PreToolUseHook] Failed to log execution:', message);
+            log.error('Failed to log execution', { error: message });
         }
     }
 }

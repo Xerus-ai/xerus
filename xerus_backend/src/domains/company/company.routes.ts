@@ -26,6 +26,9 @@ import {
     domainExists,
     getChannelWithDomain,
 } from './company-workspace-db.service';
+import { logger } from '../../utils/logger';
+
+const log = logger('CompanyRoutes');
 
 const MAX_NAME_LENGTH = 100;
 const MAX_DESCRIPTION_LENGTH = 500;
@@ -389,7 +392,7 @@ router.post('/channels/:channelId/messages', auth, async (req: AuthenticatedRequ
 
         // Write to posts.jsonl for agent IPC (not Neon sync)
         syncMessageToSandbox(userId, channelTag, messageEntry).catch(err =>
-            console.warn(`[CompanyRoutes] Sandbox sync failed for message: ${err instanceof Error ? err.message : String(err)}`),
+            log.warn('Sandbox sync failed for message', { error: err instanceof Error ? err.message : String(err) }),
         );
 
         // Forward message to running agent's CLI stdin (best-effort, non-blocking)
@@ -399,7 +402,7 @@ router.post('/channels/:channelId/messages', auth, async (req: AuthenticatedRequ
                 channel_slug: channelId,
                 content: content.trim(),
             }).catch(err =>
-                console.warn(`[CompanyRoutes] Runner dispatch failed: ${err instanceof Error ? err.message : String(err)}`),
+                log.warn('Runner dispatch failed', { error: err instanceof Error ? err.message : String(err) }),
             );
         }
 

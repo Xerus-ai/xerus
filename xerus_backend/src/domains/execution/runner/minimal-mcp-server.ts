@@ -385,10 +385,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main(): Promise<void> {
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    console.error('[minimal-mcp-server] Running with 17 backend-coupled tools');
+    process.stderr.write('[minimal-mcp-server] Running with 17 backend-coupled tools\n');
 }
 
 main().catch((err) => {
-    console.error('[minimal-mcp-server] Fatal error:', err);
+    process.stderr.write(`[minimal-mcp-server] Fatal error: ${err}\n`);
     process.exit(1);
 });

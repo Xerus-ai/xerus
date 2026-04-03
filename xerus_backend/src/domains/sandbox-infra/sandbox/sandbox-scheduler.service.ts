@@ -3,8 +3,11 @@
 // Runs every 60 seconds to evaluate running sandboxes for sleep eligibility.
 // Provides imperative wake methods for user messages, heartbeats, and events.
 
+import { logger } from '../../../utils/logger';
 import cron from 'node-cron';
 import type { ScheduledTask } from 'node-cron';
+
+const log = logger('SandboxScheduler');
 
 // Configurable thresholds (constants, not DB config)
 const DEFAULT_INACTIVITY_TIMEOUT_MINUTES = 4320; // 3 days
@@ -89,15 +92,12 @@ export class SandboxSchedulerService {
 
         this.cronTask = cron.schedule(TICK_CRON_EXPRESSION, () => {
             this.tick().catch((err) => {
-                console.error(
-                    '[SandboxScheduler] Tick failed:',
-                    err instanceof Error ? err.message : err
-                );
+                log.error('Tick failed', { error: String(err instanceof Error ? err.message : err) });
             });
         });
 
         this.running = true;
-        console.log('[SandboxScheduler] Started (tick every 60s)');
+        log.info('Started (tick every 60s)');
     }
 
     stop(): void {
@@ -109,7 +109,7 @@ export class SandboxSchedulerService {
         this.cronTask.stop();
         this.cronTask = null;
         this.running = false;
-        console.log('[SandboxScheduler] Stopped');
+        log.info('Stopped');
     }
 
     isRunning(): boolean {
@@ -186,16 +186,10 @@ export class SandboxSchedulerService {
             try {
                 await this.sleepHandler(sandbox.sandbox_id, sandbox.user_id);
                 result.slept++;
-                console.log(
-                    `[SandboxScheduler] Slept sandbox ${sandbox.sandbox_id} ` +
-                    `for user ${sandbox.user_id} (inactive ${Math.round(inactiveMs / 60000)}min)`
-                );
+                log.info('Slept sandbox', { sandbox_id: sandbox.sandbox_id, user_id: sandbox.user_id, inactive_min: Math.round(inactiveMs / 60000) });
             } catch (err) {
                 result.errors++;
-                console.error(
-                    `[SandboxScheduler] Failed to sleep sandbox ${sandbox.sandbox_id}:`,
-                    err instanceof Error ? err.message : err
-                );
+                log.error('Failed to sleep sandbox', { sandbox_id: sandbox.sandbox_id, error: String(err instanceof Error ? err.message : err) });
             }
         }
 
@@ -212,11 +206,7 @@ export class SandboxSchedulerService {
         this.lastSleepEval = sleepResult;
 
         if (sleepResult.slept > 0 || sleepResult.errors > 0) {
-            console.log(
-                `[SandboxScheduler] Tick #${this.tickCount}: ` +
-                `evaluated=${sleepResult.evaluated}, slept=${sleepResult.slept}, ` +
-                `errors=${sleepResult.errors}`
-            );
+            log.info('Tick summary', { tick: this.tickCount, evaluated: sleepResult.evaluated, slept: sleepResult.slept, errors: sleepResult.errors });
         }
     }
 
@@ -225,9 +215,7 @@ export class SandboxSchedulerService {
 
         try {
             await this.wakeHandler(sandboxId);
-            console.log(
-                `[SandboxScheduler] Woke sandbox ${sandboxId} (reason: ${reason})`
-            );
+            log.info('Woke sandbox', { sandbox_id: sandboxId, reason });
             return {
                 woken: true,
                 sandboxId,
@@ -236,9 +224,7 @@ export class SandboxSchedulerService {
             };
         } catch (err) {
             const errorMsg = err instanceof Error ? err.message : String(err);
-            console.error(
-                `[SandboxScheduler] Failed to wake sandbox ${sandboxId}: ${errorMsg}`
-            );
+            log.error('Failed to wake sandbox', { sandbox_id: sandboxId, error: errorMsg });
             return {
                 woken: false,
                 sandboxId,

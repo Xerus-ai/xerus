@@ -3,6 +3,7 @@
 // trigger, notification, kb, tool, session, memory.
 // Extracted from runner-event-router.ts to keep files under 400 lines.
 
+import { logger } from '../../utils/logger';
 import type { PipelineContext, ResolvedExecutionDeps } from './execution-pipeline.types';
 import { requireAgent } from './pipeline-guards';
 import type { MemoryScope } from '../memory/memory.types';
@@ -10,7 +11,8 @@ import { getSessionControlService, getMemoryService } from '../platform-tools/pl
 import { escapeSQL, executeWorkspaceJsonQuery } from '../conversations/workspace-db.helpers';
 import type { DaytonaProvider } from '../sandbox-infra/sandbox/providers/daytona.provider';
 
-const LOG_PREFIX = '[EventRouter]';
+const log = logger('EntitySyncHandlers');
+const LOG_PREFIX = '[EntitySyncHandlers]';
 
 // ---------------------------------------------------------------------------
 // Typed event data interfaces for entity sync handlers
@@ -135,14 +137,14 @@ export async function handleTriggerSync(
                 `DELETE FROM agent_triggers WHERE id = $1 AND user_id = $2`,
                 [String(d.trigger_id), ctx.request.userId],
             );
-            console.log(`${LOG_PREFIX} trigger sync: deregistered trigger id=${d.trigger_id}`);
+            log.info('Trigger sync deregistered by id', { trigger_id: d.trigger_id });
             return;
         }
         // Fall through to field-based deregister below
     }
 
     if (!d.agent_slug || !d.app_slug || !d.event_type) {
-        console.warn(`${LOG_PREFIX} trigger sync: missing fields`);
+        log.warn('Trigger sync missing fields');
         return;
     }
 
@@ -151,7 +153,7 @@ export async function handleTriggerSync(
         [d.agent_slug, ctx.request.userId],
     );
     if (agentResult.rows.length === 0) {
-        console.warn(`${LOG_PREFIX} trigger sync: agent not found slug=${d.agent_slug}`);
+        log.warn('Trigger sync agent not found', { agent_slug: d.agent_slug });
         return;
     }
     const agentId = agentResult.rows[0].id;
@@ -163,13 +165,13 @@ export async function handleTriggerSync(
              ON CONFLICT (agent_id, app_slug, event_type) DO NOTHING`,
             [agentId, ctx.request.userId, d.app_slug, d.event_type],
         );
-        console.log(`${LOG_PREFIX} trigger sync: registered ${d.app_slug}.${d.event_type} for agent=${d.agent_slug}`);
+        log.info('Trigger sync registered', { app_slug: d.app_slug, event_type: d.event_type, agent_slug: d.agent_slug });
     } else if (action === 'deregister') {
         await deps.db.query(
             `DELETE FROM agent_triggers WHERE agent_id = $1 AND app_slug = $2 AND event_type = $3`,
             [agentId, d.app_slug, d.event_type],
         );
-        console.log(`${LOG_PREFIX} trigger sync: deregistered ${d.app_slug}.${d.event_type} for agent=${d.agent_slug}`);
+        log.info('Trigger sync deregistered', { app_slug: d.app_slug, event_type: d.event_type, agent_slug: d.agent_slug });
     }
 }
 
@@ -179,7 +181,7 @@ export async function handleNotificationSync(
     const d = assertNotificationSyncData(data);
 
     if (!ctx.sandboxId) {
-        console.warn(`${LOG_PREFIX} notification sync: no sandboxId in context, skipping`);
+        log.warn('Notification sync: no sandboxId in context, skipping');
         return;
     }
 
@@ -203,7 +205,7 @@ export async function handleNotificationSync(
         throw new Error(`Failed to create notification inbox item in workspace DB for sandbox=${ctx.sandboxId}`);
     }
 
-    console.log(`${LOG_PREFIX} notification sync: created inbox item id=${rows[0].id} in workspace DB for sandbox=${ctx.sandboxId}`);
+    log.info('Notification sync: created inbox item', { inbox_item_id: rows[0].id, sandbox_id: ctx.sandboxId });
 }
 
 export async function handleKbSync(
@@ -211,7 +213,7 @@ export async function handleKbSync(
 ): Promise<void> {
     const d = assertKbSyncData(data);
     // KB assignments now live in config.json (filesystem is source of truth).
-    console.log(`${LOG_PREFIX} kb sync: ${action} kb=${d.kb_id} agent=${d.agent_slug} (filesystem is source of truth, no DB write)`);
+    log.info('KB sync (filesystem is source of truth, no DB write)', { action, kb_id: d.kb_id, agent_slug: d.agent_slug });
 }
 
 export async function handleSessionSync(
@@ -226,7 +228,7 @@ export async function handleSessionSync(
                 sessionId: d.session_id,
                 reason: d.reason || '',
             });
-            console.log(`${LOG_PREFIX} session sync: paused session=${d.session_id}`);
+            log.info('Session sync paused', { session_id: d.session_id });
             break;
         case 'resume':
             await sessionControlService.resumeExecution(userId, {
@@ -234,13 +236,13 @@ export async function handleSessionSync(
                 approved: d.approved === true,
                 feedback: d.feedback || '',
             });
-            console.log(`${LOG_PREFIX} session sync: resumed session=${d.session_id}`);
+            log.info('Session sync resumed', { session_id: d.session_id });
             break;
         case 'get_state':
-            console.log(`${LOG_PREFIX} session sync: get_state for session=${d.session_id} (fire-and-forget, result cannot be returned to agent)`);
+            log.info('Session sync get_state (fire-and-forget)', { session_id: d.session_id });
             break;
         default:
-            console.warn(`${LOG_PREFIX} session sync: unknown action '${action}'`);
+            log.warn('Session sync unknown action', { action });
     }
 }
 
@@ -255,7 +257,7 @@ export async function handleMemorySync(
         scopeId: d.scope_id,
         filePath: d.path,
     });
-    console.log(`${LOG_PREFIX} memory sync: indexed in pgvector scope=${d.scope}`);
+    log.info('Memory sync indexed in pgvector', { scope: d.scope });
 }
 
 export async function handleToolSync(
@@ -263,5 +265,5 @@ export async function handleToolSync(
 ): Promise<void> {
     const d = assertToolSyncData(data);
     // Tool assignments now live in config.json (filesystem is source of truth).
-    console.log(`${LOG_PREFIX} tool sync: ${action} tool=${d.app_slug} agent=${d.agent_slug} (filesystem is source of truth, no DB write)`);
+    log.info('Tool sync (filesystem is source of truth, no DB write)', { action, app_slug: d.app_slug, agent_slug: d.agent_slug });
 }

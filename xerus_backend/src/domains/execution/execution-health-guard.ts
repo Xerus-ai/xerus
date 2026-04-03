@@ -8,10 +8,11 @@
 // gets no response within PROBE_RESPONSE_TIMEOUT_MS, aborts the stream via
 // AbortController so the pipeline error path handles cleanup.
 
+import { logger } from '../../utils/logger';
 import { sendCommand } from '../sandbox-infra/sandbox';
 import type { SessionHandle } from '../sandbox-infra/sandbox/providers/daytona-runner';
 
-const LOG_PREFIX = '[HealthGuard]';
+const log = logger('HealthGuard');
 
 // -----------------------------------------------------------------------------
 // Configuration
@@ -80,10 +81,7 @@ export function createHealthGuard(
         if (probeSentAt !== null) {
             const msSinceProbe = Date.now() - probeSentAt;
             if (msSinceProbe >= PROBE_RESPONSE_TIMEOUT_MS) {
-                console.error(
-                    `${LOG_PREFIX} [${executionId.slice(0, 8)}] Runner unresponsive: no events for ${msSinceActivity}ms, `
-                    + `health probe sent ${msSinceProbe}ms ago with no response — aborting stream`,
-                );
+                log.error('Runner unresponsive, aborting stream', { execution_id: executionId, ms_since_activity: msSinceActivity, ms_since_probe: msSinceProbe });
                 ac.abort();
                 return;
             }
@@ -95,27 +93,21 @@ export function createHealthGuard(
         if (msSinceActivity < ACTIVITY_TIMEOUT_MS) return;
 
         // Activity is stale — send a health probe
-        console.warn(
-            `${LOG_PREFIX} [${executionId.slice(0, 8)}] No events for ${msSinceActivity}ms — sending health probe`,
-        );
+        log.warn('No events received, sending health probe', { execution_id: executionId, ms_since_activity: msSinceActivity });
         probeSentAt = Date.now();
 
         try {
             await sendCommand(handle, { type: 'health' });
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
-            console.error(
-                `${LOG_PREFIX} [${executionId.slice(0, 8)}] Health probe send failed: ${msg} — aborting stream`,
-            );
+            log.error('Health probe send failed, aborting stream', { execution_id: executionId, error: msg });
             ac.abort();
         }
     }
 
     const intervalId = setInterval(() => {
         tick().catch((err: unknown) => {
-            console.error(
-                `${LOG_PREFIX} [${executionId.slice(0, 8)}] Unexpected error in health check tick: ${(err as Error).message}`,
-            );
+            log.error('Unexpected error in health check tick', { execution_id: executionId, error: (err as Error).message });
         });
     }, CHECK_INTERVAL_MS);
 

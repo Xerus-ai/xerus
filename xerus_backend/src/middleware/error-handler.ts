@@ -1,6 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../utils/errors';
 import { sendError } from '../utils/response';
+import { logger } from '../utils/logger';
+
+const log = logger('ErrorHandler');
 
 export function errorHandler(err: Error, req: Request, res: Response, _next: NextFunction): void {
     const startTime = res.locals.startTime || Date.now();
@@ -10,12 +13,7 @@ export function errorHandler(err: Error, req: Request, res: Response, _next: Nex
         return;
     }
 
-    console.error('Unhandled error:', {
-        message: err.message,
-        stack: err.stack,
-        path: req.path,
-        method: req.method,
-    });
+    log.error(`Unhandled error on ${req.method} ${req.path}`, err);
 
     sendError(res, 500, 'INTERNAL_ERROR', process.env.NODE_ENV === 'development' ? err.message : 'Internal server error', startTime);
 }

@@ -26,6 +26,9 @@ import { toolConnectionRoutes } from './tool-connection.routes';
 import { memoryRoutes } from './memory.routes';
 import { scheduleRoutes } from './schedule.routes';
 import { McpToolResult } from './types';
+import { logger } from '../../../utils/logger';
+
+const log = logger('InternalMCP');
 
 const router = Router();
 
@@ -42,7 +45,7 @@ router.use(scheduleRoutes);
 
 // Error Handler
 router.use((error: Error, _req: Request, res: Response, _next: NextFunction) => {
-    console.error('[Internal MCP] Error:', error.message);
+    log.error('Internal MCP request failed', error);
 
     const mcpResult: McpToolResult = {
         success: false,

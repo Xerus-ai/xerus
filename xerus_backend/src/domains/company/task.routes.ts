@@ -24,6 +24,9 @@ import {
     resolveAgentsFromWorkspace,
 } from './task-workspace-db.service';
 import type { WorkspaceTaskRow, WorkspaceAgentRow } from './task-workspace-db.service';
+import { logger } from '../../utils/logger';
+
+const log = logger('TaskRoutes');
 
 const router = Router();
 const auth = authenticateFirebaseToken;
@@ -254,7 +257,7 @@ router.post('/channels/:channelId/tasks', auth, async (req: AuthenticatedRequest
             created_at: new Date().toISOString(),
         };
         appendBeadsEntry(provider, sandboxId, channelId, beadsEntry).catch(err =>
-            console.warn(`[TaskRoutes] Beads JSONL sync failed for create: ${err instanceof Error ? err.message : String(err)}`),
+            log.warn('Beads JSONL sync failed for create', { error: err instanceof Error ? err.message : String(err) }),
         );
 
         const allSlugs = row.assigned_agent ? [row.assigned_agent] : [];
@@ -296,7 +299,7 @@ router.post('/tasks/:taskId/status', auth, async (req: AuthenticatedRequest, res
         // Update status in .beads/issues.jsonl for agent access via `bd` tool
         if (row.project_slug) {
             updateBeadsEntry(provider, sandboxId, row.project_slug, taskId, { status }).catch(err =>
-                console.warn(`[TaskRoutes] Beads JSONL sync failed for status update: ${err instanceof Error ? err.message : String(err)}`),
+                log.warn('Beads JSONL sync failed for status update', { error: err instanceof Error ? err.message : String(err) }),
             );
         }
 

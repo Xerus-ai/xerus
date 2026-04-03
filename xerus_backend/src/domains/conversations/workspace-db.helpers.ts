@@ -5,6 +5,9 @@
 import type { DaytonaProvider } from '../sandbox-infra/sandbox/providers/daytona.provider';
 import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
 import { shellEscapePath } from '../../utils/shell-safety';
+import { logger } from '../../utils/logger';
+
+const log = logger('WorkspaceDB');
 
 export const WORKSPACE_DB_PATH = `${SANDBOX_CONFIG.workspacePath}/data/workspace.db`;
 
@@ -54,6 +57,6 @@ export async function executeWorkspaceJsonQuery<T>(
     }
 
     const trimmed = output.trim();
-    console.error('[WorkspaceDB] Failed to parse JSON:', trimmed.slice(0, 200));
+    log.error('Failed to parse JSON', { preview: trimmed.slice(0, 200) });
     throw new Error(`Workspace DB returned invalid JSON: ${trimmed.slice(0, 300)}`);
 }

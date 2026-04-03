@@ -9,7 +9,10 @@
 // All checks execute on the Daytona sandbox via SandboxExecutor,
 // never on the backend host's filesystem.
 
+import { logger } from '../../../utils/logger';
 import type { AdapterType, AuthResult, CLIBillingType } from './cli-adapters/types';
+
+const log = logger('AuthDetector');
 
 // -----------------------------------------------------------------------------
 // Sandbox Executor Interface
@@ -115,7 +118,7 @@ async function detectClaudeAuth(
                 };
             }
         } catch (err) {
-            console.warn('[auth-detector] Malformed Claude credentials file:', err);
+            log.warn('Malformed Claude credentials file', { error: err instanceof Error ? err.message : String(err) });
         }
     }
 

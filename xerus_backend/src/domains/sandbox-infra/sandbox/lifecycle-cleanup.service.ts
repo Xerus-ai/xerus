@@ -5,6 +5,10 @@
 // - Clean up stuck execution sessions
 // Spec: xerus-y5v.4.112
 
+import { logger } from '../../../utils/logger';
+
+const log = logger('LifecycleCleanup');
+
 // -----------------------------------------------------------------------------
 // Types
 // -----------------------------------------------------------------------------
@@ -113,7 +117,7 @@ export class LifecycleCleanupService {
                 cleaned++;
             } catch (err) {
                 const msg = err instanceof Error ? err.message : String(err);
-                console.error(`[LifecycleCleanup] Failed to pause stale sandbox ${row.sandbox_id}: ${msg}`);
+                log.error('Failed to pause stale sandbox', { sandbox_id: row.sandbox_id, error: msg });
                 errors++;
             }
         }
@@ -142,7 +146,7 @@ export class LifecycleCleanupService {
                 cleaned++;
             } catch (err) {
                 const msg = err instanceof Error ? err.message : String(err);
-                console.error(`[LifecycleCleanup] Failed to kill long-paused sandbox ${row.sandbox_id}: ${msg}`);
+                log.error('Failed to kill long-paused sandbox', { sandbox_id: row.sandbox_id, error: msg });
                 errors++;
             }
         }
@@ -169,7 +173,7 @@ export class LifecycleCleanupService {
                 cleaned++;
             } catch (err) {
                 const msg = err instanceof Error ? err.message : String(err);
-                console.error(`[LifecycleCleanup] Failed to kill orphaned sandbox ${row.sandbox_id}: ${msg}`);
+                log.error('Failed to kill orphaned sandbox', { sandbox_id: row.sandbox_id, error: msg });
                 errors++;
             }
         }
@@ -195,7 +199,7 @@ export class LifecycleCleanupService {
                 cleaned++;
             } catch (err) {
                 const msg = err instanceof Error ? err.message : String(err);
-                console.error(`[LifecycleCleanup] Failed to mark stuck session ${row.id}: ${msg}`);
+                log.error('Failed to mark stuck session', { session_id: row.id, error: msg });
                 errors++;
             }
         }

@@ -1,4 +1,5 @@
 // Daytona Sandbox Service — per-user lifecycle: create, resume, pause, kill
+import { logger } from '../../../utils/logger';
 import { SANDBOX_CONFIG } from './sandbox.config';
 import {
     SandboxSession,
@@ -23,6 +24,8 @@ import {
     runBrowserSetup,
 } from './sandbox-setup';
 import type { S3BackupService } from '../storage/s3-backup.service';
+
+const log = logger('SandboxService');
 
 // Database interface (injected dependency)
 export interface SandboxDatabase {
@@ -105,12 +108,10 @@ export class SandboxService {
         if (existing && existing.sandbox_status !== 'killed' && existing.sandbox_id) {
             try {
                 await this.provider.kill(existing.sandbox_id);
-                console.log(`[SandboxService] Killed previous sandbox ${existing.sandbox_id} for user ${userId}`);
+                log.info('Killed previous sandbox', { sandbox_id: existing.sandbox_id, user_id: userId });
             } catch (err) {
                 // Sandbox may already be deleted externally — log and continue
-                console.log(
-                    `[SandboxService] Could not kill previous sandbox ${existing.sandbox_id}: ${(err as Error).message}`,
-                );
+                log.warn('Could not kill previous sandbox', { sandbox_id: existing.sandbox_id, error: (err as Error).message });
             }
             this.sessions.delete(userId);
         }
@@ -163,7 +164,7 @@ export class SandboxService {
         this.sessions.set(userId, session);
         await this.registry.persist(session);
 
-        console.log(`[SandboxService] Created sandbox ${sandbox.sandboxId} for user ${userId} in ${Date.now() - startTime}ms`);
+        log.info('Created sandbox', { sandbox_id: sandbox.sandboxId, user_id: userId, duration_ms: Date.now() - startTime });
         return session;
     }
 
@@ -196,11 +197,11 @@ export class SandboxService {
             this.sessions.set(userId, session);
             await this.registry.updateStatus(userId, 'paused');
 
-            console.log(`[SandboxService] Paused sandbox ${session.sandboxId} for user ${userId} in ${Date.now() - startTime}ms`);
+            log.info('Paused sandbox', { sandbox_id: session.sandboxId, user_id: userId, duration_ms: Date.now() - startTime });
             return { success: true, sandboxId: session.sandboxId, durationMs: Date.now() - startTime };
         } catch (error) {
             // Cleanup: sandbox is gone, update local and registry state
-            console.log(`[SandboxService] Failed to pause sandbox ${session.sandboxId}: ${(error as Error).message}`);
+            log.warn('Failed to pause sandbox', { sandbox_id: session.sandboxId, error: (error as Error).message });
             this.sessions.delete(userId);
             await this.registry.updateStatus(userId, 'killed');
             // Fail-fast: re-throw after cleanup so caller can handle
@@ -242,7 +243,7 @@ export class SandboxService {
 
         if (killError) throw killError;
 
-        console.log(`[SandboxService] Killed sandbox ${session.sandboxId} for user ${userId} in ${Date.now() - startTime}ms`);
+        log.info('Killed sandbox', { sandbox_id: session.sandboxId, user_id: userId, duration_ms: Date.now() - startTime });
         return { success: true, sandboxId: session.sandboxId, durationMs: Date.now() - startTime };
     }
 
@@ -328,10 +329,10 @@ export class SandboxService {
 
         // Already set up — return cached URL
         if (session.novncUrl) {
-            console.log(`[SandboxService] ensureBrowserReady: returning CACHED novncUrl for ${userId} (sandbox ${session.sandboxId})`);
+            log.debug('ensureBrowserReady: returning cached novncUrl', { user_id: userId, sandbox_id: session.sandboxId });
             return session.novncUrl;
         }
-        console.log(`[SandboxService] ensureBrowserReady: no cached URL, running FRESH browser setup for ${userId} (sandbox ${session.sandboxId})`);
+        log.info('ensureBrowserReady: running fresh browser setup', { user_id: userId, sandbox_id: session.sandboxId });
 
 
         const deps = this.getSetupDeps();
@@ -386,9 +387,9 @@ export class SandboxService {
             const provider = this.getDaytonaProvider();
             const tarBuffer = await createWorkspaceTar(provider, sandboxId);
             const result = await this.s3Backup.createSnapshot(userId, tarBuffer);
-            console.log(`[SandboxService] S3 snapshot created for user ${userId}: ${result.snapshotKey} (${result.sizeBytes} bytes)`);
+            log.info('S3 snapshot created', { user_id: userId, snapshot_key: result.snapshotKey, size_bytes: result.sizeBytes });
         } catch (err) {
-            console.warn(`[SandboxService] S3 snapshot failed for user ${userId} (non-blocking): ${(err as Error).message}`);
+            log.warn('S3 snapshot failed (non-blocking)', { user_id: userId, error: (err as Error).message });
         }
     }
 
@@ -398,7 +399,7 @@ export class SandboxService {
 
         const latestKey = await this.s3Backup.getLatestSnapshot(userId);
         if (!latestKey) {
-            console.log(`[SandboxService] No S3 snapshot found for user ${userId}, starting fresh`);
+            log.info('No S3 snapshot found, starting fresh', { user_id: userId });
             return;
         }
 
@@ -412,16 +413,16 @@ export class SandboxService {
             const provider = this.getDaytonaProvider();
             const snapshot = await this.s3Backup.restoreSnapshot(latestKey);
             await restoreWorkspaceTar(provider, sandboxId, snapshot.content);
-            console.log(`[SandboxService] Restored S3 snapshot for user ${userId}: ${latestKey} (${snapshot.sizeBytes} bytes)`);
+            log.info('Restored S3 snapshot', { user_id: userId, snapshot_key: latestKey, size_bytes: snapshot.sizeBytes });
         } catch (err) {
             // Corrupt snapshot (e.g., wrong encoding from older code). Delete it so the
             // next pause creates a clean one, and continue with a fresh workspace.
-            console.warn(`[SandboxService] Snapshot restore failed for ${userId}, deleting corrupt snapshot and continuing fresh: ${(err as Error).message}`);
+            log.warn('Snapshot restore failed, deleting corrupt snapshot and continuing fresh', { user_id: userId, error: (err as Error).message });
             try {
                 await this.s3Backup.deleteSnapshot(latestKey);
-                console.log(`[SandboxService] Deleted corrupt snapshot: ${latestKey}`);
+                log.info('Deleted corrupt snapshot', { snapshot_key: latestKey });
             } catch (delErr) {
-                console.warn(`[SandboxService] Failed to delete corrupt snapshot: ${(delErr as Error).message}`);
+                log.warn('Failed to delete corrupt snapshot', { error: (delErr as Error).message });
             }
         }
     }
@@ -431,10 +432,10 @@ export class SandboxService {
 
         const cached = this.sessions.get(userId);
         if (cached && cached.status === 'paused') {
-            console.log(`[SandboxService] tryResume: found cached paused session, connecting...`);
+            log.debug('tryResume: found cached paused session, connecting');
             const tConnect = Date.now();
             const connected = await this.connectToSandbox(cached.sandboxId);
-            console.log(`[SandboxService] connect (cached paused): ${Date.now() - tConnect}ms, success=${connected}`);
+            log.debug('connect (cached paused)', { duration_ms: Date.now() - tConnect, success: connected });
             if (connected) {
                 cached.status = 'running';
                 cached.wasResumed = true;
@@ -448,24 +449,24 @@ export class SandboxService {
                 const tHealth = Date.now();
                 const healthCheckPromise = runWorkspaceHealthCheck(cached.sandboxId, userId, this.getSetupDeps());
                 void this.registry.markResumed(userId).catch(err =>
-                    console.warn(`[SandboxService] Fire-and-forget markResumed failed for ${userId}: ${(err as Error).message}`),
+                    log.warn('Fire-and-forget markResumed failed', { user_id: userId, error: (err as Error).message }),
                 );
                 await healthCheckPromise;
-                console.log(`[SandboxService] healthCheck (cached): ${Date.now() - tHealth}ms`);
+                log.debug('healthCheck (cached)', { duration_ms: Date.now() - tHealth });
 
-                console.log(`[SandboxService] Resumed sandbox ${cached.sandboxId} for user ${userId} in ${Date.now() - startTime}ms`);
+                log.info('Resumed sandbox', { sandbox_id: cached.sandboxId, user_id: userId, duration_ms: Date.now() - startTime });
                 return cached;
             }
             this.sessions.delete(userId);
         } else if (cached && cached.status === 'running') {
-            console.log(`[SandboxService] tryResume: found cached running session (skip resume)`);
+            log.debug('tryResume: found cached running session (skip resume)');
         } else {
-            console.log(`[SandboxService] tryResume: no cached session, checking registry`);
+            log.debug('tryResume: no cached session, checking registry');
         }
 
         const tRegistry = Date.now();
         const registryEntry = await this.registry.getByUserId(userId);
-        console.log(`[SandboxService] registry lookup: ${Date.now() - tRegistry}ms, status=${registryEntry?.sandbox_status || 'none'}`);
+        log.debug('registry lookup', { duration_ms: Date.now() - tRegistry, status: registryEntry?.sandbox_status || 'none' });
         if (registryEntry && (registryEntry.sandbox_status === 'paused' || registryEntry.sandbox_status === 'running')) {
             const logLabel = registryEntry.sandbox_status === 'paused' ? 'Resumed sandbox' : 'Reconnected to running sandbox';
             const result = await this.resumeFromRegistry(registryEntry, userId, startTime, logLabel);
@@ -487,7 +488,7 @@ export class SandboxService {
 
         const tConnect = Date.now();
         const connected = await this.connectToSandbox(entry.sandbox_id);
-        console.log(`[SandboxService] connect (registry): ${Date.now() - tConnect}ms, success=${connected}`);
+        log.debug('connect (registry)', { duration_ms: Date.now() - tConnect, success: connected });
         if (!connected) {
             await this.registry.updateStatus(userId, 'killed');
             return null;
@@ -510,12 +511,12 @@ export class SandboxService {
         const tHealth = Date.now();
         const healthCheckPromise = runWorkspaceHealthCheck(entry.sandbox_id, userId, this.getSetupDeps());
         void this.registry.markResumed(userId).catch(err =>
-            console.warn(`[SandboxService] Fire-and-forget markResumed failed for ${userId}: ${(err as Error).message}`),
+            log.warn('Fire-and-forget markResumed failed', { user_id: userId, error: (err as Error).message }),
         );
         await healthCheckPromise;
-        console.log(`[SandboxService] healthCheck (registry): ${Date.now() - tHealth}ms`);
+        log.debug('healthCheck (registry)', { duration_ms: Date.now() - tHealth });
 
-        console.log(`[SandboxService] ${logLabel} ${entry.sandbox_id} for user ${userId} in ${Date.now() - startTime}ms`);
+        log.info(`${logLabel}`, { sandbox_id: entry.sandbox_id, user_id: userId, duration_ms: Date.now() - startTime });
         return session;
     }
 
@@ -524,7 +525,7 @@ export class SandboxService {
             await this.provider.connect(sandboxId);
             return true;
         } catch (error) {
-            console.log(`[SandboxService] Failed to connect to sandbox ${sandboxId}: ${(error as Error).message}`);
+            log.warn('Failed to connect to sandbox', { sandbox_id: sandboxId, error: (error as Error).message });
             return false;
         }
     }

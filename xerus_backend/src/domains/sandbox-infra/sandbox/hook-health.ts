@@ -4,8 +4,11 @@
 // from the sandbox via a single compound shell command.
 // See: docs/planning/execution/ (Shell Hook Observability)
 
+import { logger } from '../../../utils/logger';
 import type { HookHealth, HookHealthAuditEntry } from '../../execution/execution-pipeline.types';
 import { shellEscape } from '../../../utils/shell-safety';
+
+const log = logger('HookHealth');
 
 export interface HookHealthDeps {
     executeCommand: (sandboxId: string, command: string) => Promise<{ result: string; exitCode: number }>;
@@ -68,7 +71,7 @@ export function parseHookHealthOutput(
             }
         } catch {
             const safe = line.slice(0, 120).replace(/[\n\r\t]/g, ' ');
-            console.warn(`[HookHealth] Skipping malformed audit line: ${safe}`);
+            log.warn('Skipping malformed audit line', { line: safe });
         }
     }
 
@@ -121,7 +124,7 @@ export async function checkHookHealth(
         // than no data. Only a genuine shell/connection failure throws.
         return parseHookHealthOutput(result.result, executionStartedAt);
     } catch (err) {
-        console.warn(`[HookHealth] Health check failed: ${(err as Error).message}`);
+        log.warn('Health check failed', { error: (err as Error).message });
         return null;
     }
 }

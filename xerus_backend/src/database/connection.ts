@@ -1,7 +1,10 @@
 import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 import dotenv from 'dotenv';
+import { logger } from '../utils/logger';
 
 dotenv.config();
+
+const log = logger('Database');
 
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
@@ -15,7 +18,7 @@ const pool = new Pool({
 pool.on('error', (err: Error) => {
     // Neon serverless postgres closes idle connections - this is expected
     // Log but don't crash - the pool will create new connections as needed
-    console.warn('Pool client error (will reconnect):', err.message);
+    log.warn('Pool client error (will reconnect)', { error: err.message });
 });
 
 export interface QueryOptions {
@@ -29,7 +32,7 @@ export async function query<T = QueryResultRow>(text: string, values?: unknown[]
     const duration = Date.now() - start;
 
     if (process.env.NODE_ENV === 'development') {
-        console.log('Executed query', { text, duration, rows: result.rowCount });
+        log.debug('Executed query', { text, duration, rows: result.rowCount ?? 0 });
     }
 
     return result;
@@ -56,7 +59,7 @@ export async function transaction<T>(callback: (client: PoolClient) => Promise<T
 
 export async function testConnection(): Promise<boolean> {
     const result = await pool.query('SELECT NOW()');
-    console.log('Database connected:', result.rows[0]);
+    log.info('Database connected', { timestamp: String(result.rows[0]?.now ?? '') });
     return true;
 }
 
@@ -72,7 +75,7 @@ export async function warmPool(): Promise<void> {
     await Promise.all(
         Array.from({ length: target }, () => pool.query('SELECT 1')),
     );
-    console.log(`Pool warmed: ${target} connections in ${Date.now() - t0}ms`);
+    log.info('Pool warmed', { connections: target, duration_ms: Date.now() - t0 });
 }
 
 export async function closePool(): Promise<void> {

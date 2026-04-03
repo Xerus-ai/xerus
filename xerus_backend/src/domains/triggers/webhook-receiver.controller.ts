@@ -14,6 +14,9 @@ import { TriggerProviderNotFoundError } from './trigger.errors';
 import { eventRouterService } from './event-router.service';
 import type { TriggerProvider, EventNormalizationMetadata } from './trigger.types';
 import { TRIGGER_PROVIDERS } from './trigger.types';
+import { logger } from '../../utils/logger';
+
+const log = logger('WebhookReceiver');
 
 // -----------------------------------------------------------------------------
 // Constants
@@ -85,14 +88,14 @@ function verifyWebhookSignature(provider: TriggerProvider, req: Request): boolea
     }
 
     // No adapter or no verifySignature method - reject unknown providers
-    console.warn(`[WebhookReceiver] No signature verification for provider '${provider}'. Rejecting.`);
+    log.warn('No signature verification for provider, rejecting', { provider });
     return false;
 }
 
 function verifyPipedreamSignature(req: Request): boolean {
     const secret = process.env.PIPEDREAM_WEBHOOK_SECRET;
     if (!secret) {
-        console.error('[WebhookReceiver] PIPEDREAM_WEBHOOK_SECRET not configured. Rejecting webhook.');
+        log.error('PIPEDREAM_WEBHOOK_SECRET not configured, rejecting webhook');
         return false;
     }
 
@@ -200,10 +203,9 @@ webhookReceiverRouter.post(
                 return;
             }
 
-            console.error(
-                `[WebhookReceiver] Error processing webhook:`,
-                err instanceof Error ? err.message : err
-            );
+            log.error('Error processing webhook', {
+                error: err instanceof Error ? err.message : String(err),
+            });
 
             sendResponse(res, 200, {
                 received: true,

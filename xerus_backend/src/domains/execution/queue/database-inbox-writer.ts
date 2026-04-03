@@ -10,8 +10,11 @@
 //   2. Write file to agents/xerus-master/inbox/{timestamp}.json (via Daytona provider)
 //   InboxWatcher picks up file -> agent reads it -> file moved to processed/
 
+import { logger } from '../../../utils/logger';
 import type { InboxWriter } from './announce-queue.service';
 import type { DaytonaProvider } from '../../sandbox-infra/sandbox/providers/daytona.provider';
+
+const log = logger('WorkspaceInboxWriter');
 import { escapeSQL, executeWorkspaceJsonQuery } from '../../conversations/workspace-db.helpers';
 import { SANDBOX_CONFIG } from '../../sandbox-infra/sandbox/sandbox.config';
 
@@ -78,7 +81,7 @@ export class WorkspaceInboxWriter implements InboxWriter {
                 const deleteSql = `DELETE FROM inbox_items WHERE id = ${rows[0].id};`;
                 await executeWorkspaceJsonQuery(this.provider, this.sandboxId, deleteSql);
             } catch (cleanupErr) {
-                console.error('Failed to clean up inbox DB row after file write failure', cleanupErr);
+                log.error('Failed to clean up inbox DB row after file write failure', { error: cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr) });
             }
             throw fileErr;
         }

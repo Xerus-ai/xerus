@@ -1,9 +1,10 @@
 // Indexing Event Handler
 // Handles trigger_indexing events from the runner, routing to the memory search index.
 
+import { logger } from '../../utils/logger';
 import type { PipelineContext, ResolvedExecutionDeps } from './execution-pipeline.types';
 import type { MemoryType, MemoryScope } from '../memory/memory.types';
-import { EVENT_ROUTER_LOG_PREFIX } from './runner-event-router';
+const log = logger('IndexingEventHandler');
 
 export async function handleTriggerIndexing(
     d: Record<string, unknown>, ctx: PipelineContext, deps: ResolvedExecutionDeps,
@@ -18,13 +19,13 @@ export async function handleTriggerIndexing(
     const workspaceId = d.workspace_id as string | undefined;
 
     if (!contentPath || !workspaceId) {
-        console.warn(`${EVENT_ROUTER_LOG_PREFIX} trigger_indexing: missing content_path or workspace_id`);
+        log.warn('trigger_indexing: missing content_path or workspace_id');
         return;
     }
 
     if (operation === 'delete') {
         await deps.memorySearchIndex.removeFileChunks(workspaceId, contentPath);
-        console.log(`${EVENT_ROUTER_LOG_PREFIX} trigger_indexing: deleted chunks for ${contentPath}`);
+        log.info('trigger_indexing: deleted chunks', { content_path: contentPath });
         return;
     }
 
@@ -41,7 +42,7 @@ export async function handleTriggerIndexing(
             memoryType,
             scope,
         });
-        console.log(`${EVENT_ROUTER_LOG_PREFIX} trigger_indexing: indexed ${contentPath} (${content.length} chars)`);
+        log.info('trigger_indexing: indexed', { content_path: contentPath, content_length: content.length });
         return;
     }
 
@@ -61,7 +62,7 @@ export async function handleTriggerIndexing(
                     memoryType: 'working',
                     scope: 'agent',
                 });
-                console.log(`${EVENT_ROUTER_LOG_PREFIX} trigger_indexing: indexed ${contentPath} from sandbox`);
+                log.info('trigger_indexing: indexed from sandbox', { content_path: contentPath });
                 return;
             }
         }
@@ -72,5 +73,5 @@ export async function handleTriggerIndexing(
 
 function logEvent(eventType: string, d: Record<string, unknown>): void {
     const agentSlug = d.agent_slug || '';
-    console.log(`${EVENT_ROUTER_LOG_PREFIX} ${eventType}: agent=${agentSlug} data=${JSON.stringify(d)}`);
+    log.debug(eventType, { agent_slug: agentSlug, data: d });
 }

@@ -17,6 +17,7 @@
 // - GET    /execute/schedules/runs             -> List schedule runs (workspace.db)
 
 import { Router, Response, NextFunction } from 'express';
+import { logger } from '../../utils/logger';
 import rateLimit from 'express-rate-limit';
 import { AuthenticatedRequest } from '../../types';
 import { sendResponse } from '../../utils/response';
@@ -50,6 +51,7 @@ import { getConversation } from '../conversations/workspace-db.service';
 // Constants
 // -----------------------------------------------------------------------------
 
+const log = logger('ExecutionRoutes');
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const MAX_STREAMS_PER_USER = 10;
 
@@ -136,7 +138,7 @@ router.get('/conversations/:id/stream', sseAuth, async (req: AuthenticatedReques
         const stream = new StreamingResponse(res);
         sseRegistry.register(req.user.uid, conversationId, stream);
 
-        console.log(`[SSE] Stream opened for user=${req.user.uid} conv=${conversationId}`);
+        log.info('SSE stream opened', { user_id: req.user.uid, conversation_id: conversationId });
 
         // Send initial meta event so frontend knows connection is live
         stream.send('meta', { conversationId });
@@ -154,7 +156,7 @@ router.get('/conversations/:id/stream', sseAuth, async (req: AuthenticatedReques
         // the active one. A newer connectStream call may have replaced it in the
         // registry; blindly unregistering would delete the replacement stream.
         res.on('close', () => {
-            console.log(`[SSE] Stream closed for user=${req.user!.uid} conv=${conversationId} (was open ${Math.round((Date.now() - (res.locals.startTime || Date.now())) / 1000)}s)`);
+            log.info('SSE stream closed', { user_id: req.user!.uid, conversation_id: conversationId, open_seconds: Math.round((Date.now() - (res.locals.startTime || Date.now())) / 1000) });
             clearInterval(heartbeatInterval);
             const current = sseRegistry.get(req.user!.uid, conversationId);
             if (current === stream) {
@@ -164,7 +166,7 @@ router.get('/conversations/:id/stream', sseAuth, async (req: AuthenticatedReques
 
         // Log if the underlying socket errors or closes unexpectedly
         req.socket.once('error', (err) => {
-            console.error(`[SSE] Socket error for conv=${conversationId}:`, err.message);
+            log.error('SSE socket error', { conversation_id: conversationId, error: err.message });
         });
 
         // Do NOT call next() or end the response — stream stays open
@@ -226,7 +228,7 @@ router.post('/conversations/:id/messages', auth, executionRateLimit, async (req:
             stream,
             triggerType: 'user_message',
         }).catch(err => {
-            console.error('[ExecutionRoutes] Background execution failed:', (err as Error).message);
+            log.error('Background execution failed', { error: (err as Error).message });
             if (!stream.isClosed()) {
                 stream.sendError(new Error('Execution failed to start'));
             }

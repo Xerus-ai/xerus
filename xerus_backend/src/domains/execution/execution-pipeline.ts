@@ -11,6 +11,7 @@
 // See: docs/planning/execution/EXECUTION_ARCHITECTURE_v2.md Section 10
 
 import { randomUUID } from 'crypto';
+import { logger } from '../../utils/logger';
 import { BillingType, ExecutionSummary, STREAM_EVENT_TYPES, StreamEventType, type AdapterType } from './types';
 import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
 import { DEFAULT_MODEL } from '../agents/types';
@@ -111,6 +112,7 @@ const QUEUE_WAIT_TIMEOUT_MS = 120_000; // 2 minutes
 const SANDBOX_CREATION_TIMEOUT_MS = 120_000; // 2 minutes
 
 export const LOG_PREFIX = '[ExecutionPipeline]';
+const log = logger('ExecutionPipeline');
 
 // -----------------------------------------------------------------------------
 // Step 1: Validate Agent + Auth
@@ -358,7 +360,7 @@ async function processEventStream(
     const combinedSignal = AbortSignal.any(signals);
     const firstEventTimer = setTimeout(() => {
         if (eventsProcessed === 0) {
-            console.error(`${LOG_PREFIX} No events received from runner within ${FIRST_EVENT_TIMEOUT_MS}ms — runner may have crashed`);
+            log.error('No events received from runner within timeout', { timeout_ms: FIRST_EVENT_TIMEOUT_MS });
             firstEventAc.abort();
         }
     }, FIRST_EVENT_TIMEOUT_MS);
@@ -376,7 +378,7 @@ async function processEventStream(
         // Events without a recognized event field are untyped runner output (e.g. raw SDK stdout).
         // Log for debugging but never forward to the frontend.
         if (!eventType) {
-            console.warn(`${LOG_PREFIX} Untyped runner event (no event field), skipping:`, JSON.stringify(raw).slice(0, 200));
+            log.warn('Untyped runner event (no event field), skipping', { raw_preview: JSON.stringify(raw).slice(0, 200) });
             continue;
         }
 
@@ -386,7 +388,7 @@ async function processEventStream(
         const eventSlug = (raw.agent_slug || (raw.data as Record<string, unknown> | undefined)?.agent_slug) as string | undefined;
         if (eventSlug && eventSlug !== '_transport' && eventSlug !== expectedSlug) {
             if (ctx.eventsFiltered < 5) {
-                console.warn(`${LOG_PREFIX} Filtered event: type=${eventType} slug=${eventSlug} expected=${expectedSlug}`);
+                log.warn('Filtered event (slug mismatch)', { event_type: eventType, event_slug: eventSlug, expected_slug: expectedSlug });
             }
             ctx.eventsFiltered++;
             continue;
@@ -416,13 +418,13 @@ async function processEventStream(
         if (eventType === 'error') {
             const data = raw.data as Record<string, unknown> | undefined;
             const code = data?.code as string || '';
-            console.error(`${LOG_PREFIX} Fatal runner error: code=${code} — breaking stream loop`);
+            log.error('Fatal runner error, breaking stream loop', { code });
             break;
         }
     }
 
     clearTimeout(firstEventTimer);
-    console.log(`${LOG_PREFIX} ${expectedSlug}: ${eventsProcessed} events processed, ${ctx.eventsFiltered} filtered (slug mismatch)`);
+    log.info('Event stream finished', { agent_slug: expectedSlug, events_processed: eventsProcessed, events_filtered: ctx.eventsFiltered });
 
     // If the health guard detected a dead runner, fail-fast with a clear error
     if (healthGuard?.signal.aborted) {
@@ -466,9 +468,7 @@ export async function finalizeCredits(
     // BYOK users: track usage for analytics but skip credit deduction
     if (ctx.keySource === 'byok') {
         const usage = await deps.creditTracker.getSessionUsage(ctx.sessionId);
-        console.log(
-            `${LOG_PREFIX} BYOK execution ${ctx.executionId}: ${usage.total_input_tokens + usage.total_output_tokens} tokens tracked (no credits deducted)`,
-        );
+        log.info('BYOK execution tracked (no credits deducted)', { execution_id: ctx.executionId, total_tokens: usage.total_input_tokens + usage.total_output_tokens });
         return { total_credits_deducted: 0 };
     }
 
@@ -555,9 +555,7 @@ export async function updateSessionRecord(
             const provider = deps.sandboxService.getDaytonaProvider();
             await incrementConversationMessageCount(provider, ctx.sandboxId, ctx.conversationId);
         } catch (err) {
-            console.error(
-                `${LOG_PREFIX} Failed to increment message count for ${ctx.conversationId}: ${(err as Error).message}`,
-            );
+            log.error('Failed to increment message count', { conversation_id: ctx.conversationId, error: (err as Error).message });
         }
     }
 }

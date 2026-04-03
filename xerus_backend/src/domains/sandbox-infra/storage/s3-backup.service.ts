@@ -2,7 +2,10 @@
 // Periodic workspace snapshots to S3 for disaster recovery.
 // Triggered after significant executions. Configurable retention.
 
+import { logger } from '../../../utils/logger';
 import type { StorageFile } from './storage.types';
+
+const log = logger('S3Backup');
 
 const DEFAULT_MAX_SNAPSHOTS = 7;
 
@@ -65,9 +68,7 @@ export class S3BackupService {
 
         await this.enforceRetention(userId);
 
-        console.log(
-            `[S3Backup] Created snapshot for user ${userId}: ${snapshotKey} (${content.length} bytes)`
-        );
+        log.info('Created snapshot', { user_id: userId, snapshot_key: snapshotKey, size_bytes: content.length });
 
         return {
             success: true,
@@ -93,9 +94,7 @@ export class S3BackupService {
     async restoreSnapshot(snapshotKey: string): Promise<RestoreResult> {
         const downloaded = await this.download(snapshotKey);
 
-        console.log(
-            `[S3Backup] Restored snapshot: ${snapshotKey} (${downloaded.content.length} bytes)`
-        );
+        log.info('Restored snapshot', { snapshot_key: snapshotKey, size_bytes: downloaded.content.length });
 
         return {
             success: true,
@@ -107,7 +106,7 @@ export class S3BackupService {
 
     async deleteSnapshot(snapshotKey: string): Promise<void> {
         await this.deleteFn(snapshotKey);
-        console.log(`[S3Backup] Deleted snapshot: ${snapshotKey}`);
+        log.info('Deleted snapshot', { snapshot_key: snapshotKey });
     }
 
     private async enforceRetention(userId: string): Promise<void> {
@@ -117,7 +116,7 @@ export class S3BackupService {
         const toDelete = snapshots.slice(0, snapshots.length - this.maxSnapshots);
         for (const file of toDelete) {
             await this.deleteFn(file.key);
-            console.log(`[S3Backup] Retention cleanup: deleted ${file.key}`);
+            log.info('Retention cleanup: deleted snapshot', { snapshot_key: file.key });
         }
     }
 }

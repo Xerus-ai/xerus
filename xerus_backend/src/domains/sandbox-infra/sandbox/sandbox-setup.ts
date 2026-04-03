@@ -2,6 +2,7 @@
 // Workspace initialization steps for new and resumed sandboxes.
 // Extracted from SandboxService to keep file sizes under 400 lines.
 
+import { logger } from '../../../utils/logger';
 import { SANDBOX_CONFIG } from './sandbox.config';
 import { cloneWorkspaceTemplate } from './workspace-clone';
 import { installRunnerBundle } from './runner-installer';
@@ -12,6 +13,8 @@ import { GIT_MEMORY_CONFIG } from '../../memory/git-memory/git-memory.types';
 import type { DaytonaProvider } from './providers/daytona.provider';
 import type { SandboxFileSystem } from '../workspace/workspace.manager';
 import type { SandboxDatabase } from './sandbox.service';
+
+const log = logger('SandboxSetup');
 
 interface SetupDeps {
     getDaytonaProvider: () => DaytonaProvider;
@@ -25,7 +28,7 @@ export async function runWorkspaceClone(
 ): Promise<void> {
     const provider = deps.getDaytonaProvider();
     const result = await cloneWorkspaceTemplate(provider, sandboxId);
-    console.log(`[SandboxSetup] Cloned workspace template into ${sandboxId} in ${result.durationMs}ms`);
+    log.info('Cloned workspace template', { sandbox_id: sandboxId, duration_ms: result.durationMs });
 }
 
 export async function runWorkspacePersonalize(
@@ -36,9 +39,7 @@ export async function runWorkspacePersonalize(
     const sandboxFs = await deps.getSandboxFs(sandboxId);
     const startTime = Date.now();
     const result = await personalizeWorkspace(sandboxFs, { userId });
-    console.log(
-        `[SandboxSetup] Personalized workspace for ${sandboxId}: ${result.createdFiles.length} files (${Date.now() - startTime}ms)`,
-    );
+    log.info('Personalized workspace', { sandbox_id: sandboxId, files_created: result.createdFiles.length, duration_ms: Date.now() - startTime });
 }
 
 export async function runRunnerInstall(
@@ -48,7 +49,7 @@ export async function runRunnerInstall(
     const provider = deps.getDaytonaProvider();
     const startTime = Date.now();
     await installRunnerBundle(provider, sandboxId);
-    console.log(`[SandboxSetup] Runner installed in ${sandboxId} (${Date.now() - startTime}ms)`);
+    log.info('Runner installed', { sandbox_id: sandboxId, duration_ms: Date.now() - startTime });
 }
 
 export async function runAgentSync(
@@ -74,12 +75,14 @@ export async function runMcpConfigSync(
     const mcpJsonPath = `${SANDBOX_CONFIG.workspacePath}/.mcp.json`;
     const result = await syncPipedreamMcpConfig(sandboxFs, mcpJsonPath, userId, deps.db);
     if (result.added.length > 0 || result.removed.length > 0) {
-        console.log(
-            `[SandboxSetup] MCP config synced for ${sandboxId}: `
-            + `+${result.added.length} (${result.added.join(', ') || 'none'}) `
-            + `-${result.removed.length} (${result.removed.join(', ') || 'none'}) `
-            + `= ${result.total} Pipedream servers`,
-        );
+        log.info('MCP config synced', {
+            sandbox_id: sandboxId,
+            added: result.added.length,
+            added_servers: result.added.join(', ') || 'none',
+            removed: result.removed.length,
+            removed_servers: result.removed.join(', ') || 'none',
+            total: result.total,
+        });
     }
 }
 
@@ -121,7 +124,7 @@ export async function runBrowserSetup(
     // Start Xvfb + x11vnc + noVNC (computerUse API) + launch Chromium on DISPLAY=:1
     const novncUrl = await provider.startComputerUse(sandboxId);
 
-    console.log(`[SandboxSetup] Browser setup for ${sandboxId} in ${Date.now() - startTime}ms`);
+    log.info('Browser setup complete', { sandbox_id: sandboxId, duration_ms: Date.now() - startTime });
     return { novncUrl };
 }
 
@@ -172,7 +175,7 @@ export async function runFullWorkspaceSetup(
             `git -C '${basePath}' commit -m 'init: workspace root for SDK project detection'`,
         ].join(' && '));
         report.git_initialized = true;
-        console.log(`[SandboxSetup] Initialized workspace root .git in ${sandboxId}`);
+        log.info('Initialized workspace root .git', { sandbox_id: sandboxId });
     }
 
     // 1b. Initialize .memory/ git repo (idempotent — skips if .git already exists)
@@ -191,7 +194,7 @@ export async function runFullWorkspaceSetup(
             `git -C '${memoryPath}' commit -m 'init: initialize memory repository'`,
         ].join(' && '));
         report.memory_git_initialized = true;
-        console.log(`[SandboxSetup] Initialized .memory/ git repo in ${sandboxId}`);
+        log.info('Initialized .memory/ git repo', { sandbox_id: sandboxId });
     }
 
     // 2. Create context directories
@@ -218,7 +221,7 @@ export async function runFullWorkspaceSetup(
             `apt-get update -qq && apt-get install -y -qq sqlite3 2>&1 || (apk add --no-cache sqlite 2>&1 || echo 'WARN: sqlite3 install failed')`,
         );
         report.sqlite_installed = true;
-        console.log(`[SandboxSetup] Installed sqlite3 in ${sandboxId}`);
+        log.info('Installed sqlite3', { sandbox_id: sandboxId });
     }
 
     // 4b. Initialize workspace databases (company.db + workspace.db)
@@ -230,7 +233,7 @@ export async function runFullWorkspaceSetup(
     );
     if (initDbCheck.exitCode === 0 && !(initDbCheck.result || '').includes('not found')) {
         report.databases_initialized = true;
-        console.log(`[SandboxSetup] Initialized workspace databases in ${sandboxId}`);
+        log.info('Initialized workspace databases', { sandbox_id: sandboxId });
     }
 
     // 5. Verify Node.js is available (required by agent runner)
@@ -241,7 +244,7 @@ export async function runFullWorkspaceSetup(
     const nodeOutput = (nodeCheck.result || '').trim();
     if (nodeOutput.endsWith('MISSING')) {
         // Attempt runtime install as fallback (snapshot may be stale or broken)
-        console.warn(`[SandboxSetup] Node.js not found in ${sandboxId}, installing via nodesource...`);
+        log.warn('Node.js not found, installing via nodesource', { sandbox_id: sandboxId });
         const installResult = await provider.executeCommand(
             sandboxId,
             `curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs 2>&1 | tail -3`,
@@ -256,13 +259,13 @@ export async function runFullWorkspaceSetup(
         }
         report.node_version = (verifyResult.result || '').trim();
         report.node_verified = true;
-        console.log(`[SandboxSetup] Installed Node.js ${report.node_version} in ${sandboxId}`);
+        log.info('Installed Node.js', { node_version: report.node_version, sandbox_id: sandboxId });
     } else {
         // Extract version from output (e.g., "v22.11.0\nFOUND")
         const versionMatch = nodeOutput.match(/v[\d.]+/);
         report.node_version = versionMatch ? versionMatch[0] : 'unknown';
         report.node_verified = true;
-        console.log(`[SandboxSetup] Node.js ${report.node_version} verified in ${sandboxId}`);
+        log.info('Node.js verified', { node_version: report.node_version, sandbox_id: sandboxId });
     }
 
     // 6. Sync DB agents into workspace (scaffold missing ones + update index.json)
@@ -275,7 +278,7 @@ export async function runFullWorkspaceSetup(
     await startSchedulerDaemon(sandboxId, deps);
 
     report.duration_ms = Date.now() - startTime;
-    console.log(`[SandboxSetup] Full workspace setup for ${sandboxId} in ${report.duration_ms}ms`);
+    log.info('Full workspace setup complete', { sandbox_id: sandboxId, duration_ms: report.duration_ms });
     return report;
 }
 
@@ -293,6 +296,16 @@ export async function startSchedulerDaemon(
     const pidFile = `${basePath}/.xerus/runner/scheduler.pid`;
     const schedulerScript = `${basePath}/.xerus/runner/scheduler.ts`;
 
+    // Check if scheduler script exists (optional — only in cli-native workspaces)
+    const fileCheck = await provider.executeCommand(
+        sandboxId,
+        `[ -f '${schedulerScript}' ] && echo EXISTS || echo MISSING`,
+    );
+    if ((fileCheck.result || '').trim() === 'MISSING') {
+        log.info('Scheduler script not found, skipping', { sandbox_id: sandboxId, path: schedulerScript });
+        return;
+    }
+
     // Check if scheduler is already running (idempotent)
     // Use a lock file approach: check PID file AND verify process is alive.
     // Brief sleep after launch to avoid race where PID file isn't written yet.
@@ -301,7 +314,7 @@ export async function startSchedulerDaemon(
         `[ -f '${pidFile}' ] && kill -0 $(cat '${pidFile}') 2>/dev/null && echo RUNNING || echo STOPPED`,
     );
     if ((pidCheck.result || '').trim() === 'RUNNING') {
-        console.log(`[SandboxSetup] Scheduler already running in ${sandboxId}`);
+        log.debug('Scheduler already running', { sandbox_id: sandboxId });
         return;
     }
 
@@ -321,5 +334,5 @@ export async function startSchedulerDaemon(
         throw new Error(`Scheduler daemon failed to start in sandbox ${sandboxId}: ${startResult.result}`);
     }
 
-    console.log(`[SandboxSetup] Scheduler daemon started in ${sandboxId}`);
+    log.info('Scheduler daemon started', { sandbox_id: sandboxId });
 }

@@ -15,6 +15,9 @@ import {
 } from './git-memory.types';
 import { stripMemoryPrefix } from './memory-file-writer.helpers';
 import { GitMemoryError, CommitLockError, GitCommandError } from './errors';
+import { logger } from '../../../utils/logger';
+
+const log = logger('GitMemoryRepository');
 
 // -----------------------------------------------------------------------------
 // Git Memory Repository
@@ -294,7 +297,7 @@ export class GitMemoryRepository {
         try {
             await this.executor.exec(`rm -f ${shellEscape(lockPath)}`);
         } catch (err) {
-            console.warn(`[git-memory] Lock release failed for ${lockPath}: ${(err as Error).message}`);
+            log.warn('Lock release failed', { lock_path: lockPath, error: (err as Error).message });
             await this.fs.writeFile(lockPath, '');
         }
     }
@@ -328,7 +331,7 @@ export class GitMemoryRepository {
         try {
             await this.executor.exec(`rm -f ${shellEscape(lockPath)}`);
         } catch (err) {
-            console.warn(`[git-memory] Commit lock release failed for ${lockPath}: ${(err as Error).message}`);
+            log.warn('Commit lock release failed', { lock_path: lockPath, error: (err as Error).message });
         }
     }
 

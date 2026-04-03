@@ -9,22 +9,26 @@ dotenv.config();
 import { toolsService } from '../domains/tools/service';
 import { toolsRepository } from '../domains/tools/repository';
 import { testConnection, closePool } from '../database/connection';
+import { logger } from '../utils/logger';
+
+const log = logger('SyncPipedreamApps');
 
 async function syncApps() {
-    console.log('Starting Pipedream apps sync...');
+    log.info('Starting Pipedream apps sync...');
 
     try {
         await testConnection();
 
-        console.log('Syncing apps from Pipedream API to database...');
+        log.info('Syncing apps from Pipedream API to database...');
         const result = await toolsService.syncPipedreamApps();
 
-        console.log(`\nSync completed successfully!`);
-        console.log(`Total apps synced: ${result.synced}`);
-        console.log(`Errors: ${result.failed}`);
-        console.log(`Duration: ${result.duration_ms}ms`);
+        log.info('Sync completed successfully', {
+            synced: result.synced,
+            errors: result.failed,
+            duration_ms: result.duration_ms,
+        });
     } catch (error) {
-        console.error('Sync failed:', error);
+        log.error('Sync failed', error instanceof Error ? error : new Error(String(error)));
         await toolsRepository.updateSyncMetadata('failed', undefined, error instanceof Error ? error.message : String(error));
         process.exit(1);
     } finally {

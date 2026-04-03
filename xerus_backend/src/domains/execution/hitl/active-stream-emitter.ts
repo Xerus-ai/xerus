@@ -3,9 +3,12 @@
 // Implements HITLSSEEmitter so the singleton HITLHandler can emit to
 // whichever stream is handling the current execution.
 
+import { logger } from '../../../utils/logger';
 import type { HITLSSEEmitter } from './hitl.handler';
 import type { StreamEvent, StreamEventType } from '../types';
 import type { StreamingResponse } from '../streaming/stream.handler';
+
+const log = logger('ActiveStreamEmitter');
 
 export class ActiveStreamEmitter implements HITLSSEEmitter {
     private streams = new Map<string, StreamingResponse>();
@@ -24,9 +27,7 @@ export class ActiveStreamEmitter implements HITLSSEEmitter {
     emit(event: StreamEvent): void {
         const stream = this.streams.get(event.execution_id);
         if (!stream || stream.isClosed()) {
-            console.warn(
-                `[ActiveStreamEmitter] No active stream for execution ${event.execution_id}, dropping ${event.type} event`,
-            );
+            log.warn('No active stream, dropping event', { execution_id: event.execution_id, event_type: event.type });
             return;
         }
         stream.send(event.type as StreamEventType, event.content, event.meta);

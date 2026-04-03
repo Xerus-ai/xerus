@@ -2,6 +2,7 @@
 // Uses Sessions API for bidirectional communication
 // See: docs/planning/execution/EXECUTION_ARCHITECTURE_v2.md
 
+import { logger } from '../../../../utils/logger';
 import { Daytona, Sandbox } from '@daytonaio/sdk';
 import { SandboxProvider, ProviderSandbox, CreateProviderSandboxOptions, ProviderSandboxStatus, ProviderCapabilities } from './sandbox-provider.interface';
 import { SANDBOX_CONFIG } from '../sandbox.config';
@@ -13,6 +14,8 @@ import { runAgentInSandbox, sendCommand, sendMessage, streamEvents, createAgentS
 import type { AgentSessionOptions } from './daytona-runner';
 import { createDaytonaFileSystem } from './daytona-filesystem';
 import type { SandboxFileSystem } from '../../workspace/workspace.manager';
+
+const log = logger('DaytonaProvider');
 
 export interface DaytonaCreateOptions extends CreateProviderSandboxOptions {
     snapshot?: string;
@@ -201,7 +204,7 @@ export class DaytonaProvider implements SandboxProvider {
     async startComputerUse(sandboxId: string): Promise<string> {
         const sandbox = await this.getSandboxInstance(sandboxId);
         const startResult = await sandbox.computerUse.start();
-        console.log(`[DaytonaProvider] computerUse.start() result:`, JSON.stringify(startResult));
+        log.debug('computerUse.start() result', { result: startResult });
 
         // Detect actual DISPLAY from running X server process args
         const detectDisplay = await this.executeCommand(sandboxId, [
@@ -211,12 +214,12 @@ export class DaytonaProvider implements SandboxProvider {
             'echo "---"',
             'file /usr/bin/chromium 2>/dev/null || echo "chromium not found"',
         ].join('; '));
-        console.log(`[DaytonaProvider] X11 state: ${detectDisplay.result.slice(0, 2000)}`);
+        log.debug('X11 state', { output: detectDisplay.result.slice(0, 2000) });
 
         // Extract DISPLAY number from X server process (e.g. "Xvfb :1" or "Xtigervnc :1")
         const xMatch = detectDisplay.result.match(/(?:Xvfb|Xtigervnc|Xvnc|Xorg)\s+(:\d+)/);
         const display = xMatch ? xMatch[1] : ':1';
-        console.log(`[DaytonaProvider] Detected DISPLAY=${display}`);
+        log.debug('Detected DISPLAY', { display });
 
         // Strip xfce4 desktop chrome and persist DISPLAY for future agent use
         await this.executeCommand(sandboxId, [
@@ -244,7 +247,7 @@ sleep 3
 echo "Chromium PID: $(pgrep -f chromium | head -1)"
 cat /tmp/chromium.log 2>/dev/null | head -20`;
         const launch = await this.executeCommand(sandboxId, launchScript);
-        console.log(`[DaytonaProvider] browser launch (exit=${launch.exitCode}): ${launch.result.slice(0, 1000)}`);
+        log.debug('Browser launch', { exit_code: launch.exitCode, output: launch.result.slice(0, 1000) });
 
         // Signed URL — vnc.html has auto-hiding side tab instead of permanent top bar
         const signed = await sandbox.getSignedPreviewUrl(SANDBOX_CONFIG.novncPort, 3600);

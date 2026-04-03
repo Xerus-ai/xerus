@@ -1,9 +1,12 @@
 // Sandbox Retry Utility
 // Exponential backoff with jitter for Daytona operations
 
+import { logger } from '../../../utils/logger';
 import { RETRY_CONFIG, RETRYABLE_ERROR_CODES } from './sandbox.config';
 import { SANDBOX_CONFIG } from './sandbox.config';
 import { SandboxCreationError, SandboxTimeoutError } from '../../execution/errors';
+
+const log = logger('SandboxRetry');
 
 /**
  * Execute an operation with exponential backoff retry.
@@ -32,7 +35,7 @@ export async function withRetry<T>(operation: () => Promise<T>, context: string)
                 const jitter = RETRY_CONFIG.jitter ? Math.random() * delay * 0.1 : 0;
                 const actualDelay = Math.min(delay + jitter, RETRY_CONFIG.maxDelayMs);
 
-                console.log(`[SandboxRetry] ${context} attempt ${attempt} failed, retrying in ${Math.round(actualDelay)}ms`);
+                log.info('Retry attempt failed', { context, attempt, retry_delay_ms: Math.round(actualDelay) });
                 await sleep(actualDelay);
                 delay *= RETRY_CONFIG.multiplier;
             }

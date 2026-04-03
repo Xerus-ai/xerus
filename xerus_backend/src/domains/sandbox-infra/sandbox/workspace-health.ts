@@ -3,12 +3,15 @@
 // Used by SandboxService.tryResumeSandbox() to detect corrupted workspaces.
 // Reference: docs/plans/2026-02-21-workspace-lifecycle-design.md Section 4
 
+import { logger } from '../../../utils/logger';
 import { SANDBOX_CONFIG } from './sandbox.config';
 import type { SandboxFileSystem } from '../workspace/workspace.manager';
 import { personalizeWorkspace } from '../workspace/workspace-personalizer.service';
 import { batchFetchAgentRows, buildScaffoldFilesFromRow } from '../scaffold/scaffold-payload.service';
 import type { SandboxDatabase } from './sandbox.service';
 import { DEFAULT_SDK_MODEL } from '../../agents/types';
+
+const log = logger('WorkspaceHealth');
 
 // Critical files that must exist for a workspace to be functional.
 // If any are missing, the workspace needs volume restore or reinitialization.
@@ -69,18 +72,14 @@ export async function ensureWorkspaceIntegrity(
     const health = await verifyWorkspaceHealth(sandboxFs);
 
     if (!health.healthy) {
-        console.log(
-            `[WorkspaceHealth] Unhealthy workspace: missing ${health.missingFiles.join(', ')} (${health.durationMs}ms)`
-        );
+        log.warn('Unhealthy workspace', { missing_files: health.missingFiles.join(', '), duration_ms: health.durationMs });
 
         // Re-clone workspace template and personalize
         await cloneWorkspace();
-        console.log(`[WorkspaceHealth] Re-cloned workspace template for user ${userId}`);
+        log.info('Re-cloned workspace template', { user_id: userId });
         if (installRunner) await installRunner();
         const result = await personalizeWorkspace(sandboxFs, { userId });
-        console.log(
-            `[WorkspaceHealth] Personalized workspace: ${result.createdFiles.length} files`
-        );
+        log.info('Personalized workspace', { files_created: result.createdFiles.length });
     }
 
     // Sync DB agents into workspace (scaffold any missing ones, update index.json)
@@ -128,7 +127,7 @@ export async function syncAgentsToWorkspace(
             try {
                 const row = agentRows.get(agent.id);
                 if (!row) {
-                    console.warn(`[WorkspaceHealth] Agent ${agent.slug} (ID ${agent.id}) not found in batch query`);
+                    log.warn('Agent not found in batch query', { agent_slug: agent.slug, agent_id: agent.id });
                     continue;
                 }
 
@@ -140,7 +139,7 @@ export async function syncAgentsToWorkspace(
                 scaffoldedCount++;
             } catch (err) {
                 const msg = err instanceof Error ? err.message : String(err);
-                console.warn(`[WorkspaceHealth] Failed to scaffold agent ${agent.slug}: ${msg}`);
+                log.warn('Failed to scaffold agent', { agent_slug: agent.slug, error: msg });
             }
         }
     }
@@ -173,7 +172,7 @@ export async function syncAgentsToWorkspace(
         // agents/ dir might not exist yet
     }
     if (modelFixCount > 0) {
-        console.log(`[WorkspaceHealth] Fixed model format in ${modelFixCount} agent config(s) to ${DEFAULT_SDK_MODEL}`);
+        log.info('Fixed model format in agent configs', { count: modelFixCount, model: DEFAULT_SDK_MODEL });
     }
 
     // Always update agents/index.json to reflect current DB state
@@ -190,6 +189,6 @@ export async function syncAgentsToWorkspace(
     await sandboxFs.writeFile(indexPath, indexContent);
 
     if (scaffoldedCount > 0) {
-        console.log(`[WorkspaceHealth] Synced ${scaffoldedCount} agent(s) to workspace, updated agents/index.json`);
+        log.info('Synced agents to workspace', { scaffolded_count: scaffoldedCount });
     }
 }

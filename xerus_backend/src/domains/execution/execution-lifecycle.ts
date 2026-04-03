@@ -1,11 +1,12 @@
 // Execution Lifecycle Helpers
 // Extracted from execution.service.ts — error handling and cleanup logic.
 
+import { logger } from '../../utils/logger';
 import type { ResolvedExecutionDeps, PipelineContext, ExecutionServiceDeps } from './execution-pipeline.types';
 import { DomainError } from '../../utils/errors';
 import { getConversation, deleteConversation } from '../conversations/workspace-db.service';
 
-const LOG_PREFIX = '[ExecutionPipeline]';
+const log = logger('ExecutionLifecycle');
 
 /**
  * Handle execution failure: update DB session/conversation, send error to stream.
@@ -17,7 +18,7 @@ export async function handleExecutionError(
     error: unknown,
 ): Promise<void> {
     const err = error instanceof Error ? error : new Error(String(error));
-    console.error(`${LOG_PREFIX} Execution ${ctx.executionId} failed:`, err.message);
+    log.error('Execution failed', { execution_id: ctx.executionId, error: err.message });
 
     if (ctx.sessionId) {
         try {
@@ -28,9 +29,7 @@ export async function handleExecutionError(
         } catch (dbErr) {
             // Cleanup errors are intentionally caught and logged, not re-thrown.
             // Re-throwing here would mask the original execution error.
-            console.error(
-                `${LOG_PREFIX} Failed to update session ${ctx.sessionId}: ${(dbErr as Error).message}`,
-            );
+            log.error('Failed to update session', { session_id: ctx.sessionId, error: (dbErr as Error).message });
         }
     } else if (ctx.conversationId && ctx.conversationId !== ctx.request.conversationId) {
         // Conversation was created by this execution but session record was never inserted.
@@ -44,9 +43,7 @@ export async function handleExecutionError(
                 }
             }
         } catch (dbErr) {
-            console.error(
-                `${LOG_PREFIX} Failed to clean up orphaned conversation ${ctx.conversationId}: ${(dbErr as Error).message}`,
-            );
+            log.error('Failed to clean up orphaned conversation', { conversation_id: ctx.conversationId, error: (dbErr as Error).message });
         }
     }
 
@@ -83,9 +80,7 @@ export function cleanupExecution(resolved: ResolvedExecutionDeps, ctx: PipelineC
         } catch (releaseErr) {
             // Cleanup errors are intentionally caught and logged, not re-thrown.
             // Re-throwing here would mask the original execution error.
-            console.error(
-                `${LOG_PREFIX} Failed to release lane ${ctx.laneId}: ${(releaseErr as Error).message}`,
-            );
+            log.error('Failed to release lane', { lane_id: ctx.laneId, error: (releaseErr as Error).message });
         }
     }
 
