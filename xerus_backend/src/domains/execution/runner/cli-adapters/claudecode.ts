@@ -1,27 +1,33 @@
 // Claude Code CLI Adapter
-// Interactive persistent Claude CLI sessions via Daytona Sessions API
-// Backend sends messages directly to Claude's stdin (no cli-executor middleman)
+// Persistent Claude CLI sessions via Daytona Sessions API using stream-json I/O.
+// Uses --input-format stream-json so Claude reads NDJSON from stdin as a stream
+// (no EOF wait). Backend sends structured messages; Claude outputs stream-json.
 // Auth detection is handled by auth-detector.ts (not the adapter).
-// Reference: Paperclip claude-local/execute.ts, 9to5 claude.ts
+// Reference: Claude Code source src/cli/structuredIO.ts, src/main.tsx
 
 import type { CLIAdapter, AdapterType, AgentConfig } from './types';
 import { validateAgentConfig } from './types';
 
 export class ClaudeCodeAdapter implements CLIAdapter {
     readonly type: AdapterType = 'claudecode';
-    readonly promptViaStdin = false;
+    readonly promptViaStdin = true;
 
     /**
-     * Build command for interactive (persistent) Claude session.
-     * Claude stays alive, backend pipes messages to stdin.
-     * --resume is only used for crash recovery (existing session_id).
+     * Build command for persistent stream-json Claude session.
+     * --input-format stream-json: reads NDJSON from stdin without waiting for EOF.
+     * --output-format stream-json --verbose: full event firehose to stdout.
+     * Stdin messages: {"type":"user","message":{"role":"user","content":"..."}}
+     * --resume for multi-turn: reattach to existing Claude conversation.
      */
     buildCommand(_prompt: string, config: AgentConfig): string[] {
         validateAgentConfig(config);
 
         const args: string[] = [
             'claude',
+            '--input-format', 'stream-json',
             '--output-format', 'stream-json',
+            '--verbose',
+            '--print',
             '--dangerously-skip-permissions',
         ];
 
@@ -29,7 +35,7 @@ export class ClaudeCodeAdapter implements CLIAdapter {
             args.push('--model', config.model);
         }
 
-        // --resume for crash recovery: reattach to existing Claude session
+        // --resume for multi-turn: reattach to existing Claude conversation
         if (config.session_id) {
             args.push('--resume', config.session_id);
         }
@@ -46,9 +52,16 @@ export class ClaudeCodeAdapter implements CLIAdapter {
             args.push('--append-system-prompt', config.system_prompt);
         }
 
-        // '--' prevents any subsequent positional args from being parsed as flags
-        args.push('--');
-
         return args;
+    }
+
+    /**
+     * Format a user message as stream-json NDJSON for Claude's stdin.
+     */
+    formatStdinMessage(text: string): string {
+        return JSON.stringify({
+            type: 'user',
+            message: { role: 'user', content: text },
+        });
     }
 }

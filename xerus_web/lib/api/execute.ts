@@ -164,6 +164,40 @@ export async function respondToGuidance(
 }
 
 // -----------------------------------------------------------------------------
+// Execution Sessions (Neon PostgreSQL — manual/chat runs)
+// -----------------------------------------------------------------------------
+
+export interface ExecutionSessionEntry {
+  id: string;
+  agent_slug: string;
+  status: string;
+  trigger_type: string | null;
+  user_prompt: string | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  credits_used: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+}
+
+export async function listExecutionSessions(params?: {
+  agent_slug?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{ sessions: ExecutionSessionEntry[]; total: number }> {
+  const qs = new URLSearchParams();
+  if (params?.agent_slug) qs.set('agent_slug', params.agent_slug);
+  if (params?.limit !== undefined) qs.set('limit', String(params.limit));
+  if (params?.offset !== undefined) qs.set('offset', String(params.offset));
+  const query = qs.toString();
+
+  const response = await apiCall(`/execute/sessions${query ? `?${query}` : ''}`, { method: 'GET' });
+  const json = await response.json();
+  return json.data ?? json;
+}
+
+// -----------------------------------------------------------------------------
 // Conversation CRUD
 // -----------------------------------------------------------------------------
 

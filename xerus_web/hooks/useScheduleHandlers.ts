@@ -54,7 +54,7 @@ function buildRruleFromSchedule(schedule: ScheduledExecution): string | undefine
 
 interface UseScheduleHandlersArgs {
   agentId: number
-  agentSlug?: string | null
+  agentSlug: string
   setSchedules: Dispatch<SetStateAction<ScheduledExecution[] | null>>
 }
 
@@ -63,7 +63,7 @@ export function useScheduleHandlers({
   agentSlug,
   setSchedules,
 }: UseScheduleHandlersArgs) {
-  const slug = agentSlug ?? String(agentId)
+  const slug = agentSlug
 
   const handleScheduleCreate = useCallback(async (scheduleData: ScheduledExecution) => {
     const rrule = buildRruleFromSchedule(scheduleData)

@@ -1,6 +1,6 @@
-// Bundle the minimal MCP server into JS for sandbox deployment
+// Bundle the MCP server into JS for sandbox deployment
 // Usage: npx ts-node scripts/bundle-runner.ts
-// Output: dist/runner-bundle/minimal-mcp-server.js
+// Output: dist/runner-bundle/mcp-server.js
 
 import { build, type BuildOptions } from 'esbuild';
 import path from 'path';
@@ -27,8 +27,8 @@ const SHARED_OPTIONS: BuildOptions = {
 async function bundleRunner(): Promise<void> {
     const result = await build({
         ...SHARED_OPTIONS,
-        entryPoints: [path.join(RUNNER_DIR, 'minimal-mcp-server.ts')],
-        outfile: path.join(OUT_DIR, 'minimal-mcp-server.js'),
+        entryPoints: [path.join(RUNNER_DIR, 'mcp-server.ts')],
+        outfile: path.join(OUT_DIR, 'mcp-server.js'),
     });
 
     if (result.errors.length > 0) {
@@ -37,7 +37,7 @@ async function bundleRunner(): Promise<void> {
     }
 
     console.log('Runner bundles created:');
-    console.log('  dist/runner-bundle/minimal-mcp-server.js');
+    console.log('  dist/runner-bundle/mcp-server.js');
 }
 
 bundleRunner().catch((err) => {

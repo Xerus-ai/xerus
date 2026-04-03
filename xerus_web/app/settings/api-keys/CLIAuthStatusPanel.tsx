@@ -1,10 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { Sparkles, Cpu, ExternalLink, Loader2, CheckCircle2 } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { Sparkles, Cpu, ExternalLink, Loader2, CheckCircle2, ArrowRight } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from '@/lib/toast'
-import { triggerCliLogin, getCliAuthStatus, type CliAuthStatus } from '@/lib/api/user'
+import { triggerCliLogin, completeCliLogin, getCliAuthStatus, type CliAuthStatus } from '@/lib/api/user'
 
 interface CLIAuthStatusPanelProps {
   cliAuthStatus: CliAuthStatus | null
@@ -13,6 +13,9 @@ interface CLIAuthStatusPanelProps {
 
 export function CLIAuthStatusPanel({ cliAuthStatus, onStatusChange }: CLIAuthStatusPanelProps) {
   const [isLoggingIn, setIsLoggingIn] = useState<'claudecode' | 'codex' | null>(null)
+  const [pendingAdapter, setPendingAdapter] = useState<'claudecode' | 'codex' | null>(null)
+  const [authCode, setAuthCode] = useState('')
+  const [isSubmittingCode, setIsSubmittingCode] = useState(false)
 
   const handleLogin = async (adapter: 'claudecode' | 'codex') => {
     setIsLoggingIn(adapter)
@@ -20,16 +23,23 @@ export function CLIAuthStatusPanel({ cliAuthStatus, onStatusChange }: CLIAuthSta
       const result = await triggerCliLogin(adapter)
       if (result.authUrl) {
         window.open(result.authUrl, '_blank', 'noopener,noreferrer')
-        toast.success('Complete login in the opened tab', {
-          description: 'Once authenticated, your status will update automatically.',
-        })
-        // Poll for auth status after a delay
-        setTimeout(async () => {
-          try {
-            const updated = await getCliAuthStatus()
-            onStatusChange?.(updated)
-          } catch { /* ignore */ }
-        }, 8000)
+        // Show code paste input since localhost callback won't reach the sandbox
+        if (result.needsCode) {
+          setPendingAdapter(adapter)
+          setAuthCode('')
+          toast.info('Authenticate in the opened tab, then paste the code from the URL bar below.')
+        } else {
+          toast.success('Complete login in the opened tab', {
+            description: 'Once authenticated, your status will update automatically.',
+          })
+          // Poll for auth status after a delay
+          setTimeout(async () => {
+            try {
+              const updated = await getCliAuthStatus()
+              onStatusChange?.(updated)
+            } catch { /* ignore */ }
+          }, 8000)
+        }
       } else {
         toast.info(result.message)
       }
@@ -39,6 +49,30 @@ export function CLIAuthStatusPanel({ cliAuthStatus, onStatusChange }: CLIAuthSta
       })
     } finally {
       setIsLoggingIn(null)
+    }
+  }
+
+  const handleSubmitCode = async () => {
+    if (!pendingAdapter || !authCode.trim()) return
+    setIsSubmittingCode(true)
+    try {
+      const result = await completeCliLogin(pendingAdapter, authCode.trim())
+      if (result.success) {
+        toast.success(result.message)
+        setPendingAdapter(null)
+        setAuthCode('')
+        // Refresh auth status
+        try {
+          const updated = await getCliAuthStatus()
+          onStatusChange?.(updated)
+        } catch { /* ignore */ }
+      } else {
+        toast.error(result.message)
+      }
+    } catch {
+      toast.error('Failed to complete authentication.')
+    } finally {
+      setIsSubmittingCode(false)
     }
   }
 
@@ -151,6 +185,55 @@ export function CLIAuthStatusPanel({ cliAuthStatus, onStatusChange }: CLIAuthSta
           )}
         </div>
       </div>
+
+      {/* Code paste input — shown after auth URL is opened */}
+      <AnimatePresence>
+        {pendingAdapter && (
+          <motion.div
+            className="mt-4 p-4 bg-amber-50/50 rounded-xl border border-amber-200/50"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <p className="text-xs text-text-secondary mb-2">
+              After authenticating, your browser will show a page that can't load.
+              Copy the <strong>full URL</strong> from the address bar and paste it below:
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={authCode}
+                onChange={(e) => setAuthCode(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSubmitCode()}
+                placeholder="Paste the URL or code here..."
+                className="flex-1 px-3 py-2 text-xs bg-white rounded-lg border border-surface-active/50 focus:outline-none focus:ring-1 focus:ring-amber-400 focus:border-amber-400"
+                disabled={isSubmittingCode}
+              />
+              <button
+                onClick={handleSubmitCode}
+                disabled={isSubmittingCode || !authCode.trim()}
+                className="flex items-center gap-1.5 px-3 py-2 bg-text text-white rounded-lg hover:bg-text/90 disabled:opacity-50 transition-colors text-xs font-medium whitespace-nowrap"
+              >
+                {isSubmittingCode ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <>
+                    Submit
+                    <ArrowRight className="w-3 h-3" />
+                  </>
+                )}
+              </button>
+            </div>
+            <button
+              onClick={() => { setPendingAdapter(null); setAuthCode(''); }}
+              className="mt-2 text-[10px] text-text-secondary/70 hover:text-text-secondary transition-colors"
+            >
+              Cancel
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Subtle note */}
       <p className="mt-3 text-[10px] text-text-secondary/70 text-center">

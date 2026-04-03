@@ -89,7 +89,8 @@ export function buildSDKEnvironment(
         ...filtered,
         ANTHROPIC_BASE_URL: SDK_CONFIG.openRouterBaseUrl,
         ANTHROPIC_AUTH_TOKEN: apiKey,
-        ANTHROPIC_API_KEY: '',
+        // Do NOT set ANTHROPIC_API_KEY — empty string confuses CLI auth detection.
+        // ANTHROPIC_AUTH_TOKEN provides Bearer auth for OpenRouter.
         XERUS_WORKSPACE_ROOT: process.env.XERUS_WORKSPACE_ROOT || '/home/daytona',
     };
 

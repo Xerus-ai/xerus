@@ -1,5 +1,5 @@
 // Internal MCP Routes
-// Backend API endpoints called by minimal-mcp-server.ts from sandbox
+// Backend API endpoints called by mcp-server.ts from sandbox
 // These routes handle the 13 backend-coupled tools that require platform state
 //
 // Tools:

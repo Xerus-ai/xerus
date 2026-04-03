@@ -160,6 +160,85 @@ export async function routeEventToBackend(
         case 'hitl_request':
             await handleHitlRequest(d, ctx, deps);
             break;
+        // ----- CLI stream-json events (Claude Code --output-format stream-json) -----
+        case 'user':
+            // Echo of our input message — ignore
+            break;
+
+        case 'system': {
+            const subtype = d.subtype as string | undefined;
+            if (subtype === 'init') {
+                // Capture CLI session_id for --resume on next message
+                const cliSessionId = d.session_id as string | undefined;
+                if (cliSessionId && ctx.conversationId && ctx.sandboxId) {
+                    const provider = deps.sandboxService.getDaytonaProvider();
+                    await updateSdkSessionId(provider, ctx.sandboxId, ctx.conversationId, cliSessionId);
+                    ctx.sdkSessionId = cliSessionId;
+                }
+                log.debug('CLI init', { model: d.model, tools_count: (d.tools as string[] | undefined)?.length });
+            } else if (subtype === 'hook_started' || subtype === 'hook_response') {
+                log.debug('CLI hook event', { hook_name: d.hook_name, subtype });
+            } else {
+                log.debug('CLI system event', { subtype });
+            }
+            break;
+        }
+
+        case 'assistant': {
+            // Extract text content from CLI assistant message and forward as token events
+            const msg = d.message as Record<string, unknown> | undefined;
+            if (msg) {
+                const content = msg.content as Array<{ type: string; text?: string }> | undefined;
+                if (content) {
+                    for (const block of content) {
+                        if (block.type === 'text' && block.text) {
+                            ctx.responseText = block.text;
+                            ctx.stream.send('token', { token: block.text });
+                        }
+                    }
+                }
+                // Track token usage
+                const usage = msg.usage as Record<string, number> | undefined;
+                if (usage) {
+                    ctx.inputTokens += usage.input_tokens || 0;
+                    ctx.outputTokens += usage.output_tokens || 0;
+                }
+            }
+            break;
+        }
+
+        case 'result': {
+            // CLI execution complete — map to session_ended
+            const isError = d.is_error as boolean | undefined;
+            const result = d.result as string | undefined;
+            const sessionId = d.session_id as string | undefined;
+            const totalCost = d.total_cost_usd as number | undefined;
+            const numTurns = d.num_turns as number | undefined;
+
+            if (result && !isError) {
+                ctx.responseText = result;
+            }
+            if (totalCost) {
+                ctx.creditsUsed = totalCost;
+            }
+
+            // Track usage from result event
+            const usage = d.usage as Record<string, number> | undefined;
+            if (usage) {
+                ctx.inputTokens = usage.input_tokens || ctx.inputTokens;
+                ctx.outputTokens = usage.output_tokens || ctx.outputTokens;
+            }
+
+            log.info('CLI result', {
+                is_error: isError,
+                num_turns: numTurns,
+                cost_usd: totalCost,
+                session_id: sessionId,
+                duration_ms: d.duration_ms,
+            });
+            break;
+        }
+
         default:
             log.warn('Unknown event type', { event_type: eventType });
             break;

@@ -1,6 +1,5 @@
-// Minimal MCP Server (CLI-Native Pivot)
-// Lightweight MCP server with 17 backend-coupled tools that CLIs access
-// Replaces the 34-tool platform-mcp-server.ts — most tools are now native CLI ops
+// Xerus Platform MCP Server
+// MCP server with 17 backend-coupled tools that CLIs access
 //
 // 17 tools that require backend state:
 //  1. pause_execution          — Session control (needs backend state machine)
@@ -385,10 +384,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main(): Promise<void> {
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    process.stderr.write('[minimal-mcp-server] Running with 17 backend-coupled tools\n');
+    process.stderr.write('[mcp-server] Running with 17 backend-coupled tools\n');
 }
 
 main().catch((err) => {
-    process.stderr.write(`[minimal-mcp-server] Fatal error: ${err}\n`);
+    process.stderr.write(`[mcp-server] Fatal error: ${err}\n`);
     process.exit(1);
 });

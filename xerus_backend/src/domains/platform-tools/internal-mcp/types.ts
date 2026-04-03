@@ -15,7 +15,7 @@ export interface InternalMcpRequest extends Request {
 }
 
 /**
- * MCP tool result format expected by minimal-mcp-server.ts.
+ * MCP tool result format expected by mcp-server.ts.
  * All internal MCP routes return this structure.
  */
 export interface McpToolResult {

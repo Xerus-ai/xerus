@@ -19,7 +19,7 @@ const CRITICAL_FILES = [
     '.git',
     '.claude/settings.json',
     'CLAUDE.md',
-    '.xerus/runner/minimal-mcp-server.js',
+    '.xerus/runner/mcp-server.js',
     'agents/index.json',
 ] as const;
 

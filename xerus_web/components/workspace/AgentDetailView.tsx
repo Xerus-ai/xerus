@@ -54,11 +54,10 @@ export function AgentDetailView({ agentId, onBack }: AgentDetailViewProps) {
 
   const isMarketplace = agent ? isSystemTemplate(agent.userId, agent.agentType) : false
 
-  const agentSlugForSchedules = agent?.slug || agent?.name?.toLowerCase().replace(/\s+/g, '-') || String(agent?.id ?? '')
   const { data: schedulesData } = useSWR(
-    isAuthReady && agent && !isMarketplace ? ['schedules', agent.id] : null,
+    isAuthReady && agent?.slug && !isMarketplace ? ['schedules', agent.id] : null,
     async () => {
-      const result = await listSchedules({ agent_slug: agentSlugForSchedules })
+      const result = await listSchedules({ agent_slug: agent!.slug! })
       return result.schedules.map((s: ScheduleEntry): ScheduledExecution => ({
         id: s.id,
         name: s.name,
@@ -102,7 +101,7 @@ export function AgentDetailView({ agentId, onBack }: AgentDetailViewProps) {
 
   const { handleScheduleCreate, handleScheduleToggle, handleScheduleDelete } = useScheduleHandlers({
     agentId: agent?.id ?? 0,
-    agentSlug: agent?.slug,
+    agentSlug: agent?.slug ?? '',
     setSchedules: setLocalSchedules,
   })
 

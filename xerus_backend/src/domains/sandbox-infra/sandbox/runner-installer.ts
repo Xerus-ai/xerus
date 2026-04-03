@@ -18,7 +18,7 @@ import type { DaytonaProvider } from './providers/daytona.provider';
 const log = logger('RunnerInstaller');
 
 const BUNDLE_DIR = path.join(__dirname, '..', '..', '..', '..', 'dist', 'runner-bundle');
-const MINIMAL_MCP_BUNDLE_PATH = path.join(BUNDLE_DIR, 'minimal-mcp-server.js');
+const MCP_BUNDLE_PATH = path.join(BUNDLE_DIR, 'mcp-server.js');
 
 // Snapshot names where runner deps are pre-installed via Dockerfile
 const PREINSTALLED_SNAPSHOTS = new Set(['xerus-sandbox']);
@@ -57,14 +57,14 @@ export async function installRunnerBundle(
     const depsPreinstalled = PREINSTALLED_SNAPSHOTS.has(snapshot);
 
     // CLI executors (claude, codex) run directly — no bundled runner needed.
-    // Only the minimal MCP server bundle is uploaded for backend-coupled tools.
+    // Only the MCP server bundle is uploaded for backend-coupled tools.
     const sandboxFs = await provider.createFileSystem(sandboxId);
     await sandboxFs.mkdir(runnerDir);
 
-    // Upload minimal MCP server bundle (9 backend-coupled tools)
-    if (fs.existsSync(MINIMAL_MCP_BUNDLE_PATH)) {
-        const mcpContent = fs.readFileSync(MINIMAL_MCP_BUNDLE_PATH, 'utf-8');
-        await sandboxFs.writeFile(`${runnerDir}/minimal-mcp-server.js`, mcpContent);
+    // Upload MCP server bundle (backend-coupled tools)
+    if (fs.existsSync(MCP_BUNDLE_PATH)) {
+        const mcpContent = fs.readFileSync(MCP_BUNDLE_PATH, 'utf-8');
+        await sandboxFs.writeFile(`${runnerDir}/mcp-server.js`, mcpContent);
     }
 
     // Verify node_modules exists for pre-installed snapshots.

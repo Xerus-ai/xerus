@@ -1,6 +1,6 @@
 // Production-safe runner bundler (no ts-node required)
 // Usage: node scripts/bundle-runner.js
-// Output: dist/runner-bundle/minimal-mcp-server.js
+// Output: dist/runner-bundle/mcp-server.js
 
 const { build } = require('esbuild');
 const path = require('path');
@@ -29,8 +29,8 @@ const SHARED_OPTIONS = {
 async function bundleRunner() {
     const result = await build({
         ...SHARED_OPTIONS,
-        entryPoints: [path.join(RUNNER_DIR, 'minimal-mcp-server.ts')],
-        outfile: path.join(OUT_DIR, 'minimal-mcp-server.js'),
+        entryPoints: [path.join(RUNNER_DIR, 'mcp-server.ts')],
+        outfile: path.join(OUT_DIR, 'mcp-server.js'),
     });
 
     if (result.errors.length > 0) {
@@ -39,7 +39,7 @@ async function bundleRunner() {
     }
 
     console.log('Runner bundles created:');
-    console.log('  dist/runner-bundle/minimal-mcp-server.js');
+    console.log('  dist/runner-bundle/mcp-server.js');
 }
 
 bundleRunner().catch((err) => {

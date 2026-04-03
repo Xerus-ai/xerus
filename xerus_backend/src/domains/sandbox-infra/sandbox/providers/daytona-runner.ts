@@ -208,14 +208,20 @@ export async function sendCommand(
 }
 
 /**
- * Send a plain text message to the CLI's stdin.
- * Used for interactive Claude sessions where the prompt goes to stdin.
+ * Send a message to the CLI's stdin.
+ * For stream-json adapters (Claude Code): sends structured NDJSON.
+ * For plain text adapters (Codex): sends raw text.
  */
 export async function sendMessage(
     handle: SessionHandle,
     message: string,
 ): Promise<void> {
-    await handle.sendInput(message + '\n');
+    // Format as stream-json NDJSON for Claude Code's --input-format stream-json
+    const formatted = JSON.stringify({
+        type: 'user',
+        message: { role: 'user', content: message },
+    });
+    await handle.sendInput(formatted + '\n');
 }
 
 /**

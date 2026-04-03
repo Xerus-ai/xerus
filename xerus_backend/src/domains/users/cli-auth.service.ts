@@ -61,6 +61,9 @@ const CODEX_AUTH_PATH = '~/.codex/auth.json';
 export class CLIAuthService {
     private sandboxService: SandboxService | null = null;
 
+    // Tracks pending auth sessions so we can deliver the callback code later
+    private pendingAuth = new Map<string, { redirectUri: string; localPort: number; timestamp: number }>();
+
     setSandboxService(sandboxService: SandboxService): void {
         this.sandboxService = sandboxService;
     }
@@ -207,45 +210,182 @@ export class CLIAuthService {
     /**
      * Trigger CLI auth login in the user's sandbox.
      * Runs the login command in background, waits briefly, and captures the auth URL.
+     *
+     * The CLI starts a local OAuth server inside the sandbox. Since the user's browser
+     * can't reach that localhost, we also store the redirect_uri so that completeLogin()
+     * can deliver the auth code via curl inside the sandbox.
      */
-    async triggerLogin(userId: string, adapter: 'claudecode' | 'codex'): Promise<{ authUrl: string | null; message: string }> {
+    async triggerLogin(userId: string, adapter: 'claudecode' | 'codex'): Promise<{ authUrl: string | null; message: string; needsCode: boolean }> {
         if (!this.sandboxService) {
-            return { authUrl: null, message: 'Sandbox service not available. Please start a chat first.' };
+            return { authUrl: null, message: 'Sandbox service not available. Please start a chat first.', needsCode: false };
         }
 
         const session = this.sandboxService.getSession(userId);
         if (!session || session.status !== 'running') {
-            return { authUrl: null, message: 'Your sandbox is not running. Please start a chat first to provision your environment.' };
+            return { authUrl: null, message: 'Your sandbox is not running. Please start a chat first to provision your environment.', needsCode: false };
         }
 
         const provider = this.sandboxService.getDaytonaProvider();
         const cliCommand = adapter === 'claudecode' ? 'claude' : 'codex';
 
-        // Run auth login in background, capture output after a brief wait
-        const script = [
-            `rm -f /tmp/xerus-auth-${adapter}.log`,
-            `nohup bash -c '${cliCommand} auth login > /tmp/xerus-auth-${adapter}.log 2>&1' &`,
-            `sleep 4`,
-            `cat /tmp/xerus-auth-${adapter}.log 2>/dev/null || echo 'Waiting for auth output...'`,
-        ].join(' && ');
+        // Run auth login in background, capture output after a brief wait.
+        // The nohup & must be in a subshell so the && chain continues correctly.
+        // Without the subshell, `& &&` is a syntax error in sh/dash.
+        const logFile = `/tmp/xerus-auth-${adapter}.log`;
+        const script = `rm -f ${logFile} && (nohup ${cliCommand} auth login > ${logFile} 2>&1 &) && sleep 4 && cat ${logFile} 2>/dev/null || echo 'Waiting for auth output...'`;
 
         try {
             const result = await provider.executeCommand(session.sandboxId, script);
             const output = result.result || '';
 
-            // Parse any URL from the output (OAuth redirect URL)
-            const urlMatch = output.match(/https?:\/\/[^\s"'<>]+/);
+            // Extract ALL URLs from CLI output
+            const allUrls = output.match(/https?:\/\/[^\s"'<>]+/g) || [];
+
+            // Prefer external (non-localhost) HTTPS URLs — these are the OAuth authorization URLs.
+            // Localhost URLs are the CLI's internal callback server (useless outside the sandbox).
+            const externalUrl = allUrls.find(u => !u.includes('localhost') && !u.includes('127.0.0.1'));
+            const localhostUrl = allUrls.find(u => u.includes('localhost') || u.includes('127.0.0.1'));
+
+            // Extract redirect_uri and local port for later code delivery
+            const redirectUri = externalUrl ? this.extractRedirectUri(externalUrl) : null;
+            const localPort = this.extractLocalhostPort(localhostUrl || redirectUri || '');
+
+            if (localPort) {
+                this.pendingAuth.set(`${userId}:${adapter}`, {
+                    redirectUri: redirectUri || `http://localhost:${localPort}`,
+                    localPort,
+                    timestamp: Date.now(),
+                });
+                log.info('Stored pending auth', { adapter, user_id: userId, local_port: localPort, has_redirect_uri: !!redirectUri });
+            }
+
+            const authUrl = externalUrl || null;
             return {
-                authUrl: urlMatch ? urlMatch[0] : null,
-                message: urlMatch
-                    ? 'Please complete authentication in the opened tab.'
+                authUrl,
+                needsCode: !!authUrl,
+                message: authUrl
+                    ? 'Authenticate in the opened tab, then paste the code from the URL back here.'
                     : output.trim() || 'Auth process started. Check your sandbox terminal for prompts.',
             };
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             log.warn('Failed to trigger auth', { adapter, user_id: userId, error: errorMessage });
-            return { authUrl: null, message: `Failed to start auth: ${errorMessage}` };
+            return { authUrl: null, message: `Failed to start auth: ${errorMessage}`, needsCode: false };
         }
+    }
+
+    /**
+     * Complete a pending CLI auth by delivering the OAuth callback code to the CLI's
+     * local server inside the sandbox.
+     *
+     * The user authenticates in the browser, gets redirected to localhost (which fails),
+     * then pastes the code or full URL from their browser address bar.
+     * We deliver it to the CLI via curl inside the sandbox.
+     */
+    async completeLogin(
+        userId: string,
+        adapter: 'claudecode' | 'codex',
+        codeOrUrl: string,
+    ): Promise<{ success: boolean; message: string }> {
+        if (!this.sandboxService) {
+            return { success: false, message: 'Sandbox service not available.' };
+        }
+
+        const session = this.sandboxService.getSession(userId);
+        if (!session || session.status !== 'running') {
+            return { success: false, message: 'Sandbox not running.' };
+        }
+
+        const pending = this.pendingAuth.get(`${userId}:${adapter}`);
+        if (!pending) {
+            return { success: false, message: 'No pending auth session. Click Login first to start the flow.' };
+        }
+
+        // Expire stale sessions (10 minutes)
+        if (Date.now() - pending.timestamp > 10 * 60 * 1000) {
+            this.pendingAuth.delete(`${userId}:${adapter}`);
+            return { success: false, message: 'Auth session expired. Please click Login again.' };
+        }
+
+        const provider = this.sandboxService.getDaytonaProvider();
+        const input = codeOrUrl.trim();
+
+        try {
+            // Determine the callback URL to hit inside the sandbox.
+            // The user may paste:
+            //   (a) The full failed redirect URL: http://localhost:7775/oauth/callback?code=XYZ
+            //   (b) Just the code: ugWZFfyiMSIhfgJkHZO9ZapKLvGwSyRkvmKUGDcoe1tl4lfq
+            let callbackUrl: string;
+
+            if (input.startsWith('http://localhost') || input.startsWith('http://127.0.0.1')) {
+                // User pasted the full redirect URL — use it directly inside the sandbox
+                callbackUrl = input;
+            } else {
+                // User pasted just the code — reconstruct the callback URL
+                const redirectUri = pending.redirectUri;
+                const separator = redirectUri.includes('?') ? '&' : '?';
+                callbackUrl = `${redirectUri}${separator}code=${encodeURIComponent(input)}`;
+            }
+
+            log.info('Delivering auth callback to sandbox', {
+                adapter,
+                user_id: userId,
+                port: pending.localPort,
+                callback_url_prefix: callbackUrl.substring(0, 60),
+            });
+
+            // Deliver the callback to the CLI's local server inside the sandbox
+            await provider.executeCommand(
+                session.sandboxId,
+                `curl -sL "${callbackUrl}" -o /dev/null -w "%{http_code}" 2>&1 || echo "curl_failed"`,
+            );
+
+            // Wait for the CLI to exchange the code for tokens and write credentials
+            await new Promise(resolve => setTimeout(resolve, 3000));
+
+            // Verify credentials were written
+            const status = await this.fetchAuthStatus(userId);
+            const authResult = adapter === 'claudecode' ? status.claudecode : status.codex;
+
+            this.pendingAuth.delete(`${userId}:${adapter}`);
+
+            if (authResult.authenticated && authResult.method === 'subscription') {
+                return { success: true, message: 'Authentication successful! Connected via subscription.' };
+            }
+
+            return {
+                success: false,
+                message: 'Code delivered but credentials not detected yet. The CLI may still be processing — try refreshing in a few seconds.',
+            };
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            log.warn('Failed to complete auth', { adapter, user_id: userId, error: errorMessage });
+            return { success: false, message: `Failed to complete auth: ${errorMessage}` };
+        }
+    }
+
+    /**
+     * Extract redirect_uri from an OAuth authorization URL.
+     */
+    private extractRedirectUri(authUrl: string): string | null {
+        try {
+            const url = new URL(authUrl);
+            return url.searchParams.get('redirect_uri');
+        } catch {
+            const match = authUrl.match(/redirect_uri=([^&]+)/);
+            return match ? decodeURIComponent(match[1]) : null;
+        }
+    }
+
+    /**
+     * Extract port number from a localhost URL or redirect_uri.
+     */
+    private extractLocalhostPort(urlStr: string): number | null {
+        const match = urlStr.match(/localhost:(\d+)|127\.0\.0\.1:(\d+)/);
+        if (match) {
+            return parseInt(match[1] || match[2], 10);
+        }
+        return null;
     }
 }
 

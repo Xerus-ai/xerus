@@ -7,8 +7,9 @@ import {
 } from 'lucide-react'
 import { toast } from '@/lib/toast'
 import { listScheduleRuns, type ScheduleRunEntry } from '@/lib/api/schedules'
+import { listExecutionSessions, type ExecutionSessionEntry } from '@/lib/api/execute'
 
-/** Run history entry mapped from schedule_runs table */
+/** Run history entry mapped from either schedule_runs or execution_sessions */
 interface RunEntry {
     id: string
     status: 'success' | 'failed' | 'running'
@@ -64,6 +65,45 @@ function mapScheduleRunToEntry(run: ScheduleRunEntry): RunEntry {
     }
 }
 
+/** Map an execution_sessions row to a RunEntry for display */
+function mapSessionToEntry(session: ExecutionSessionEntry): RunEntry {
+    const status = session.status === 'completed' ? 'success'
+        : session.status === 'running' || session.status === 'pending' ? 'running'
+        : 'failed'
+
+    const startedAt = session.started_at ?? session.created_at
+    const completedAt = session.completed_at ?? null
+
+    let duration = ''
+    if (startedAt && completedAt) {
+        const ms = new Date(completedAt).getTime() - new Date(startedAt).getTime()
+        const seconds = Math.round(ms / 1000)
+        if (seconds < 60) {
+            duration = `${seconds}s`
+        } else {
+            const minutes = Math.floor(seconds / 60)
+            const remainingSeconds = seconds % 60
+            duration = `${minutes}m ${remainingSeconds}s`
+        }
+    }
+
+    const tokens = (session.input_tokens ?? 0) + (session.output_tokens ?? 0)
+
+    return {
+        id: session.id,
+        status,
+        triggerType: session.trigger_type ?? 'user_message',
+        task: session.user_prompt?.slice(0, 80) ?? 'Chat execution',
+        description: session.user_prompt ?? '',
+        tokensUsed: tokens,
+        creditsUsed: session.credits_used ? parseFloat(session.credits_used) : 0,
+        startedAt,
+        completedAt,
+        createdAt: session.created_at,
+        duration,
+    }
+}
+
 type RunStatus = 'all' | 'success' | 'failed'
 
 const ITEMS_PER_PAGE = 10
@@ -81,12 +121,19 @@ export function RunHistory({ agent }: RunHistoryProps) {
     useEffect(() => {
         let cancelled = false
         async function fetchHistory() {
+            if (!agent.slug) return
             setIsLoading(true)
             try {
-                const agentSlug = agent.slug || String(agent.id)
-                const result = await listScheduleRuns({ agent_slug: agentSlug, limit: 100 })
+                const [scheduleResult, sessionResult] = await Promise.all([
+                    listScheduleRuns({ agent_slug: agent.slug, limit: 100 }),
+                    listExecutionSessions({ agent_slug: agent.slug, limit: 100 }),
+                ])
                 if (!cancelled) {
-                    setRuns(result.runs.map(mapScheduleRunToEntry))
+                    const scheduleRuns = scheduleResult.runs.map(mapScheduleRunToEntry)
+                    const sessionRuns = sessionResult.sessions.map(mapSessionToEntry)
+                    const merged = [...scheduleRuns, ...sessionRuns]
+                        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                    setRuns(merged)
                 }
             } catch (err) {
                 if (!cancelled) {
@@ -259,6 +306,9 @@ export function RunHistory({ agent }: RunHistoryProps) {
                                                 : 'bg-amber-100 text-amber-700'
                                         }`}>
                                             {run.status === 'running' ? 'Running' : run.status}
+                                        </span>
+                                        <span className="text-xs px-2 py-0.5 rounded-full bg-surface-hover text-text-muted">
+                                            {run.triggerType === 'schedule' ? 'Scheduled' : 'Chat'}
                                         </span>
                                     </div>
                                     {run.description && (

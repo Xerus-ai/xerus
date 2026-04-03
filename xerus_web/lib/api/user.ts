@@ -221,12 +221,27 @@ export const getCliAuthStatus = async (): Promise<CliAuthStatus> => {
 export interface CliAuthTriggerResult {
   authUrl: string | null;
   message: string;
+  needsCode: boolean;
 }
 
 export const triggerCliLogin = async (adapter: 'claudecode' | 'codex'): Promise<CliAuthTriggerResult> => {
   const response = await apiCall('/users/cli-auth-trigger', {
     method: 'POST',
     body: JSON.stringify({ adapter }),
+  });
+  const json = await response.json();
+  return json.data || json;
+};
+
+export interface CliAuthCompleteResult {
+  success: boolean;
+  message: string;
+}
+
+export const completeCliLogin = async (adapter: 'claudecode' | 'codex', code: string): Promise<CliAuthCompleteResult> => {
+  const response = await apiCall('/users/cli-auth-complete', {
+    method: 'POST',
+    body: JSON.stringify({ adapter, code }),
   });
   const json = await response.json();
   return json.data || json;

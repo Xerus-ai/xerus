@@ -107,6 +107,59 @@ router.use('/conversations', conversationRouter);
 // Mount schedule CRUD + run history routes (workspace.db queries)
 router.use('/schedules', scheduleFrontendRouter);
 
+// GET /api/v1/execute/sessions - List execution sessions (Neon PostgreSQL)
+// Supports ?agent_slug=... &limit=... &offset=...
+router.get('/sessions', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const startTime = res.locals.startTime || Date.now();
+    try {
+        if (!req.user) throw new UnauthorizedError();
+
+        const agentSlug = req.query.agent_slug as string | undefined;
+        const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
+        const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : 0;
+
+        if (isNaN(limit) || limit < 1) {
+            throw new BadRequestError('limit must be a positive integer');
+        }
+        if (isNaN(offset) || offset < 0) {
+            throw new BadRequestError('offset must be a non-negative integer');
+        }
+
+        const params: unknown[] = [req.user.uid, limit, offset];
+        let agentFilter = '';
+        if (agentSlug) {
+            agentFilter = 'AND es.agent_slug = $4';
+            params.push(agentSlug);
+        }
+
+        const result = await query<SessionListRow>(
+            `SELECT es.id, es.agent_slug, es.status, es.trigger_type,
+                    es.user_prompt, es.input_tokens, es.output_tokens,
+                    es.credits_used, es.started_at, es.completed_at, es.created_at
+             FROM execution_sessions es
+             JOIN workspaces w ON es.workspace_id = w.id
+             WHERE w.user_id = $1 ${agentFilter}
+             ORDER BY es.created_at DESC
+             LIMIT $2 OFFSET $3`,
+            params,
+        );
+
+        const countResult = await query<{ count: string }>(
+            `SELECT COUNT(*) as count
+             FROM execution_sessions es
+             JOIN workspaces w ON es.workspace_id = w.id
+             WHERE w.user_id = $1 ${agentFilter}`,
+            agentSlug ? [req.user.uid, agentSlug] : [req.user.uid],
+        );
+
+        const total = parseInt(countResult.rows[0]?.count ?? '0', 10);
+
+        sendResponse(res, 200, { sessions: result.rows, total }, startTime);
+    } catch (err) {
+        next(err);
+    }
+});
+
 // POST /api/v1/execute/sse-token - Issue a short-lived, single-use token for SSE auth
 router.post('/sse-token', auth, createSseTokenHandler());
 
@@ -407,6 +460,20 @@ interface StatusRow {
     credits_used: string | null;
     message_metadata: { tool_calls?: unknown[] } | null;
     key_source: 'byok' | 'platform' | null;
+}
+
+interface SessionListRow {
+    id: string;
+    agent_slug: string;
+    status: string;
+    trigger_type: string | null;
+    user_prompt: string | null;
+    input_tokens: number | null;
+    output_tokens: number | null;
+    credits_used: string | null;
+    started_at: Date | null;
+    completed_at: Date | null;
+    created_at: Date;
 }
 
 // -----------------------------------------------------------------------------

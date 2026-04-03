@@ -373,7 +373,10 @@ async function processEventStream(
         }
 
         const raw = event as unknown as Record<string, unknown>;
-        const eventType = typeof raw.event === 'string' && raw.event ? raw.event : null;
+        // Claude CLI stream-json uses `type` field, old SDK runner used `event` field.
+        const eventType = (typeof raw.event === 'string' && raw.event)
+            || (typeof raw.type === 'string' && raw.type)
+            || null;
 
         // Events without a recognized event field are untyped runner output (e.g. raw SDK stdout).
         // Log for debugging but never forward to the frontend.
@@ -409,7 +412,8 @@ async function processEventStream(
 
         // Runner is a persistent process — it stays alive after the session ends.
         // Break the loop so the pipeline can finalize credits and close the stream.
-        if (eventType === 'session_ended' || eventType === 'session_completed') {
+        // CLI stream-json uses `result` as the completion event.
+        if (eventType === 'session_ended' || eventType === 'session_completed' || eventType === 'result') {
             break;
         }
 
