@@ -215,7 +215,12 @@ export class CLIAuthService {
      * can't reach that localhost, we also store the redirect_uri so that completeLogin()
      * can deliver the auth code via curl inside the sandbox.
      */
-    async triggerLogin(userId: string, adapter: 'claudecode' | 'codex'): Promise<{ authUrl: string | null; message: string; needsCode: boolean }> {
+    async triggerLogin(userId: string, adapter: 'claudecode' | 'codex'): Promise<{
+        authUrl: string | null;
+        message: string;
+        needsCode: boolean;
+        deviceCode?: string;
+    }> {
         if (!this.sandboxService) {
             return { authUrl: null, message: 'Sandbox service not available. Please start a chat first.', needsCode: false };
         }
@@ -226,52 +231,115 @@ export class CLIAuthService {
         }
 
         const provider = this.sandboxService.getDaytonaProvider();
-        const cliCommand = adapter === 'claudecode' ? 'claude' : 'codex';
+
+        // Codex supports --device-auth for headless/remote environments (no localhost callback needed).
+        // Claude Code doesn't have this — it uses localhost OAuth which we handle via code paste.
+        const loginCommand = adapter === 'codex' ? 'codex login --device-auth' : 'claude auth login';
 
         // Run auth login in background, capture output after a brief wait.
         // The nohup & must be in a subshell so the && chain continues correctly.
         // Without the subshell, `& &&` is a syntax error in sh/dash.
         const logFile = `/tmp/xerus-auth-${adapter}.log`;
-        const script = `rm -f ${logFile} && (nohup ${cliCommand} auth login > ${logFile} 2>&1 &) && sleep 4 && cat ${logFile} 2>/dev/null || echo 'Waiting for auth output...'`;
+        const script = `rm -f ${logFile} && (nohup ${loginCommand} > ${logFile} 2>&1 &) && sleep 4 && cat ${logFile} 2>/dev/null || echo 'Waiting for auth output...'`;
 
         try {
             const result = await provider.executeCommand(session.sandboxId, script);
             const output = result.result || '';
 
-            // Extract ALL URLs from CLI output
-            const allUrls = output.match(/https?:\/\/[^\s"'<>]+/g) || [];
-
-            // Prefer external (non-localhost) HTTPS URLs — these are the OAuth authorization URLs.
-            // Localhost URLs are the CLI's internal callback server (useless outside the sandbox).
-            const externalUrl = allUrls.find(u => !u.includes('localhost') && !u.includes('127.0.0.1'));
-            const localhostUrl = allUrls.find(u => u.includes('localhost') || u.includes('127.0.0.1'));
-
-            // Extract redirect_uri and local port for later code delivery
-            const redirectUri = externalUrl ? this.extractRedirectUri(externalUrl) : null;
-            const localPort = this.extractLocalhostPort(localhostUrl || redirectUri || '');
-
-            if (localPort) {
-                this.pendingAuth.set(`${userId}:${adapter}`, {
-                    redirectUri: redirectUri || `http://localhost:${localPort}`,
-                    localPort,
-                    timestamp: Date.now(),
-                });
-                log.info('Stored pending auth', { adapter, user_id: userId, local_port: localPort, has_redirect_uri: !!redirectUri });
+            // Device auth flow (Codex --device-auth): outputs a URL and a user code.
+            // e.g. "Visit https://auth.openai.com/activate and enter code: ABCD-EFGH"
+            if (adapter === 'codex') {
+                return this.parseDeviceAuthOutput(output, userId, adapter);
             }
 
-            const authUrl = externalUrl || null;
-            return {
-                authUrl,
-                needsCode: !!authUrl,
-                message: authUrl
-                    ? 'Authenticate in the opened tab, then paste the code from the URL back here.'
-                    : output.trim() || 'Auth process started. Check your sandbox terminal for prompts.',
-            };
+            // Standard OAuth flow (Claude): outputs external auth URL + starts localhost server.
+            return this.parseOAuthOutput(output, userId, adapter);
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             log.warn('Failed to trigger auth', { adapter, user_id: userId, error: errorMessage });
             return { authUrl: null, message: `Failed to start auth: ${errorMessage}`, needsCode: false };
         }
+    }
+
+    /**
+     * Parse device auth output (Codex --device-auth).
+     * The CLI outputs a URL to visit and a code to enter. No localhost callback needed.
+     * The CLI process keeps running in background and auto-detects when the user completes auth.
+     */
+    private parseDeviceAuthOutput(output: string, userId: string, adapter: 'claudecode' | 'codex'): {
+        authUrl: string | null;
+        message: string;
+        needsCode: boolean;
+        deviceCode?: string;
+    } {
+        // Extract the activation URL
+        const allUrls = output.match(/https?:\/\/[^\s"'<>]+/g) || [];
+        const authUrl = allUrls.find(u => !u.includes('localhost') && !u.includes('127.0.0.1')) || null;
+
+        // Extract the device code (e.g. "ABCD-EFGH" or "enter code: XXXX-XXXX")
+        const codeMatch = output.match(/code[:\s]+([A-Z0-9]{4}-[A-Z0-9]{4})/i)
+            || output.match(/:\s*([A-Z0-9]{4}-[A-Z0-9]{4})/i);
+        const deviceCode = codeMatch ? codeMatch[1] : undefined;
+
+        log.info('Device auth triggered', { adapter, user_id: userId, has_url: !!authUrl, has_code: !!deviceCode });
+
+        if (authUrl && deviceCode) {
+            return {
+                authUrl,
+                needsCode: false, // No code paste needed — CLI auto-detects completion
+                deviceCode,
+                message: `Visit the link and enter code: ${deviceCode}`,
+            };
+        }
+
+        // Fallback if parsing fails
+        return {
+            authUrl,
+            needsCode: false,
+            message: output.trim() || 'Device auth started. Check the opened tab.',
+        };
+    }
+
+    /**
+     * Parse standard OAuth output (Claude auth login).
+     * The CLI outputs an external auth URL and starts a localhost callback server.
+     * Since the sandbox's localhost isn't reachable from the browser, we store the
+     * redirect_uri so the user can paste the code back via completeLogin().
+     */
+    private parseOAuthOutput(output: string, userId: string, adapter: 'claudecode' | 'codex'): {
+        authUrl: string | null;
+        message: string;
+        needsCode: boolean;
+    } {
+        // Extract ALL URLs from CLI output
+        const allUrls = output.match(/https?:\/\/[^\s"'<>]+/g) || [];
+
+        // Prefer external (non-localhost) HTTPS URLs — these are the OAuth authorization URLs.
+        // Localhost URLs are the CLI's internal callback server (useless outside the sandbox).
+        const externalUrl = allUrls.find(u => !u.includes('localhost') && !u.includes('127.0.0.1'));
+        const localhostUrl = allUrls.find(u => u.includes('localhost') || u.includes('127.0.0.1'));
+
+        // Extract redirect_uri and local port for later code delivery
+        const redirectUri = externalUrl ? this.extractRedirectUri(externalUrl) : null;
+        const localPort = this.extractLocalhostPort(localhostUrl || redirectUri || '');
+
+        if (localPort) {
+            this.pendingAuth.set(`${userId}:${adapter}`, {
+                redirectUri: redirectUri || `http://localhost:${localPort}`,
+                localPort,
+                timestamp: Date.now(),
+            });
+            log.info('Stored pending auth', { adapter, user_id: userId, local_port: localPort, has_redirect_uri: !!redirectUri });
+        }
+
+        const authUrl = externalUrl || null;
+        return {
+            authUrl,
+            needsCode: !!authUrl,
+            message: authUrl
+                ? 'Authenticate in the opened tab, then paste the code from the URL back here.'
+                : output.trim() || 'Auth process started. Check your sandbox terminal for prompts.',
+        };
     }
 
     /**

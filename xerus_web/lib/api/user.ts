@@ -222,6 +222,7 @@ export interface CliAuthTriggerResult {
   authUrl: string | null;
   message: string;
   needsCode: boolean;
+  deviceCode?: string;
 }
 
 export const triggerCliLogin = async (adapter: 'claudecode' | 'codex'): Promise<CliAuthTriggerResult> => {

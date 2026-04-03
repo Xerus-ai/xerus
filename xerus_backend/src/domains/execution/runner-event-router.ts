@@ -185,15 +185,56 @@ export async function routeEventToBackend(
         }
 
         case 'assistant': {
-            // Extract text content from CLI assistant message and forward as token events
+            // Map CLI assistant content blocks to typed frontend SSE events
             const msg = d.message as Record<string, unknown> | undefined;
             if (msg) {
-                const content = msg.content as Array<{ type: string; text?: string }> | undefined;
+                const content = msg.content as Array<Record<string, unknown>> | undefined;
                 if (content) {
                     for (const block of content) {
-                        if (block.type === 'text' && block.text) {
-                            ctx.responseText = block.text;
-                            ctx.stream.send('token', { token: block.text });
+                        switch (block.type) {
+                            case 'text': {
+                                const text = block.text as string;
+                                if (text) {
+                                    ctx.responseText = text;
+                                    ctx.responseChunks.push(text);
+                                    ctx.stream.send('token' as StreamEventType, { text, tokenCount: ctx.outputTokens });
+                                }
+                                break;
+                            }
+                            case 'tool_use': {
+                                ctx.toolCallCount++;
+                                const callId = (block.id as string) || `tc-${ctx.toolCallCount}`;
+                                const toolName = (block.name as string) || 'unknown';
+                                const args = (block.input as Record<string, unknown>) || {};
+                                ctx.toolCallDetails.push({ call_id: callId, tool_name: toolName, arguments: args, started_at: Date.now() });
+                                ctx.toolCallMap.set(callId, ctx.toolCallDetails[ctx.toolCallDetails.length - 1]);
+                                ctx.stream.send('tool_call' as StreamEventType, { toolName, arguments: args, callId });
+                                break;
+                            }
+                            case 'tool_result': {
+                                const callId = (block.tool_use_id as string) || '';
+                                const resultContent = block.content;
+                                const resultText = typeof resultContent === 'string'
+                                    ? resultContent
+                                    : Array.isArray(resultContent)
+                                        ? (resultContent as Array<{ type: string; text?: string }>).filter(b => b.type === 'text').map(b => b.text).join('\n')
+                                        : '';
+                                const tracked = ctx.toolCallMap.get(callId);
+                                const durationMs = tracked ? Date.now() - tracked.started_at : 0;
+                                if (tracked) { tracked.result = resultText; tracked.success = true; tracked.duration_ms = durationMs; }
+                                ctx.stream.send('tool_result' as StreamEventType, { callId, result: resultText, durationMs, success: true });
+                                break;
+                            }
+                            case 'thinking': {
+                                const thought = (block.thinking as string) || (block.text as string) || '';
+                                if (thought) {
+                                    ctx.thinkingChunks.push(thought);
+                                    ctx.stream.send('reasoning' as StreamEventType, { thought });
+                                }
+                                break;
+                            }
+                            default:
+                                break;
                         }
                     }
                 }

@@ -28,6 +28,7 @@ export class ClaudeCodeAdapter implements CLIAdapter {
             '--output-format', 'stream-json',
             '--verbose',
             '--print',
+            '--include-partial-messages',
             '--dangerously-skip-permissions',
         ];
 
