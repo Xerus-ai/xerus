@@ -3,10 +3,10 @@
 // Two scopes: channel-scoped (default) and global (root .claude/skills/).
 // All operations go directly to the Daytona sandbox filesystem.
 
-import { SandboxService } from '../execution/sandbox/sandbox.service';
-import type { DaytonaProvider } from '../execution/sandbox/providers/daytona.provider';
-import type { SandboxFileSystem } from '../execution/workspace/workspace.manager';
-import { SANDBOX_CONFIG } from '../execution/sandbox/sandbox.config';
+import { SandboxService } from '../sandbox-infra/sandbox/sandbox.service';
+import type { DaytonaProvider } from '../sandbox-infra/sandbox/providers/daytona.provider';
+import type { SandboxFileSystem } from '../sandbox-infra/workspace/workspace.manager';
+import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
 import { SkillInstallScope, SKILL_SLUG_PATTERN } from './types';
 import { shellEscapePath } from '../../utils/shell-safety';
 

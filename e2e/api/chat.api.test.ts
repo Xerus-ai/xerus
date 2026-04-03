@@ -80,8 +80,9 @@ test.describe('Chat API', () => {
       data: { task: '[E2E] API test message', agent_slug: 'xerus-master' },
     })
 
-    // Expect 400 (no active stream) or 404 (conversation in workspace.db, not Neon)
-    expect([400, 404]).toContain(msgResp.status())
+    // Conversation should be mirrored for execution; without an active SSE stream
+    // the API now consistently returns 400.
+    expect(msgResp.status()).toBe(400)
     const body = await msgResp.json()
     expect(body.success).toBe(false)
   })

@@ -5,9 +5,9 @@
 
 import type { StreamingResponse } from './streaming/stream.handler';
 import type { PricingService } from './sdk/pricing.service';
-import type { SandboxService } from './sandbox/sandbox.service';
+import type { SandboxService } from '../sandbox-infra/sandbox/sandbox.service';
 import type { ExecutionQueueService } from './queue/execution-queue.service';
-import type { CreditTracker } from './credits/credit-tracker.service';
+import type { CreditTracker } from '../credits/credit-tracker.service';
 import type {
     ExecutionRequest,
     ExecutionStatus,
@@ -17,7 +17,7 @@ import type {
 } from './types';
 import type { KeySource } from './key-resolver.service';
 import type { TriggerType } from './queue/execution-lane.types';
-import type { SessionHandle } from './sandbox/providers/daytona-runner';
+import type { SessionHandle } from '../sandbox-infra/sandbox/providers/daytona-runner';
 import type { MemorySearchIndexService } from '../memory/git-memory/memory-search-index.service';
 import type { MessageBridgeService } from '../inbox/messaging/message-bridge.service';
 import type { AnnounceQueueService } from './queue/announce-queue.service';
@@ -86,6 +86,16 @@ export interface StartExecutionOptions {
     triggerType?: TriggerType;
 }
 
+export interface ToolCallDetail {
+    call_id: string;
+    tool_name: string;
+    arguments?: Record<string, unknown>;
+    result?: unknown;
+    success?: boolean;
+    duration_ms?: number;
+    started_at: number;
+}
+
 export interface PipelineContext {
     executionId: string;
     stream: StreamingResponse;
@@ -120,15 +130,9 @@ export interface PipelineContext {
     /** Accumulated reasoning/thinking chunks from reasoning events */
     thinkingChunks: string[];
     /** Accumulated tool call details for structured persistence */
-    toolCallDetails: Array<{
-        call_id: string;
-        tool_name: string;
-        arguments?: Record<string, unknown>;
-        result?: unknown;
-        success?: boolean;
-        duration_ms?: number;
-        started_at: number;
-    }>;
+    toolCallDetails: ToolCallDetail[];
+    /** O(1) lookup map for tool call details by call_id */
+    toolCallMap: Map<string, ToolCallDetail>;
     /** Number of runner events filtered out due to agent_slug mismatch */
     eventsFiltered: number;
     /** Setup report from runFullWorkspaceSetup (null if sandbox was already warm) */

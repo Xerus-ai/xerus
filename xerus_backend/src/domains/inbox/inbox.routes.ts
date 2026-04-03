@@ -1,13 +1,82 @@
 // Inbox Routes
 // REST API endpoints for inbox item management and SSE streaming
+// Queries workspace.db (SQLite) on sandbox via provider.executeCommand()
 
 import { Router, Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../../types';
 import { sendResponse } from '../../utils/response';
+import { BadRequestError, UnauthorizedError, NotFoundError } from '../../utils/errors';
 import { authenticateFirebaseToken } from '../../middleware/auth';
 import { sseAuth, createSseTokenHandler } from '../../middleware/sse-auth';
-import { query } from '../../database/connection';
 import { InMemoryInboxSSEBroadcaster } from './inbox-sse.broadcaster';
+import type { SandboxService } from '../sandbox-infra/sandbox/sandbox.service';
+import { requireRunningSandbox, getDaytonaProvider } from '../sandbox-infra/sandbox/sandbox-route-helpers';
+import {
+    listInboxItems,
+    getInboxItem,
+    markInboxItemRead,
+    archiveInboxItem,
+} from './inbox-workspace-db.service';
+import type { InboxItemRow } from './inbox-workspace-db.service';
+
+// -----------------------------------------------------------------------------
+// Dependency Injection
+// -----------------------------------------------------------------------------
+
+export interface InboxRoutesDeps {
+    sandboxService: SandboxService;
+}
+
+let deps: InboxRoutesDeps | null = null;
+
+export function setInboxRoutesDeps(d: InboxRoutesDeps): void {
+    deps = d;
+}
+
+function getDeps(): InboxRoutesDeps {
+    if (!deps) {
+        throw new Error('InboxRoutes dependencies not initialized');
+    }
+    return deps;
+}
+
+// -----------------------------------------------------------------------------
+// Helpers
+// -----------------------------------------------------------------------------
+
+/**
+ * Map workspace DB inbox_items row to a frontend-compatible shape.
+ * Workspace uses integer id, agent_slug/sender_slug, and workspace-specific status values.
+ */
+function mapItemToResponse(row: InboxItemRow): Record<string, unknown> {
+    let parsedMetadata: Record<string, unknown> | null = null;
+    if (row.metadata) {
+        try {
+            parsedMetadata = JSON.parse(row.metadata) as Record<string, unknown>;
+        } catch {
+            parsedMetadata = null;
+        }
+    }
+
+    return {
+        id: row.id,
+        agent_slug: row.agent_slug,
+        sender_slug: row.sender_slug,
+        message_type: row.message_type,
+        subject: row.subject,
+        content: row.content,
+        metadata: parsedMetadata,
+        priority: row.priority,
+        status: row.status,
+        received_at: row.received_at,
+        read_at: row.read_at,
+        actioned_at: row.actioned_at,
+    };
+}
+
+// -----------------------------------------------------------------------------
+// Router
+// -----------------------------------------------------------------------------
 
 const router = Router();
 const auth = authenticateFirebaseToken;
@@ -18,8 +87,7 @@ export const inboxSSEBroadcaster = new InMemoryInboxSSEBroadcaster();
 router.post('/sse-token', auth, createSseTokenHandler());
 
 // GET /api/v1/inbox/sse - SSE stream for real-time inbox updates
-// IMPORTANT: Must be registered before /:itemId to avoid Express matching "sse" as a param
-// Uses sseAuth (short-lived token from POST /sse-token) instead of raw JWT in URL
+// Must be registered before /:itemId to avoid Express matching "sse" as a param
 router.get('/sse', sseAuth, (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user?.uid;
     if (!userId) {
@@ -41,134 +109,120 @@ router.get('/sse', sseAuth, (req: AuthenticatedRequest, res: Response) => {
     });
 });
 
-// GET /api/v1/inbox - List inbox items for authenticated user
+// GET /api/v1/inbox - List inbox items from workspace DB
 router.get('/', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const startTime = res.locals.startTime || Date.now();
     try {
-        const userId = req.user?.uid;
-        if (!userId) {
-            res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
-            return;
-        }
+        if (!req.user) throw new UnauthorizedError();
 
         const status = req.query.status as string | undefined;
-        const channelId = req.query.channel_id as string | undefined;
-        const limit = Math.min(parseInt(req.query.limit as string, 10) || 50, 100);
-        const offset = parseInt(req.query.offset as string, 10) || 0;
+        const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+        const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : undefined;
 
-        const conditions: string[] = ['user_id = $1', 'is_archived = false'];
-        const params: unknown[] = [userId];
-        let paramIndex = 2;
-
-        if (status) {
-            conditions.push(`status = $${paramIndex}`);
-            params.push(status);
-            paramIndex++;
+        if (limit !== undefined && (isNaN(limit) || limit < 1)) {
+            throw new BadRequestError('limit must be a positive integer');
+        }
+        if (offset !== undefined && (isNaN(offset) || offset < 0)) {
+            throw new BadRequestError('offset must be a non-negative integer');
         }
 
-        if (channelId) {
-            conditions.push(`channel_id = $${paramIndex}`);
-            params.push(channelId);
-            paramIndex++;
+        const validStatuses = ['unread', 'read', 'actioned', 'archived'];
+        if (status && !validStatuses.includes(status)) {
+            throw new BadRequestError(`status must be one of: ${validStatuses.join(', ')}`);
         }
 
-        const whereClause = conditions.join(' AND ');
-        params.push(limit, offset);
+        const { sandboxService } = getDeps();
+        const sandboxId = await requireRunningSandbox(sandboxService, req.user.uid);
+        const provider = getDaytonaProvider(sandboxService);
 
-        const result = await query(
-            `SELECT * FROM inbox_items
-             WHERE ${whereClause}
-             ORDER BY created_at DESC
-             LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
-            params
-        );
+        const result = await listInboxItems(provider, sandboxId, {
+            status: status as 'unread' | 'read' | 'actioned' | 'archived' | undefined,
+            limit,
+            offset,
+        });
 
-        sendResponse(res, 200, result.rows, startTime);
+        sendResponse(res, 200, {
+            items: result.items.map(mapItemToResponse),
+            total: result.total,
+        }, startTime);
     } catch (err) {
         next(err);
     }
 });
 
-// GET /api/v1/inbox/:itemId - Get single inbox item
+// GET /api/v1/inbox/:itemId - Get single inbox item from workspace DB
 router.get('/:itemId', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const startTime = res.locals.startTime || Date.now();
     try {
-        const userId = req.user?.uid;
-        if (!userId) {
-            res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
-            return;
+        if (!req.user) throw new UnauthorizedError();
+
+        const itemId = parseInt(req.params.itemId, 10);
+        if (isNaN(itemId) || itemId < 1) {
+            throw new BadRequestError('itemId must be a positive integer');
         }
 
-        const { itemId } = req.params;
-        const result = await query(
-            `SELECT * FROM inbox_items WHERE item_id = $1 AND user_id = $2`,
-            [itemId, userId]
-        );
+        const { sandboxService } = getDeps();
+        const sandboxId = await requireRunningSandbox(sandboxService, req.user.uid);
+        const provider = getDaytonaProvider(sandboxService);
 
-        if (result.rows.length === 0) {
-            res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Inbox item not found' } });
-            return;
+        const item = await getInboxItem(provider, sandboxId, itemId);
+        if (!item) {
+            throw new NotFoundError('Inbox item');
         }
 
-        sendResponse(res, 200, result.rows[0], startTime);
+        sendResponse(res, 200, mapItemToResponse(item), startTime);
     } catch (err) {
         next(err);
     }
 });
 
-// PATCH /api/v1/inbox/:itemId/read - Mark item as read
+// PATCH /api/v1/inbox/:itemId/read - Mark item as read in workspace DB
 router.patch('/:itemId/read', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const startTime = res.locals.startTime || Date.now();
     try {
-        const userId = req.user?.uid;
-        if (!userId) {
-            res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
-            return;
+        if (!req.user) throw new UnauthorizedError();
+
+        const itemId = parseInt(req.params.itemId, 10);
+        if (isNaN(itemId) || itemId < 1) {
+            throw new BadRequestError('itemId must be a positive integer');
         }
 
-        const { itemId } = req.params;
-        const result = await query(
-            `UPDATE inbox_items SET is_read = true, updated_at = NOW()
-             WHERE item_id = $1 AND user_id = $2
-             RETURNING *`,
-            [itemId, userId]
-        );
+        const { sandboxService } = getDeps();
+        const sandboxId = await requireRunningSandbox(sandboxService, req.user.uid);
+        const provider = getDaytonaProvider(sandboxService);
 
-        if (result.rows.length === 0) {
-            res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Inbox item not found' } });
-            return;
+        const item = await markInboxItemRead(provider, sandboxId, itemId);
+        if (!item) {
+            throw new NotFoundError('Inbox item');
         }
 
-        sendResponse(res, 200, result.rows[0], startTime);
+        sendResponse(res, 200, mapItemToResponse(item), startTime);
     } catch (err) {
         next(err);
     }
 });
 
-// PATCH /api/v1/inbox/:itemId/archive - Archive item
+// PATCH /api/v1/inbox/:itemId/archive - Archive item in workspace DB
 router.patch('/:itemId/archive', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const startTime = res.locals.startTime || Date.now();
     try {
-        const userId = req.user?.uid;
-        if (!userId) {
-            res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
-            return;
+        if (!req.user) throw new UnauthorizedError();
+
+        const itemId = parseInt(req.params.itemId, 10);
+        if (isNaN(itemId) || itemId < 1) {
+            throw new BadRequestError('itemId must be a positive integer');
         }
 
-        const { itemId } = req.params;
-        const result = await query(
-            `UPDATE inbox_items SET is_archived = true, status = 'archived', updated_at = NOW()
-             WHERE item_id = $1 AND user_id = $2
-             RETURNING *`,
-            [itemId, userId]
-        );
+        const { sandboxService } = getDeps();
+        const sandboxId = await requireRunningSandbox(sandboxService, req.user.uid);
+        const provider = getDaytonaProvider(sandboxService);
 
-        if (result.rows.length === 0) {
-            res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Inbox item not found' } });
-            return;
+        const item = await archiveInboxItem(provider, sandboxId, itemId);
+        if (!item) {
+            throw new NotFoundError('Inbox item');
         }
 
-        sendResponse(res, 200, result.rows[0], startTime);
+        sendResponse(res, 200, mapItemToResponse(item), startTime);
     } catch (err) {
         next(err);
     }

@@ -3,22 +3,18 @@
 export * from './execution.service';
 export * from './types';
 export * from './errors';
-export * from './sandbox';
-export * from './storage';
+// sandbox, storage, workspace, scaffold, metadata-sync extracted to domains/sandbox-infra/
+// NOTE: Do NOT re-export sandbox-infra here. Import directly from '../sandbox-infra'.
 export * from './sdk';
 export * from './utils';
 export * from './streaming';
-export * from './workspace';
 export * from './queue';
 export * from './hooks';
-export * from './orchestrator';
 // knowledge module: KB docs written directly to Daytona workspace via Drive API
-export * from './credits';
-export * from './ace';
+// credits module: extracted to standalone domain at src/domains/credits/
 // Modules with selective exports to avoid name conflicts
 export {
     RunnerHealthMonitor,
-    createRunnerHealthMonitor,
     StdinParser,
     StdoutEmitter,
     RUNNER_ENV,
@@ -43,10 +39,11 @@ export type {
     HealthCheckResult,
     RuntimeHookContext,
     PlatformAuthStatus,
+    SandboxExecutor,
     CLIAgentConfig,
     AdapterType,
     AuthResult,
-    BillingType,
+    CLIBillingType,
 } from './runner';
 
 export { HITLHandler, HITLPauseRepositoryImpl, ActiveStreamEmitter } from './hitl';
@@ -55,34 +52,6 @@ export type { HITLRequest, HITLResponse, HITLPauseState, HITLResult, HITLScenari
 
 export * from './background';
 
-export {
-    MetadataSyncService,
-    createMetadataSyncService,
-    SYNC_ENTITY_TYPES,
-} from './metadata-sync';
-export type {
-    SyncEntityType,
-    MetadataSyncEvent,
-    SyncResult as MetadataSyncResult,
-    SyncDatabase as MetadataSyncDatabase,
-    DomainSyncPayload,
-    ChannelSyncPayload,
-    ChannelMessageSyncPayload,
-    SyncQueryResult,
-} from './metadata-sync';
+// metadata-sync re-exports now come from sandbox-infra barrel
 
-// Platform: no longer needs rename workaround (orchestrator uses TOOL_FILTER_CATEGORIES)
-export {
-    TOOL_CATEGORIES as PLATFORM_TOOL_CATEGORIES,
-    PLATFORM_TOOL_SCHEMAS,
-    TOOL_METADATA,
-    getToolSchema,
-    getToolMetadata,
-    getToolSchemasByCategory,
-    isRegisteredTool,
-    getRequiredFields,
-    evaluateHitlRule,
-    getHitlRequirement,
-    buildHitlReason,
-} from './platform';
-export type { ToolCategory as PlatformToolCategory } from './platform';
+// Platform tools, orchestrator, and internal-mcp extracted to domains/platform-tools/

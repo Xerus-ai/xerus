@@ -107,7 +107,6 @@ export interface DeleteUserResult {
     user_id: string;
     cleanup: {
         agents_deleted: number;
-        sessions_deleted: number;
         api_keys_deleted: number;
     };
 }

@@ -1,6 +1,6 @@
-// Bundle the CLI executor + minimal MCP server into JS files for sandbox deployment
+// Bundle the minimal MCP server into JS for sandbox deployment
 // Usage: npx ts-node scripts/bundle-runner.ts
-// Output: dist/runner-bundle/cli-executor.js, dist/runner-bundle/minimal-mcp-server.js
+// Output: dist/runner-bundle/minimal-mcp-server.js
 
 import { build, type BuildOptions } from 'esbuild';
 import path from 'path';
@@ -25,27 +25,18 @@ const SHARED_OPTIONS: BuildOptions = {
 };
 
 async function bundleRunner(): Promise<void> {
-    const results = await Promise.all([
-        build({
-            ...SHARED_OPTIONS,
-            entryPoints: [path.join(RUNNER_DIR, 'cli-executor.ts')],
-            outfile: path.join(OUT_DIR, 'cli-executor.js'),
-        }),
-        build({
-            ...SHARED_OPTIONS,
-            entryPoints: [path.join(RUNNER_DIR, 'minimal-mcp-server.ts')],
-            outfile: path.join(OUT_DIR, 'minimal-mcp-server.js'),
-        }),
-    ]);
+    const result = await build({
+        ...SHARED_OPTIONS,
+        entryPoints: [path.join(RUNNER_DIR, 'minimal-mcp-server.ts')],
+        outfile: path.join(OUT_DIR, 'minimal-mcp-server.js'),
+    });
 
-    const errors = results.flatMap(r => r.errors);
-    if (errors.length > 0) {
-        console.error('Bundle failed:', errors);
+    if (result.errors.length > 0) {
+        console.error('Bundle failed:', result.errors);
         process.exit(1);
     }
 
     console.log('Runner bundles created:');
-    console.log('  dist/runner-bundle/cli-executor.js');
     console.log('  dist/runner-bundle/minimal-mcp-server.js');
 }
 

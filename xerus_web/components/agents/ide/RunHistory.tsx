@@ -6,7 +6,63 @@ import {
     ChevronLeft, ChevronRight, Activity,
 } from 'lucide-react'
 import { toast } from '@/lib/toast'
-import { getAgentHistory, type RunEntry } from '@/lib/api/history'
+import { listScheduleRuns, type ScheduleRunEntry } from '@/lib/api/schedules'
+
+/** Run history entry mapped from schedule_runs table */
+interface RunEntry {
+    id: string
+    status: 'success' | 'failed' | 'running'
+    triggerType: string
+    task: string
+    description: string
+    tokensUsed: number
+    creditsUsed: number
+    startedAt: string
+    completedAt: string | null
+    createdAt: string
+    duration: string
+}
+
+/** Map a schedule_runs row to a RunEntry for display */
+function mapScheduleRunToEntry(run: ScheduleRunEntry): RunEntry {
+    const status = run.status === 'completed' ? 'success'
+        : run.status === 'running' || run.status === 'pending' ? 'running'
+        : 'failed'
+
+    const startedAt = run.started_at
+        ? new Date(run.started_at * 1000).toISOString()
+        : new Date(run.created_at * 1000).toISOString()
+
+    const completedAt = run.completed_at
+        ? new Date(run.completed_at * 1000).toISOString()
+        : null
+
+    let duration = ''
+    if (run.duration_ms != null) {
+        const seconds = Math.round(run.duration_ms / 1000)
+        if (seconds < 60) {
+            duration = `${seconds}s`
+        } else {
+            const minutes = Math.floor(seconds / 60)
+            const remainingSeconds = seconds % 60
+            duration = `${minutes}m ${remainingSeconds}s`
+        }
+    }
+
+    return {
+        id: run.id,
+        status,
+        triggerType: 'schedule',
+        task: run.schedule_name,
+        description: run.schedule_prompt,
+        tokensUsed: 0,
+        creditsUsed: run.cost_usd ?? 0,
+        startedAt,
+        completedAt,
+        createdAt: new Date(run.created_at * 1000).toISOString(),
+        duration,
+    }
+}
 
 type RunStatus = 'all' | 'success' | 'failed'
 
@@ -27,8 +83,11 @@ export function RunHistory({ agent }: RunHistoryProps) {
         async function fetchHistory() {
             setIsLoading(true)
             try {
-                const data = await getAgentHistory(agent.slug ?? String(agent.id))
-                if (!cancelled) setRuns(data)
+                const agentSlug = agent.slug || String(agent.id)
+                const result = await listScheduleRuns({ agent_slug: agentSlug, limit: 100 })
+                if (!cancelled) {
+                    setRuns(result.runs.map(mapScheduleRunToEntry))
+                }
             } catch (err) {
                 if (!cancelled) {
                     toast.error("Couldn't load run history", { description: 'Please refresh the page and try again.' })

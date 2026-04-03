@@ -136,28 +136,11 @@ async function syncAgentHeartbeat(
     event: SyncEvent,
     match: RegExpMatchArray,
     _content: string | null,
-    userId: string,
+    _userId: string,
 ): Promise<void> {
     const slug = match[1];
-
-    // HEARTBEAT.md is a generated display file (human-readable).
-    // DB heartbeat_configs is the canonical source, set via PUT /api/v1/agents/:id/heartbeat.
-    // DB → generateHeartbeatMd() → HEARTBEAT.md (one-way). No reverse parse needed.
-    if (event === 'delete') {
-        const agentResult = await query<{ id: number }>(
-            `SELECT id FROM agent_registry WHERE slug = $1 AND user_id = $2 LIMIT 1`,
-            [slug, userId],
-        );
-        if (agentResult.rows.length > 0) {
-            await query(
-                `DELETE FROM heartbeat_configs WHERE agent_id = $1`,
-                [agentResult.rows[0].id],
-            );
-            console.log(`${LOG_PREFIX} agent heartbeat delete: slug=${slug}`);
-        }
-    } else {
-        console.log(`${LOG_PREFIX} agent heartbeat ${event}: slug=${slug} (DB is canonical, use heartbeat API)`);
-    }
+    // Heartbeat tables deprecated in migration 081. HEARTBEAT.md is now a static template.
+    console.log(`${LOG_PREFIX} agent heartbeat ${event}: slug=${slug} (heartbeat tables deprecated, no DB sync)`);
 }
 
 // -----------------------------------------------------------------------------
@@ -186,34 +169,11 @@ async function syncDomain(
     event: SyncEvent,
     match: RegExpMatchArray,
     _content: string | null,
-    userId: string,
+    _userId: string,
 ): Promise<void> {
     const domainSlug = match[1];
-
-    if (event === 'create') {
-        const wsResult = await query<{ id: string }>(
-            `SELECT id FROM workspaces WHERE user_id = $1 LIMIT 1`,
-            [userId],
-        );
-        if (wsResult.rows.length === 0) {
-            console.warn(`${LOG_PREFIX} domain create: no workspace found for user=${userId}`);
-            return;
-        }
-
-        await query(
-            `INSERT INTO domains (slug, name, user_id, workspace_id)
-             VALUES ($1, $2, $3, $4)
-             ON CONFLICT (slug, workspace_id) DO NOTHING`,
-            [domainSlug, domainSlug, userId, wsResult.rows[0].id],
-        );
-        console.log(`${LOG_PREFIX} domain create: slug=${domainSlug}`);
-    } else if (event === 'delete') {
-        await query(
-            `DELETE FROM domains WHERE slug = $1 AND user_id = $2`,
-            [domainSlug, userId],
-        );
-        console.log(`${LOG_PREFIX} domain delete: slug=${domainSlug}`);
-    }
+    // Domain data lives in workspace DB (source of truth). No Neon write needed.
+    console.log(`${LOG_PREFIX} domain ${event}: slug=${domainSlug} (workspace DB is source of truth, no Neon write)`);
 }
 
 // -----------------------------------------------------------------------------
@@ -224,39 +184,10 @@ async function syncChannel(
     event: SyncEvent,
     match: RegExpMatchArray,
     _content: string | null,
-    userId: string,
+    _userId: string,
 ): Promise<void> {
     const domainSlug = match[1];
     const channelSlug = match[2];
-
-    if (event === 'create') {
-        const domainResult = await query<{ id: string }>(
-            `SELECT id FROM domains WHERE slug = $1 AND user_id = $2 LIMIT 1`,
-            [domainSlug, userId],
-        );
-        if (domainResult.rows.length === 0) {
-            console.warn(`${LOG_PREFIX} channel create: domain not found slug=${domainSlug}`);
-            return;
-        }
-
-        await query(
-            `INSERT INTO channels (slug, name, domain_id, user_id)
-             VALUES ($1, $2, $3, $4)
-             ON CONFLICT (slug, domain_id) DO NOTHING`,
-            [channelSlug, channelSlug, domainResult.rows[0].id, userId],
-        );
-        console.log(`${LOG_PREFIX} channel create: ${domainSlug}/${channelSlug}`);
-    } else if (event === 'delete') {
-        const domainResult = await query<{ id: string }>(
-            `SELECT id FROM domains WHERE slug = $1 AND user_id = $2 LIMIT 1`,
-            [domainSlug, userId],
-        );
-        if (domainResult.rows.length === 0) return;
-
-        await query(
-            `DELETE FROM channels WHERE slug = $1 AND domain_id = $2`,
-            [channelSlug, domainResult.rows[0].id],
-        );
-        console.log(`${LOG_PREFIX} channel delete: ${domainSlug}/${channelSlug}`);
-    }
+    // Channel data lives in workspace DB (source of truth). No Neon write needed.
+    console.log(`${LOG_PREFIX} channel ${event}: ${domainSlug}/${channelSlug} (workspace DB is source of truth, no Neon write)`);
 }

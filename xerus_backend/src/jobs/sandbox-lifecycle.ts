@@ -4,10 +4,10 @@
 
 import cron from 'node-cron';
 import { query } from '../database/connection';
-import { SandboxSchedulerService } from '../domains/execution/sandbox/sandbox-scheduler.service';
-import { LifecycleCleanupService } from '../domains/execution/sandbox/lifecycle-cleanup.service';
-import type { SandboxProvider } from '../domains/execution/sandbox/providers';
-import type { SandboxService } from '../domains/execution/sandbox/sandbox.service';
+import { SandboxSchedulerService } from '../domains/sandbox-infra/sandbox/sandbox-scheduler.service';
+import { LifecycleCleanupService } from '../domains/sandbox-infra/sandbox/lifecycle-cleanup.service';
+import type { SandboxProvider } from '../domains/sandbox-infra/sandbox/providers';
+import type { SandboxService } from '../domains/sandbox-infra/sandbox/sandbox.service';
 
 // Typed query wrapper matching SchedulerDatabase interface
 async function typedQuery<T>(sql: string, params?: unknown[]): Promise<{ rows: T[] }> {

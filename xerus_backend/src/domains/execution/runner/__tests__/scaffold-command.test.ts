@@ -8,7 +8,7 @@ import os from 'os';
 import { Readable, Writable } from 'stream';
 import { StdinParser, StdinCommand } from '../stdin-parser';
 import { StdoutEmitter, StdoutEvent } from '../stdout-emitter';
-import { scaffoldAgent } from '../../scaffold/scaffold-writer';
+import { scaffoldAgent } from '../../../sandbox-infra/scaffold/scaffold-writer';
 
 // --- StdinParser: scaffold_agent command ---
 

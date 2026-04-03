@@ -1,6 +1,8 @@
 // Inbox Domain - Public API
 
 export { default as inboxRoutes } from './inbox.routes';
+export { setInboxRoutesDeps } from './inbox.routes';
+export type { InboxRoutesDeps } from './inbox.routes';
 
 export { ExecutionInboxService } from './inbox.service';
 

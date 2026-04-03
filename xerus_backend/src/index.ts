@@ -8,29 +8,30 @@ import { generalRateLimit } from './middleware/rate-limit';
 import { shutdownSseAuth } from './middleware/sse-auth';
 import { testConnection, warmPool } from './database/connection';
 import { startAllJobs } from './jobs';
-import { StorageService } from './domains/execution/storage/storage.service';
-import { S3BackupService } from './domains/execution/storage/s3-backup.service';
+import { StorageService } from './domains/sandbox-infra/storage/storage.service';
+import { S3BackupService } from './domains/sandbox-infra/storage/s3-backup.service';
 
 import usersRoutes, { setUserRoutesDeps } from './domains/users/routes';
 import adminRoutes from './routes/admin.routes';
 import agentRoutes, { setAgentRoutesDeps } from './domains/agents/routes';
 import { toolsRouter } from './domains/tools/routes';
 import executeRoutes, { setExecutionService, setExecutionRoutesDeps } from './domains/execution/execution.routes';
-import { internalMcpRouter } from './domains/execution/internal-mcp';
+import { internalMcpRouter } from './domains/platform-tools/internal-mcp';
 import { setAgentFilesDeps } from './domains/execution/agent-files.routes';
-import { setConversationRoutesDeps } from './domains/execution/conversations/conversation.routes';
-import { setScheduleRoutesDeps } from './domains/execution/internal-mcp/schedule.routes';
+import { setConversationRoutesDeps } from './domains/conversations/conversation.routes';
+import { setScheduleRoutesDeps } from './domains/platform-tools/internal-mcp/schedule.routes';
 import { webhookReceiverRouter } from './domains/triggers';
-import { ExecutionService } from './domains/execution/execution.service';
+import { ExecutionService, setExecutionApiKeyLookup } from './domains/execution/execution.service';
+import { apiKeyService } from './domains/users/api-key-service';
 import { query } from './database/connection';
 import { PricingService } from './domains/execution/sdk/pricing.service';
-import { SandboxService } from './domains/execution/sandbox/sandbox.service';
-import type { SandboxProvider } from './domains/execution/sandbox/providers';
+import { SandboxService } from './domains/sandbox-infra/sandbox/sandbox.service';
+import type { SandboxProvider } from './domains/sandbox-infra/sandbox/providers';
 import { ExecutionQueueService } from './domains/execution/queue/execution-queue.service';
-import { createCreditTracker } from './domains/execution/credits/credit-tracker.service';
+import { createCreditTracker } from './domains/credits/credit-tracker.service';
 import { CreditService } from './domains/users/credit-service';
-import { DatabaseUsageStore } from './domains/execution/credits/usage-store';
-import { inboxRoutes } from './domains/inbox';
+import { DatabaseUsageStore } from './domains/credits/usage-store';
+import { inboxRoutes, setInboxRoutesDeps } from './domains/inbox';
 import { companyRoutes, setCompanyRoutesDeps, taskRoutes, setTaskRoutesDeps } from './domains/company';
 import { onboardingRoutes, setOnboardingDeps } from './domains/onboarding';
 import { memoryRoutes } from './domains/memory';
@@ -40,7 +41,6 @@ import skillRoutes, { setSkillRoutesDeps, agentSkillsRouter } from './domains/sk
 import { agentChannelsRouter, setAgentChannelsDeps } from './domains/agents/agent-channels.routes';
 import inviteCodeRoutes from './domains/invite-codes/routes';
 import { createMessageBridgeService } from './domains/inbox/messaging/message-bridge.service';
-import { MessageBridgeRepository } from './domains/inbox/messaging/message-bridge.repository';
 import { HITLHandler } from './domains/execution/hitl/hitl.handler';
 import { HITLPauseRepositoryImpl } from './domains/execution/hitl/hitl-pause.repository';
 import { ActiveStreamEmitter } from './domains/execution/hitl/active-stream-emitter';
@@ -222,8 +222,7 @@ async function startServer(): Promise<void> {
             console.warn('[Boot] OPENAI_API_KEY not set - memory pgvector indexing disabled');
         }
 
-        const messageBridgeRepo = new MessageBridgeRepository(executionDb);
-        const messageBridge = createMessageBridgeService({ repository: messageBridgeRepo });
+        const messageBridge = createMessageBridgeService();
 
         // Wire SessionDispatcher: bridges inbox messaging -> execution sandbox sessions
         messageBridge.setSessionDispatcher({
@@ -241,6 +240,9 @@ async function startServer(): Promise<void> {
             sseEmitter: activeStreamEmitter,
         });
 
+        // Wire cross-domain API key lookup (execution -> users)
+        setExecutionApiKeyLookup(apiKeyService);
+
         const executionService = new ExecutionService({
             sdkService,
             sandboxService,
@@ -256,6 +258,7 @@ async function startServer(): Promise<void> {
         setExecutionRoutesDeps({ sandboxService });
         setAgentFilesDeps({ sandboxService });
         setConversationRoutesDeps({ sandboxService });
+        setInboxRoutesDeps({ sandboxService });
         setScheduleRoutesDeps({ sandboxService });
         setAgentRoutesDeps({ sandboxService });
         setAgentChannelsDeps({ sandboxService });

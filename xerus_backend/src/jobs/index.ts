@@ -5,9 +5,9 @@ import { startSyncPipedreamAppsJob } from './sync-pipedream-apps';
 import { startSandboxSchedulerJob, startSandboxCleanupJob } from './sandbox-lifecycle';
 import { startDigestSchedulerJob } from './digest-scheduler';
 import { startBackupSchedulerJob } from './s3-backup-job';
-import type { SandboxProvider } from '../domains/execution/sandbox/providers';
-import type { SandboxService } from '../domains/execution/sandbox/sandbox.service';
-import type { S3BackupService } from '../domains/execution/storage/s3-backup.service';
+import type { SandboxProvider } from '../domains/sandbox-infra/sandbox/providers';
+import type { SandboxService } from '../domains/sandbox-infra/sandbox/sandbox.service';
+import type { S3BackupService } from '../domains/sandbox-infra/storage/s3-backup.service';
 import type { ExecutionDatabase } from '../domains/execution/execution-pipeline.types';
 
 export interface JobDependencies {

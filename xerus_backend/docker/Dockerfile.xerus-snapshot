@@ -1,9 +1,12 @@
 # Xerus Custom Daytona Snapshot
+# CLI-native architecture: agents run via Claude Code CLI + Codex CLI (no Agent SDK)
+#
 # Extends the standard daytona sandbox image with:
 # - Node.js 22 LTS (via nodesource)
 # - sqlite3 (company.db, beads task boards)
 # - @beads/bd CLI (task tracking across sessions)
-# - @anthropic-ai/claude-agent-sdk (TypeScript Agent SDK)
+# - Claude Code CLI (@anthropic-ai/claude-code)
+# - Codex CLI (@openai/codex)
 # - @modelcontextprotocol/sdk (Platform MCP server)
 # - Pre-created runner directory structure
 #
@@ -38,9 +41,6 @@ RUN node --version && npm --version
 # Install global Node.js tools
 RUN npm install -g ts-node@10.9.2 typescript@5.9.3 @beads/bd
 
-# Install Python claude-agent-sdk (for Python-based agents)
-RUN python3 -m pip install --no-cache-dir claude-agent-sdk==0.1.22
-
 # --- Xerus-specific additions ---
 
 ENV XERUS_WORKSPACE_ROOT=/home/daytona \
@@ -66,5 +66,10 @@ RUN pip install claude-ipc-mcp
 
 # 9to5 scheduling daemon
 RUN npm install -g 9to5-cli@latest
+
+# Bun runtime (scheduler daemon uses bun:sqlite and Bun.spawn)
+RUN curl -fsSL https://bun.sh/install | bash && \
+    ln -s /home/daytona/.bun/bin/bun /usr/local/bin/bun
+ENV PATH="/home/daytona/.bun/bin:${PATH}"
 
 ENTRYPOINT [ "sleep", "infinity" ]

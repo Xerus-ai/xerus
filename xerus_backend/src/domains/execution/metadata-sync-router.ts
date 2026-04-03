@@ -4,9 +4,9 @@
 
 import type { PipelineContext, ResolvedExecutionDeps } from './execution-pipeline.types';
 import { agentRegistryRepository } from '../agents/agent-registry.repository';
-import { createMetadataSyncService } from './metadata-sync/metadata-sync.service';
-import type { SyncEntityType } from './metadata-sync/metadata-sync.types';
-import { handleTriggerSync, handleNotificationSync, handleKbSync, handleToolSync, handleSessionSync, handleMemorySync, handleHeartbeatSync } from './entity-sync-handlers';
+import { createMetadataSyncService } from '../sandbox-infra/metadata-sync/metadata-sync.service';
+import type { SyncEntityType, WorkspaceSyncPayload } from '../sandbox-infra/metadata-sync/metadata-sync.types';
+import { handleTriggerSync, handleNotificationSync, handleKbSync, handleToolSync, handleSessionSync, handleMemorySync } from './entity-sync-handlers';
 
 const LOG_PREFIX = '[EventRouter]';
 
@@ -23,7 +23,7 @@ function sanitizeSyncData(data: Record<string, unknown>): Record<string, unknown
 }
 
 const SUPPORTED_SYNC_ENTITIES = new Set<string>([
-    'workspace', 'domain', 'channel', 'channel_message', 'task',
+    'workspace',
 ]);
 
 export async function handleMetadataSync(
@@ -54,7 +54,8 @@ export async function handleMetadataSync(
         return;
     }
     if (entity === 'heartbeat') {
-        await handleHeartbeatSync(data, action, ctx, deps);
+        // Heartbeat tables dropped in migration 081. Log and skip.
+        console.log(`${LOG_PREFIX} metadata_sync: heartbeat sync ignored (tables deprecated)`);
         return;
     }
     if (entity === 'trigger') {
@@ -99,6 +100,22 @@ export async function handleMetadataSync(
         handleSkillSync(data, action, userId);
         return;
     }
+    if (entity === 'task') {
+        console.log(`${LOG_PREFIX} metadata_sync: task sync ignored (workspace DB is source of truth)`);
+        return;
+    }
+    if (entity === 'domain') {
+        console.log(`${LOG_PREFIX} metadata_sync: domain sync ignored (workspace DB is source of truth)`);
+        return;
+    }
+    if (entity === 'channel') {
+        console.log(`${LOG_PREFIX} metadata_sync: channel sync ignored (workspace DB is source of truth)`);
+        return;
+    }
+    if (entity === 'channel_message') {
+        console.log(`${LOG_PREFIX} metadata_sync: channel_message sync ignored (workspace DB is source of truth)`);
+        return;
+    }
 
     if (!SUPPORTED_SYNC_ENTITIES.has(entity as SyncEntityType)) {
         console.warn(`${LOG_PREFIX} metadata_sync: unsupported entity='${entity}'`);
@@ -106,14 +123,10 @@ export async function handleMetadataSync(
     }
 
     const syncService = createMetadataSyncService(deps.db);
-    const payload = entity === 'channel'
-        ? { domain_slug: data.domain as string, slug: data.slug, name: data.name, description: data.description, agent_count: data.agent_count }
-        : data;
-
     const result = await syncService.sync({
         entity: entity as SyncEntityType,
         user_id: userId,
-        payload: payload as never,
+        payload: data as unknown as WorkspaceSyncPayload,
     });
     console.log(`${LOG_PREFIX} metadata_sync: synced ${entity} id=${result.id} for user=${userId}`);
 }

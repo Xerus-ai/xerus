@@ -1,64 +1,100 @@
 // Skill Secrets Repository
-// Database operations for skill_secrets table (per-user encrypted env vars)
+// Database operations for skill_secrets table (per-workspace encrypted env vars)
+// Uses workspace SQLite DB via Daytona provider (migrated from Neon PostgreSQL)
 // Uses skill_slug (text) as the skill identifier
 
-import { query } from '../../database/connection';
+import type { DaytonaProvider } from '../sandbox-infra/sandbox/providers/daytona.provider';
 import type { SkillSecretRow } from './types';
+import {
+    upsertSecret,
+    deleteSecret,
+    getSecretsForSkill,
+    deleteAllSecretsForSkill,
+    getSecretsForSkills,
+    getAllSecrets,
+} from './secrets-workspace-db.service';
 
 export class SkillSecretsRepository {
-    async upsert(userId: string, skillSlug: string, envKey: string, encryptedValue: string, hint: string): Promise<SkillSecretRow> {
-        const result = await query<SkillSecretRow>(
-            `INSERT INTO skill_secrets (user_id, skill_slug, env_key, encrypted_value, hint)
-             VALUES ($1, $2, $3, $4, $5)
-             ON CONFLICT (user_id, skill_slug, env_key) DO UPDATE SET
-                encrypted_value = EXCLUDED.encrypted_value,
-                hint = EXCLUDED.hint,
-                updated_at = NOW()
-             RETURNING *`,
-            [userId, skillSlug, envKey, encryptedValue, hint],
-        );
-        return result.rows[0];
+    async upsert(
+        provider: DaytonaProvider,
+        sandboxId: string,
+        skillSlug: string,
+        secretName: string,
+        encryptedValue: string,
+    ): Promise<SkillSecretRow> {
+        const row = await upsertSecret(provider, sandboxId, skillSlug, secretName, encryptedValue);
+        return {
+            id: row.id,
+            skill_slug: row.skill_slug,
+            secret_name: row.secret_name,
+            encrypted_value: row.encrypted_value,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        };
     }
 
-    async delete(userId: string, skillSlug: string, envKey: string): Promise<boolean> {
-        const result = await query(
-            'DELETE FROM skill_secrets WHERE user_id = $1 AND skill_slug = $2 AND env_key = $3',
-            [userId, skillSlug, envKey],
-        );
-        return (result.rowCount ?? 0) > 0;
+    async delete(
+        provider: DaytonaProvider,
+        sandboxId: string,
+        skillSlug: string,
+        secretName: string,
+    ): Promise<boolean> {
+        return deleteSecret(provider, sandboxId, skillSlug, secretName);
     }
 
-    async getForSkill(userId: string, skillSlug: string): Promise<SkillSecretRow[]> {
-        const result = await query<SkillSecretRow>(
-            'SELECT * FROM skill_secrets WHERE user_id = $1 AND skill_slug = $2 ORDER BY env_key',
-            [userId, skillSlug],
-        );
-        return result.rows;
+    async getForSkill(
+        provider: DaytonaProvider,
+        sandboxId: string,
+        skillSlug: string,
+    ): Promise<SkillSecretRow[]> {
+        const rows = await getSecretsForSkill(provider, sandboxId, skillSlug);
+        return rows.map(row => ({
+            id: row.id,
+            skill_slug: row.skill_slug,
+            secret_name: row.secret_name,
+            encrypted_value: row.encrypted_value,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        }));
     }
 
-    async deleteAllForSkill(userId: string, skillSlug: string): Promise<number> {
-        const result = await query(
-            'DELETE FROM skill_secrets WHERE user_id = $1 AND skill_slug = $2',
-            [userId, skillSlug],
-        );
-        return result.rowCount ?? 0;
+    async deleteAllForSkill(
+        provider: DaytonaProvider,
+        sandboxId: string,
+        skillSlug: string,
+    ): Promise<number> {
+        return deleteAllSecretsForSkill(provider, sandboxId, skillSlug);
     }
 
-    async getForSkills(userId: string, skillSlugs: string[]): Promise<SkillSecretRow[]> {
-        if (skillSlugs.length === 0) return [];
-        const result = await query<SkillSecretRow>(
-            'SELECT * FROM skill_secrets WHERE user_id = $1 AND skill_slug = ANY($2::text[])',
-            [userId, skillSlugs],
-        );
-        return result.rows;
+    async getForSkills(
+        provider: DaytonaProvider,
+        sandboxId: string,
+        skillSlugs: string[],
+    ): Promise<SkillSecretRow[]> {
+        const rows = await getSecretsForSkills(provider, sandboxId, skillSlugs);
+        return rows.map(row => ({
+            id: row.id,
+            skill_slug: row.skill_slug,
+            secret_name: row.secret_name,
+            encrypted_value: row.encrypted_value,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        }));
     }
 
-    async getAllForUser(userId: string): Promise<SkillSecretRow[]> {
-        const result = await query<SkillSecretRow>(
-            'SELECT * FROM skill_secrets WHERE user_id = $1',
-            [userId],
-        );
-        return result.rows;
+    async getAll(
+        provider: DaytonaProvider,
+        sandboxId: string,
+    ): Promise<SkillSecretRow[]> {
+        const rows = await getAllSecrets(provider, sandboxId);
+        return rows.map(row => ({
+            id: row.id,
+            skill_slug: row.skill_slug,
+            secret_name: row.secret_name,
+            encrypted_value: row.encrypted_value,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        }));
     }
 }
 

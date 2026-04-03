@@ -1,7 +1,10 @@
 // Skill Secrets Service
-// Business logic for per-user encrypted env vars for skills
+// Business logic for per-workspace encrypted env vars for skills
+// Uses workspace SQLite DB (migrated from Neon PostgreSQL)
 // Uses skill_slug as the identifier
 
+import type { DaytonaProvider } from '../sandbox-infra/sandbox/providers/daytona.provider';
+import type { SandboxService } from '../sandbox-infra/sandbox/sandbox.service';
 import type { SkillSecretStatus } from './types';
 import {
     SkillNotFoundError,
@@ -18,72 +21,99 @@ import { SkillRepository, skillRepository } from './repository';
 import { SkillSecretsRepository, skillSecretsRepository } from './secrets.repository';
 
 export class SkillSecretsService {
+    private sandboxService: SandboxService | null = null;
+
     constructor(
         private readonly repository: SkillRepository = skillRepository,
         private readonly secretsRepo: SkillSecretsRepository = skillSecretsRepository,
     ) {}
 
-    async setSecret(skillSlug: string, envKey: string, value: string, userId: string): Promise<void> {
+    setSandboxService(svc: SandboxService): void {
+        this.sandboxService = svc;
+    }
+
+    private async resolveSandbox(userId: string): Promise<{ provider: DaytonaProvider; sandboxId: string }> {
+        if (!this.sandboxService) {
+            throw new Error('SandboxService not configured on SkillSecretsService');
+        }
+        const status = await this.sandboxService.getSandboxStatus(userId);
+        if (status.status !== 'running' || !status.sandboxId) {
+            throw new Error(`No running sandbox for user ${userId}`);
+        }
+        const provider = this.sandboxService.getDaytonaProvider();
+        return { provider, sandboxId: status.sandboxId };
+    }
+
+    async setSecret(skillSlug: string, secretName: string, value: string, userId: string): Promise<void> {
         await this.validateSkillAccess(skillSlug, userId);
 
-        this.validateSecretKey(envKey);
+        this.validateSecretKey(secretName);
         const valueError = validateEnvVarValue(value);
         if (valueError) {
-            throw new SkillSecretInvalidValueError(envKey, valueError);
+            throw new SkillSecretInvalidValueError(secretName, valueError);
         }
 
         const encryptedValue = encrypt(value);
-        const hint = maskApiKey(value);
-        await this.secretsRepo.upsert(userId, skillSlug, envKey, encryptedValue, hint);
+        const { provider, sandboxId } = await this.resolveSandbox(userId);
+        await this.secretsRepo.upsert(provider, sandboxId, skillSlug, secretName, encryptedValue);
     }
 
-    async deleteSecret(skillSlug: string, envKey: string, userId: string): Promise<void> {
+    async deleteSecret(skillSlug: string, secretName: string, userId: string): Promise<void> {
         await this.validateSkillAccess(skillSlug, userId);
 
-        this.validateSecretKey(envKey);
-        const deleted = await this.secretsRepo.delete(userId, skillSlug, envKey);
+        this.validateSecretKey(secretName);
+        const { provider, sandboxId } = await this.resolveSandbox(userId);
+        const deleted = await this.secretsRepo.delete(provider, sandboxId, skillSlug, secretName);
         if (!deleted) {
-            throw new SkillSecretNotFoundError(skillSlug, envKey);
+            throw new SkillSecretNotFoundError(skillSlug, secretName);
         }
     }
 
     async getSecretStatuses(skillSlug: string, userId: string): Promise<SkillSecretStatus[]> {
         await this.validateSkillAccess(skillSlug, userId);
 
-        const rows = await this.secretsRepo.getForSkill(userId, skillSlug);
+        const { provider, sandboxId } = await this.resolveSandbox(userId);
+        const rows = await this.secretsRepo.getForSkill(provider, sandboxId, skillSlug);
         return rows.map(row => ({
-            env_key: row.env_key,
+            secret_name: row.secret_name,
             has_value: true,
-            hint: row.hint,
+            hint: maskApiKey(decrypt(row.encrypted_value)),
             updated_at: row.updated_at,
         }));
     }
 
-    async resolveSecretsForExecution(userId: string, skillSlugs: string[]): Promise<Record<string, string>> {
+    async resolveSecretsForExecution(
+        provider: DaytonaProvider,
+        sandboxId: string,
+        skillSlugs: string[],
+    ): Promise<Record<string, string>> {
         if (skillSlugs.length === 0) return {};
 
-        const rows = await this.secretsRepo.getForSkills(userId, skillSlugs);
+        const rows = await this.secretsRepo.getForSkills(provider, sandboxId, skillSlugs);
         const secrets: Record<string, string> = {};
 
         for (const row of rows) {
             // Defense-in-depth: re-validate at injection time
-            if (isBlockedEnvKey(row.env_key)) continue;
-            if (!isValidEnvKeyFormat(row.env_key)) continue;
+            if (isBlockedEnvKey(row.secret_name)) continue;
+            if (!isValidEnvKeyFormat(row.secret_name)) continue;
 
-            secrets[row.env_key] = decrypt(row.encrypted_value);
+            secrets[row.secret_name] = decrypt(row.encrypted_value);
         }
 
         return secrets;
     }
 
-    async resolveAllSecrets(userId: string): Promise<Record<string, string>> {
-        const rows = await this.secretsRepo.getAllForUser(userId);
+    async resolveAllSecrets(
+        provider: DaytonaProvider,
+        sandboxId: string,
+    ): Promise<Record<string, string>> {
+        const rows = await this.secretsRepo.getAll(provider, sandboxId);
         const secrets: Record<string, string> = {};
 
         for (const row of rows) {
-            if (isBlockedEnvKey(row.env_key)) continue;
-            if (!isValidEnvKeyFormat(row.env_key)) continue;
-            secrets[row.env_key] = decrypt(row.encrypted_value);
+            if (isBlockedEnvKey(row.secret_name)) continue;
+            if (!isValidEnvKeyFormat(row.secret_name)) continue;
+            secrets[row.secret_name] = decrypt(row.encrypted_value);
         }
 
         return secrets;
@@ -92,7 +122,8 @@ export class SkillSecretsService {
     async cleanupOnUninstall(skillSlug: string, userId: string): Promise<void> {
         const isInstalled = await this.repository.isInstalled(userId, skillSlug);
         if (!isInstalled) {
-            await this.secretsRepo.deleteAllForSkill(userId, skillSlug);
+            const { provider, sandboxId } = await this.resolveSandbox(userId);
+            await this.secretsRepo.deleteAllForSkill(provider, sandboxId, skillSlug);
         }
     }
 

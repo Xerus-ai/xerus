@@ -218,30 +218,22 @@ function createActivityCollector(db: ExecutionDatabase): ActivityDataCollector {
                 [userId],
             );
 
-            // Credit usage from credit_ledger
+            // Credit usage from credit_transactions (migration 065)
             let creditsUsed = 0;
             let creditsRemaining = 0;
-            try {
-                const creditResult = await db.query<{ total: string }>(
-                    `SELECT COALESCE(SUM(ABS(amount)), 0)::text AS total
-                     FROM credit_ledger WHERE user_id = $1 AND amount < 0 AND created_at >= $2`,
-                    [userId, since],
-                );
-                creditsUsed = parseInt(creditResult.rows[0]?.total || '0', 10);
 
-                const balanceResult = await db.query<{ balance: string }>(
-                    `SELECT COALESCE(SUM(amount), 0)::text AS balance FROM credit_ledger WHERE user_id = $1`,
-                    [userId],
-                );
-                creditsRemaining = parseInt(balanceResult.rows[0]?.balance || '0', 10);
-            } catch (err: unknown) {
-                const pgCode = (err as { code?: string })?.code;
-                if (pgCode === '42P01') {
-                    // credit_ledger table does not exist yet — skip credit data
-                } else {
-                    throw err;
-                }
-            }
+            const creditResult = await db.query<{ total: string }>(
+                `SELECT COALESCE(SUM(ABS(amount)), 0)::text AS total
+                 FROM credit_transactions WHERE user_id = $1 AND amount < 0 AND created_at >= $2`,
+                [userId, since],
+            );
+            creditsUsed = parseInt(creditResult.rows[0]?.total || '0', 10);
+
+            const balanceResult = await db.query<{ balance: string }>(
+                `SELECT COALESCE(SUM(amount), 0)::text AS balance FROM credit_transactions WHERE user_id = $1`,
+                [userId],
+            );
+            creditsRemaining = parseInt(balanceResult.rows[0]?.balance || '0', 10);
 
             return {
                 completed_tasks: completedResult.rows.map(r => ({

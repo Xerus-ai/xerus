@@ -25,8 +25,8 @@ import {
 import { generateMascotConfig } from './avatar';
 import { slugify } from '../../shared/slugify';
 import { configToAgent, canUserClone } from './agent-helpers';
-import { buildAllSoulFiles } from '../execution/workspace/soul-file-templates';
-import { generateOperatingMd } from '../execution/workspace/operating-md.template';
+import { buildAllSoulFiles } from '../sandbox-infra/workspace/soul-file-templates';
+import { generateOperatingMd } from '../sandbox-infra/workspace/operating-md.template';
 
 const AGENT_LIMITS = {
     private: 100,

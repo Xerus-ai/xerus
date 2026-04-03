@@ -157,8 +157,6 @@ const RUNNER_EVENT_TYPES = [
     'health',
     'sessions',
     'credit_check',
-    'heartbeat_fired',
-    'heartbeat_skipped',
     'ace_reflection',
     'skill_suggestion',
     'scaffold_complete',

@@ -10,6 +10,11 @@
 // - POST   /execute/:id/respond                -> HITL response
 // - POST   /execute/:id/cancel                 -> Cancel execution
 // - GET    /execute/:id/status                 -> Get execution status
+// - GET    /execute/schedules                  -> List schedules (workspace.db)
+// - POST   /execute/schedules                  -> Create schedule
+// - PATCH  /execute/schedules/:id              -> Update schedule
+// - DELETE /execute/schedules/:id              -> Delete schedule
+// - GET    /execute/schedules/runs             -> List schedule runs (workspace.db)
 
 import { Router, Response, NextFunction } from 'express';
 import rateLimit from 'express-rate-limit';
@@ -22,7 +27,7 @@ import { query } from '../../database/connection';
 import { ExecutionService } from './execution.service';
 import { StreamingResponse } from './streaming/stream.handler';
 import { sseRegistry } from './streaming/sse-registry';
-import { getSessionControlService } from './platform/tools/session-control.tools';
+import { getSessionControlService } from '../platform-tools/platform/tools/session-control.tools';
 import {
     serializeExecutionStatus,
     serializeHITLAcknowledgment,
@@ -34,8 +39,12 @@ import {
     validateRespondBody,
     validateCancelBody,
 } from './execution.validators';
+import type { SandboxService } from '../sandbox-infra/sandbox/sandbox.service';
+import { requireRunningSandbox, getDaytonaProvider } from '../sandbox-infra/sandbox/sandbox-route-helpers';
 import agentFilesRouter from './agent-files.routes';
-import conversationRouter from './conversations/conversation.routes';
+import conversationRouter from '../conversations/conversation.routes';
+import scheduleFrontendRouter, { setScheduleFrontendRoutesDeps } from './schedule.routes';
+import { getConversation } from '../conversations/workspace-db.service';
 
 // -----------------------------------------------------------------------------
 // Constants
@@ -60,6 +69,25 @@ const executionRateLimit = rateLimit({
     validate: { xForwardedForHeader: false },
 });
 
+export interface ExecutionRoutesDeps {
+    sandboxService: SandboxService;
+}
+
+let deps: ExecutionRoutesDeps | null = null;
+
+export function setExecutionRoutesDeps(d: ExecutionRoutesDeps): void {
+    deps = d;
+    // Also initialize schedule frontend routes with the same sandbox service
+    setScheduleFrontendRoutesDeps({ sandboxService: d.sandboxService });
+}
+
+function getDeps(): ExecutionRoutesDeps {
+    if (!deps) {
+        throw new Error('ExecutionRoutes dependencies not initialized');
+    }
+    return deps;
+}
+
 // -----------------------------------------------------------------------------
 // Router
 // -----------------------------------------------------------------------------
@@ -74,6 +102,9 @@ router.use('/agents', agentFilesRouter);
 // MUST be before /conversations/:id/stream to ensure proper route matching
 router.use('/conversations', conversationRouter);
 
+// Mount schedule CRUD + run history routes (workspace.db queries)
+router.use('/schedules', scheduleFrontendRouter);
+
 // POST /api/v1/execute/sse-token - Issue a short-lived, single-use token for SSE auth
 router.post('/sse-token', auth, createSseTokenHandler());
 
@@ -87,17 +118,17 @@ router.get('/conversations/:id/stream', sseAuth, async (req: AuthenticatedReques
         const conversationId = req.params.id;
         validateUUID(conversationId, 'conversation id');
 
+        const { sandboxService } = getDeps();
+        const sandboxId = await requireRunningSandbox(sandboxService, req.user.uid);
+        const provider = getDaytonaProvider(sandboxService);
+
         // Enforce per-user stream limit
         if (sseRegistry.countForUser(req.user.uid) >= MAX_STREAMS_PER_USER) {
             throw new BadRequestError(`Too many active streams (max ${MAX_STREAMS_PER_USER})`);
         }
 
-        // Verify conversation belongs to this user
-        const result = await query<{ id: string; agent_slug: string | null }>(
-            `SELECT id, agent_slug FROM conversations WHERE id = $1 AND user_id = $2`,
-            [conversationId, req.user.uid],
-        );
-        if (result.rows.length === 0) {
+        const conversation = await getConversation(provider, sandboxId, conversationId);
+        if (!conversation) {
             throw new NotFoundError('Conversation');
         }
 
@@ -154,16 +185,16 @@ router.post('/conversations/:id/messages', auth, executionRateLimit, async (req:
         validateUUID(conversationId, 'conversation id');
         const validated = validateMessageBody(req.body);
 
-        // Look up conversation to get agent_id (ownership verified by user_id WHERE clause)
-        const convResult = await query<{ id: string; agent_slug: string | null }>(
-            `SELECT id, agent_slug FROM conversations WHERE id = $1 AND user_id = $2`,
-            [conversationId, req.user.uid],
-        );
-        if (convResult.rows.length === 0) {
+        const { sandboxService } = getDeps();
+        const sandboxId = await requireRunningSandbox(sandboxService, req.user.uid);
+        const provider = getDaytonaProvider(sandboxService);
+
+        const conversation = await getConversation(provider, sandboxId, conversationId);
+        if (!conversation) {
             throw new NotFoundError('Conversation');
         }
 
-        const agentSlug = convResult.rows[0].agent_slug;
+        const agentSlug = conversation.agent_slug;
         if (!agentSlug) {
             throw new BadRequestError('Conversation has no associated agent');
         }

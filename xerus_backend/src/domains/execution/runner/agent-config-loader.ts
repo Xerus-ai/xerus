@@ -11,14 +11,14 @@ import { buildRuntimeHookHandlers } from './runtime-hook-factory';
 import type { HookAgentContext, HookTriggerContext } from '../hooks/hooks.types';
 import { AgentConfigLoadError } from '../errors';
 import { NATIVE_SDK_TOOLS } from '../types';
-import { sanitizeSubagentTools } from '../orchestrator/tool.filter';
+import { sanitizeSubagentTools } from '../../platform-tools/orchestrator/tool.filter';
 import { DEFAULT_SDK_MODEL } from '../../agents/types';
 
 // Inlined from deleted xerus-master.types.ts
 const XERUS_MASTER_SLUG = 'xerus-master';
 const XERUS_CTO_SLUG = 'xerus-cto';
 
-// Inlined from deleted process-manager.ts
+// Agent configuration types (formerly in process-manager.ts, inlined here as canonical source)
 export interface PresetSystemPrompt {
     type: 'preset';
     preset: 'claude_code';

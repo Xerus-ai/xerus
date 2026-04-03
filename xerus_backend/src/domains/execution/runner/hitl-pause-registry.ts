@@ -24,15 +24,26 @@ interface PendingPause {
 
 const pendingPauses = new Map<string, PendingPause>();
 
+/** Maximum number of concurrent pending pause requests to prevent unbounded memory growth */
+const MAX_PENDING_PAUSES = 50;
+
 /**
  * Register a new pause and return a Promise that resolves when the user responds.
  * Automatically rejects after timeoutMs with a deny result.
+ * Rejects immediately if the registry is at capacity (MAX_PENDING_PAUSES).
  */
 export function registerPause(
     pauseId: string,
     toolName: string,
     timeoutMs: number,
 ): Promise<PauseResolutionResult> {
+    if (pendingPauses.size >= MAX_PENDING_PAUSES) {
+        return Promise.resolve({
+            approved: false,
+            feedback: `Too many pending HITL requests (${MAX_PENDING_PAUSES}). Rejecting automatically.`,
+        });
+    }
+
     return new Promise<PauseResolutionResult>((resolve, reject) => {
         const timer = setTimeout(() => {
             const pending = pendingPauses.get(pauseId);

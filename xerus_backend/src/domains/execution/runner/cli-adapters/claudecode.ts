@@ -1,14 +1,11 @@
 // Claude Code CLI Adapter
 // Interactive persistent Claude CLI sessions via Daytona Sessions API
 // Backend sends messages directly to Claude's stdin (no cli-executor middleman)
-// Reference: Paperclip claude-local/execute.ts, 9to5 claude.ts, Ductor auth.py
+// Auth detection is handled by auth-detector.ts (not the adapter).
+// Reference: Paperclip claude-local/execute.ts, 9to5 claude.ts
 
-import { existsSync, readFileSync } from 'fs';
-import { join } from 'path';
-import { homedir } from 'os';
-import type { CLIAdapter, AdapterType, AgentConfig, AuthResult, BillingType } from './types';
-
-const CREDENTIALS_PATH = join(homedir(), '.claude', '.credentials.json');
+import type { CLIAdapter, AdapterType, AgentConfig } from './types';
+import { validateAgentConfig } from './types';
 
 export class ClaudeCodeAdapter implements CLIAdapter {
     readonly type: AdapterType = 'claudecode';
@@ -20,6 +17,8 @@ export class ClaudeCodeAdapter implements CLIAdapter {
      * --resume is only used for crash recovery (existing session_id).
      */
     buildCommand(_prompt: string, config: AgentConfig): string[] {
+        validateAgentConfig(config);
+
         const args: string[] = [
             'claude',
             '--output-format', 'stream-json',
@@ -47,44 +46,9 @@ export class ClaudeCodeAdapter implements CLIAdapter {
             args.push('--append-system-prompt', config.system_prompt);
         }
 
+        // '--' prevents any subsequent positional args from being parsed as flags
+        args.push('--');
+
         return args;
-    }
-
-    async detectAuth(): Promise<AuthResult> {
-        // 1. Credentials file (OAuth subscription)
-        if (existsSync(CREDENTIALS_PATH)) {
-            try {
-                const content = readFileSync(CREDENTIALS_PATH, 'utf-8');
-                const parsed = JSON.parse(content);
-                if (parsed.claudeAiOauth?.accessToken || parsed.accessToken) {
-                    return {
-                        authenticated: true,
-                        method: 'credentials_file',
-                        billingType: 'subscription',
-                        credentialPath: CREDENTIALS_PATH,
-                    };
-                }
-            } catch {
-                // Malformed credentials file
-            }
-        }
-
-        // 2. Environment variable (API key)
-        if (process.env.ANTHROPIC_API_KEY) {
-            return {
-                authenticated: true,
-                method: 'env_var',
-                billingType: 'api',
-            };
-        }
-
-        // 3. No auth found — platform will inject OpenRouter
-        return { authenticated: false, method: 'none', billingType: 'platform' };
-    }
-
-    resolveBillingType(env: Record<string, string>): BillingType {
-        if (env.ANTHROPIC_API_KEY) return 'api';
-        if (existsSync(CREDENTIALS_PATH)) return 'subscription';
-        return 'platform';
     }
 }

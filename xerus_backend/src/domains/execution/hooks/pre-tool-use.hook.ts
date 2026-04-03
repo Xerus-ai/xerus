@@ -9,9 +9,9 @@
 //   4. Log hook execution
 
 import { PreToolUseInput, PreToolUseOutput, HookResult } from './hooks.types';
-import { validateToolAccess } from '../orchestrator/tool.filter';
-import { evaluateHitlRule } from '../platform/hitl-rules';
-import type { AgentType } from '../orchestrator/tool.filter';
+import { validateToolAccess } from '../../platform-tools/orchestrator/tool.filter';
+import { evaluateHitlRule } from '../../platform-tools/platform/hitl-rules';
+import type { AgentType } from '../../platform-tools/orchestrator/tool.filter';
 import type { AutonomyLevel } from '../types';
 
 // -----------------------------------------------------------------------------

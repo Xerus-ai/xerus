@@ -159,7 +159,7 @@ export const getSkillSecrets = async (skillSlug: string): Promise<SkillSecretSta
   const result = await response.json();
   const data = result.data || result;
   return (data.secrets || []).map((s: Record<string, unknown>) => ({
-    envKey: s.env_key as string,
+    envKey: s.secret_name as string,
     hasValue: s.has_value as boolean,
     hint: s.hint as string,
     updatedAt: s.updated_at as string,

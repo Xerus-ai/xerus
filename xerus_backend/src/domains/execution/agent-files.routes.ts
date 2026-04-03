@@ -15,10 +15,10 @@ import { validateWorkspacePath } from '../../utils/path-validation';
 import { validateSlug } from '../../shared/slugify';
 import { authenticateFirebaseToken } from '../../middleware/auth';
 import { query } from '../../database/connection';
-import { SandboxService } from './sandbox/sandbox.service';
-import { DaytonaProvider } from './sandbox/providers/daytona.provider';
-import { SANDBOX_CONFIG } from './sandbox/sandbox.config';
-import { AGENT_SUBDIRECTORIES } from './workspace/workspace.types';
+import { SandboxService } from '../sandbox-infra/sandbox/sandbox.service';
+import { requireRunningSandbox, getDaytonaProvider } from '../sandbox-infra/sandbox/sandbox-route-helpers';
+import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
+import { AGENT_SUBDIRECTORIES } from '../sandbox-infra/workspace/workspace.types';
 import { shellEscapePath } from '../../utils/shell-safety';
 
 // -----------------------------------------------------------------------------
@@ -63,14 +63,6 @@ function validateFilePath(filePath: string): void {
 
 function buildAgentFilePath(agentSlug: string, filePath: string): string {
     return `${SANDBOX_CONFIG.workspacePath}/agents/${agentSlug}/${filePath}`;
-}
-
-function getDaytonaProvider(sandboxService: SandboxService): DaytonaProvider {
-    const provider = sandboxService.getProvider();
-    if (!provider || typeof (provider as DaytonaProvider).readFile !== 'function') {
-        throw new Error('Sandbox provider does not support file operations');
-    }
-    return provider as DaytonaProvider;
 }
 
 // -----------------------------------------------------------------------------
@@ -127,21 +119,6 @@ async function resolveAndVerifyAgent(
         name: agent.name,
         isRunning: agent.has_running_execution,
     };
-}
-
-// -----------------------------------------------------------------------------
-// Sandbox Resolution (Daytona-only)
-// -----------------------------------------------------------------------------
-
-async function requireRunningSandbox(
-    sandboxService: SandboxService,
-    userId: string,
-): Promise<string> {
-    const status = await sandboxService.getSandboxStatus(userId);
-    if (status.status !== 'running' || !status.sandboxId) {
-        throw new BadRequestError('Sandbox not running — start a session first to access agent files');
-    }
-    return status.sandboxId;
 }
 
 // -----------------------------------------------------------------------------

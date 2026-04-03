@@ -5,10 +5,10 @@
 
 import cron from 'node-cron';
 import { query } from '../database/connection';
-import { SANDBOX_CONFIG, BACKUP_TAR_EXCLUDE_FLAGS } from '../domains/execution/sandbox/sandbox.config';
-import type { SandboxService } from '../domains/execution/sandbox/sandbox.service';
-import type { S3BackupService } from '../domains/execution/storage/s3-backup.service';
-import type { DaytonaProvider } from '../domains/execution/sandbox/providers/daytona.provider';
+import { SANDBOX_CONFIG, BACKUP_TAR_EXCLUDE_FLAGS } from '../domains/sandbox-infra/sandbox/sandbox.config';
+import type { SandboxService } from '../domains/sandbox-infra/sandbox/sandbox.service';
+import type { S3BackupService } from '../domains/sandbox-infra/storage/s3-backup.service';
+import type { DaytonaProvider } from '../domains/sandbox-infra/sandbox/providers/daytona.provider';
 
 const TAR_TEMP_PATH = '/tmp/workspace-backup.tar.gz';
 

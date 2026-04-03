@@ -124,7 +124,7 @@ export interface DigestTriggerContext {
 
 /**
  * Collects activity data from the database for digest generation.
- * Implementations query execution_sessions, channels, credit_ledger, etc.
+ * Implementations query execution_sessions, channels, credit_transactions, etc.
  */
 export interface ActivityDataCollector {
     /**

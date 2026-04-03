@@ -15,7 +15,7 @@
 import { userRepository } from './repository';
 import { decrypt } from '../../utils/encryption';
 import { shellEscapePath } from '../../utils/shell-safety';
-import type { SandboxService } from '../execution/sandbox/sandbox.service';
+import type { SandboxService } from '../sandbox-infra/sandbox/sandbox.service';
 
 export type AuthMethod = 'subscription' | 'api' | 'platform';
 
@@ -199,6 +199,49 @@ export class CLIAuthService {
             const errorMessage = error instanceof Error ? error.message : String(error);
             console.warn(`[CLIAuthService] Failed to check API key for user ${userId}, provider ${apiProvider}:`, error);
             return { status: 'unavailable', reason: 'query_error', error: errorMessage };
+        }
+    }
+    /**
+     * Trigger CLI auth login in the user's sandbox.
+     * Runs the login command in background, waits briefly, and captures the auth URL.
+     */
+    async triggerLogin(userId: string, adapter: 'claudecode' | 'codex'): Promise<{ authUrl: string | null; message: string }> {
+        if (!this.sandboxService) {
+            return { authUrl: null, message: 'Sandbox service not available. Please start a chat first.' };
+        }
+
+        const session = this.sandboxService.getSession(userId);
+        if (!session || session.status !== 'running') {
+            return { authUrl: null, message: 'Your sandbox is not running. Please start a chat first to provision your environment.' };
+        }
+
+        const provider = this.sandboxService.getDaytonaProvider();
+        const cliCommand = adapter === 'claudecode' ? 'claude' : 'codex';
+
+        // Run auth login in background, capture output after a brief wait
+        const script = [
+            `rm -f /tmp/xerus-auth-${adapter}.log`,
+            `nohup bash -c '${cliCommand} auth login > /tmp/xerus-auth-${adapter}.log 2>&1' &`,
+            `sleep 4`,
+            `cat /tmp/xerus-auth-${adapter}.log 2>/dev/null || echo 'Waiting for auth output...'`,
+        ].join(' && ');
+
+        try {
+            const result = await provider.executeCommand(session.sandboxId, script);
+            const output = result.result || '';
+
+            // Parse any URL from the output (OAuth redirect URL)
+            const urlMatch = output.match(/https?:\/\/[^\s"'<>]+/);
+            return {
+                authUrl: urlMatch ? urlMatch[0] : null,
+                message: urlMatch
+                    ? 'Please complete authentication in the opened tab.'
+                    : output.trim() || 'Auth process started. Check your sandbox terminal for prompts.',
+            };
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.warn(`[CLIAuthService] Failed to trigger ${adapter} auth for user ${userId}:`, error);
+            return { authUrl: null, message: `Failed to start auth: ${errorMessage}` };
         }
     }
 }

@@ -15,20 +15,23 @@ export {
     createMessageRouter,
 } from './messaging.service';
 
-// Message Bridge (v2 bidirectional routing)
+// Message Bridge (v2 bidirectional routing — workspace-DB backed)
 export {
     MessageBridgeService,
-    MessageBridgeDeps,
     ChannelNotFoundError,
-    ChannelNotFoundByIdError,
+    ChannelNotFoundBySlugError,
     NoChannelLeadError,
     createMessageBridgeService,
 } from './message-bridge.service';
 export type { RunnerSessionHandle } from './message-bridge.service';
 export {
-    MessageBridgeRepository,
-    MessageBridgeDatabase,
-    MessageBridgeQueryResult,
+    insertChannelMessage,
+    queryChannelMessages,
+    findChannelByProjectAndSlug,
+    findChannelBySlug,
+    findChannelLead,
+} from './message-bridge.repository';
+export type {
     InsertMessageInput,
     ChannelLookupRow,
 } from './message-bridge.repository';

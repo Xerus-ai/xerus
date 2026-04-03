@@ -18,9 +18,9 @@ import { GitMemoryRepository } from '../../memory/git-memory/git-memory.reposito
 import { DigestGeneratorService } from '../../memory/git-memory/digest-generator.service';
 import { CrossProjectSharingService } from '../../memory/git-memory/cross-project-sharing.service';
 import type { SandboxCommandExecutor } from '../../memory/git-memory/git-memory.types';
-import { ACEReflectionTrigger } from '../ace/ace-reflection.trigger';
-import { AceExtractorService } from '../ace/ace-extractor.service';
-import { AcePlaybookCuratorService } from '../ace/ace-playbook-curator.service';
+import { ACEReflectionTrigger } from '../../ace/ace-reflection.trigger';
+import { AceExtractorService } from '../../ace/ace-extractor.service';
+import { AcePlaybookCuratorService } from '../../ace/ace-playbook-curator.service';
 import { SandboxContextBuilder } from './sandbox-context-builder';
 import type { RuntimeHookContext } from './runtime-hook-factory';
 import type { GitMemoryService, SessionEndHandlerResult } from '../hooks/session-end.types';

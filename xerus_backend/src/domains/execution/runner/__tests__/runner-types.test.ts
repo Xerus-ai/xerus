@@ -4,8 +4,6 @@ import type {
     RunnerEventType,
     AgentOutputEvent,
     SessionEndedEvent,
-    HeartbeatFiredEvent,
-    HeartbeatSkippedEvent,
     HealthResponseEvent,
     SessionsListEvent,
     CreditCheckEvent,
@@ -23,7 +21,6 @@ import type {
     TriggerIndexingEvent,
     SubagentFailureEvent,
     AgentConfig,
-    HeartbeatConfig,
     McpServerConfig,
     SessionState,
     RunnerConfig,
@@ -57,7 +54,7 @@ describe('Runner v2 Types', () => {
         it('supports all event types', () => {
             const types: RunnerEventType[] = [
                 'agent_output', 'session_started', 'session_ended',
-                'agent_message', 'heartbeat_fired', 'heartbeat_skipped',
+                'agent_message',
                 'health', 'sessions', 'credit_check', 'error',
                 'sse_forward', 'credit_usage', 'session_analytics',
                 'update_agent_run', 'create_inbox_item', 'push_notification',
@@ -65,7 +62,7 @@ describe('Runner v2 Types', () => {
                 'skill_suggestion', 'sandbox_lifecycle', 'trigger_indexing',
                 'subagent_failure',
             ];
-            expect(types).toHaveLength(23);
+            expect(types).toHaveLength(21);
         });
 
         it('validates agent_output event shape', () => {
@@ -97,22 +94,6 @@ describe('Runner v2 Types', () => {
                 trigger: 'heartbeat',
             };
             expect(event.trigger).toBe('heartbeat');
-        });
-
-        it('validates heartbeat events', () => {
-            const fired: HeartbeatFiredEvent = {
-                event: 'heartbeat_fired',
-                agent: 'seo-writer',
-                had_work: true,
-            };
-            expect(fired.had_work).toBe(true);
-
-            const skipped: HeartbeatSkippedEvent = {
-                event: 'heartbeat_skipped',
-                agent: 'ad-optimizer',
-                reason: 'outside_active_hours',
-            };
-            expect(skipped.reason).toBe('outside_active_hours');
         });
 
         it('validates health response', () => {
@@ -289,8 +270,6 @@ describe('Runner v2 Types', () => {
                 { event: 'session_started', agent: 'a', session_id: 's' },
                 { event: 'session_ended', agent: 'a', session_id: 's', reason: 'complete', usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 } },
                 { event: 'agent_message', from: 'a', to: 'b', content: 'c' },
-                { event: 'heartbeat_fired', agent: 'a', had_work: true },
-                { event: 'heartbeat_skipped', agent: 'a', reason: 'r' },
                 { event: 'health', status: 'ok', active_sessions: 0, uptime_seconds: 0, agents_registered: 0 },
                 { event: 'sessions', sessions: [] },
                 { event: 'credit_check', agent: 'a', estimated_tokens: 100, trigger: 'execute' },
@@ -309,7 +288,7 @@ describe('Runner v2 Types', () => {
                 { event: 'trigger_indexing', agent: 'a', content_type: 'memory', content_path: '/memory/a.md', operation: 'index' },
                 { event: 'subagent_failure', agent: 'a', subagent_type: 'researcher', error_message: 'timeout', recoverable: true },
             ];
-            expect(events).toHaveLength(23);
+            expect(events).toHaveLength(21);
         });
     });
 
@@ -329,15 +308,6 @@ describe('Runner v2 Types', () => {
             };
             expect(config.agent_slug).toBe('seo-writer');
             expect(config.model).toBe('claude-sonnet-4-5-20250929');
-        });
-
-        it('validates heartbeat config', () => {
-            const config: HeartbeatConfig = {
-                enabled: true,
-                interval_minutes: 60,
-                offset_minutes: 10,
-            };
-            expect(config.interval_minutes).toBe(60);
         });
 
         it('validates MCP server config', () => {

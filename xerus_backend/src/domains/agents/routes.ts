@@ -5,7 +5,7 @@
 
 import { Router } from 'express';
 import { agentService, agentToolsService, agentKBService, agentMarketplaceService } from './service';
-import type { SandboxService } from '../execution/sandbox/sandbox.service';
+import type { SandboxService } from '../sandbox-infra/sandbox/sandbox.service';
 import { DriveService } from '../drive/drive.service';
 import { AgentFilesystemRepository } from './agent-filesystem.repository';
 

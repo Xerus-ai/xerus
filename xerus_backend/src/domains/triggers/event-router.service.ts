@@ -197,23 +197,8 @@ export class EventRouterService {
         entry.count++;
     }
 
-    private async getMaxEventsPerHour(agentId: number): Promise<number> {
-        // Query heartbeat_configs if table exists; default to 60 events/hour
-        try {
-            const result = await query<{ max_alerts_per_hour: number }>(
-                `SELECT max_alerts_per_hour FROM heartbeat_configs WHERE agent_id = $1`,
-                [agentId]
-            );
-            if (result.rows.length > 0) {
-                return result.rows[0].max_alerts_per_hour;
-            }
-        } catch (err: unknown) {
-            const pgCode = (err as { code?: string })?.code;
-            if (pgCode !== '42P01') {
-                throw err;
-            }
-            // Table does not exist yet; use default
-        }
+    private async getMaxEventsPerHour(_agentId: number): Promise<number> {
+        // Heartbeat tables deprecated in migration 081. Use sensible default.
         return 60;
     }
 

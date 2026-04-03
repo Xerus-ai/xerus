@@ -1,16 +1,19 @@
 // Codex CLI Adapter
 // Interactive persistent Codex CLI sessions via Daytona Sessions API
 // Backend sends messages directly to Codex's stdin (no cli-executor middleman)
+// Auth detection is handled by auth-detector.ts (not the adapter).
 // Reference: Paperclip codex-local/execute.ts, Ductor service.py
+//
+// LIMITATION: Budget controls
+// The Codex CLI does not expose --max-budget-usd or --max-tokens flags as of
+// v0.1.x. config.max_budget_usd is therefore ignored at the CLI level.
+// Defense-in-depth: the backend runner event stream already tracks token usage
+// and credits per session (see runner.service.ts). A process-level cost monitor
+// that kills the Codex process when budget is exceeded would add a second layer
+// of protection. See: https://github.com/openai/codex/issues (track for new flags).
 
-import { existsSync, mkdirSync, writeFileSync } from 'fs';
-import { join } from 'path';
-import { homedir } from 'os';
-import type { CLIAdapter, AdapterType, AgentConfig, AuthResult, BillingType } from './types';
-
-const CODEX_HOME = process.env.CODEX_HOME || join(homedir(), '.codex');
-const CODEX_AUTH_PATH = join(CODEX_HOME, 'auth.json');
-const CODEX_CONFIG_PATH = join(CODEX_HOME, 'config.toml');
+import type { CLIAdapter, AdapterType, AgentConfig } from './types';
+import { validateAgentConfig } from './types';
 
 export class CodexAdapter implements CLIAdapter {
     readonly type: AdapterType = 'codex';
@@ -22,6 +25,8 @@ export class CodexAdapter implements CLIAdapter {
      * --session-id for crash recovery (existing session).
      */
     buildCommand(_prompt: string, config: AgentConfig): string[] {
+        validateAgentConfig(config);
+
         const args: string[] = [
             'codex',
             '--approval-mode', 'full-auto',
@@ -37,49 +42,9 @@ export class CodexAdapter implements CLIAdapter {
             args.push('--session-id', config.session_id);
         }
 
+        // '--' prevents any subsequent positional args from being parsed as flags
+        args.push('--');
+
         return args;
-    }
-
-    async detectAuth(): Promise<AuthResult> {
-        // 1. Auth file (respects CODEX_HOME env var per Ductor pattern)
-        if (existsSync(CODEX_AUTH_PATH)) {
-            return {
-                authenticated: true,
-                method: 'credentials_file',
-                billingType: 'subscription',
-                credentialPath: CODEX_AUTH_PATH,
-            };
-        }
-
-        // 2. Environment variable
-        if (process.env.OPENAI_API_KEY) {
-            return {
-                authenticated: true,
-                method: 'env_var',
-                billingType: 'api',
-            };
-        }
-
-        // 3. No auth — platform will inject OpenRouter
-        return { authenticated: false, method: 'none', billingType: 'platform' };
-    }
-
-    resolveBillingType(env: Record<string, string>): BillingType {
-        if (env.OPENAI_API_KEY) return 'api';
-        if (existsSync(CODEX_AUTH_PATH)) return 'subscription';
-        return 'platform';
-    }
-
-    /**
-     * Write config.toml with model_provider = "openrouter" for platform billing.
-     * Called before spawning Codex when user has no BYOK key.
-     */
-    writeOpenRouterConfig(openRouterApiKey: string): void {
-        mkdirSync(CODEX_HOME, { recursive: true });
-        const toml = [
-            'model_provider = "openrouter"',
-            `api_key = "${openRouterApiKey}"`,
-        ].join('\n');
-        writeFileSync(CODEX_CONFIG_PATH, toml, 'utf-8');
     }
 }

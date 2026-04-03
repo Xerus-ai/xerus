@@ -5,16 +5,16 @@
 import { EventEmitter } from 'events';
 import { ExecutionService, ExecutionServiceDeps, AgentRow, ExecutionDatabase } from '../execution.service';
 import { PricingService } from '../sdk/pricing.service';
-import { SandboxService } from '../sandbox/sandbox.service';
+import { SandboxService } from '../../sandbox-infra/sandbox/sandbox.service';
 import {
     SandboxProvider,
     ProviderSandbox,
     CreateProviderSandboxOptions,
     ProviderSandboxStatus,
     ProviderCapabilities,
-} from '../sandbox/providers';
+} from '../../sandbox-infra/sandbox/providers';
 import { ExecutionQueueService } from '../queue/execution-queue.service';
-import { CreditTracker, CreditTrackerDeps } from '../credits/credit-tracker.service';
+import { CreditTracker, CreditTrackerDeps } from '../../credits/credit-tracker.service';
 import { StreamingResponse } from '../streaming/stream.handler';
 import { ThinkingLevel, AutonomyLevel } from '../types';
 

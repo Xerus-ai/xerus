@@ -3,58 +3,107 @@
 // Pattern: Ductor auth.py (check_claude_auth, check_codex_auth)
 //   1. Credential file on disk (subscription / BYOS)
 //   2. Environment variable (API key / BYOK)
-//   3. CLI status command (fallback, slow — parses JSON output)
-//   4. Installed-but-unauthenticated vs not-installed distinction
-//   5. No auth -> platform billing via OpenRouter credits
+//   3. Installed-but-unauthenticated vs not-installed distinction
+//   4. No auth -> platform billing via OpenRouter credits
+//
+// All checks execute on the Daytona sandbox via SandboxExecutor,
+// never on the backend host's filesystem.
 
-import { existsSync, readFileSync, statSync } from 'fs';
-import { join } from 'path';
-import { homedir } from 'os';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
-import type { AdapterType, AuthResult, BillingType } from './cli-adapters/types';
+import type { AdapterType, AuthResult, CLIBillingType } from './cli-adapters/types';
 
-const execFileAsync = promisify(execFile);
+// -----------------------------------------------------------------------------
+// Sandbox Executor Interface
+// -----------------------------------------------------------------------------
 
-const CLAUDE_DIR = join(homedir(), '.claude');
-const CLAUDE_CREDENTIALS = join(CLAUDE_DIR, '.credentials.json');
-// Respect CODEX_HOME env var (Ductor pattern) for non-standard Codex installs
-const CODEX_HOME = process.env.CODEX_HOME || join(homedir(), '.codex');
-const CODEX_AUTH = join(CODEX_HOME, 'auth.json');
-const CLI_STATUS_TIMEOUT_MS = 5000;
+export interface SandboxExecutor {
+    executeCommand(sandboxId: string, command: string): Promise<{ result: string; exitCode: number }>;
+}
+
+// -----------------------------------------------------------------------------
+// Sandbox Filesystem Helpers
+// -----------------------------------------------------------------------------
+
+async function readSandboxFile(
+    sandboxId: string, executor: SandboxExecutor, path: string,
+): Promise<string | null> {
+    const { result, exitCode } = await executor.executeCommand(
+        sandboxId, `test -f ${path} && cat ${path} 2>/dev/null`,
+    );
+    return exitCode === 0 && result.trim().length > 0 ? result.trim() : null;
+}
+
+async function getSandboxFileMtime(
+    sandboxId: string, executor: SandboxExecutor, path: string,
+): Promise<string | undefined> {
+    const { result, exitCode } = await executor.executeCommand(
+        sandboxId, `stat -c '%Y' ${path} 2>/dev/null`,
+    );
+    if (exitCode !== 0 || !result.trim()) return undefined;
+    const epoch = parseInt(result.trim(), 10);
+    if (isNaN(epoch)) return undefined;
+    return new Date(epoch * 1000).toISOString();
+}
+
+async function sandboxDirExists(
+    sandboxId: string, executor: SandboxExecutor, path: string,
+): Promise<boolean> {
+    const { exitCode } = await executor.executeCommand(sandboxId, `test -d ${path}`);
+    return exitCode === 0;
+}
+
+async function getSandboxEnvVar(
+    sandboxId: string, executor: SandboxExecutor, name: string,
+): Promise<string | null> {
+    const { result, exitCode } = await executor.executeCommand(
+        sandboxId, `printenv ${name} 2>/dev/null`,
+    );
+    return exitCode === 0 && result.trim().length > 0 ? result.trim() : null;
+}
+
+// -----------------------------------------------------------------------------
+// Public API
+// -----------------------------------------------------------------------------
 
 export interface PlatformAuthStatus {
     claudecode: AuthResult;
     codex: AuthResult;
 }
 
-export async function detectAllAuth(): Promise<PlatformAuthStatus> {
+export async function detectAllAuth(
+    sandboxId: string, executor: SandboxExecutor,
+): Promise<PlatformAuthStatus> {
     const [claudeAuth, codexAuth] = await Promise.all([
-        detectClaudeAuth(),
-        detectCodexAuth(),
+        detectClaudeAuth(sandboxId, executor),
+        detectCodexAuth(sandboxId, executor),
     ]);
     return { claudecode: claudeAuth, codex: codexAuth };
 }
 
-export async function detectAuthForAdapter(adapterType: AdapterType): Promise<AuthResult> {
-    return adapterType === 'claudecode' ? detectClaudeAuth() : detectCodexAuth();
+export async function detectAuthForAdapter(
+    sandboxId: string, executor: SandboxExecutor, adapterType: AdapterType,
+): Promise<AuthResult> {
+    return adapterType === 'claudecode'
+        ? detectClaudeAuth(sandboxId, executor)
+        : detectCodexAuth(sandboxId, executor);
 }
 
-/** Get ISO timestamp of file modification time (Ductor pattern: auth_age tracking) */
-function getFileAge(filePath: string): string | undefined {
-    try {
-        return statSync(filePath).mtime.toISOString();
-    } catch {
-        return undefined;
-    }
-}
+// -----------------------------------------------------------------------------
+// Private Detection
+// -----------------------------------------------------------------------------
 
-async function detectClaudeAuth(): Promise<AuthResult> {
+const CLAUDE_CREDENTIALS = '$HOME/.claude/.credentials.json';
+const CLAUDE_DIR = '$HOME/.claude';
+const CODEX_AUTH = '${CODEX_HOME:-$HOME/.codex}/auth.json';
+const CODEX_HOME_DIR = '${CODEX_HOME:-$HOME/.codex}';
+
+async function detectClaudeAuth(
+    sandboxId: string, executor: SandboxExecutor,
+): Promise<AuthResult> {
     // 1. Fast path: credentials file (standard OAuth login)
     // Ductor pattern: check ~/.claude/.credentials.json first
-    if (existsSync(CLAUDE_CREDENTIALS)) {
+    const content = await readSandboxFile(sandboxId, executor, CLAUDE_CREDENTIALS);
+    if (content) {
         try {
-            const content = readFileSync(CLAUDE_CREDENTIALS, 'utf-8');
             const parsed = JSON.parse(content);
             if (parsed.claudeAiOauth?.accessToken || parsed.accessToken) {
                 return {
@@ -62,16 +111,17 @@ async function detectClaudeAuth(): Promise<AuthResult> {
                     method: 'credentials_file',
                     billingType: 'subscription',
                     credentialPath: CLAUDE_CREDENTIALS,
-                    credentialAge: getFileAge(CLAUDE_CREDENTIALS),
+                    credentialAge: await getSandboxFileMtime(sandboxId, executor, CLAUDE_CREDENTIALS),
                 };
             }
-        } catch {
-            // Malformed credentials file — continue
+        } catch (err) {
+            console.warn('[auth-detector] Malformed Claude credentials file:', err);
         }
     }
 
     // 2. ANTHROPIC_API_KEY environment variable (BYOK)
-    if (process.env.ANTHROPIC_API_KEY) {
+    const anthropicKey = await getSandboxEnvVar(sandboxId, executor, 'ANTHROPIC_API_KEY');
+    if (anthropicKey) {
         return {
             authenticated: true,
             method: 'env_var',
@@ -79,57 +129,32 @@ async function detectClaudeAuth(): Promise<AuthResult> {
         };
     }
 
-    // 3. CLI status command (last resort, slow)
-    // Ductor pattern: parse JSON output from `claude auth status`
-    try {
-        const { stdout } = await execFileAsync('claude', ['auth', 'status'], {
-            timeout: CLI_STATUS_TIMEOUT_MS,
-        });
-        try {
-            const data = JSON.parse(stdout);
-            if (data.loggedIn === true) {
-                return {
-                    authenticated: true,
-                    method: 'cli_status',
-                    billingType: 'subscription',
-                };
-            }
-        } catch {
-            // Non-JSON output: fallback to string matching
-            if (stdout.includes('authenticated') || stdout.includes('Logged in')) {
-                return {
-                    authenticated: true,
-                    method: 'cli_status',
-                    billingType: 'subscription',
-                };
-            }
-        }
-    } catch {
-        // CLI not installed or auth check failed
-    }
-
-    // 4. Ductor pattern: distinguish installed-but-unauthenticated from not-installed
-    if (existsSync(CLAUDE_DIR)) {
+    // 3. Ductor pattern: distinguish installed-but-unauthenticated from not-installed
+    if (await sandboxDirExists(sandboxId, executor, CLAUDE_DIR)) {
         return { authenticated: false, method: 'none', billingType: 'platform', installed: true };
     }
 
     return { authenticated: false, method: 'none', billingType: 'platform' };
 }
 
-async function detectCodexAuth(): Promise<AuthResult> {
+async function detectCodexAuth(
+    sandboxId: string, executor: SandboxExecutor,
+): Promise<AuthResult> {
     // 1. Fast path: auth.json credential file (respects CODEX_HOME env var per Ductor pattern)
-    if (existsSync(CODEX_AUTH)) {
+    const content = await readSandboxFile(sandboxId, executor, CODEX_AUTH);
+    if (content) {
         return {
             authenticated: true,
             method: 'credentials_file',
             billingType: 'subscription',
             credentialPath: CODEX_AUTH,
-            credentialAge: getFileAge(CODEX_AUTH),
+            credentialAge: await getSandboxFileMtime(sandboxId, executor, CODEX_AUTH),
         };
     }
 
     // 2. OPENAI_API_KEY environment variable (BYOK)
-    if (process.env.OPENAI_API_KEY) {
+    const openaiKey = await getSandboxEnvVar(sandboxId, executor, 'OPENAI_API_KEY');
+    if (openaiKey) {
         return {
             authenticated: true,
             method: 'env_var',
@@ -139,15 +164,19 @@ async function detectCodexAuth(): Promise<AuthResult> {
 
     // 3. Ductor pattern: check install markers (version.json or config.toml)
     // Distinguish "installed but not authenticated" from "not found"
-    const versionFile = join(CODEX_HOME, 'version.json');
-    const configFile = join(CODEX_HOME, 'config.toml');
-    if (existsSync(versionFile) || existsSync(configFile)) {
+    const versionFile = `${CODEX_HOME_DIR}/version.json`;
+    const configFile = `${CODEX_HOME_DIR}/config.toml`;
+    const [versionContent, configContent] = await Promise.all([
+        readSandboxFile(sandboxId, executor, versionFile),
+        readSandboxFile(sandboxId, executor, configFile),
+    ]);
+    if (versionContent !== null || configContent !== null) {
         return { authenticated: false, method: 'none', billingType: 'platform', installed: true };
     }
 
     return { authenticated: false, method: 'none', billingType: 'platform' };
 }
 
-export function resolveBillingType(authResult: AuthResult): BillingType {
+export function resolveBillingType(authResult: AuthResult): CLIBillingType {
     return authResult.billingType;
 }

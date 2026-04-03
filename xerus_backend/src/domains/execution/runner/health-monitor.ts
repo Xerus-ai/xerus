@@ -137,14 +137,6 @@ export class RunnerHealthMonitor {
         }
     }
 
-    recordHealthResponse(sandboxId: string): void {
-        const entry = this.entries.get(sandboxId);
-        if (entry) {
-            entry.last_activity = Date.now();
-            entry.healthy = true;
-        }
-    }
-
     getLastActivity(sandboxId: string): number | undefined {
         return this.entries.get(sandboxId)?.last_activity;
     }
@@ -289,13 +281,3 @@ export class RunnerHealthMonitor {
     }
 }
 
-// -----------------------------------------------------------------------------
-// Factory
-// -----------------------------------------------------------------------------
-
-export function createRunnerHealthMonitor(
-    deps: RunnerHealthMonitorDeps,
-    config?: Partial<HealthMonitorConfig>
-): RunnerHealthMonitor {
-    return new RunnerHealthMonitor(deps, config);
-}

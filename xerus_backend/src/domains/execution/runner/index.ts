@@ -10,8 +10,6 @@ export type {
     SessionStartedEvent,
     SessionEndedEvent,
     AgentMessageEvent as RunnerAgentMessageEvent,
-    HeartbeatFiredEvent,
-    HeartbeatSkippedEvent,
     HealthResponseEvent,
     SessionsListEvent as RunnerSessionsListEvent,
     CreditCheckEvent,
@@ -33,7 +31,6 @@ export type {
     ScaffoldFile,
     SessionInfo,
     AgentConfig as RunnerAgentConfig,
-    ActiveHoursConfig,
     SessionState,
     CreditResponseCommand,
 } from './runner.types';
@@ -42,7 +39,6 @@ export type {
 export type {
     RunnerConfig,
     McpServerConfig,
-    HeartbeatConfig,
 } from './runner.types';
 export { RUNNER_ENV } from './runner.types';
 
@@ -62,7 +58,7 @@ export type {
 export { buildSoulAppend } from './soul-append-builder';
 
 export { detectAllAuth, detectAuthForAdapter, resolveBillingType } from './auth-detector';
-export type { PlatformAuthStatus } from './auth-detector';
+export type { PlatformAuthStatus, SandboxExecutor } from './auth-detector';
 
 export { parseClaudeStreamLine, parseCodexStreamLine, clearAccumulator } from './stream-parser';
 
@@ -72,10 +68,10 @@ export type {
     AdapterType,
     AgentConfig as CLIAgentConfig,
     AuthResult,
-    BillingType,
+    CLIBillingType,
 } from './cli-adapters/types';
 
-export { RunnerHealthMonitor, createRunnerHealthMonitor } from './health-monitor';
+export { RunnerHealthMonitor } from './health-monitor';
 export type {
     RunnerHealthMonitorDeps,
     HealthMonitorConfig,

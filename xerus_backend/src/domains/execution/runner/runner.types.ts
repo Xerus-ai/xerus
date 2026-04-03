@@ -6,18 +6,11 @@
 // -----------------------------------------------------------------------------
 // Inbound Commands (Backend -> Runner via stdin)
 // Canonical command types are defined in stdin-parser.ts (uses `type` field).
-// Only CreditResponseCommand and ScaffoldFile remain here as they are
-// consumed by backend services (credit-deduction, scaffold) outside the runner.
+// CreditResponseCommand is defined in shared/types/credit-protocol.types.ts
+// and re-exported here for backward compatibility.
 // -----------------------------------------------------------------------------
 
-export interface CreditResponseCommand {
-    cmd: 'credit_response';
-    agent: string;
-    approved: boolean;
-    reserved_credits?: number;
-    balance_remaining: number;
-    reason?: string;
-}
+export type { CreditResponseCommand } from '../../../shared/types/credit-protocol.types';
 
 export interface ScaffoldFile {
     path: string;
@@ -34,8 +27,6 @@ export type RunnerEventType =
     | 'session_started'
     | 'session_ended'
     | 'agent_message'
-    | 'heartbeat_fired'
-    | 'heartbeat_skipped'
     | 'health'
     | 'sessions'
     | 'credit_check'
@@ -101,18 +92,6 @@ export interface AgentMessageEvent extends RunnerEventBase {
     content: string;
     domain?: string;
     channel?: string;
-}
-
-export interface HeartbeatFiredEvent extends RunnerEventBase {
-    event: 'heartbeat_fired';
-    agent: string;
-    had_work: boolean;
-}
-
-export interface HeartbeatSkippedEvent extends RunnerEventBase {
-    event: 'heartbeat_skipped';
-    agent: string;
-    reason: string;
 }
 
 export interface HealthResponseEvent extends RunnerEventBase {
@@ -300,8 +279,6 @@ export type RunnerEvent =
     | SessionStartedEvent
     | SessionEndedEvent
     | AgentMessageEvent
-    | HeartbeatFiredEvent
-    | HeartbeatSkippedEvent
     | HealthResponseEvent
     | SessionsListEvent
     | CreditCheckEvent
@@ -323,11 +300,9 @@ export type RunnerEvent =
     | MetadataSyncEvent
     | HitlRequestEvent;
 
-// Re-export configuration types (inlined in agent-config-loader after process-manager deletion)
+// Re-export configuration types (inlined in agent-config-loader after deletion of legacy process-manager)
 export type { AgentConfig, PresetSystemPrompt, SystemPrompt } from './agent-config-loader';
 export type {
-    HeartbeatConfig,
-    ActiveHoursConfig,
     McpServerConfig,
     SessionState,
     RunnerConfig,

@@ -16,10 +16,12 @@ import type { HeartbeatConfigDTO, Assistant } from '@/lib/api/types'
 import { apiCall } from '@/lib/api/client'
 import { formatPrompt } from '@/lib/api/agents'
 import {
-  getHeartbeatConfig,
-  updateHeartbeatConfig,
-  deleteHeartbeatConfig,
-} from '@/lib/api/heartbeat'
+  listSchedules,
+  createSchedule,
+  updateSchedule,
+  deleteSchedule as deleteScheduleApi,
+  type ScheduleEntry,
+} from '@/lib/api/schedules'
 import { toast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
@@ -57,6 +59,8 @@ export function BehaviourTab({
 }: BehaviourTabProps) {
   const [activeSection, setActiveSection] = useState<BehaviourSection>('heartbeat')
   const [heartbeatConfig, setHeartbeatConfig] = useState<HeartbeatConfigDTO | null>(null)
+  // Track the active schedule entry from workspace.db (for update/delete operations)
+  const [activeScheduleId, setActiveScheduleId] = useState<string | null>(null)
 
   // HEARTBEAT.md file state
   const [heartbeatContent, setHeartbeatContent] = useState<string | null>(null)
@@ -88,7 +92,40 @@ export function BehaviourTab({
     if (!active || hasLoaded || !agent?.id) return
 
     setHasLoaded(true)
-    getHeartbeatConfig(agent.id).then(setHeartbeatConfig)
+
+    // Fetch active schedules for this agent from workspace.db
+    const loadSchedules = async () => {
+      try {
+        const result = await listSchedules({ agent_slug: agentSlug })
+        const activeSchedule = result.schedules.find(
+          (s: ScheduleEntry) => s.status === 'active'
+        )
+        if (activeSchedule) {
+          setActiveScheduleId(activeSchedule.id)
+          setHeartbeatConfig({
+            agentId: agent.id,
+            enabled: true,
+            cronExpression: activeSchedule.rrule ?? '*/30 * * * *',
+            timezone: 'UTC',
+            weekdaysOnly: false,
+            maxDurationSeconds: 300,
+            retryOnFailure: true,
+            tokenBudget: 8000,
+            eventTokenBudget: 4000,
+            maxAlertsPerHour: 3,
+            suppressToken: 'HEARTBEAT_OK',
+            staggerOffsetMs: 0,
+          })
+        } else {
+          setActiveScheduleId(null)
+          setHeartbeatConfig(null)
+        }
+      } catch {
+        setActiveScheduleId(null)
+        setHeartbeatConfig(null)
+      }
+    }
+    loadSchedules()
 
     const loadFile = async () => {
       setIsLoadingFile(true)
@@ -170,17 +207,60 @@ export function BehaviourTab({
   const handleHeartbeatSave = useCallback(
     async (config: Partial<HeartbeatConfigDTO>) => {
       setActiveSection('proactivity')
-      const saved = await updateHeartbeatConfig(agent.id, config)
-      setHeartbeatConfig(saved)
+      try {
+        const rrule = config.cronExpression ?? '*/30 * * * *'
+        if (activeScheduleId) {
+          // Update existing schedule
+          await updateSchedule(activeScheduleId, {
+            rrule,
+            status: 'active',
+          })
+        } else {
+          // Create a new heartbeat schedule
+          const result = await createSchedule({
+            agent_slug: agentSlug,
+            name: `${agentSlug}-heartbeat`,
+            prompt: 'Heartbeat check-in: review goals, reflect on progress, and take proactive action.',
+            rrule,
+          })
+          setActiveScheduleId(result.schedule.id)
+        }
+        setHeartbeatConfig({
+          agentId: agent.id,
+          enabled: true,
+          cronExpression: rrule,
+          timezone: config.timezone ?? 'UTC',
+          activeHoursStart: config.activeHoursStart,
+          activeHoursEnd: config.activeHoursEnd,
+          weekdaysOnly: config.weekdaysOnly ?? false,
+          maxDurationSeconds: config.maxDurationSeconds ?? 300,
+          retryOnFailure: config.retryOnFailure ?? true,
+          tokenBudget: config.tokenBudget ?? 8000,
+          eventTokenBudget: config.eventTokenBudget ?? 4000,
+          maxAlertsPerHour: config.maxAlertsPerHour ?? 3,
+          suppressToken: config.suppressToken ?? 'HEARTBEAT_OK',
+          staggerOffsetMs: config.staggerOffsetMs ?? 0,
+        })
+        toast.success('Proactivity schedule saved')
+      } catch {
+        // apiCall handles error toast
+      }
     },
-    [agent?.id]
+    [activeScheduleId, agentSlug, agent.id]
   )
 
   const handleHeartbeatDelete = useCallback(async () => {
     setActiveSection('proactivity')
-    await deleteHeartbeatConfig(agent.id)
-    setHeartbeatConfig(null)
-  }, [agent?.id])
+    try {
+      if (activeScheduleId) {
+        await updateSchedule(activeScheduleId, { status: 'paused' })
+      }
+      setHeartbeatConfig(null)
+      toast.success('Proactivity disabled')
+    } catch {
+      // apiCall handles error toast
+    }
+  }, [activeScheduleId])
 
   // At-a-glance summary
   const thinkingLabel = { low: 'Low', medium: 'Medium', high: 'High' }[agent.thinkingLevel ?? 'medium'] ?? 'Medium'

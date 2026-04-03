@@ -7,14 +7,14 @@ import {
     SANDBOX_CONFIG,
     createWorkspaceTar,
     restoreWorkspaceTar,
-} from '../execution';
-import type { DaytonaProvider } from '../execution';
+} from '../sandbox-infra';
+import type { DaytonaProvider } from '../sandbox-infra';
 import { isHidden } from './editability';
 import { buildWorkspaceOverview } from './workspace-overview';
 import type { FileNode, TreeResponse, WorkspaceStatus, WorkspaceOverview } from './types';
-import type { SandboxOperationResult, SandboxSession } from '../execution';
-import type { S3BackupService, BackupResult } from '../execution/storage/s3-backup.service';
-import type { StorageFile } from '../execution/storage/storage.types';
+import type { SandboxOperationResult, SandboxSession } from '../sandbox-infra';
+import type { S3BackupService, BackupResult } from '../sandbox-infra/storage/s3-backup.service';
+import type { StorageFile } from '../sandbox-infra/storage/storage.types';
 import { shellEscapePath } from '../../utils/shell-safety';
 
 export class DriveService {

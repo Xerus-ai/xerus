@@ -6,43 +6,152 @@
 import type { PipelineContext, ResolvedExecutionDeps } from './execution-pipeline.types';
 import { requireAgent } from './pipeline-guards';
 import type { MemoryScope } from '../memory/memory.types';
-import { getSessionControlService, getMemoryService } from './platform/tools';
+import { getSessionControlService, getMemoryService } from '../platform-tools/platform/tools';
+import { escapeSQL, executeWorkspaceJsonQuery } from '../conversations/workspace-db.helpers';
+import type { DaytonaProvider } from '../sandbox-infra/sandbox/providers/daytona.provider';
 
 const LOG_PREFIX = '[EventRouter]';
+
+// ---------------------------------------------------------------------------
+// Typed event data interfaces for entity sync handlers
+// ---------------------------------------------------------------------------
+
+interface TriggerSyncData {
+    trigger_id?: string | number;
+    agent_slug: string;
+    app_slug: string;
+    event_type: string;
+}
+
+interface NotificationSyncData {
+    content: string;
+    priority?: string;
+    metadata?: Record<string, unknown>;
+}
+
+interface KbSyncData {
+    agent_slug: string;
+    kb_id?: string;
+}
+
+interface SessionSyncData {
+    session_id: string;
+    reason?: string;
+    approved?: boolean;
+    feedback?: string;
+}
+
+interface MemorySyncData {
+    content: string;
+    scope?: MemoryScope;
+    scope_id?: string;
+    path?: string;
+}
+
+interface ToolSyncData {
+    agent_slug: string;
+    app_slug?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Assertion functions (fail-fast with explicit type checks)
+// ---------------------------------------------------------------------------
+
+function assertTriggerSyncData(data: Record<string, unknown>): TriggerSyncData {
+    const agentSlug = typeof data.agent_id === 'string' ? data.agent_id
+        : typeof data.agent_slug === 'string' ? data.agent_slug : '';
+    const appSlug = typeof data.app_slug === 'string' ? data.app_slug : '';
+    const eventType = typeof data.event_type === 'string' ? data.event_type : '';
+    const triggerId = typeof data.trigger_id === 'string' || typeof data.trigger_id === 'number'
+        ? data.trigger_id : undefined;
+    return { trigger_id: triggerId, agent_slug: agentSlug, app_slug: appSlug, event_type: eventType };
+}
+
+function assertNotificationSyncData(data: Record<string, unknown>): NotificationSyncData {
+    if (typeof data.content !== 'string' || data.content.length === 0) {
+        throw new Error(`${LOG_PREFIX} notification sync: missing content`);
+    }
+    return {
+        content: data.content,
+        priority: typeof data.priority === 'string' ? data.priority : 'normal',
+        metadata: typeof data.metadata === 'object' && data.metadata !== null
+            ? data.metadata as Record<string, unknown> : undefined,
+    };
+}
+
+function assertKbSyncData(data: Record<string, unknown>): KbSyncData {
+    const agentSlug = typeof data.agent_id === 'string' ? data.agent_id
+        : typeof data.agent_slug === 'string' ? data.agent_slug : '';
+    return {
+        agent_slug: agentSlug,
+        kb_id: typeof data.kb_id === 'string' ? data.kb_id : undefined,
+    };
+}
+
+function assertSessionSyncData(data: Record<string, unknown>): SessionSyncData {
+    if (typeof data.session_id !== 'string') {
+        throw new Error(`${LOG_PREFIX} session sync: missing session_id`);
+    }
+    return {
+        session_id: data.session_id,
+        reason: typeof data.reason === 'string' ? data.reason : undefined,
+        approved: typeof data.approved === 'boolean' ? data.approved : undefined,
+        feedback: typeof data.feedback === 'string' ? data.feedback : '',
+    };
+}
+
+function assertMemorySyncData(data: Record<string, unknown>): MemorySyncData {
+    if (typeof data.content !== 'string' || data.content.length === 0) {
+        throw new Error(`${LOG_PREFIX} memory sync: missing content`);
+    }
+    return {
+        content: data.content,
+        scope: typeof data.scope === 'string' ? data.scope as MemoryScope : undefined,
+        scope_id: typeof data.scope_id === 'string' ? data.scope_id : undefined,
+        path: typeof data.path === 'string' ? data.path : undefined,
+    };
+}
+
+function assertToolSyncData(data: Record<string, unknown>): ToolSyncData {
+    const agentSlug = typeof data.agent_id === 'string' ? data.agent_id
+        : typeof data.agent_slug === 'string' ? data.agent_slug : '';
+    return {
+        agent_slug: agentSlug,
+        app_slug: typeof data.app_slug === 'string' ? data.app_slug : undefined,
+    };
+}
 
 export async function handleTriggerSync(
     data: Record<string, unknown>, action: string, ctx: PipelineContext, deps: ResolvedExecutionDeps,
 ): Promise<void> {
+    const d = assertTriggerSyncData(data);
+
     if (action === 'deregister') {
         // Deregister supports two paths:
         // 1. By trigger_id (from platform.deregister_trigger MCP handler)
         // 2. By agent_id + app_slug + event_type (field-based match)
-        const triggerId = data.trigger_id as string | number | undefined;
-        if (triggerId) {
+        if (d.trigger_id !== undefined) {
             await deps.db.query(
                 `DELETE FROM agent_triggers WHERE id = $1 AND user_id = $2`,
-                [String(triggerId), ctx.request.userId],
+                [String(d.trigger_id), ctx.request.userId],
             );
-            console.log(`${LOG_PREFIX} trigger sync: deregistered trigger id=${triggerId}`);
+            console.log(`${LOG_PREFIX} trigger sync: deregistered trigger id=${d.trigger_id}`);
             return;
         }
         // Fall through to field-based deregister below
     }
 
-    const agentSlug = data.agent_id as string || data.agent_slug as string;
-    const appSlug = data.app_slug as string;
-    const eventType = data.event_type as string;
-    if (!agentSlug || !appSlug || !eventType) {
+    if (!d.agent_slug || !d.app_slug || !d.event_type) {
         console.warn(`${LOG_PREFIX} trigger sync: missing fields`);
         return;
     }
 
     const agentResult = await deps.db.query<{ id: number }>(
         `SELECT id FROM agent_registry WHERE slug = $1 AND user_id = $2 LIMIT 1`,
-        [agentSlug, ctx.request.userId],
+        [d.agent_slug, ctx.request.userId],
     );
     if (agentResult.rows.length === 0) {
-        console.warn(`${LOG_PREFIX} trigger sync: agent not found slug=${agentSlug}`);
+        console.warn(`${LOG_PREFIX} trigger sync: agent not found slug=${d.agent_slug}`);
         return;
     }
     const agentId = agentResult.rows[0].id;
@@ -52,71 +161,83 @@ export async function handleTriggerSync(
             `INSERT INTO agent_triggers (agent_id, user_id, app_slug, event_type)
              VALUES ($1, $2, $3, $4)
              ON CONFLICT (agent_id, app_slug, event_type) DO NOTHING`,
-            [agentId, ctx.request.userId, appSlug, eventType],
+            [agentId, ctx.request.userId, d.app_slug, d.event_type],
         );
-        console.log(`${LOG_PREFIX} trigger sync: registered ${appSlug}.${eventType} for agent=${agentSlug}`);
+        console.log(`${LOG_PREFIX} trigger sync: registered ${d.app_slug}.${d.event_type} for agent=${d.agent_slug}`);
     } else if (action === 'deregister') {
         await deps.db.query(
             `DELETE FROM agent_triggers WHERE agent_id = $1 AND app_slug = $2 AND event_type = $3`,
-            [agentId, appSlug, eventType],
+            [agentId, d.app_slug, d.event_type],
         );
-        console.log(`${LOG_PREFIX} trigger sync: deregistered ${appSlug}.${eventType} for agent=${agentSlug}`);
+        console.log(`${LOG_PREFIX} trigger sync: deregistered ${d.app_slug}.${d.event_type} for agent=${d.agent_slug}`);
     }
 }
 
 export async function handleNotificationSync(
     data: Record<string, unknown>, ctx: PipelineContext, deps: ResolvedExecutionDeps,
 ): Promise<void> {
-    const content = data.content as string;
-    if (!content) {
-        console.warn(`${LOG_PREFIX} notification sync: missing content`);
+    const d = assertNotificationSyncData(data);
+
+    if (!ctx.sandboxId) {
+        console.warn(`${LOG_PREFIX} notification sync: no sandboxId in context, skipping`);
         return;
     }
-    const channel = data.channel as string | undefined;
-    const priority = data.priority as string || 'normal';
-    const title = (content.length > 80 ? content.slice(0, 77) + '...' : content);
-    const summary = content.slice(0, 200);
 
-    await deps.db.query(
-        `INSERT INTO inbox_items (user_id, channel_id, agent_slug, title, summary, content, status, priority, metadata)
-         VALUES ($1, $2, $3, $4, $5, $6, 'delivered', $7, $8)`,
-        [ctx.request.userId, channel || null, requireAgent(ctx).slug, title, summary, content, priority, JSON.stringify(data.metadata ?? {})],
-    );
-    console.log(`${LOG_PREFIX} notification sync: created inbox item for user=${ctx.request.userId}`);
+    const workspacePriority = d.priority === 'critical' ? 'urgent' : (d.priority || 'normal');
+    const subject = (d.content.length > 80 ? d.content.slice(0, 77) + '...' : d.content);
+    const senderSlug = requireAgent(ctx).slug;
+    const now = new Date().toISOString();
+    const metadataStr = JSON.stringify(d.metadata ?? {});
+
+    const provider = deps.sandboxService.getDaytonaProvider() as DaytonaProvider;
+
+    const sql = `
+        BEGIN;
+        INSERT INTO inbox_items (agent_slug, sender_slug, message_type, subject, content, metadata, priority, status, received_at)
+        VALUES ('xerus-master', '${escapeSQL(senderSlug)}', 'notification', '${escapeSQL(subject)}', '${escapeSQL(d.content)}', '${escapeSQL(metadataStr)}', '${escapeSQL(workspacePriority)}', 'unread', '${now}');
+        SELECT id FROM inbox_items WHERE id = last_insert_rowid();
+        COMMIT;
+    `;
+    const rows = await executeWorkspaceJsonQuery<{ id: number }>(provider, ctx.sandboxId, sql);
+    if (rows.length === 0) {
+        throw new Error(`Failed to create notification inbox item in workspace DB for sandbox=${ctx.sandboxId}`);
+    }
+
+    console.log(`${LOG_PREFIX} notification sync: created inbox item id=${rows[0].id} in workspace DB for sandbox=${ctx.sandboxId}`);
 }
 
 export async function handleKbSync(
     data: Record<string, unknown>, action: string, _ctx: PipelineContext, _deps: ResolvedExecutionDeps,
 ): Promise<void> {
-    const agentSlug = data.agent_id as string || data.agent_slug as string;
-    const kbId = data.kb_id as string;
+    const d = assertKbSyncData(data);
     // KB assignments now live in config.json (filesystem is source of truth).
-    console.log(`${LOG_PREFIX} kb sync: ${action} kb=${kbId} agent=${agentSlug} (filesystem is source of truth, no DB write)`);
+    console.log(`${LOG_PREFIX} kb sync: ${action} kb=${d.kb_id} agent=${d.agent_slug} (filesystem is source of truth, no DB write)`);
 }
 
 export async function handleSessionSync(
     data: Record<string, unknown>, action: string, ctx: PipelineContext, _deps: ResolvedExecutionDeps,
 ): Promise<void> {
+    const d = assertSessionSyncData(data);
     const sessionControlService = getSessionControlService();
     const userId = ctx.request.userId;
     switch (action) {
         case 'pause':
             await sessionControlService.pauseExecution(userId, {
-                sessionId: data.session_id as string,
-                reason: data.reason as string,
+                sessionId: d.session_id,
+                reason: d.reason || '',
             });
-            console.log(`${LOG_PREFIX} session sync: paused session=${data.session_id}`);
+            console.log(`${LOG_PREFIX} session sync: paused session=${d.session_id}`);
             break;
         case 'resume':
             await sessionControlService.resumeExecution(userId, {
-                sessionId: data.session_id as string,
-                approved: data.approved === true,
-                feedback: (data.feedback as string) || '',
+                sessionId: d.session_id,
+                approved: d.approved === true,
+                feedback: d.feedback || '',
             });
-            console.log(`${LOG_PREFIX} session sync: resumed session=${data.session_id}`);
+            console.log(`${LOG_PREFIX} session sync: resumed session=${d.session_id}`);
             break;
         case 'get_state':
-            console.log(`${LOG_PREFIX} session sync: get_state for session=${data.session_id} (fire-and-forget, result cannot be returned to agent)`);
+            console.log(`${LOG_PREFIX} session sync: get_state for session=${d.session_id} (fire-and-forget, result cannot be returned to agent)`);
             break;
         default:
             console.warn(`${LOG_PREFIX} session sync: unknown action '${action}'`);
@@ -126,70 +247,21 @@ export async function handleSessionSync(
 export async function handleMemorySync(
     data: Record<string, unknown>, _action: string, ctx: PipelineContext,
 ): Promise<void> {
-    const content = data.content as string;
-    if (!content) {
-        console.warn(`${LOG_PREFIX} memory sync: missing content, skipping pgvector index`);
-        return;
-    }
+    const d = assertMemorySyncData(data);
     const memoryService = getMemoryService();
     await memoryService.writeMemory(ctx.request.userId, {
-        content,
-        scope: (data.scope as MemoryScope) || 'company',
-        scopeId: data.scope_id as string,
-        filePath: data.path as string,
+        content: d.content,
+        scope: d.scope || 'company',
+        scopeId: d.scope_id,
+        filePath: d.path,
     });
-    console.log(`${LOG_PREFIX} memory sync: indexed in pgvector scope=${data.scope}`);
-}
-
-export async function handleHeartbeatSync(
-    data: Record<string, unknown>, _action: string, ctx: PipelineContext, deps: ResolvedExecutionDeps,
-): Promise<void> {
-    const agentSlug = data.agent_id as string || data.agent_slug as string;
-    if (!agentSlug) {
-        console.warn(`${LOG_PREFIX} heartbeat sync: missing agent_id`);
-        return;
-    }
-
-    const agentResult = await deps.db.query<{ id: number }>(
-        `SELECT id FROM agent_registry WHERE slug = $1 AND user_id = $2 LIMIT 1`,
-        [agentSlug, ctx.request.userId],
-    );
-    if (agentResult.rows.length === 0) {
-        console.warn(`${LOG_PREFIX} heartbeat sync: agent not found slug=${agentSlug}`);
-        return;
-    }
-    const agentId = agentResult.rows[0].id;
-
-    await deps.db.query(
-        `INSERT INTO heartbeat_configs (agent_id, user_id, enabled, cron_expression, timezone, active_hours_start, active_hours_end, weekdays_only, prompt)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-         ON CONFLICT (agent_id) DO UPDATE SET
-             enabled = COALESCE(EXCLUDED.enabled, heartbeat_configs.enabled),
-             cron_expression = COALESCE(EXCLUDED.cron_expression, heartbeat_configs.cron_expression),
-             timezone = COALESCE(EXCLUDED.timezone, heartbeat_configs.timezone),
-             active_hours_start = COALESCE(EXCLUDED.active_hours_start, heartbeat_configs.active_hours_start),
-             active_hours_end = COALESCE(EXCLUDED.active_hours_end, heartbeat_configs.active_hours_end),
-             weekdays_only = COALESCE(EXCLUDED.weekdays_only, heartbeat_configs.weekdays_only),
-             prompt = COALESCE(EXCLUDED.prompt, heartbeat_configs.prompt)`,
-        [
-            agentId, ctx.request.userId,
-            data.enabled ?? true,
-            data.cron_expression as string || '0 */4 * * *',
-            data.timezone as string || 'UTC',
-            data.active_hours_start as string || null,
-            data.active_hours_end as string || null,
-            data.weekdays_only ?? false,
-            data.prompt as string || null,
-        ],
-    );
-    console.log(`${LOG_PREFIX} heartbeat sync: upserted config for agent=${agentSlug}`);
+    console.log(`${LOG_PREFIX} memory sync: indexed in pgvector scope=${d.scope}`);
 }
 
 export async function handleToolSync(
     data: Record<string, unknown>, action: string, _ctx: PipelineContext, _deps: ResolvedExecutionDeps,
 ): Promise<void> {
-    const agentSlug = data.agent_id as string || data.agent_slug as string;
-    const appSlug = data.app_slug as string;
+    const d = assertToolSyncData(data);
     // Tool assignments now live in config.json (filesystem is source of truth).
-    console.log(`${LOG_PREFIX} tool sync: ${action} tool=${appSlug} agent=${agentSlug} (filesystem is source of truth, no DB write)`);
+    console.log(`${LOG_PREFIX} tool sync: ${action} tool=${d.app_slug} agent=${d.agent_slug} (filesystem is source of truth, no DB write)`);
 }

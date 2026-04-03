@@ -55,17 +55,50 @@ interface TokenAccumulator {
     inputTokens: number;
     outputTokens: number;
     toolCalls: number;
+    createdAt: number;
 }
 
 const sessionTokens = new Map<string, TokenAccumulator>();
 
+/** Maximum number of tracked sessions before evicting oldest entries */
+const MAX_SESSION_ACCUMULATORS = 10_000;
+
+/** Maximum age of an accumulator before it is considered stale (1 hour) */
+const ACCUMULATOR_TTL_MS = 60 * 60 * 1000;
+
+/** Interval for periodic TTL sweep (5 minutes) */
+const TTL_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
+
 /** Estimated characters per token for rough token counting */
 const CHARS_PER_TOKEN_ESTIMATE = 4;
+
+/** Periodic sweep: prune accumulators older than ACCUMULATOR_TTL_MS */
+function sweepStaleAccumulators(): void {
+    const now = Date.now();
+    for (const [key, acc] of sessionTokens) {
+        if (now - acc.createdAt > ACCUMULATOR_TTL_MS) {
+            sessionTokens.delete(key);
+        }
+    }
+}
+
+// Start periodic TTL sweep. unref() ensures the timer does not keep the process alive.
+const sweepTimer = setInterval(sweepStaleAccumulators, TTL_SWEEP_INTERVAL_MS);
+if (typeof sweepTimer === 'object' && 'unref' in sweepTimer) {
+    sweepTimer.unref();
+}
 
 function findOrCreateAccumulator(sessionId: string): TokenAccumulator {
     let acc = sessionTokens.get(sessionId);
     if (!acc) {
-        acc = { inputTokens: 0, outputTokens: 0, toolCalls: 0 };
+        // Evict oldest entries when map exceeds bounds (prevents leak from crashed sessions)
+        if (sessionTokens.size >= MAX_SESSION_ACCUMULATORS) {
+            const oldestKey = sessionTokens.keys().next().value;
+            if (oldestKey !== undefined) {
+                sessionTokens.delete(oldestKey);
+            }
+        }
+        acc = { inputTokens: 0, outputTokens: 0, toolCalls: 0, createdAt: Date.now() };
         sessionTokens.set(sessionId, acc);
     }
     return acc;
@@ -87,6 +120,7 @@ export function parseClaudeStreamLine(
     try {
         event = JSON.parse(line);
     } catch {
+        // Expected: NDJSON streams contain non-JSON lines (e.g. blank lines, progress markers)
         return;
     }
 
@@ -178,6 +212,7 @@ export function parseCodexStreamLine(
     try {
         event = JSON.parse(line);
     } catch {
+        // Expected: NDJSON streams contain non-JSON lines (e.g. blank lines, progress markers)
         return;
     }
 
@@ -198,7 +233,8 @@ export function parseCodexStreamLine(
             acc.toolCalls++;
             let parsedArgs: Record<string, unknown> = {};
             if (event.arguments) {
-                try { parsedArgs = JSON.parse(event.arguments); } catch { /* raw string */ }
+                // Expected: arguments may be raw string rather than valid JSON
+                try { parsedArgs = JSON.parse(event.arguments); } catch { /* raw string is fine */ }
             }
             emitter.sseForward(agentSlug, sessionId, 'tool_call', {
                 toolName: event.name || 'unknown',

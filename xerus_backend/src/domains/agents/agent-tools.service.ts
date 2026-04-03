@@ -7,6 +7,8 @@ import { Agent, EnrichedTool } from './types';
 import { AgentNotFoundError, AgentAccessDeniedError, InvalidToolsError } from './errors';
 import { toolsRepository } from '../tools/repository';
 import { configToAgent, canUserView, canUserModify } from './agent-helpers';
+import { syncPipedreamMcpConfigViaRepo } from '../sandbox-infra/workspace/mcp-config.service';
+import { query as dbQuery } from '../../database/connection';
 
 export class AgentToolsService {
     constructor(
@@ -45,6 +47,9 @@ export class AgentToolsService {
         }
         await fs.updateTools(userId, entry.slug, tools);
 
+        // Sync .mcp.json so the new tool's Pipedream MCP server is available to CLI agents
+        await this.syncMcpConfig(userId);
+
         return tools;
     }
 
@@ -61,6 +66,9 @@ export class AgentToolsService {
 
         const tools = (config.tools || []).filter(t => t !== appSlug);
         await fs.updateTools(userId, entry.slug, tools);
+
+        // Sync .mcp.json to reflect removed tool
+        await this.syncMcpConfig(userId);
 
         return tools;
     }
@@ -96,6 +104,31 @@ export class AgentToolsService {
             }
         }
         return result;
+    }
+
+    /**
+     * Sync .mcp.json on the sandbox with Pipedream MCP servers for the user's connected accounts.
+     * Only suppresses sandbox-not-found errors (agent created before first execution).
+     * All other errors propagate — fail-fast per project rules.
+     */
+    private async syncMcpConfig(userId: string): Promise<void> {
+        const fs = this.getFs();
+        try {
+            await syncPipedreamMcpConfigViaRepo(
+                (uid, path) => fs.readFile(uid, path),
+                (uid, path, content) => fs.writeFile(uid, path, content),
+                userId,
+                { query: dbQuery },
+            );
+        } catch (err) {
+            const msg = err instanceof Error ? err.message.toLowerCase() : '';
+            const isSandboxMissing = msg.includes('not found') || msg.includes('enoent') || msg.includes('no sandbox');
+            if (isSandboxMissing) {
+                // Expected: agent tool assigned before user's first execution (no sandbox yet)
+                return;
+            }
+            throw err;
+        }
     }
 
     async findByTools(appSlugs: string[], userId: string): Promise<Agent[]> {
