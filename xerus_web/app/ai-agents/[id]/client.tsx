@@ -10,7 +10,7 @@ import {
   updateAgent,
   getAssistants,
 } from "@/lib/api/agents"
-import { getSchedules } from "@/lib/api/schedules"
+import type { ScheduledExecution } from "@/lib/api/types"
 import { getAgentKnowledgeBases } from "@/lib/api/agent-kb"
 import { getTree, type FileNode } from "@/lib/api/workspace"
 import { canEditAgent, isSystemTemplate } from "@/utils/agentLabels"
@@ -80,10 +80,10 @@ export default function AgentDetailsClient({ agentId }: AgentDetailsClientProps)
   // Marketplace agents are read-only catalog entries (id: -1, no DB record)
   const isMarketplace = agent ? isSystemTemplate(agent.userId, agent.agentType) : false
 
-  // Schedules use numeric agent ID (from loaded agent) — skip for marketplace
+  // Schedules domain removed (CLI-native pivot); scheduling is now sandbox-native via 9to5
   const { data: schedulesData } = useSWR(
     isAuthReady && agent && !isMarketplace ? ['schedules', agent.id] : null,
-    () => agent ? getSchedules({ agentId: agent.id }) : Promise.resolve([])
+    () => Promise.resolve([] as ScheduledExecution[])
   )
 
   const { data: allAgentsData } = useSWR(

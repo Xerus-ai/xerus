@@ -8,7 +8,7 @@ import {
     SDK_CONFIG,
     buildSDKEnvironment,
 } from '../sdk.config';
-import { PricingService } from '../sdk.service';
+import { PricingService } from '../pricing.service';
 
 // Test DB that returns pricing data matching model_registry
 function createTestDb(pricing: Array<{ id: string; pricing_input_cents: string; pricing_output_cents: string }>) {

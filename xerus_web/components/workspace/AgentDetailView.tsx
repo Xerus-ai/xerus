@@ -6,7 +6,8 @@ import Image from 'next/image'
 import useSWR, { mutate } from 'swr'
 import { useAuth } from '@/utils/AuthContext'
 import { getAssistant, updateAgent, getAssistants } from '@/lib/api/agents'
-import { getSchedules } from '@/lib/api/schedules'
+// Schedules domain removed (CLI-native pivot); scheduling is now sandbox-native via 9to5
+import type { ScheduledExecution } from '@/lib/api/types'
 import { getAgentKnowledgeBases } from '@/lib/api/agent-kb'
 import { getTree, type FileNode } from '@/lib/api/workspace'
 import { canEditAgent, isSystemTemplate } from '@/utils/agentLabels'
@@ -55,7 +56,7 @@ export function AgentDetailView({ agentId, onBack }: AgentDetailViewProps) {
 
   const { data: schedulesData } = useSWR(
     isAuthReady && agent && !isMarketplace ? ['schedules', agent.id] : null,
-    () => (agent ? getSchedules({ agentId: agent.id }) : Promise.resolve([]))
+    () => Promise.resolve([] as ScheduledExecution[])
   )
 
   const { data: allAgentsData } = useSWR(

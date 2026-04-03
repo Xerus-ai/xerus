@@ -4,7 +4,7 @@
 
 import { EventEmitter } from 'events';
 import { ExecutionService, ExecutionServiceDeps, AgentRow, ExecutionDatabase } from '../execution.service';
-import { PricingService } from '../sdk/sdk.service';
+import { PricingService } from '../sdk/pricing.service';
 import { SandboxService } from '../sandbox/sandbox.service';
 import {
     SandboxProvider,

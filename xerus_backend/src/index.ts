@@ -15,14 +15,14 @@ import usersRoutes, { setUserRoutesDeps } from './domains/users/routes';
 import adminRoutes from './routes/admin.routes';
 import agentRoutes, { setAgentRoutesDeps } from './domains/agents/routes';
 import { toolsRouter } from './domains/tools/routes';
-import executeRoutes, { setExecutionService } from './domains/execution/execution.routes';
+import executeRoutes, { setExecutionService, setExecutionRoutesDeps } from './domains/execution/execution.routes';
 import { internalMcpRouter } from './domains/execution/internal-mcp';
 import { setAgentFilesDeps } from './domains/execution/agent-files.routes';
 import { setConversationRoutesDeps } from './domains/execution/conversations/conversation.routes';
 import { webhookReceiverRouter } from './domains/triggers';
 import { ExecutionService } from './domains/execution/execution.service';
 import { query } from './database/connection';
-import { PricingService } from './domains/execution/sdk/sdk.service';
+import { PricingService } from './domains/execution/sdk/pricing.service';
 import { SandboxService } from './domains/execution/sandbox/sandbox.service';
 import type { SandboxProvider } from './domains/execution/sandbox/providers';
 import { ExecutionQueueService } from './domains/execution/queue/execution-queue.service';
@@ -252,6 +252,7 @@ async function startServer(): Promise<void> {
             activeStreamEmitter,
         });
         setExecutionService(executionService);
+        setExecutionRoutesDeps({ sandboxService });
         setAgentFilesDeps({ sandboxService });
         setConversationRoutesDeps({ sandboxService });
         setAgentRoutesDeps({ sandboxService });

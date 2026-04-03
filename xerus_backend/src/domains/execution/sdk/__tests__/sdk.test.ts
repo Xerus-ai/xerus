@@ -21,7 +21,7 @@ import {
     ExecuteAgentOptions,
     SDKStreamEvent,
 } from '../sdk.types';
-import { PricingService } from '../sdk.service';
+import { PricingService } from '../pricing.service';
 import { SDKExecutionError } from '../../errors';
 
 // Test DB that returns pricing data matching model_registry

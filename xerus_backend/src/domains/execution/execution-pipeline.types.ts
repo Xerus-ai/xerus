@@ -4,7 +4,7 @@
 // See: docs/planning/execution/EXECUTION_ARCHITECTURE_v2.md Section 10
 
 import type { StreamingResponse } from './streaming/stream.handler';
-import type { PricingService } from './sdk/sdk.service';
+import type { PricingService } from './sdk/pricing.service';
 import type { SandboxService } from './sandbox/sandbox.service';
 import type { ExecutionQueueService } from './queue/execution-queue.service';
 import type { CreditTracker } from './credits/credit-tracker.service';
