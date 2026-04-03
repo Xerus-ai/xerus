@@ -69,12 +69,23 @@ export const SANDBOX_CONFIG = {
 } as const;
 
 // Directories excluded from workspace backup tars (large, regenerable, or not user data)
+// Infrastructure files (.claude/hooks, schemas, .xerus/) come from the workspace template
+// (git clone) and must NOT be restored from S3 — otherwise S3 overwrites newer versions.
 export const BACKUP_TAR_EXCLUDES = [
     'node_modules',
     '.git',
     '.cache',
     'marketplace',
     '.xerus/runner',
+    '.claude/hooks',
+    '.claude/settings.json',
+    '.claude/skills',
+    '.xerus/ipc',
+    '.xerus/templates',
+    '.xerus/manifest.yaml',
+    'data/schema.sql',
+    'data/workspace-schema.sql',
+    'shared/knowledge/TOOL_GUIDE.md',
 ] as const;
 
 // Pre-built tar exclude flags for shell commands

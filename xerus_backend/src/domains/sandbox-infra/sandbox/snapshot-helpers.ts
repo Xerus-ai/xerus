@@ -47,9 +47,11 @@ export async function restoreWorkspaceTar(
     await provider.uploadFile(sandboxId, tarBuffer.toString('base64'), TAR_PATH);
 
     try {
+        // Use the same exclude flags on extract so old backups (created before
+        // infrastructure paths were excluded) don't overwrite template files.
         const extractResult = await provider.executeCommand(
             sandboxId,
-            `tar xzf ${TAR_PATH} -C ${SANDBOX_CONFIG.workspacePath} --no-same-owner`,
+            `tar xzf ${TAR_PATH} -C ${SANDBOX_CONFIG.workspacePath} --no-same-owner ${BACKUP_TAR_EXCLUDE_FLAGS}`,
         );
         if (extractResult.exitCode !== 0) {
             throw new Error(`tar extract failed: ${extractResult.result}`);

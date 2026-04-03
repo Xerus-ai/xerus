@@ -236,6 +236,7 @@ export async function runFullWorkspaceSetup(
         log.info('Initialized workspace databases', { sandbox_id: sandboxId });
     }
 
+
     // 5. Verify Node.js is available (required by agent runner)
     const nodeCheck = await provider.executeCommand(
         sandboxId,
