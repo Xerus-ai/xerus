@@ -27,6 +27,7 @@ const RUNNER_PACKAGE_JSON = {
     private: true,
     dependencies: {
         '@modelcontextprotocol/sdk': '^1.26.0',
+        'rrule': '^2.8.1',
     },
 };
 

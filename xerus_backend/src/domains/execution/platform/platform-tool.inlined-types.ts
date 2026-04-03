@@ -26,10 +26,10 @@ export const PLATFORM_TOOLS = {
     // Tools & Integrations (2)
     SEARCH_TOOLS: 'search_tools',
     CONNECT_TOOL: 'connect_tool',
+    // Notifications (1)
+    SEND_NOTIFICATION: 'send_notification',
     // Status (1)
     GET_STATUS: 'get_status',
-    // Heartbeat (1)
-    CONFIGURE_HEARTBEAT: 'configure_heartbeat',
     // Session Control (3 + 1 complete)
     PAUSE_EXECUTION: 'pause_execution',
     RESUME_EXECUTION: 'resume_execution',
@@ -45,6 +45,11 @@ export const PLATFORM_TOOLS = {
     DEREGISTER_TRIGGER: 'deregister_trigger',
     // Outputs (1)
     SEARCH_OUTPUTS: 'search_outputs',
+    // Schedules (4) — sandbox-local workspace.db via sqlite3
+    CREATE_SCHEDULE: 'create_schedule',
+    LIST_SCHEDULES: 'list_schedules',
+    UPDATE_SCHEDULE: 'update_schedule',
+    DELETE_SCHEDULE: 'delete_schedule',
 } as const;
 
 export type PlatformTool = (typeof PLATFORM_TOOLS)[keyof typeof PLATFORM_TOOLS];
@@ -77,10 +82,10 @@ export const PLATFORM_TOOL_HITL: Record<PlatformTool, HITLRequirement> = {
     // Tools & Integrations
     [PLATFORM_TOOLS.SEARCH_TOOLS]: 'auto',
     [PLATFORM_TOOLS.CONNECT_TOOL]: 'always',
+    // Notifications
+    [PLATFORM_TOOLS.SEND_NOTIFICATION]: 'auto',
     // Status
     [PLATFORM_TOOLS.GET_STATUS]: 'auto',
-    // Heartbeat
-    [PLATFORM_TOOLS.CONFIGURE_HEARTBEAT]: 'always',
     // Session Control
     [PLATFORM_TOOLS.PAUSE_EXECUTION]: 'auto',
     [PLATFORM_TOOLS.RESUME_EXECUTION]: 'always',
@@ -96,6 +101,11 @@ export const PLATFORM_TOOL_HITL: Record<PlatformTool, HITLRequirement> = {
     [PLATFORM_TOOLS.DEREGISTER_TRIGGER]: 'auto',
     // Outputs
     [PLATFORM_TOOLS.SEARCH_OUTPUTS]: 'auto',
+    // Schedules
+    [PLATFORM_TOOLS.CREATE_SCHEDULE]: 'auto',
+    [PLATFORM_TOOLS.LIST_SCHEDULES]: 'auto',
+    [PLATFORM_TOOLS.UPDATE_SCHEDULE]: 'auto',
+    [PLATFORM_TOOLS.DELETE_SCHEDULE]: 'auto',
 };
 
 // -----------------------------------------------------------------------------
@@ -106,14 +116,7 @@ export interface CreateAgentInput {
     name: string;
     slug?: string;
     description: string;
-    system_prompt: {
-        identity: string;
-        goals: string;
-        capabilities?: string;
-        guidelines?: string;
-        constraints?: string;
-        personality?: string;
-    };
+    system_prompt: string;
     model_id?: string;
     autonomy_level?: string;
     tool_slugs?: string[];
@@ -229,6 +232,16 @@ export interface ConnectToolInput {
 }
 
 // -----------------------------------------------------------------------------
+// Notification Input Types
+// -----------------------------------------------------------------------------
+
+export interface SendNotificationInput {
+    message: string;
+    priority?: 'low' | 'medium' | 'high' | 'critical';
+    agent_slug?: string;
+}
+
+// -----------------------------------------------------------------------------
 // Status Input Types
 // -----------------------------------------------------------------------------
 
@@ -239,18 +252,13 @@ export interface GetStatusInput {
 }
 
 // -----------------------------------------------------------------------------
-// Heartbeat Input Types
+// Heartbeat Input Types (deprecated -- tables dropped in migration 081)
+// Stub retained for HeartbeatServicePort compatibility in platform-tool.types.ts
 // -----------------------------------------------------------------------------
 
+/** @deprecated Heartbeat tables dropped in migration 081. */
 export interface ConfigureHeartbeatInput {
     agent_id: string;
-    enabled?: boolean;
-    cron_expression?: string;
-    timezone?: string;
-    active_hours_start?: string;
-    active_hours_end?: string;
-    weekdays_only?: boolean;
-    prompt?: string;
 }
 
 // -----------------------------------------------------------------------------
@@ -456,4 +464,74 @@ export interface OutputEntry {
 export interface SearchOutputsResult {
     outputs: OutputEntry[];
     totalCount: number;
+}
+
+// -----------------------------------------------------------------------------
+// Schedule Input/Result Types (workspace.db on sandbox)
+// -----------------------------------------------------------------------------
+
+export interface CreateScheduleInput {
+    agent_slug: string;
+    name: string;
+    prompt: string;
+    rrule?: string;
+    adapter_type?: 'claudecode' | 'codex';
+    model?: string;
+    max_budget_usd?: number;
+    allowed_tools?: string[];
+    system_prompt?: string;
+}
+
+export interface ListSchedulesInput {
+    agent_slug?: string;
+    status?: 'active' | 'paused';
+}
+
+export interface UpdateScheduleInput {
+    schedule_id: string;
+    name?: string;
+    prompt?: string;
+    rrule?: string;
+    status?: 'active' | 'paused';
+    model?: string;
+    max_budget_usd?: number;
+    allowed_tools?: string[];
+    system_prompt?: string;
+}
+
+export interface DeleteScheduleInput {
+    schedule_id: string;
+}
+
+export interface ScheduleEntry {
+    id: string;
+    agent_slug: string;
+    name: string;
+    prompt: string;
+    rrule: string | null;
+    adapter_type: string;
+    model: string | null;
+    status: string;
+    max_budget_usd: number | null;
+    next_run_at: number | null;
+    last_run_at: number | null;
+    created_at: number;
+}
+
+export interface CreateScheduleResult {
+    schedule: ScheduleEntry;
+}
+
+export interface ListSchedulesResult {
+    schedules: ScheduleEntry[];
+    total: number;
+}
+
+export interface UpdateScheduleResult {
+    schedule: ScheduleEntry;
+}
+
+export interface DeleteScheduleResult {
+    schedule_id: string;
+    deleted_at: string;
 }

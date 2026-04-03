@@ -57,19 +57,7 @@ export const CREATE_AGENT_SCHEMA: ToolSchema = {
             name: { type: 'string', description: 'Agent display name' },
             slug: { type: 'string', description: 'URL-safe identifier (auto-generated if omitted)' },
             description: { type: 'string', description: 'What this agent does' },
-            system_prompt: {
-                type: 'object',
-                description: 'System prompt sections defining agent behavior',
-                properties: {
-                    identity: { type: 'string', description: 'Who the agent is' },
-                    goals: { type: 'string', description: 'What the agent should accomplish' },
-                    capabilities: { type: 'string', description: 'What the agent can do' },
-                    guidelines: { type: 'string', description: 'How the agent should behave' },
-                    constraints: { type: 'string', description: 'What the agent must not do' },
-                    personality: { type: 'string', description: 'Agent personality traits' },
-                },
-                required: ['identity', 'goals'],
-            },
+            system_prompt: { type: 'string', description: 'System prompt defining agent behavior and identity' },
             model_id: { type: 'string', description: 'LLM model (default: claude-sonnet)', default: 'claude-sonnet' },
             autonomy_level: {
                 type: 'string',
@@ -270,6 +258,22 @@ export const CONNECT_TOOL_SCHEMA: ToolSchema = {
     },
 };
 
+// -- Notifications (1) --------------------------------------------------------
+
+export const SEND_NOTIFICATION_SCHEMA: ToolSchema = {
+    name: PLATFORM_TOOLS.SEND_NOTIFICATION,
+    description: 'Send a notification to the user via the platform.',
+    inputSchema: {
+        type: 'object',
+        properties: {
+            message: { type: 'string', description: 'Notification message' },
+            priority: { type: 'string', description: 'Priority level', enum: ['low', 'medium', 'high', 'critical'], default: 'medium' },
+            agent_slug: { type: 'string', description: 'Sending agent slug' },
+        },
+        required: ['message'],
+    },
+};
+
 // -- Status (1) ---------------------------------------------------------------
 
 export const GET_STATUS_SCHEMA: ToolSchema = {
@@ -283,27 +287,6 @@ export const GET_STATUS_SCHEMA: ToolSchema = {
             include_activity: { type: 'boolean', description: 'Include recent activity log', default: false },
         },
         required: ['scope'],
-    },
-};
-
-// -- Heartbeat (1) ------------------------------------------------------------
-
-export const CONFIGURE_HEARTBEAT_SCHEMA: ToolSchema = {
-    name: PLATFORM_TOOLS.CONFIGURE_HEARTBEAT,
-    description: 'Configure heartbeat schedule for an agent. Controls when the agent proactively checks in.',
-    inputSchema: {
-        type: 'object',
-        properties: {
-            agent_id: { type: 'string', description: 'Agent to configure heartbeat for' },
-            enabled: { type: 'boolean', description: 'Enable or disable the heartbeat' },
-            cron_expression: { type: 'string', description: 'Cron schedule (e.g., "0 */4 * * *" for every 4 hours)' },
-            timezone: { type: 'string', description: 'Timezone for the schedule (e.g., America/New_York)' },
-            active_hours_start: { type: 'string', description: 'Active hours start (HH:MM, null for always active)' },
-            active_hours_end: { type: 'string', description: 'Active hours end (HH:MM, null for always active)' },
-            weekdays_only: { type: 'boolean', description: 'Only run on weekdays', default: false },
-            prompt: { type: 'string', description: 'Custom heartbeat prompt (null for default)' },
-        },
-        required: ['agent_id'],
     },
 };
 
@@ -479,6 +462,73 @@ export const COMPLETE_SESSION_SCHEMA: ToolSchema = {
     },
 };
 
+// -- Schedule Management (4) --------------------------------------------------
+
+export const CREATE_SCHEDULE_SCHEMA: ToolSchema = {
+    name: PLATFORM_TOOLS.CREATE_SCHEDULE,
+    description: 'Create a recurring schedule for an agent. The scheduler daemon polls every 30s and spawns CLI processes for due schedules.',
+    inputSchema: {
+        type: 'object',
+        properties: {
+            agent_slug: { type: 'string', description: 'Agent slug to schedule' },
+            name: { type: 'string', description: 'Human-readable schedule name (unique)' },
+            prompt: { type: 'string', description: 'Prompt to execute on each run' },
+            rrule: { type: 'string', description: 'RFC 5545 recurrence rule (e.g., FREQ=DAILY;BYHOUR=9;BYMINUTE=0)' },
+            adapter_type: { type: 'string', enum: ['claudecode', 'codex'], description: 'CLI adapter (default: claudecode)' },
+            model: { type: 'string', description: 'AI model to use (e.g., anthropic/claude-sonnet-4.6)' },
+            max_budget_usd: { type: 'number', description: 'Maximum budget per run in USD' },
+            allowed_tools: { type: 'array', items: { type: 'string' }, description: 'Tool allowlist (omit for all tools)' },
+            system_prompt: { type: 'string', description: 'Additional system prompt appended to agent prompt' },
+        },
+        required: ['agent_slug', 'name', 'prompt'],
+    },
+};
+
+export const LIST_SCHEDULES_SCHEMA: ToolSchema = {
+    name: PLATFORM_TOOLS.LIST_SCHEDULES,
+    description: 'List all schedules, optionally filtered by agent or status.',
+    inputSchema: {
+        type: 'object',
+        properties: {
+            agent_slug: { type: 'string', description: 'Filter by agent slug' },
+            status: { type: 'string', enum: ['active', 'paused'], description: 'Filter by status' },
+        },
+        required: [],
+    },
+};
+
+export const UPDATE_SCHEDULE_SCHEMA: ToolSchema = {
+    name: PLATFORM_TOOLS.UPDATE_SCHEDULE,
+    description: 'Update a schedule (name, prompt, rrule, status, model, budget, tools, system prompt).',
+    inputSchema: {
+        type: 'object',
+        properties: {
+            schedule_id: { type: 'string', description: 'Schedule ID to update' },
+            name: { type: 'string', description: 'New schedule name' },
+            prompt: { type: 'string', description: 'New prompt' },
+            rrule: { type: 'string', description: 'New recurrence rule' },
+            status: { type: 'string', enum: ['active', 'paused'], description: 'Pause or activate' },
+            model: { type: 'string', description: 'New model' },
+            max_budget_usd: { type: 'number', description: 'New budget cap' },
+            allowed_tools: { type: 'array', items: { type: 'string' }, description: 'New tool allowlist' },
+            system_prompt: { type: 'string', description: 'New system prompt' },
+        },
+        required: ['schedule_id'],
+    },
+};
+
+export const DELETE_SCHEDULE_SCHEMA: ToolSchema = {
+    name: PLATFORM_TOOLS.DELETE_SCHEDULE,
+    description: 'Delete a schedule by ID.',
+    inputSchema: {
+        type: 'object',
+        properties: {
+            schedule_id: { type: 'string', description: 'Schedule ID to delete' },
+        },
+        required: ['schedule_id'],
+    },
+};
+
 // -- Schema Collections -------------------------------------------------------
 
 export const PLATFORM_TOOL_SCHEMAS: readonly ToolSchema[] = [
@@ -492,10 +542,10 @@ export const PLATFORM_TOOL_SCHEMAS: readonly ToolSchema[] = [
     CREATE_SKILL_SCHEMA, SEARCH_SKILLS_SCHEMA,
     // Tools & Integrations (2)
     SEARCH_TOOLS_SCHEMA, CONNECT_TOOL_SCHEMA,
+    // Notifications (1)
+    SEND_NOTIFICATION_SCHEMA,
     // Status (1)
     GET_STATUS_SCHEMA,
-    // Heartbeat (1)
-    CONFIGURE_HEARTBEAT_SCHEMA,
     // Session Control (3)
     PAUSE_EXECUTION_SCHEMA, RESUME_EXECUTION_SCHEMA, GET_SESSION_STATE_SCHEMA,
     // Memory Operations (3)
@@ -506,6 +556,8 @@ export const PLATFORM_TOOL_SCHEMAS: readonly ToolSchema[] = [
     SEARCH_OUTPUTS_SCHEMA,
     // Session Completion (1)
     COMPLETE_SESSION_SCHEMA,
+    // Schedule Management (4)
+    CREATE_SCHEDULE_SCHEMA, LIST_SCHEDULES_SCHEMA, UPDATE_SCHEDULE_SCHEMA, DELETE_SCHEDULE_SCHEMA,
 ] as const;
 
 export const ALL_TOOL_SCHEMAS: readonly ToolSchema[] = [

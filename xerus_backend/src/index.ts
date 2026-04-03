@@ -19,6 +19,7 @@ import executeRoutes, { setExecutionService, setExecutionRoutesDeps } from './do
 import { internalMcpRouter } from './domains/execution/internal-mcp';
 import { setAgentFilesDeps } from './domains/execution/agent-files.routes';
 import { setConversationRoutesDeps } from './domains/execution/conversations/conversation.routes';
+import { setScheduleRoutesDeps } from './domains/execution/internal-mcp/schedule.routes';
 import { webhookReceiverRouter } from './domains/triggers';
 import { ExecutionService } from './domains/execution/execution.service';
 import { query } from './database/connection';
@@ -255,6 +256,7 @@ async function startServer(): Promise<void> {
         setExecutionRoutesDeps({ sandboxService });
         setAgentFilesDeps({ sandboxService });
         setConversationRoutesDeps({ sandboxService });
+        setScheduleRoutesDeps({ sandboxService });
         setAgentRoutesDeps({ sandboxService });
         setAgentChannelsDeps({ sandboxService });
         setTaskRoutesDeps({ sandboxService });

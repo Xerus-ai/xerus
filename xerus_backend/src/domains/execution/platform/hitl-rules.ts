@@ -8,7 +8,6 @@
 //   - create_skill: always require user review of SKILL.md content
 //   - connect_tool: always require user OAuth
 //   - upload_kb: auto-approve if content < 1MB, ask otherwise
-//   - configure_heartbeat: always require confirmation
 //   - Destructive ops (delete): NOT provided as tools
 
 import {
@@ -94,9 +93,6 @@ export function buildHitlReason(
         case PLATFORM_TOOLS.CONNECT_TOOL:
             return `Requires user OAuth authorization for '${toolInput.app_slug ?? 'unknown'}' integration`;
 
-        case PLATFORM_TOOLS.CONFIGURE_HEARTBEAT:
-            return `Requires confirmation to configure heartbeat for agent '${toolInput.agent_id ?? 'unknown'}'`;
-
         case PLATFORM_TOOLS.UPLOAD_KB: {
             const contentSize = estimateContentSize(toolInput);
             if (contentSize !== null && contentSize > UPLOAD_KB_SIZE_LIMIT_BYTES) {
@@ -145,6 +141,19 @@ export function buildHitlReason(
         // Session Completion
         case PLATFORM_TOOLS.COMPLETE_SESSION:
             return `Complete session auto-approved`;
+
+        // Schedule Management
+        case PLATFORM_TOOLS.CREATE_SCHEDULE:
+            return `Create schedule '${toolInput.name ?? 'unnamed'}' for agent '${toolInput.agent_slug ?? 'unknown'}' auto-approved`;
+
+        case PLATFORM_TOOLS.LIST_SCHEDULES:
+            return `List schedules auto-approved`;
+
+        case PLATFORM_TOOLS.UPDATE_SCHEDULE:
+            return `Update schedule '${toolInput.schedule_id ?? 'unknown'}' auto-approved`;
+
+        case PLATFORM_TOOLS.DELETE_SCHEDULE:
+            return `Delete schedule '${toolInput.schedule_id ?? 'unknown'}' auto-approved`;
 
         default:
             return `${toolName} auto-approved`;

@@ -34,3 +34,9 @@ export {
     resetOutputService,
     InvalidDateRangeError,
 } from './output.tools';
+
+export {
+    ScheduleService,
+    ScheduleNotFoundError,
+    ScheduleConflictError,
+} from './schedule.tools';

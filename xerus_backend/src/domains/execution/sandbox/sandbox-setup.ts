@@ -74,6 +74,9 @@ export async function runWorkspaceHealthCheck(
     };
 
     await ensureWorkspaceIntegrity(sandboxFs, userId, deps.db, cloneWorkspace, installRunner);
+
+    // Restart scheduler daemon if not running (sandbox was paused/stopped)
+    await startSchedulerDaemon(sandboxId, deps);
 }
 
 export async function runBrowserSetup(
@@ -238,7 +241,55 @@ export async function runFullWorkspaceSetup(
     // 6. Sync DB agents into workspace (scaffold missing ones + update index.json)
     await runAgentSync(sandboxId, userId, deps);
 
+    // 7. Start scheduler daemon (9to5-style recurring agent automation)
+    await startSchedulerDaemon(sandboxId, deps);
+
     report.duration_ms = Date.now() - startTime;
     console.log(`[SandboxSetup] Full workspace setup for ${sandboxId} in ${report.duration_ms}ms`);
     return report;
+}
+
+/**
+ * Start the 9to5 scheduler daemon in the sandbox.
+ * Polls schedules table every 30s, spawns CLI processes for due automations.
+ * Idempotent: checks PID file before starting.
+ */
+export async function startSchedulerDaemon(
+    sandboxId: string,
+    deps: SetupDeps,
+): Promise<void> {
+    const provider = deps.getDaytonaProvider();
+    const basePath = SANDBOX_CONFIG.workspacePath;
+    const pidFile = `${basePath}/.xerus/runner/scheduler.pid`;
+    const schedulerScript = `${basePath}/.xerus/runner/scheduler.ts`;
+
+    // Check if scheduler is already running (idempotent)
+    // Use a lock file approach: check PID file AND verify process is alive.
+    // Brief sleep after launch to avoid race where PID file isn't written yet.
+    const pidCheck = await provider.executeCommand(
+        sandboxId,
+        `[ -f '${pidFile}' ] && kill -0 $(cat '${pidFile}') 2>/dev/null && echo RUNNING || echo STOPPED`,
+    );
+    if ((pidCheck.result || '').trim() === 'RUNNING') {
+        console.log(`[SandboxSetup] Scheduler already running in ${sandboxId}`);
+        return;
+    }
+
+    // Verify bun is available (fail-fast — scheduler requires Bun runtime)
+    const bunCheck = await provider.executeCommand(sandboxId, 'which bun 2>/dev/null && echo FOUND || echo MISSING');
+    if ((bunCheck.result || '').trim().endsWith('MISSING')) {
+        throw new Error(`Bun runtime not found in sandbox ${sandboxId}. Scheduler cannot start.`);
+    }
+
+    // Start scheduler daemon in background, then verify PID file appears
+    const startResult = await provider.executeCommand(
+        sandboxId,
+        `cd '${basePath}' && nohup bun run '${schedulerScript}' >> '${basePath}/.xerus/runner/scheduler.log' 2>&1 & sleep 2 && [ -f '${pidFile}' ] && echo STARTED || echo FAILED`,
+    );
+
+    if (startResult.exitCode !== 0 || (startResult.result || '').trim() === 'FAILED') {
+        throw new Error(`Scheduler daemon failed to start in sandbox ${sandboxId}: ${startResult.result}`);
+    }
+
+    console.log(`[SandboxSetup] Scheduler daemon started in ${sandboxId}`);
 }

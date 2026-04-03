@@ -115,20 +115,20 @@ export const TOOL_METADATA: ReadonlyMap<string, ToolMetadata> = new Map<string, 
         delegatesTo: 'ToolsService.initiateConnection()',
         isDestructive: false,
     }],
+    // Notifications
+    [PLATFORM_TOOLS.SEND_NOTIFICATION, {
+        name: PLATFORM_TOOLS.SEND_NOTIFICATION,
+        category: 'notifications' as ToolCategory,
+        description: 'Send a notification to the user',
+        delegatesTo: 'NotificationRoutes.sendNotification()',
+        isDestructive: false,
+    }],
     // Status
     [PLATFORM_TOOLS.GET_STATUS, {
         name: PLATFORM_TOOLS.GET_STATUS,
         category: 'status' as ToolCategory,
         description: 'Get workspace/agent/team/task status',
         delegatesTo: 'StatusService.get()',
-        isDestructive: false,
-    }],
-    // Heartbeat
-    [PLATFORM_TOOLS.CONFIGURE_HEARTBEAT, {
-        name: PLATFORM_TOOLS.CONFIGURE_HEARTBEAT,
-        category: 'heartbeat' as ToolCategory,
-        description: 'Configure agent heartbeat schedule',
-        delegatesTo: 'HeartbeatConfigService.update()',
         isDestructive: false,
     }],
     // Session Control
@@ -212,6 +212,35 @@ export const TOOL_METADATA: ReadonlyMap<string, ToolMetadata> = new Map<string, 
         description: 'Signal that the current agent session is complete',
         delegatesTo: 'SessionControlService.completeSession()',
         isDestructive: false,
+    }],
+    // Schedule Management (workspace.db on sandbox)
+    [PLATFORM_TOOLS.CREATE_SCHEDULE, {
+        name: PLATFORM_TOOLS.CREATE_SCHEDULE,
+        category: 'triggers' as ToolCategory,
+        description: 'Create a recurring schedule for an agent',
+        delegatesTo: 'ScheduleService.createSchedule()',
+        isDestructive: false,
+    }],
+    [PLATFORM_TOOLS.LIST_SCHEDULES, {
+        name: PLATFORM_TOOLS.LIST_SCHEDULES,
+        category: 'triggers' as ToolCategory,
+        description: 'List schedules for agents',
+        delegatesTo: 'ScheduleService.listSchedules()',
+        isDestructive: false,
+    }],
+    [PLATFORM_TOOLS.UPDATE_SCHEDULE, {
+        name: PLATFORM_TOOLS.UPDATE_SCHEDULE,
+        category: 'triggers' as ToolCategory,
+        description: 'Update a schedule',
+        delegatesTo: 'ScheduleService.updateSchedule()',
+        isDestructive: false,
+    }],
+    [PLATFORM_TOOLS.DELETE_SCHEDULE, {
+        name: PLATFORM_TOOLS.DELETE_SCHEDULE,
+        category: 'triggers' as ToolCategory,
+        description: 'Delete a schedule',
+        delegatesTo: 'ScheduleService.deleteSchedule()',
+        isDestructive: true,
     }],
 ]);
 

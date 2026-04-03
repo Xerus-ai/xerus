@@ -1,17 +1,25 @@
 // Minimal MCP Server (CLI-Native Pivot)
-// Lightweight MCP server with 9 backend-coupled tools that CLIs access
+// Lightweight MCP server with 17 backend-coupled tools that CLIs access
 // Replaces the 34-tool platform-mcp-server.ts — most tools are now native CLI ops
 //
-// 9 tools that require backend state:
-// 1. pause_execution     — Session control (needs backend state machine)
-// 2. resume_execution    — HITL approval (needs backend state)
-// 3. get_session_state   — Distributed state query (needs backend DB)
-// 4. complete_session    — Termination signal (needs backend cleanup)
-// 5. connect_tool        — OAuth flow (needs Pipedream integration)
-// 6. register_trigger    — Webhook provisioning (needs backend registration)
-// 7. deregister_trigger  — Webhook cleanup (needs backend)
-// 8. send_notification   — User notification (needs backend push)
-// 9. search_tools        — Query connected accounts (needs Pipedream DB)
+// 17 tools that require backend state:
+//  1. pause_execution          — Session control (needs backend state machine)
+//  2. resume_execution         — HITL approval (needs backend state)
+//  3. get_session_state        — Distributed state query (needs backend DB)
+//  4. complete_session         — Termination signal (needs backend cleanup)
+//  5. connect_tool             — OAuth flow (needs Pipedream integration)
+//  6. register_trigger         — Webhook provisioning (needs backend registration)
+//  7. deregister_trigger       — Webhook cleanup (needs backend)
+//  8. send_notification        — User notification (needs backend push)
+//  9. search_tools             — Query connected accounts (needs Pipedream DB)
+// 10. query_memory             — pgvector semantic search (needs Neon DB)
+// 11. analyze_memory_patterns  — Memory analytics (needs pgvector)
+// 12. list_triggers            — List registered webhooks (needs backend DB)
+// 13. get_status               — Agent/sandbox status (needs backend DB)
+// 14. create_schedule          — Create recurring schedule (workspace.db via sqlite3)
+// 15. list_schedules           — List schedules (workspace.db via sqlite3)
+// 16. update_schedule          — Update schedule (workspace.db via sqlite3)
+// 17. delete_schedule          — Delete schedule (workspace.db via sqlite3)
 //
 // Reference: Paperclip adapter pattern (agent calls MCP -> MCP calls backend API)
 
@@ -59,6 +67,13 @@ const BACKEND_URL = process.env.XERUS_BACKEND_URL || 'http://localhost:5001';
 const BACKEND_TOKEN = process.env.XERUS_BACKEND_TOKEN;
 if (!BACKEND_TOKEN && process.env.NODE_ENV === 'production') {
     throw new Error('XERUS_BACKEND_TOKEN is required in production');
+}
+
+// User ID injected by workspace-personalizer into .claude/settings.json env
+// The MCP server inherits it from the Claude Code process environment
+const USER_ID = process.env.XERUS_USER_ID;
+if (!USER_ID && process.env.NODE_ENV === 'production') {
+    throw new Error('XERUS_USER_ID is required — set via .claude/settings.json env');
 }
 
 // -----------------------------------------------------------------------------
@@ -176,6 +191,115 @@ const TOOLS = [
             required: ['query'],
         },
     },
+    {
+        name: 'query_memory',
+        description: 'Search agent memories using semantic similarity. Returns relevant memory entries from the platform knowledge base.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                query: { type: 'string', description: 'Search query for semantic similarity' },
+                scope: { type: 'string', enum: ['company', 'project', 'channel', 'agent'], description: 'Memory scope' },
+                scope_id: { type: 'string', description: 'ID of the scope entity' },
+                memory_type: { type: 'string', description: 'Filter by memory type' },
+                limit: { type: 'number', description: 'Max results (default 10)' },
+            },
+            required: ['query'],
+        },
+    },
+    {
+        name: 'analyze_memory_patterns',
+        description: 'Analyze patterns across stored memories. Returns category counts, examples, and insights.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                scope: { type: 'string', enum: ['company', 'project', 'channel', 'agent'], description: 'Memory scope' },
+                scope_id: { type: 'string', description: 'ID of the scope entity' },
+                categories: { type: 'array', items: { type: 'string' }, description: 'Memory categories to analyze' },
+            },
+        },
+    },
+    {
+        name: 'list_triggers',
+        description: 'List all registered webhook triggers for agents.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                agent_slug: { type: 'string', description: 'Filter by agent slug' },
+            },
+        },
+    },
+    {
+        name: 'get_status',
+        description: 'Get current platform status including active agents, sandbox state, and system health.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                include_agents: { type: 'boolean', description: 'Include agent status details' },
+                include_sandbox: { type: 'boolean', description: 'Include sandbox resource info' },
+            },
+        },
+    },
+    // Schedule Management (4) — workspace.db via backend proxy
+    {
+        name: 'create_schedule',
+        description: 'Create a recurring schedule for an agent. The 9to5 scheduler daemon polls every 30s and spawns CLI processes for due schedules.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                agent_slug: { type: 'string', description: 'Agent slug to schedule' },
+                name: { type: 'string', description: 'Human-readable schedule name (unique)' },
+                prompt: { type: 'string', description: 'Prompt to execute on each run' },
+                rrule: { type: 'string', description: 'RFC 5545 recurrence rule (e.g., FREQ=DAILY;BYHOUR=9;BYMINUTE=0)' },
+                adapter_type: { type: 'string', enum: ['claudecode', 'codex'], description: 'CLI adapter (default: claudecode)' },
+                model: { type: 'string', description: 'AI model (e.g., anthropic/claude-sonnet-4.6)' },
+                max_budget_usd: { type: 'number', description: 'Max budget per run in USD' },
+                allowed_tools: { type: 'array', items: { type: 'string' }, description: 'Tool allowlist' },
+                system_prompt: { type: 'string', description: 'Additional system prompt' },
+            },
+            required: ['agent_slug', 'name', 'prompt'],
+        },
+    },
+    {
+        name: 'list_schedules',
+        description: 'List all schedules, optionally filtered by agent or status.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                agent_slug: { type: 'string', description: 'Filter by agent slug' },
+                status: { type: 'string', enum: ['active', 'paused'], description: 'Filter by status' },
+            },
+        },
+    },
+    {
+        name: 'update_schedule',
+        description: 'Update a schedule (name, prompt, rrule, status, model, budget, tools, system prompt).',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                schedule_id: { type: 'string', description: 'Schedule ID to update' },
+                name: { type: 'string', description: 'New name' },
+                prompt: { type: 'string', description: 'New prompt' },
+                rrule: { type: 'string', description: 'New recurrence rule' },
+                status: { type: 'string', enum: ['active', 'paused'], description: 'Pause or activate' },
+                model: { type: 'string', description: 'New model' },
+                max_budget_usd: { type: 'number', description: 'New budget cap' },
+                allowed_tools: { type: 'array', items: { type: 'string' }, description: 'New tool allowlist' },
+                system_prompt: { type: 'string', description: 'New system prompt' },
+            },
+            required: ['schedule_id'],
+        },
+    },
+    {
+        name: 'delete_schedule',
+        description: 'Delete a schedule by ID.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                schedule_id: { type: 'string', description: 'Schedule ID to delete' },
+            },
+            required: ['schedule_id'],
+        },
+    },
 ];
 
 // -----------------------------------------------------------------------------
@@ -186,6 +310,9 @@ async function callBackendApi(
     path: string,
     body: Record<string, unknown>,
 ): Promise<unknown> {
+    // Inject user_id into every request — backend middleware requires it
+    const enrichedBody = { ...body, user_id: USER_ID };
+
     let response: Response;
     try {
         response = await fetch(`${BACKEND_URL}/api/v1/internal${path}`, {
@@ -194,7 +321,7 @@ async function callBackendApi(
                 'Content-Type': 'application/json',
                 ...(BACKEND_TOKEN ? { Authorization: `Bearer ${BACKEND_TOKEN}` } : {}),
             },
-            body: JSON.stringify(body),
+            body: JSON.stringify(enrichedBody),
         });
     } catch (err) {
         throw new BackendNetworkError(path, err as Error);
@@ -258,7 +385,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main(): Promise<void> {
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    console.error('[minimal-mcp-server] Running with 9 backend-coupled tools');
+    console.error('[minimal-mcp-server] Running with 17 backend-coupled tools');
 }
 
 main().catch((err) => {
