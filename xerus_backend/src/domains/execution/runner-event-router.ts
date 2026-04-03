@@ -165,6 +165,38 @@ export async function routeEventToBackend(
             // Echo of our input message — ignore
             break;
 
+        case 'stream_event': {
+            // Real-time streaming deltas from --include-partial-messages.
+            // Contains content_block_start, content_block_delta, content_block_stop events.
+            const streamType = d.subtype as string | undefined;
+            const contentBlock = d.content_block as Record<string, unknown> | undefined;
+            const delta = d.delta as Record<string, unknown> | undefined;
+
+            if (streamType === 'content_block_delta' && delta) {
+                if (delta.type === 'text_delta' && typeof delta.text === 'string') {
+                    ctx.responseChunks.push(delta.text);
+                    ctx.stream.send('token' as StreamEventType, { text: delta.text, tokenCount: 0 });
+                } else if (delta.type === 'thinking_delta' && typeof delta.thinking === 'string') {
+                    ctx.thinkingChunks.push(delta.thinking);
+                    ctx.stream.send('reasoning' as StreamEventType, { thought: delta.thinking });
+                } else if (delta.type === 'input_json_delta' && typeof delta.partial_json === 'string') {
+                    // Tool input streaming — accumulate but don't send (tool_call sent on block_start)
+                }
+            } else if (streamType === 'content_block_start' && contentBlock) {
+                if (contentBlock.type === 'tool_use') {
+                    ctx.toolCallCount++;
+                    const callId = (contentBlock.id as string) || `tc-${ctx.toolCallCount}`;
+                    const toolName = (contentBlock.name as string) || 'unknown';
+                    ctx.toolCallDetails.push({ call_id: callId, tool_name: toolName, arguments: {}, started_at: Date.now() });
+                    ctx.toolCallMap.set(callId, ctx.toolCallDetails[ctx.toolCallDetails.length - 1]);
+                    ctx.stream.send('tool_call' as StreamEventType, { toolName, arguments: {}, callId });
+                }
+            } else if (streamType === 'content_block_stop') {
+                // Block finished — tool_result will come in the assistant message
+            }
+            break;
+        }
+
         case 'system': {
             const subtype = d.subtype as string | undefined;
             if (subtype === 'init') {
