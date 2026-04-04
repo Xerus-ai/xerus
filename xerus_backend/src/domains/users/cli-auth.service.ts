@@ -219,7 +219,6 @@ export class CLIAuthService {
         authUrl: string | null;
         message: string;
         needsCode: boolean;
-        deviceCode?: string;
     }> {
         if (!this.sandboxService) {
             return { authUrl: null, message: 'Sandbox service not available. Please start a chat first.', needsCode: false };
@@ -232,9 +231,12 @@ export class CLIAuthService {
 
         const provider = this.sandboxService.getDaytonaProvider();
 
-        // Codex supports --device-auth for headless/remote environments (no localhost callback needed).
-        // Claude Code doesn't have this — it uses localhost OAuth which we handle via code paste.
-        const loginCommand = adapter === 'codex' ? 'codex login --device-auth' : 'claude auth login';
+        // Both CLIs use localhost OAuth: start local server, redirect user to external auth page,
+        // then browser redirects to localhost callback. Since the sandbox's localhost isn't reachable
+        // from the user's browser, we capture the external URL, let the user authenticate, then
+        // deliver the callback code via curl inside the sandbox (code-paste flow).
+        // Note: `codex login --device-auth` exists but requires ChatGPT admin to enable it.
+        const loginCommand = adapter === 'codex' ? 'codex auth login' : 'claude auth login';
 
         // Run auth login in background, capture output after a brief wait.
         // The nohup & must be in a subshell so the && chain continues correctly.
@@ -244,15 +246,10 @@ export class CLIAuthService {
 
         try {
             const result = await provider.executeCommand(session.sandboxId, script);
-            const output = result.result || '';
+            // Strip ANSI escape codes from CLI output (color codes like \x1B[0m corrupt URLs)
+            const output = (result.result || '').replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '');
 
-            // Device auth flow (Codex --device-auth): outputs a URL and a user code.
-            // e.g. "Visit https://auth.openai.com/activate and enter code: ABCD-EFGH"
-            if (adapter === 'codex') {
-                return this.parseDeviceAuthOutput(output, userId, adapter);
-            }
-
-            // Standard OAuth flow (Claude): outputs external auth URL + starts localhost server.
+            // Both CLIs: parse external auth URL + localhost port for code-paste flow.
             return this.parseOAuthOutput(output, userId, adapter);
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
@@ -262,46 +259,7 @@ export class CLIAuthService {
     }
 
     /**
-     * Parse device auth output (Codex --device-auth).
-     * The CLI outputs a URL to visit and a code to enter. No localhost callback needed.
-     * The CLI process keeps running in background and auto-detects when the user completes auth.
-     */
-    private parseDeviceAuthOutput(output: string, userId: string, adapter: 'claudecode' | 'codex'): {
-        authUrl: string | null;
-        message: string;
-        needsCode: boolean;
-        deviceCode?: string;
-    } {
-        // Extract the activation URL
-        const allUrls = output.match(/https?:\/\/[^\s"'<>]+/g) || [];
-        const authUrl = allUrls.find(u => !u.includes('localhost') && !u.includes('127.0.0.1')) || null;
-
-        // Extract the device code (e.g. "ABCD-EFGH" or "enter code: XXXX-XXXX")
-        const codeMatch = output.match(/code[:\s]+([A-Z0-9]{4}-[A-Z0-9]{4})/i)
-            || output.match(/:\s*([A-Z0-9]{4}-[A-Z0-9]{4})/i);
-        const deviceCode = codeMatch ? codeMatch[1] : undefined;
-
-        log.info('Device auth triggered', { adapter, user_id: userId, has_url: !!authUrl, has_code: !!deviceCode });
-
-        if (authUrl && deviceCode) {
-            return {
-                authUrl,
-                needsCode: false, // No code paste needed — CLI auto-detects completion
-                deviceCode,
-                message: `Visit the link and enter code: ${deviceCode}`,
-            };
-        }
-
-        // Fallback if parsing fails
-        return {
-            authUrl,
-            needsCode: false,
-            message: output.trim() || 'Device auth started. Check the opened tab.',
-        };
-    }
-
-    /**
-     * Parse standard OAuth output (Claude auth login).
+     * Parse OAuth output from CLI auth login (both Claude and Codex).
      * The CLI outputs an external auth URL and starts a localhost callback server.
      * Since the sandbox's localhost isn't reachable from the browser, we store the
      * redirect_uri so the user can paste the code back via completeLogin().

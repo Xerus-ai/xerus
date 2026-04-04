@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Sparkles, Cpu, ExternalLink, Loader2, CheckCircle2, ArrowRight, Copy, Check } from 'lucide-react'
+import { useState } from 'react'
+import { Sparkles, Cpu, ExternalLink, Loader2, CheckCircle2, ArrowRight } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from '@/lib/toast'
 import { triggerCliLogin, completeCliLogin, getCliAuthStatus, type CliAuthStatus } from '@/lib/api/user'
@@ -13,52 +13,32 @@ interface CLIAuthStatusPanelProps {
 
 export function CLIAuthStatusPanel({ cliAuthStatus, onStatusChange }: CLIAuthStatusPanelProps) {
   const [isLoggingIn, setIsLoggingIn] = useState<'claudecode' | 'codex' | null>(null)
-  // Claude: code paste flow (localhost callback can't reach sandbox)
   const [pendingAdapter, setPendingAdapter] = useState<'claudecode' | 'codex' | null>(null)
   const [authCode, setAuthCode] = useState('')
   const [isSubmittingCode, setIsSubmittingCode] = useState(false)
-  // Codex: device auth flow (shows code to enter on OpenAI page)
-  const [deviceCode, setDeviceCode] = useState<string | null>(null)
-  const [deviceCodeCopied, setDeviceCodeCopied] = useState(false)
-
-  const pollAuthStatus = (delayMs: number) => {
-    setTimeout(async () => {
-      try {
-        const updated = await getCliAuthStatus()
-        onStatusChange?.(updated)
-      } catch { /* ignore */ }
-    }, delayMs)
-  }
 
   const handleLogin = async (adapter: 'claudecode' | 'codex') => {
     setIsLoggingIn(adapter)
     try {
       const result = await triggerCliLogin(adapter)
-
-      if (result.deviceCode && result.authUrl) {
-        // Device auth flow (Codex --device-auth): show code, open activation page
-        setDeviceCode(result.deviceCode)
+      if (result.authUrl) {
         window.open(result.authUrl, '_blank', 'noopener,noreferrer')
-        toast.success(`Enter code ${result.deviceCode} on the opened page`, {
-          description: 'Once authenticated, your status will update automatically.',
-        })
-        // Poll a few times since CLI auto-detects completion
-        pollAuthStatus(10000)
-        pollAuthStatus(20000)
-        pollAuthStatus(30000)
-      } else if (result.authUrl && result.needsCode) {
-        // OAuth flow with code paste (Claude): open auth URL, show paste input
-        window.open(result.authUrl, '_blank', 'noopener,noreferrer')
-        setPendingAdapter(adapter)
-        setAuthCode('')
-        toast.info('Authenticate in the opened tab, then paste the code from the URL bar below.')
-      } else if (result.authUrl) {
-        // Auth URL opened, auto-polling
-        window.open(result.authUrl, '_blank', 'noopener,noreferrer')
-        toast.success('Complete login in the opened tab', {
-          description: 'Once authenticated, your status will update automatically.',
-        })
-        pollAuthStatus(8000)
+        if (result.needsCode) {
+          // OAuth flow with code paste: open auth URL, show paste input
+          setPendingAdapter(adapter)
+          setAuthCode('')
+          toast.info('Authenticate in the opened tab, then paste the redirect URL below.')
+        } else {
+          toast.success('Complete login in the opened tab', {
+            description: 'Once authenticated, your status will update automatically.',
+          })
+          setTimeout(async () => {
+            try {
+              const updated = await getCliAuthStatus()
+              onStatusChange?.(updated)
+            } catch { /* ignore */ }
+          }, 8000)
+        }
       } else {
         toast.info(result.message)
       }
@@ -94,24 +74,10 @@ export function CLIAuthStatusPanel({ cliAuthStatus, onStatusChange }: CLIAuthSta
     }
   }
 
-  const handleCopyDeviceCode = async () => {
-    if (!deviceCode) return
-    await navigator.clipboard.writeText(deviceCode)
-    setDeviceCodeCopied(true)
-    setTimeout(() => setDeviceCodeCopied(false), 2000)
-  }
-
   const claudeAuth = cliAuthStatus?.claudecode
   const codexAuth = cliAuthStatus?.codex
   const claudeConnected = claudeAuth?.authenticated && claudeAuth.method !== 'platform'
   const codexConnected = codexAuth?.authenticated && codexAuth.method !== 'platform'
-
-  // Clear device code when codex becomes connected
-  useEffect(() => {
-    if (codexConnected && deviceCode) {
-      setDeviceCode(null)
-    }
-  }, [codexConnected, deviceCode])
 
   return (
     <motion.div
@@ -218,42 +184,7 @@ export function CLIAuthStatusPanel({ cliAuthStatus, onStatusChange }: CLIAuthSta
         </div>
       </div>
 
-      {/* Device code display — shown for Codex device auth flow */}
-      <AnimatePresence>
-        {deviceCode && !codexConnected && (
-          <motion.div
-            className="mt-4 p-4 bg-green-50/50 rounded-xl border border-green-200/50"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            <p className="text-xs text-text-secondary mb-2">
-              Enter this code on the OpenAI page that just opened:
-            </p>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 px-4 py-2.5 bg-white rounded-lg border border-green-200 text-center text-lg font-mono font-bold tracking-widest text-green-700">
-                {deviceCode}
-              </code>
-              <button
-                onClick={handleCopyDeviceCode}
-                className="flex items-center gap-1.5 px-3 py-2.5 bg-white rounded-lg border border-green-200 hover:bg-green-50 transition-colors text-xs font-medium text-text-secondary"
-              >
-                {deviceCodeCopied ? (
-                  <Check className="w-3.5 h-3.5 text-green-600" />
-                ) : (
-                  <Copy className="w-3.5 h-3.5" />
-                )}
-              </button>
-            </div>
-            <p className="mt-2 text-[10px] text-text-secondary/70">
-              Status will update automatically once you complete authentication.
-            </p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Code paste input — shown for Claude OAuth flow */}
+      {/* Code paste input — shown after OAuth redirect fails (both Claude and Codex) */}
       <AnimatePresence>
         {pendingAdapter && (
           <motion.div
@@ -273,7 +204,7 @@ export function CLIAuthStatusPanel({ cliAuthStatus, onStatusChange }: CLIAuthSta
                 value={authCode}
                 onChange={(e) => setAuthCode(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSubmitCode()}
-                placeholder="Paste the URL or code here..."
+                placeholder="Paste the redirect URL here (http://localhost:...)"
                 className="flex-1 px-3 py-2 text-xs bg-white rounded-lg border border-surface-active/50 focus:outline-none focus:ring-1 focus:ring-amber-400 focus:border-amber-400"
                 disabled={isSubmittingCode}
               />
