@@ -1,6 +1,6 @@
 // SDK Message Types
 // Discriminated union types for messages yielded by the Claude Agent SDK query() iterator.
-// These model the actual shapes the SDK emits — used by process-manager.ts for type-safe extraction.
+// These model the actual shapes the SDK emits — used by stream-parser.ts and stdout-emitter.ts for type-safe extraction.
 
 export interface SDKSystemInitMessage {
     type: 'system';

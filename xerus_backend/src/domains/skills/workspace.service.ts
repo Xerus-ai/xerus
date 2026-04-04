@@ -3,12 +3,15 @@
 // Two scopes: channel-scoped (default) and global (root .claude/skills/).
 // All operations go directly to the Daytona sandbox filesystem.
 
-import { SandboxService } from '../execution/sandbox/sandbox.service';
-import type { DaytonaProvider } from '../execution/sandbox/providers/daytona.provider';
-import type { SandboxFileSystem } from '../execution/workspace/workspace.manager';
-import { SANDBOX_CONFIG } from '../execution/sandbox/sandbox.config';
+import { SandboxService } from '../sandbox-infra/sandbox/sandbox.service';
+import type { DaytonaProvider } from '../sandbox-infra/sandbox/providers/daytona.provider';
+import type { SandboxFileSystem } from '../sandbox-infra/workspace/workspace.manager';
+import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
 import { SkillInstallScope, SKILL_SLUG_PATTERN } from './types';
 import { shellEscapePath } from '../../utils/shell-safety';
+import { logger } from '../../utils/logger';
+
+const log = logger('SkillWorkspaceService');
 
 /**
  * Translate frontend channel_id (e.g. "marketing/seo") to workspace-relative path
@@ -195,7 +198,7 @@ export class SkillWorkspaceService {
 
         const result = await provider.executeCommand(sandboxId, cmd);
         const t2 = Date.now();
-        console.log(`[skills] batchReadMarketplace: resolve=${t1 - t0}ms ssh=${t2 - t1}ms total=${t2 - t0}ms`);
+        log.debug('batchReadMarketplace', { resolve_ms: t1 - t0, ssh_ms: t2 - t1, total_ms: t2 - t0 });
         return this.parseBatchOutput(result.result || '');
     }
 
@@ -238,7 +241,7 @@ export class SkillWorkspaceService {
 
         const result = await provider.executeCommand(sandboxId, cmd);
         const t2 = Date.now();
-        console.log(`[skills] batchReadInstalled: resolve=${t1 - t0}ms ssh=${t2 - t1}ms total=${t2 - t0}ms`);
+        log.debug('batchReadInstalled', { resolve_ms: t1 - t0, ssh_ms: t2 - t1, total_ms: t2 - t0 });
         return this.parseBatchOutputWithScope(result.result || '');
     }
 

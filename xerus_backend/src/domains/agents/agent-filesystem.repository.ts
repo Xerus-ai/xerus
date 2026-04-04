@@ -25,6 +25,7 @@ export interface AgentConfigFile {
     ai_model: string;
     thinking_level: string;
     autonomy_level: string;
+    adapter_type?: 'claudecode' | 'codex'; // CLI adapter (default: claudecode)
     // Marketplace
     is_verified: boolean;
     clone_count: number;

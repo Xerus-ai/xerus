@@ -11,7 +11,7 @@ import type {
     TriggerRegistrationResult,
     TriggerDefinition,
     EventNormalizationMetadata,
-} from '../../heartbeat/normalized-event.types';
+} from '../trigger.types';
 import {
     TriggerAdapterError,
     TriggerRegistrationError,

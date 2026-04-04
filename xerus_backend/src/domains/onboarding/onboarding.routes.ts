@@ -1,16 +1,17 @@
 // Onboarding Routes
 // REST endpoints for new user onboarding flow:
 // - POST /start   -> Acknowledge readiness (no-op, kept for compatibility)
-// - POST /handoff -> Create workspace + domain + channel + sandbox + seed conversation
+// - POST /handoff -> Create workspace + sandbox + seed domain/channel/conversation in workspace-DB
 
 import { Router, Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../../types';
 import { sendResponse } from '../../utils/response';
 import { authenticateFirebaseToken } from '../../middleware/auth';
 import { UnauthorizedError, BadRequestError } from '../../utils/errors';
-import { transaction } from '../../database/connection';
-import { PoolClient } from 'pg';
-import type { SandboxService } from '../execution';
+import { query } from '../../database/connection';
+import type { SandboxService } from '../sandbox-infra';
+import { createDomain, createChannel, createChannelMessage } from '../company/company-workspace-db.service';
+import { createConversation } from '../conversations/workspace-db.service';
 
 const router = Router();
 const auth = authenticateFirebaseToken;
@@ -61,7 +62,7 @@ router.post('/start', auth, async (req: AuthenticatedRequest, res: Response, nex
 
 // -------------------------------------------------------------------------
 // POST /api/v1/onboarding/handoff
-// Creates workspace + domain + channel + provisions sandbox + seeds conversation.
+// Creates workspace (Neon) + provisions sandbox + seeds domain/channel/conversation (workspace-DB).
 // Called when user submits the workspace name form.
 // Screen 2 (visual progress animation) plays while this runs.
 // Body: { workspace: string, project: string }
@@ -89,92 +90,60 @@ router.post('/handoff', auth, async (req: AuthenticatedRequest, res: Response, n
         const projectSlug = projectName ? slugify(projectName) : 'default';
         const projectDisplayName = projectName || 'Default';
 
-        // Steps 1-5 in a single transaction — all-or-nothing
         const safeName = (req.user?.name || 'there').replace(/[<>&"']/g, '');
         const firstNameForGreeting = safeName.split(' ')[0] || 'there';
         const welcomeMessage = buildWelcomeMessage(firstNameForGreeting, workspaceName, projectDisplayName);
 
-        const result = await transaction(async (client: PoolClient) => {
-            // 1. Create workspace row
-            const wsResult = await client.query(
-                `INSERT INTO workspaces (user_id, slug, name)
-                 VALUES ($1, $2, $3)
-                 ON CONFLICT (user_id) DO UPDATE SET
-                     name = EXCLUDED.name, slug = EXCLUDED.slug, updated_at = NOW()
-                 RETURNING id::text, slug, name`,
-                [userId, workspaceSlug, workspaceName],
-            );
-            const workspace = wsResult.rows[0] as { id: string; slug: string; name: string };
+        // 1. Create workspace row in Neon (workspaces table stays in Neon)
+        const wsResult = await query(
+            `INSERT INTO workspaces (user_id, slug, name)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (user_id) DO UPDATE SET
+                 name = EXCLUDED.name, slug = EXCLUDED.slug, updated_at = NOW()
+             RETURNING id::text, slug, name`,
+            [userId, workspaceSlug, workspaceName],
+        );
+        const workspace = wsResult.rows[0] as { id: string; slug: string; name: string };
 
-            // 2. Create default domain
-            const domainResult = await client.query(
-                `INSERT INTO domains (user_id, workspace_id, slug, name, description)
-                 VALUES ($1, $2, $3, $4, $5)
-                 ON CONFLICT (workspace_id, slug) DO UPDATE SET
-                     name = EXCLUDED.name, updated_at = NOW()
-                 RETURNING id::text, slug, name`,
-                [userId, workspace.id, projectSlug, projectDisplayName, `${projectDisplayName} department`],
-            );
-            const domain = domainResult.rows[0] as { id: string; slug: string; name: string };
-
-            // 3. Create #general channel
-            const channelResult = await client.query(
-                `INSERT INTO channels (domain_id, user_id, slug, name, description)
-                 VALUES ($1, $2, 'general', 'General', 'Default channel for team communication')
-                 ON CONFLICT (domain_id, slug) DO UPDATE SET
-                     name = EXCLUDED.name, updated_at = NOW()
-                 RETURNING id::text`,
-                [domain.id, userId],
-            );
-            const channel = channelResult.rows[0] as { id: string };
-
-            // 4. Seed conversation with welcome message (idempotent — skip if exists)
-            const existingConv = await client.query(
-                `SELECT id::text FROM conversations WHERE user_id = $1 AND title = 'Onboarding' LIMIT 1`,
-                [userId],
-            );
-            let conversationId: string;
-            if (existingConv.rows.length > 0) {
-                conversationId = (existingConv.rows[0] as { id: string }).id;
-            } else {
-                const convResult = await client.query(
-                    `INSERT INTO conversations (user_id, agent_slug, title, message_count, last_message_at)
-                     VALUES ($1, 'xerus-master', 'Onboarding', 1, NOW())
-                     RETURNING id::text`,
-                    [userId],
-                );
-                conversationId = (convResult.rows[0] as { id: string }).id;
-
-                // 5. Single welcome message referencing BOOTSTRAP.md guidance
-                await client.query(
-                    `INSERT INTO execution_sessions
-                     (id, workspace_id, agent_slug, status, trigger_type, conversation_id, agent_response, started_at, completed_at, created_at)
-                     VALUES (gen_random_uuid(), $1, 'xerus-master', 'completed', NULL, $2, $3, NOW(), NOW(), NOW())`,
-                    [workspace.id, conversationId, welcomeMessage],
-                );
-            }
-
-            return { workspace, domain, channel, conversationId };
-        });
-
-        // 6. Provision sandbox (outside transaction — Screen 2 animation covers the wait)
-        let sandboxProvisioned = false;
-        if (sandboxService) {
-            try {
-                await sandboxService.getOrCreateSandbox({ userId });
-                sandboxProvisioned = true;
-            } catch (err) {
-                console.warn(`[Onboarding] Sandbox provisioning deferred for user ${userId}: ${(err as Error).message}`);
-                sandboxProvisioned = false;
-            }
+        // 2. Provision sandbox — required before workspace-DB writes
+        if (!sandboxService) {
+            throw new Error('SandboxService not initialized');
         }
+        const session = await sandboxService.getOrCreateSandbox({ userId });
+        const sandboxId = session.sandboxId;
+        const provider = sandboxService.getDaytonaProvider();
+
+        // 3. Seed workspace-DB: domain + channel + conversation + welcome message
+        const domain = await createDomain(
+            provider, sandboxId,
+            projectSlug, projectDisplayName,
+            `${projectDisplayName} department`,
+        );
+
+        const channel = await createChannel(
+            provider, sandboxId,
+            domain.slug, 'general', 'General',
+            'Default channel for team communication',
+        );
+
+        const conversation = await createConversation(
+            provider, sandboxId,
+            'xerus-master', 'Onboarding',
+        );
+
+        // 4. Seed welcome message as a channel message
+        await createChannelMessage(
+            provider, sandboxId,
+            channel.slug, 'agent', 'xerus-master',
+            welcomeMessage, 'post', {},
+        );
 
         sendResponse(res, 200, {
-            workspace: { id: result.workspace.id, slug: result.workspace.slug, name: result.workspace.name },
-            domain: { id: result.domain.id, slug: result.domain.slug, name: result.domain.name },
-            channel: { id: result.channel.id, slug: 'general', name: 'General' },
-            conversation_id: result.conversationId,
-            sandbox_provisioned: sandboxProvisioned,
+            workspace: { id: workspace.id, slug: workspace.slug, name: workspace.name },
+            domain: { slug: domain.slug, name: domain.name },
+            channel: { slug: channel.slug, name: channel.name },
+            conversation_id: conversation.id,
+            sandbox_provisioned: true,
         }, startTime);
     } catch (err) {
         next(err);

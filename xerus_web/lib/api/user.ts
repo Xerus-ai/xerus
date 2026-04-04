@@ -195,3 +195,55 @@ export const getAllApiKeys = async (): Promise<{ [provider: string]: string | nu
   return result;
 };
 
+// ============================================================
+// CLI AUTH STATUS ENDPOINT (/api/v1/users/cli-auth-status)
+// ============================================================
+
+export interface CliAuthStatus {
+  claudecode: {
+    authenticated: boolean;
+    method: 'subscription' | 'api' | 'platform';
+    details: string;
+  };
+  codex: {
+    authenticated: boolean;
+    method: 'subscription' | 'api' | 'platform';
+    details: string;
+  };
+}
+
+export const getCliAuthStatus = async (): Promise<CliAuthStatus> => {
+  const response = await apiCall('/users/cli-auth-status', { method: 'GET' });
+  const json = await response.json();
+  return json.data || json;
+};
+
+export interface CliAuthTriggerResult {
+  authUrl: string | null;
+  message: string;
+  needsCode: boolean;
+}
+
+export const triggerCliLogin = async (adapter: 'claudecode' | 'codex'): Promise<CliAuthTriggerResult> => {
+  const response = await apiCall('/users/cli-auth-trigger', {
+    method: 'POST',
+    body: JSON.stringify({ adapter }),
+  });
+  const json = await response.json();
+  return json.data || json;
+};
+
+export interface CliAuthCompleteResult {
+  success: boolean;
+  message: string;
+}
+
+export const completeCliLogin = async (adapter: 'claudecode' | 'codex', code: string): Promise<CliAuthCompleteResult> => {
+  const response = await apiCall('/users/cli-auth-complete', {
+    method: 'POST',
+    body: JSON.stringify({ adapter, code }),
+  });
+  const json = await response.json();
+  return json.data || json;
+};
+

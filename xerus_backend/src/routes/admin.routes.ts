@@ -6,6 +6,9 @@ import { BadRequestError, ForbiddenError } from '../utils/errors';
 import { authenticateFirebaseToken, requireRole } from '../middleware/auth';
 import { userService, creditService, apiKeyService, userRepository, PlanType } from '../domains/users';
 import { toolsService } from '../domains/tools/service';
+import { logger } from '../utils/logger';
+
+const log = logger('AdminRoutes');
 
 const router = Router();
 const auth = authenticateFirebaseToken;
@@ -177,7 +180,7 @@ router.delete('/users/:id', auth, requireAdmin, async (req: AuthenticatedRequest
 router.post('/sync-tools', auth, requireAdmin, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const startTime = res.locals.startTime || Date.now();
     try {
-        console.log('[Admin] Manual sync triggered by:', req.user!.uid);
+        log.info('Manual sync triggered', { user_id: req.user!.uid });
         const result = await toolsService.syncPipedreamApps();
 
         sendResponse(

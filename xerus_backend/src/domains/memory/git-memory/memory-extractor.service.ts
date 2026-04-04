@@ -5,6 +5,9 @@
 
 import { MemoryScope, MEMORY_SCOPES } from '../memory.types';
 import { LEGACY_LIGHT_MODEL } from '../../agents/types';
+import { logger } from '../../../utils/logger';
+
+const log = logger('MemoryExtractor');
 
 // -----------------------------------------------------------------------------
 // LLM Client Interface
@@ -258,7 +261,7 @@ function sanitizeScope(scope: string): MemoryScope {
     if (VALID_SCOPES.has(scope)) {
         return scope as MemoryScope;
     }
-    console.warn(`[MemoryExtractor] Unrecognized scope '${scope}' from LLM, defaulting to 'agent'`);
+    log.warn('Unrecognized scope from LLM, defaulting to agent', { scope });
     return 'agent';
 }
 

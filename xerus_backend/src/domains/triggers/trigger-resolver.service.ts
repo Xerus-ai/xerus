@@ -6,7 +6,7 @@ import type {
     TriggerProvider,
     ProviderResolutionResult,
     TriggerProviderRow,
-} from '../heartbeat/normalized-event.types';
+} from './trigger.types';
 import { type TriggerSourceAdapter, triggerAdapterRegistry } from './trigger-source.adapter';
 import { TriggerResolutionError, TriggerProviderNotFoundError, TriggerAdapterError } from './trigger.errors';
 

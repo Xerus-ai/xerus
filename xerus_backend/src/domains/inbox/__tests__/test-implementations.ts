@@ -1,6 +1,7 @@
-// Real test implementations for inbox dependencies
-// Uses DatabaseInboxItemRepository for real DB operations with call tracking
-// ChannelResolver and SSEBroadcaster are simple implementations (not DB-backed)
+// Test implementations for inbox dependencies
+// Uses in-memory implementations for unit testing.
+// DatabaseInboxItemRepository now uses workspace DB (requires sandbox),
+// so tests use a standalone in-memory implementation.
 
 import dotenv from 'dotenv';
 import path from 'path';
@@ -50,8 +51,6 @@ class CallTracker<TArgs extends unknown[] = unknown[], TResult = unknown> {
 
 export { CallTracker };
 
-import { query } from '../../../database/connection';
-import { DatabaseInboxItemRepository } from '../inbox-item.repository';
 import type {
     ChannelResolver,
     ChannelResolutionContext,
@@ -60,6 +59,9 @@ import type {
     InboxSSEBroadcaster,
     InboxSSENewItemPayload,
     InboxSSEItemUpdatedPayload,
+    InboxContentType,
+    InboxStatus,
+    InboxPriority,
 } from '../inbox.types';
 
 // -----------------------------------------------------------------------------
@@ -106,32 +108,19 @@ export class InMemoryChannelSlugResolver {
 }
 
 // -----------------------------------------------------------------------------
-// DatabaseInboxItemRepositoryWithTracking
-// Wraps the real DatabaseInboxItemRepository with call tracking for test assertions
+// InMemoryInboxItemRepository
+// In-memory implementation of InboxItemRepository for unit testing.
+// Replaces DatabaseInboxItemRepositoryWithTracking since the real repo now
+// requires a sandbox (workspace DB).
 // -----------------------------------------------------------------------------
 
 type CreateItemInput = Parameters<InboxItemRepository['createItem']>[0];
 type MarkDeliveredUpdate = Parameters<InboxItemRepository['markDelivered']>[1];
 
-const TEST_PREFIX = 'xinbox_impl_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
-const TEST_USER_ID = TEST_PREFIX + '_user';
-
-// Ensure test user exists for FK constraints
-let testUserSeeded = false;
-async function ensureTestUser(): Promise<void> {
-    if (testUserSeeded) return;
-    const email = `${TEST_USER_ID}_${Math.random().toString(36).substring(7)}@test.com`;
-    await query(
-        `INSERT INTO users (user_id, email, display_name)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (user_id) DO UPDATE SET email = EXCLUDED.email`,
-        [TEST_USER_ID, email, 'Test User']
-    );
-    testUserSeeded = true;
-}
+let nextItemId = 1;
 
 export class DatabaseInboxItemRepositoryWithTracking implements InboxItemRepository {
-    private readonly realRepo = new DatabaseInboxItemRepository();
+    private items = new Map<string, InboxItem>();
     private getItemOverride: InboxItem | null | undefined;
     readonly createItemCalls = new CallTracker<[CreateItemInput], InboxItem>();
     readonly markDeliveredCalls = new CallTracker<[string, MarkDeliveredUpdate], InboxItem>();
@@ -140,7 +129,7 @@ export class DatabaseInboxItemRepositoryWithTracking implements InboxItemReposit
     constructor(options?: { getItemResult?: InboxItem | null }) {
         this.getItemOverride = options?.getItemResult !== undefined
             ? options.getItemResult
-            : undefined; // undefined means "use real DB"
+            : undefined; // undefined means "use in-memory store"
     }
 
     setGetItemResult(result: InboxItem | null): void {
@@ -148,19 +137,58 @@ export class DatabaseInboxItemRepositoryWithTracking implements InboxItemReposit
     }
 
     async createItem(input: CreateItemInput): Promise<InboxItem> {
-        // Rewrite user_id to test user for FK constraint
-        const dbInput = { ...input, user_id: TEST_USER_ID };
-        await ensureTestUser();
-        const item = await this.realRepo.createItem(dbInput);
-        // Record with original input for test assertions
+        const itemId = `item-${nextItemId++}`;
+        const now = new Date();
+        const item: InboxItem = {
+            item_id: itemId,
+            user_id: input.user_id,
+            channel_id: input.channel_id,
+            agent_slug: input.agent_slug,
+            team_id: input.team_id ?? null,
+            conversation_id: input.conversation_id ?? null,
+            schedule_id: input.schedule_id ?? null,
+            title: input.title,
+            summary: input.summary,
+            content: input.content,
+            content_type: input.content_type,
+            status: input.status,
+            requires_approval: input.requires_approval,
+            is_read: false,
+            is_archived: false,
+            priority: input.priority,
+            due_date: input.due_date ?? null,
+            revision_number: 1,
+            metadata: input.metadata,
+            created_at: now,
+            updated_at: now,
+            delivered_at: null,
+        };
+        this.items.set(itemId, item);
         this.createItemCalls.record([input], item);
         return item;
     }
 
     async markDelivered(itemId: string, update: MarkDeliveredUpdate): Promise<InboxItem> {
-        const item = await this.realRepo.markDelivered(itemId, update);
-        this.markDeliveredCalls.record([itemId, update], item);
-        return item;
+        const existing = this.items.get(itemId);
+        if (!existing) {
+            throw new Error(`Inbox item '${itemId}' not found`);
+        }
+        const now = new Date();
+        const updated: InboxItem = {
+            ...existing,
+            status: 'delivered' as InboxStatus,
+            content: update.content,
+            summary: update.summary ?? existing.summary,
+            content_type: update.content_type ?? existing.content_type,
+            requires_approval: update.requires_approval ?? existing.requires_approval,
+            delivered_at: now,
+            updated_at: now,
+            revision_number: existing.revision_number + 1,
+            metadata: { ...existing.metadata, ...(update.metadata ?? {}) },
+        };
+        this.items.set(itemId, updated);
+        this.markDeliveredCalls.record([itemId, update], updated);
+        return updated;
     }
 
     async getItem(itemId: string): Promise<InboxItem | null> {
@@ -168,14 +196,13 @@ export class DatabaseInboxItemRepositoryWithTracking implements InboxItemReposit
             this.getItemCalls.record([itemId], this.getItemOverride);
             return this.getItemOverride;
         }
-        const item = await this.realRepo.getItem(itemId);
+        const item = this.items.get(itemId) ?? null;
         this.getItemCalls.record([itemId], item);
         return item;
     }
 
-    // Clean up test data created by this repository
     async cleanup(): Promise<void> {
-        await query(`DELETE FROM inbox_items WHERE user_id = $1`, [TEST_USER_ID]);
+        this.items.clear();
     }
 }
 
@@ -212,12 +239,12 @@ export function createDefaultInboxItem(overrides: Partial<InboxItem> = {}): Inbo
         title: 'Test Task',
         summary: 'Working on test',
         content: '',
-        content_type: 'deliverable',
-        status: 'in_progress',
+        content_type: 'deliverable' as InboxContentType,
+        status: 'in_progress' as InboxStatus,
         requires_approval: false,
         is_read: false,
         is_archived: false,
-        priority: 'normal',
+        priority: 'normal' as InboxPriority,
         due_date: null,
         revision_number: 1,
         metadata: {},
@@ -258,14 +285,5 @@ export function createTestHeartbeatInboxDeps(): TestHeartbeatInboxDeps {
 
 // Cleanup helper for afterAll blocks
 export async function cleanupInboxTestData(): Promise<void> {
-    try {
-        await query(`DELETE FROM inbox_items WHERE user_id = $1`, [TEST_USER_ID]);
-        await query(`DELETE FROM users WHERE user_id = $1`, [TEST_USER_ID]);
-    } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        if (!msg.includes('pool') && !msg.includes('closed') && !msg.includes('terminated')) {
-            throw err;
-        }
-    }
-    testUserSeeded = false;
+    // No DB cleanup needed - in-memory implementation
 }

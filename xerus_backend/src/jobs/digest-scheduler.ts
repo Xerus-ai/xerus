@@ -3,7 +3,7 @@
 // Uses DigestDispatcher to prepare prompts, then dispatches to Xerus agent
 // via HeartbeatRunnerService and records execution via DailyDigestService.
 //
-// Architecture: Digest is a separate job from heartbeat — it has its own
+// Architecture: Digest is a separate job — it has its own
 // cron schedules (standup_cron, report_cron) per user, independent of
 // agent heartbeat intervals.
 
@@ -14,6 +14,9 @@ import { DailyDigestService } from '../domains/execution/background/daily-digest
 import { DigestDispatcher } from '../domains/execution/background/digest-dispatcher';
 import type { DailyDigestConfig, DigestVariant, DigestActivityData, ActivityDataCollector } from '../domains/execution/background/daily-digest.types';
 import type { ExecutionDatabase } from '../domains/execution/execution-pipeline.types';
+import { logger } from '../utils/logger';
+
+const log = logger('DigestScheduler');
 
 // -----------------------------------------------------------------------------
 // Types
@@ -130,10 +133,11 @@ export class DigestScheduler {
 
     private onDigestTick(userId: string, variant: DigestVariant): void {
         this.runDigest(userId, variant).catch((err) => {
-            console.error(
-                `[DigestScheduler] ${variant} digest failed for user ${userId}:`,
-                err instanceof Error ? err.message : err,
-            );
+            log.error('Digest failed', {
+                variant,
+                user_id: userId,
+                error: err instanceof Error ? err.message : String(err),
+            });
         });
     }
 
@@ -218,30 +222,22 @@ function createActivityCollector(db: ExecutionDatabase): ActivityDataCollector {
                 [userId],
             );
 
-            // Credit usage from credit_ledger
+            // Credit usage from credit_transactions (migration 065)
             let creditsUsed = 0;
             let creditsRemaining = 0;
-            try {
-                const creditResult = await db.query<{ total: string }>(
-                    `SELECT COALESCE(SUM(ABS(amount)), 0)::text AS total
-                     FROM credit_ledger WHERE user_id = $1 AND amount < 0 AND created_at >= $2`,
-                    [userId, since],
-                );
-                creditsUsed = parseInt(creditResult.rows[0]?.total || '0', 10);
 
-                const balanceResult = await db.query<{ balance: string }>(
-                    `SELECT COALESCE(SUM(amount), 0)::text AS balance FROM credit_ledger WHERE user_id = $1`,
-                    [userId],
-                );
-                creditsRemaining = parseInt(balanceResult.rows[0]?.balance || '0', 10);
-            } catch (err: unknown) {
-                const pgCode = (err as { code?: string })?.code;
-                if (pgCode === '42P01') {
-                    // credit_ledger table does not exist yet — skip credit data
-                } else {
-                    throw err;
-                }
-            }
+            const creditResult = await db.query<{ total: string }>(
+                `SELECT COALESCE(SUM(ABS(amount)), 0)::text AS total
+                 FROM credit_transactions WHERE user_id = $1 AND amount < 0 AND created_at >= $2`,
+                [userId, since],
+            );
+            creditsUsed = parseInt(creditResult.rows[0]?.total || '0', 10);
+
+            const balanceResult = await db.query<{ balance: string }>(
+                `SELECT COALESCE(SUM(amount), 0)::text AS balance FROM credit_transactions WHERE user_id = $1`,
+                [userId],
+            );
+            creditsRemaining = parseInt(balanceResult.rows[0]?.balance || '0', 10);
 
             return {
                 completed_tasks: completedResult.rows.map(r => ({
@@ -272,7 +268,7 @@ let digestSchedulerInstance: DigestScheduler | null = null;
 
 export function startDigestSchedulerJob(db?: ExecutionDatabase): void {
     if (!db) {
-        console.warn('[Jobs] Digest scheduler skipped (no DB dependency provided)');
+        log.warn('Digest scheduler skipped (no DB dependency provided)');
         return;
     }
 
@@ -281,10 +277,11 @@ export function startDigestSchedulerJob(db?: ExecutionDatabase): void {
     digestSchedulerInstance = new DigestScheduler(digestService, activityCollector);
 
     const dispatchFn: DigestDispatchFn = async (request) => {
-        console.log(
-            `[Digest] Dispatching ${request.variant} digest for user ${request.user_id} ` +
-            `via agent ${request.agent_id}`,
-        );
+        log.info('Dispatching digest', {
+            variant: request.variant,
+            user_id: request.user_id,
+            agent_id: request.agent_id,
+        });
 
         // Resolve agent slug from integer agent_id (execution_sessions uses agent_slug, not agent_id)
         const agentResult = await db.query<{ slug: string }>(
@@ -315,14 +312,14 @@ export function startDigestSchedulerJob(db?: ExecutionDatabase): void {
     // Load digest configs from DB (user_preferences or digest_configs table)
     loadDigestConfigs(db).then((configs) => {
         if (configs.length === 0) {
-            console.log('[Jobs] Digest scheduler started (no digest configs found)');
+            log.info('Digest scheduler started (no digest configs found)');
             return;
         }
         return digestSchedulerInstance!.start(dispatchFn, configs);
     }).then(() => {
-        console.log('[Jobs] Digest scheduler started');
+        log.info('Digest scheduler started');
     }).catch((err) => {
-        console.error('[Jobs] Digest scheduler failed to start:', err instanceof Error ? err.message : err);
+        log.error('Digest scheduler failed to start', { error: err instanceof Error ? err.message : String(err) });
     });
 }
 

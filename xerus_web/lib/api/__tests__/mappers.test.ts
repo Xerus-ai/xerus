@@ -3,16 +3,10 @@ import {
   mapAgentToAssistant,
   mapScheduleToFrontend,
   mapScheduleToBackend,
-  mapHeartbeatConfigToFrontend,
-  mapHeartbeatConfigToBackend,
-  mapHeartbeatExecutionToFrontend,
 } from '../mappers';
 import type {
   BackendAgent,
   ScheduledExecution,
-  BackendHeartbeatConfig,
-  HeartbeatConfigDTO,
-  BackendHeartbeatExecution,
 } from '../types';
 
 // ---------------------------------------------------------------------------
@@ -44,6 +38,7 @@ describe('mapAgentToAssistant', () => {
     avatar_url: 'https://example.com/avatar.png',
     thinking_level: 'high',
     autonomy_level: 'semi_autonomous',
+    adapter_type: 'claudecode',
   };
 
   it('maps all fields from a fully populated backend agent', () => {
@@ -72,6 +67,7 @@ describe('mapAgentToAssistant', () => {
     expect(result.avatarUrl).toBe('https://example.com/avatar.png');
     expect(result.thinkingLevel).toBe('high');
     expect(result.autonomyLevel).toBe('semi_autonomous');
+    expect(result.adapter_type).toBe('claudecode');
   });
 
   it('maps inactive agent status correctly', () => {
@@ -100,6 +96,7 @@ describe('mapAgentToAssistant', () => {
     expect(result.avatarUrl).toBeNull();
     expect(result.thinkingLevel).toBe('medium');
     expect(result.autonomyLevel).toBe('supervised');
+    expect(result.adapter_type).toBeUndefined();
   });
 
   it('handles agent with empty name', () => {
@@ -248,215 +245,3 @@ describe('mapScheduleToBackend', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// mapHeartbeatConfigToFrontend / mapHeartbeatConfigToBackend
-// ---------------------------------------------------------------------------
-
-describe('mapHeartbeatConfigToFrontend', () => {
-  const backendConfig: BackendHeartbeatConfig = {
-    id: 1,
-    agent_id: 10,
-    user_id: 'u-1',
-    enabled: true,
-    cron_expression: '*/30 * * * *',
-    timezone: 'UTC',
-    active_hours_start: '08:00',
-    active_hours_end: '18:00',
-    weekdays_only: true,
-    prompt: 'Check status',
-    max_duration_seconds: 300,
-    retry_on_failure: true,
-    token_budget: 50000,
-    event_token_budget: 3000,
-    max_alerts_per_hour: 5,
-    suppress_token: 'suppress-abc',
-    tool_allowlist: ['Read', 'Bash'],
-    default_channel_id: 99,
-    stagger_offset_ms: 5000,
-    created_at: '2026-01-01T00:00:00Z',
-    updated_at: '2026-02-01T00:00:00Z',
-  };
-
-  it('maps all fields from snake_case to camelCase', () => {
-    const result = mapHeartbeatConfigToFrontend(backendConfig);
-
-    expect(result.id).toBe(1);
-    expect(result.agentId).toBe(10);
-    expect(result.enabled).toBe(true);
-    expect(result.cronExpression).toBe('*/30 * * * *');
-    expect(result.timezone).toBe('UTC');
-    expect(result.activeHoursStart).toBe('08:00');
-    expect(result.activeHoursEnd).toBe('18:00');
-    expect(result.weekdaysOnly).toBe(true);
-    expect(result.prompt).toBe('Check status');
-    expect(result.maxDurationSeconds).toBe(300);
-    expect(result.retryOnFailure).toBe(true);
-    expect(result.tokenBudget).toBe(50000);
-    expect(result.eventTokenBudget).toBe(3000);
-    expect(result.maxAlertsPerHour).toBe(5);
-    expect(result.suppressToken).toBe('suppress-abc');
-    expect(result.toolAllowlist).toEqual(['Read', 'Bash']);
-    expect(result.defaultChannelId).toBe(99);
-    expect(result.staggerOffsetMs).toBe(5000);
-    expect(result.createdAt).toBe('2026-01-01T00:00:00Z');
-    expect(result.updatedAt).toBe('2026-02-01T00:00:00Z');
-  });
-
-  it('does not include user_id in frontend DTO', () => {
-    const result = mapHeartbeatConfigToFrontend(backendConfig);
-    expect('userId' in result).toBe(false);
-  });
-});
-
-describe('mapHeartbeatConfigToBackend', () => {
-  it('maps camelCase DTO back to snake_case', () => {
-    const dto: HeartbeatConfigDTO = {
-      id: 1,
-      agentId: 10,
-      enabled: true,
-      cronExpression: '*/30 * * * *',
-      timezone: 'UTC',
-      activeHoursStart: '08:00',
-      activeHoursEnd: '18:00',
-      weekdaysOnly: true,
-      prompt: 'Check status',
-      maxDurationSeconds: 300,
-      retryOnFailure: true,
-      tokenBudget: 50000,
-      eventTokenBudget: 3000,
-      maxAlertsPerHour: 5,
-      suppressToken: 'suppress-abc',
-      toolAllowlist: ['Read', 'Bash'],
-      defaultChannelId: 99,
-      staggerOffsetMs: 5000,
-      createdAt: '2026-01-01T00:00:00Z',
-      updatedAt: '2026-02-01T00:00:00Z',
-    };
-
-    const result = mapHeartbeatConfigToBackend(dto);
-
-    expect(result.agent_id).toBe(10);
-    expect(result.cron_expression).toBe('*/30 * * * *');
-    expect(result.active_hours_start).toBe('08:00');
-    expect(result.active_hours_end).toBe('18:00');
-    expect(result.weekdays_only).toBe(true);
-    expect(result.max_duration_seconds).toBe(300);
-    expect(result.retry_on_failure).toBe(true);
-    expect(result.token_budget).toBe(50000);
-    expect(result.event_token_budget).toBe(3000);
-    expect(result.max_alerts_per_hour).toBe(5);
-    expect(result.suppress_token).toBe('suppress-abc');
-    expect(result.tool_allowlist).toEqual(['Read', 'Bash']);
-    expect(result.default_channel_id).toBe(99);
-    expect(result.stagger_offset_ms).toBe(5000);
-  });
-
-  it('round-trips heartbeat config correctly', () => {
-    const original: BackendHeartbeatConfig = {
-      id: 2,
-      agent_id: 20,
-      enabled: false,
-      cron_expression: '0 * * * *',
-      timezone: 'Asia/Tokyo',
-      weekdays_only: false,
-      max_duration_seconds: 600,
-      retry_on_failure: false,
-      token_budget: 100000,
-      event_token_budget: 5000,
-      max_alerts_per_hour: 10,
-      suppress_token: 'tok-xyz',
-      stagger_offset_ms: 0,
-    };
-
-    const frontend = mapHeartbeatConfigToFrontend(original);
-    const backend = mapHeartbeatConfigToBackend(frontend);
-
-    expect(backend.agent_id).toBe(original.agent_id);
-    expect(backend.enabled).toBe(original.enabled);
-    expect(backend.cron_expression).toBe(original.cron_expression);
-    expect(backend.timezone).toBe(original.timezone);
-    expect(backend.weekdays_only).toBe(original.weekdays_only);
-    expect(backend.token_budget).toBe(original.token_budget);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// mapHeartbeatExecutionToFrontend
-// ---------------------------------------------------------------------------
-
-describe('mapHeartbeatExecutionToFrontend', () => {
-  it('maps all execution fields from snake_case to camelCase', () => {
-    const backend: BackendHeartbeatExecution = {
-      id: 'exec-uuid-1',
-      heartbeat_config_id: 1,
-      agent_id: 10,
-      trigger_type: 'scheduled',
-      trigger_id: 42,
-      event_payload: { source: 'cron' },
-      scheduled_at: '2026-02-28T09:00:00Z',
-      started_at: '2026-02-28T09:00:05Z',
-      completed_at: '2026-02-28T09:01:00Z',
-      status: 'completed',
-      outcome: 'success',
-      result: { output: 'done' },
-      error_message: undefined,
-      duration_ms: 55000,
-      tokens_used: 4500,
-      tool_calls_count: 12,
-      inbox_posts: 2,
-      memory_updates: 1,
-      alerts_sent: 0,
-      run_id: 'run-abc',
-      created_at: '2026-02-28T09:00:00Z',
-    };
-
-    const result = mapHeartbeatExecutionToFrontend(backend);
-
-    expect(result.id).toBe('exec-uuid-1');
-    expect(result.heartbeatConfigId).toBe(1);
-    expect(result.agentId).toBe(10);
-    expect(result.triggerType).toBe('scheduled');
-    expect(result.triggerId).toBe(42);
-    expect(result.eventPayload).toEqual({ source: 'cron' });
-    expect(result.scheduledAt).toBe('2026-02-28T09:00:00Z');
-    expect(result.startedAt).toBe('2026-02-28T09:00:05Z');
-    expect(result.completedAt).toBe('2026-02-28T09:01:00Z');
-    expect(result.status).toBe('completed');
-    expect(result.outcome).toBe('success');
-    expect(result.result).toEqual({ output: 'done' });
-    expect(result.errorMessage).toBeUndefined();
-    expect(result.durationMs).toBe(55000);
-    expect(result.tokensUsed).toBe(4500);
-    expect(result.toolCallsCount).toBe(12);
-    expect(result.inboxPosts).toBe(2);
-    expect(result.memoryUpdates).toBe(1);
-    expect(result.alertsSent).toBe(0);
-    expect(result.runId).toBe('run-abc');
-    expect(result.createdAt).toBe('2026-02-28T09:00:00Z');
-  });
-
-  it('handles failed execution with error message', () => {
-    const failed: BackendHeartbeatExecution = {
-      id: 'exec-fail',
-      agent_id: 5,
-      trigger_type: 'event',
-      scheduled_at: '2026-02-28T10:00:00Z',
-      status: 'failed',
-      outcome: 'failure',
-      error_message: 'Agent timed out after 300s',
-      duration_ms: 300000,
-      tokens_used: 0,
-      tool_calls_count: 0,
-      inbox_posts: 0,
-      memory_updates: 0,
-      alerts_sent: 1,
-      created_at: '2026-02-28T10:00:00Z',
-    };
-
-    const result = mapHeartbeatExecutionToFrontend(failed);
-    expect(result.status).toBe('failed');
-    expect(result.outcome).toBe('failure');
-    expect(result.errorMessage).toBe('Agent timed out after 300s');
-    expect(result.alertsSent).toBe(1);
-  });
-});

@@ -1,7 +1,7 @@
 // Execution Domain Errors Tests
 import { AppError, DomainError } from '../../../utils/errors';
 import {
-    ToolDomainError,
+    ToolExecutionError,
     ExecutionTimeoutError,
     ToolTimeoutError,
     ToolRateLimitedError,
@@ -12,7 +12,7 @@ import {
     UserCancelledError,
     SandboxCreationError,
     SandboxTimeoutError,
-    SDKDomainError,
+    SDKExecutionError,
     StreamingError,
     StorageSyncError,
     CoordinationError,
@@ -50,9 +50,9 @@ describe('Execution Domain Errors', () => {
         });
     });
 
-    describe('ToolDomainError', () => {
+    describe('ToolExecutionError', () => {
         it('should have correct status code 500', () => {
-            const error = new ToolDomainError('web_search', 'Rate limit exceeded', 'brave_search');
+            const error = new ToolExecutionError('web_search', 'Rate limit exceeded', 'brave_search');
             expect(error.statusCode).toBe(500);
             expect(error.code).toBe('TOOL_EXECUTION_FAILED');
             expect(error.toolName).toBe('web_search');
@@ -60,7 +60,7 @@ describe('Execution Domain Errors', () => {
         });
 
         it('should format message with tool name', () => {
-            const error = new ToolDomainError('gmail', 'Authentication failed');
+            const error = new ToolExecutionError('gmail', 'Authentication failed');
             expect(error.message).toBe("Tool 'gmail' failed: Authentication failed");
         });
     });
@@ -160,16 +160,16 @@ describe('Execution Domain Errors', () => {
         });
     });
 
-    describe('SDKDomainError', () => {
+    describe('SDKExecutionError', () => {
         it('should have correct status code 500', () => {
-            const error = new SDKDomainError('SDK query failed');
+            const error = new SDKExecutionError('SDK query failed');
             expect(error.statusCode).toBe(500);
             expect(error.code).toBe('SDK_EXECUTION_FAILED');
         });
 
         it('should preserve original error', () => {
             const originalError = new Error('Network error');
-            const error = new SDKDomainError('SDK query failed', originalError);
+            const error = new SDKExecutionError('SDK query failed', originalError);
             expect(error.originalError).toBe(originalError);
         });
     });

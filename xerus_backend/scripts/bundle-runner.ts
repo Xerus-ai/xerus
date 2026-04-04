@@ -1,6 +1,6 @@
-// Bundle the agent runner + platform MCP server into JS files for sandbox deployment
+// Bundle the MCP server into JS for sandbox deployment
 // Usage: npx ts-node scripts/bundle-runner.ts
-// Output: dist/runner-bundle/agent-runner.js, dist/runner-bundle/platform-mcp-server.js
+// Output: dist/runner-bundle/mcp-server.js
 
 import { build, type BuildOptions } from 'esbuild';
 import path from 'path';
@@ -17,39 +17,27 @@ const SHARED_OPTIONS: BuildOptions = {
     sourcemap: false,
     minify: false,
     external: [
-        '@anthropic-ai/claude-agent-sdk',
         '@modelcontextprotocol/sdk',
         '@modelcontextprotocol/sdk/*',
-        'zod',
-        'zod/*',
     ],
     treeShaking: true,
     logLevel: 'info',
 };
 
 async function bundleRunner(): Promise<void> {
-    const results = await Promise.all([
-        build({
-            ...SHARED_OPTIONS,
-            entryPoints: [path.join(RUNNER_DIR, 'agent-runner.ts')],
-            outfile: path.join(OUT_DIR, 'agent-runner.js'),
-        }),
-        build({
-            ...SHARED_OPTIONS,
-            entryPoints: [path.join(RUNNER_DIR, 'platform-mcp-server.ts')],
-            outfile: path.join(OUT_DIR, 'platform-mcp-server.js'),
-        }),
-    ]);
+    const result = await build({
+        ...SHARED_OPTIONS,
+        entryPoints: [path.join(RUNNER_DIR, 'mcp-server.ts')],
+        outfile: path.join(OUT_DIR, 'mcp-server.js'),
+    });
 
-    const errors = results.flatMap(r => r.errors);
-    if (errors.length > 0) {
-        console.error('Bundle failed:', errors);
+    if (result.errors.length > 0) {
+        console.error('Bundle failed:', result.errors);
         process.exit(1);
     }
 
     console.log('Runner bundles created:');
-    console.log('  dist/runner-bundle/agent-runner.js');
-    console.log('  dist/runner-bundle/platform-mcp-server.js');
+    console.log('  dist/runner-bundle/mcp-server.js');
 }
 
 bundleRunner().catch((err) => {

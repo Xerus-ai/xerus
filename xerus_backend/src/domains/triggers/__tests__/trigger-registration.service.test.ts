@@ -2,8 +2,8 @@
 // Tests the reconciliation logic that syncs HEARTBEAT.md events with agent_triggers table
 import { pool } from '../../../database/connection';
 import { TriggerRegistrationService } from '../trigger-registration.service';
-import { parseHeartbeatMd, type ParsedEventEntry } from '../../heartbeat/heartbeat-md-parser';
-import type { AgentTriggerRow } from '../../heartbeat/normalized-event.types';
+import type { ParsedEventEntry } from '../trigger-registration.service';
+import type { AgentTriggerRow } from '../trigger.types';
 
 // Test constants
 const TEST_USER_ID = 'test_trigger_reg_user';
@@ -138,63 +138,13 @@ describe('TriggerRegistrationService', () => {
     });
 
     // -------------------------------------------------------------------------
-    // parseHeartbeatMd integration (verify the parser returns what we expect)
-    // -------------------------------------------------------------------------
-
-    describe('HEARTBEAT.md event parsing', () => {
-        it('should parse simple event entries', () => {
-            const md = `## Events\n### On: gmail.new_email\n- Check inbox`;
-            const result = parseHeartbeatMd(md);
-
-            expect(result.events).toHaveLength(1);
-            expect(result.events[0].app).toBe('gmail');
-            expect(result.events[0].event_type).toBe('new_email');
-            expect(result.events[0].filter).toBeNull();
-        });
-
-        it('should parse event entries with filters', () => {
-            const md = `## Events\n### On: gmail.new_email [filter: "from:vip-list"]\n- Handle VIP`;
-            const result = parseHeartbeatMd(md);
-
-            expect(result.events).toHaveLength(1);
-            expect(result.events[0].filter).toBe('from:vip-list');
-        });
-
-        it('should parse multiple event entries', () => {
-            const md = [
-                '## Events',
-                '### On: gmail.new_email',
-                '- Check inbox',
-                '### On: github.check_suite.failure',
-                '- Investigate failure',
-                '### On: stripe.payment_failed',
-                '- Alert user',
-            ].join('\n');
-            const result = parseHeartbeatMd(md);
-
-            expect(result.events).toHaveLength(3);
-            expect(result.events[0].app).toBe('gmail');
-            expect(result.events[1].app).toBe('github');
-            expect(result.events[1].event_type).toBe('check_suite.failure');
-            expect(result.events[2].app).toBe('stripe');
-        });
-
-        it('should return empty events for HEARTBEAT.md with no events section', () => {
-            const md = `## Identity\nI am a helpful agent\n## Scheduled\n### Every 30 minutes\n- Check stuff`;
-            const result = parseHeartbeatMd(md);
-
-            expect(result.events).toHaveLength(0);
-        });
-    });
-
-    // -------------------------------------------------------------------------
     // reconcileTriggers()
     // -------------------------------------------------------------------------
 
     describe('reconcileTriggers()', () => {
         it('should register new triggers from parsed events', async () => {
             const desiredEvents: ParsedEventEntry[] = [
-                { app: 'gmail', event_type: 'new_email', filter: null, instructions: ['Check inbox'] },
+                { app: 'gmail', event_type: 'new_email', filter: null },
             ];
 
             const result = await service.reconcileTriggers(TEST_AGENT_ID, TEST_USER_ID, desiredEvents);
@@ -218,8 +168,8 @@ describe('TriggerRegistrationService', () => {
 
         it('should register multiple triggers at once', async () => {
             const desiredEvents: ParsedEventEntry[] = [
-                { app: 'gmail', event_type: 'new_email', filter: null, instructions: [] },
-                { app: 'github', event_type: 'pr_opened', filter: null, instructions: [] },
+                { app: 'gmail', event_type: 'new_email', filter: null },
+                { app: 'github', event_type: 'pr_opened', filter: null },
             ];
 
             const result = await service.reconcileTriggers(TEST_AGENT_ID, TEST_USER_ID, desiredEvents);
@@ -253,7 +203,7 @@ describe('TriggerRegistrationService', () => {
 
             // Reconcile with the same event
             const desiredEvents: ParsedEventEntry[] = [
-                { app: 'gmail', event_type: 'new_email', filter: null, instructions: [] },
+                { app: 'gmail', event_type: 'new_email', filter: null },
             ];
 
             const result = await service.reconcileTriggers(TEST_AGENT_ID, TEST_USER_ID, desiredEvents);
@@ -270,7 +220,7 @@ describe('TriggerRegistrationService', () => {
 
             // Reconcile with changed filter
             const desiredEvents: ParsedEventEntry[] = [
-                { app: 'gmail', event_type: 'new_email', filter: 'from:new-filter', instructions: [] },
+                { app: 'gmail', event_type: 'new_email', filter: 'from:new-filter' },
             ];
 
             const result = await service.reconcileTriggers(TEST_AGENT_ID, TEST_USER_ID, desiredEvents);
@@ -295,8 +245,8 @@ describe('TriggerRegistrationService', () => {
 
             // Desired: gmail.new_email (keep), stripe.payment_failed (add), github removed
             const desiredEvents: ParsedEventEntry[] = [
-                { app: 'gmail', event_type: 'new_email', filter: null, instructions: [] },
-                { app: 'stripe', event_type: 'payment_failed', filter: null, instructions: [] },
+                { app: 'gmail', event_type: 'new_email', filter: null },
+                { app: 'stripe', event_type: 'payment_failed', filter: null },
             ];
 
             const result = await service.reconcileTriggers(TEST_AGENT_ID, TEST_USER_ID, desiredEvents);
@@ -312,7 +262,7 @@ describe('TriggerRegistrationService', () => {
         it('should include warnings for apps not connected', async () => {
             // 'notion' is not connected for this test user
             const desiredEvents: ParsedEventEntry[] = [
-                { app: 'notion', event_type: 'page_updated', filter: null, instructions: [] },
+                { app: 'notion', event_type: 'page_updated', filter: null },
             ];
 
             const result = await service.reconcileTriggers(TEST_AGENT_ID, TEST_USER_ID, desiredEvents);
@@ -324,7 +274,7 @@ describe('TriggerRegistrationService', () => {
 
         it('should store filter_config as raw when filter is provided', async () => {
             const desiredEvents: ParsedEventEntry[] = [
-                { app: 'gmail', event_type: 'new_email', filter: 'from:vip-list', instructions: [] },
+                { app: 'gmail', event_type: 'new_email', filter: 'from:vip-list' },
             ];
 
             await service.reconcileTriggers(TEST_AGENT_ID, TEST_USER_ID, desiredEvents);
@@ -338,7 +288,7 @@ describe('TriggerRegistrationService', () => {
 
         it('should store empty filter_config when no filter', async () => {
             const desiredEvents: ParsedEventEntry[] = [
-                { app: 'gmail', event_type: 'new_email', filter: null, instructions: [] },
+                { app: 'gmail', event_type: 'new_email', filter: null },
             ];
 
             await service.reconcileTriggers(TEST_AGENT_ID, TEST_USER_ID, desiredEvents);
@@ -356,7 +306,7 @@ describe('TriggerRegistrationService', () => {
 
             // Now add a filter
             const desiredEvents: ParsedEventEntry[] = [
-                { app: 'gmail', event_type: 'new_email', filter: 'from:boss', instructions: [] },
+                { app: 'gmail', event_type: 'new_email', filter: 'from:boss' },
             ];
 
             const result = await service.reconcileTriggers(TEST_AGENT_ID, TEST_USER_ID, desiredEvents);
@@ -371,7 +321,7 @@ describe('TriggerRegistrationService', () => {
 
             // Now remove the filter
             const desiredEvents: ParsedEventEntry[] = [
-                { app: 'gmail', event_type: 'new_email', filter: null, instructions: [] },
+                { app: 'gmail', event_type: 'new_email', filter: null },
             ];
 
             const result = await service.reconcileTriggers(TEST_AGENT_ID, TEST_USER_ID, desiredEvents);
@@ -405,58 +355,40 @@ describe('TriggerRegistrationService', () => {
     });
 
     // -------------------------------------------------------------------------
-    // syncFromHeartbeatMd() - end-to-end from raw markdown
+    // syncFromEvents() - end-to-end from event list
     // -------------------------------------------------------------------------
 
-    describe('syncFromHeartbeatMd()', () => {
-        it('should parse HEARTBEAT.md content and reconcile triggers', async () => {
-            const heartbeatMd = [
-                '## Identity',
-                'I am a helpful agent',
-                '## Scheduled',
-                '### Every 30 minutes',
-                '- Check stuff',
-                '## Events',
-                '### On: gmail.new_email',
-                '- Check inbox',
-                '### On: github.pr_opened',
-                '- Review PR',
-            ].join('\n');
+    describe('syncFromEvents()', () => {
+        it('should reconcile events list with DB triggers', async () => {
+            const events: ParsedEventEntry[] = [
+                { app: 'gmail', event_type: 'new_email', filter: null },
+                { app: 'github', event_type: 'pr_opened', filter: null },
+            ];
 
-            const result = await service.syncFromHeartbeatMd(TEST_AGENT_ID, TEST_USER_ID, heartbeatMd);
+            const result = await service.syncFromEvents(TEST_AGENT_ID, TEST_USER_ID, events);
 
             expect(result.registered).toHaveLength(2);
             expect(result.registered[0].app).toBe('gmail');
             expect(result.registered[1].app).toBe('github');
         });
 
-        it('should handle HEARTBEAT.md with no events section', async () => {
-            const heartbeatMd = [
-                '## Identity',
-                'I am a helpful agent',
-                '## Scheduled',
-                '### Every 30 minutes',
-                '- Check stuff',
-            ].join('\n');
-
+        it('should deregister when events list is empty', async () => {
             // First register a trigger manually
             await insertTestTrigger(TEST_AGENT_ID, TEST_USER_ID, 'gmail', 'new_email');
 
-            // Sync with md that has no events - should deregister
-            const result = await service.syncFromHeartbeatMd(TEST_AGENT_ID, TEST_USER_ID, heartbeatMd);
+            // Sync with empty events - should deregister
+            const result = await service.syncFromEvents(TEST_AGENT_ID, TEST_USER_ID, []);
 
             expect(result.deregistered).toHaveLength(1);
             expect(result.deregistered[0].app).toBe('gmail');
         });
 
-        it('should handle HEARTBEAT.md with filter syntax', async () => {
-            const heartbeatMd = [
-                '## Events',
-                '### On: gmail.new_email [filter: "from:vip-list"]',
-                '- Handle VIP mail',
-            ].join('\n');
+        it('should handle events with filter', async () => {
+            const events: ParsedEventEntry[] = [
+                { app: 'gmail', event_type: 'new_email', filter: 'from:vip-list' },
+            ];
 
-            const result = await service.syncFromHeartbeatMd(TEST_AGENT_ID, TEST_USER_ID, heartbeatMd);
+            const result = await service.syncFromEvents(TEST_AGENT_ID, TEST_USER_ID, events);
 
             expect(result.registered).toHaveLength(1);
 
@@ -490,45 +422,4 @@ describe('TriggerRegistrationService', () => {
         });
     });
 
-    // -------------------------------------------------------------------------
-    // detectDrift()
-    // -------------------------------------------------------------------------
-
-    describe('detectDrift()', () => {
-        it('should detect no drift when DB matches parsed events', async () => {
-            await insertTestTrigger(TEST_AGENT_ID, TEST_USER_ID, 'gmail', 'new_email');
-
-            const parsedEvents: ParsedEventEntry[] = [
-                { app: 'gmail', event_type: 'new_email', filter: null, instructions: [] },
-            ];
-
-            const drift = await service.detectDrift(TEST_AGENT_ID, parsedEvents);
-
-            expect(drift.inDbOnly).toHaveLength(0);
-            expect(drift.inMdOnly).toHaveLength(0);
-            expect(drift.hasDrift).toBe(false);
-        });
-
-        it('should detect triggers in DB but not in HEARTBEAT.md', async () => {
-            await insertTestTrigger(TEST_AGENT_ID, TEST_USER_ID, 'gmail', 'new_email');
-
-            const drift = await service.detectDrift(TEST_AGENT_ID, []);
-
-            expect(drift.inDbOnly).toHaveLength(1);
-            expect(drift.inDbOnly[0]).toBe('gmail.new_email');
-            expect(drift.hasDrift).toBe(true);
-        });
-
-        it('should detect triggers in HEARTBEAT.md but not in DB', async () => {
-            const parsedEvents: ParsedEventEntry[] = [
-                { app: 'gmail', event_type: 'new_email', filter: null, instructions: [] },
-            ];
-
-            const drift = await service.detectDrift(TEST_AGENT_ID, parsedEvents);
-
-            expect(drift.inMdOnly).toHaveLength(1);
-            expect(drift.inMdOnly[0]).toBe('gmail.new_email');
-            expect(drift.hasDrift).toBe(true);
-        });
-    });
 });

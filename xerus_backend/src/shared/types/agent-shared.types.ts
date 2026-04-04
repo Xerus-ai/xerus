@@ -37,6 +37,17 @@ export const DEFAULT_THINKING_LEVEL: ThinkingLevel = 'medium';
 export const DEFAULT_AUTONOMY_LEVEL: AutonomyLevel = 'supervised';
 
 // -----------------------------------------------------------------------------
+// CLI Adapter Types (CLI-native pivot)
+// Defines which CLI execution engine an agent uses
+// -----------------------------------------------------------------------------
+
+export const ADAPTER_TYPES = ['claudecode', 'codex'] as const;
+
+export type AdapterType = (typeof ADAPTER_TYPES)[number];
+
+export const DEFAULT_ADAPTER_TYPE: AdapterType = 'claudecode';
+
+// -----------------------------------------------------------------------------
 // Agent Capabilities (used by agents domain and execution orchestrator)
 // -----------------------------------------------------------------------------
 

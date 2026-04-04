@@ -10,32 +10,30 @@ import { authenticateFirebaseToken } from '../../middleware/auth';
 import { agentChannelService } from './agent-channel.service';
 import { AgentUnauthorizedError } from './errors';
 import { resolveAgentParam } from './resolve-agent-param';
-import { syncModuleClaudeMdToWorkspace, type WorkspaceSyncDeps } from './agent-workspace-sync';
-import type { SandboxService } from '../execution/sandbox/sandbox.service';
+import type { SandboxService } from '../sandbox-infra/sandbox/sandbox.service';
 import { getSharedFsRepo } from './routes';
-import { query } from '../../database/connection';
+import { requireRunningSandbox, getDaytonaProvider } from '../sandbox-infra/sandbox/sandbox-route-helpers';
 
 // -----------------------------------------------------------------------------
 // Dependency Injection
 // -----------------------------------------------------------------------------
 
+let sandboxService: SandboxService | null = null;
+
 export interface AgentChannelsDeps {
     sandboxService: SandboxService;
 }
 
-let channelsDeps: AgentChannelsDeps | null = null;
-
 export function setAgentChannelsDeps(d: AgentChannelsDeps): void {
-    channelsDeps = d;
+    sandboxService = d.sandboxService;
     agentChannelService.setFilesystemRepo(getSharedFsRepo());
-    agentChannelService.setDb({ query });
 }
 
-function getSyncDeps(): WorkspaceSyncDeps {
-    if (!channelsDeps) {
-        throw new Error('Agent channels deps not initialized. Call setAgentChannelsDeps() at startup.');
+function getSandboxService(): SandboxService {
+    if (!sandboxService) {
+        throw new Error('AgentChannels dependencies not initialized. Call setAgentChannelsDeps() at startup.');
     }
-    return { sandboxService: channelsDeps.sandboxService, db: { query } };
+    return sandboxService;
 }
 
 const router = Router();
@@ -49,8 +47,12 @@ router.get('/:id/channels', auth, async (req: AuthenticatedRequest, res: Respons
     try {
         if (!req.user) throw new AgentUnauthorizedError();
 
+        const svc = getSandboxService();
+        const sbId = await requireRunningSandbox(svc, req.user.uid);
+        const provider = getDaytonaProvider(svc);
+
         const resolved = await resolveAgentParam(req.params.id, req.user.uid);
-        const channels = await agentChannelService.getChannels(resolved.id, req.user.uid);
+        const channels = await agentChannelService.getChannels(provider, sbId, resolved.id, req.user.uid);
 
         sendResponse(res, 200, { channels }, startTime);
     } catch (err) {
@@ -64,18 +66,17 @@ router.post('/:id/channels', auth, async (req: AuthenticatedRequest, res: Respon
     try {
         if (!req.user) throw new AgentUnauthorizedError();
 
-        const { channel_id } = req.body;
-        if (!channel_id || typeof channel_id !== 'string') {
-            throw new BadRequestError('channel_id is required');
+        const { channel_slug } = req.body;
+        if (!channel_slug || typeof channel_slug !== 'string') {
+            throw new BadRequestError('channel_slug is required');
         }
 
-        const resolved = await resolveAgentParam(req.params.id, req.user.uid);
-        const result = await agentChannelService.assignChannel(resolved.id, channel_id, req.user.uid);
+        const svc = getSandboxService();
+        const sbId = await requireRunningSandbox(svc, req.user.uid);
+        const provider = getDaytonaProvider(svc);
 
-        syncModuleClaudeMdToWorkspace(req.user.uid, resolved.id, getSyncDeps()).catch((error) => {
-            const message = error instanceof Error ? error.message : 'Unknown error';
-            console.warn(`[agents] CLAUDE.md sync failed for agent ${resolved.id} after channel assign (best-effort): ${message}`);
-        });
+        const resolved = await resolveAgentParam(req.params.id, req.user.uid);
+        const result = await agentChannelService.assignChannel(provider, sbId, resolved.id, channel_slug, req.user.uid);
 
         sendResponse(res, 201, result, startTime);
     } catch (err) {
@@ -83,19 +84,18 @@ router.post('/:id/channels', auth, async (req: AuthenticatedRequest, res: Respon
     }
 });
 
-// DELETE /api/v1/agents/:id/channels/:channelId - Remove agent from channel
-router.delete('/:id/channels/:channelId', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+// DELETE /api/v1/agents/:id/channels/:channelSlug - Remove agent from channel
+router.delete('/:id/channels/:channelSlug', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const startTime = res.locals.startTime || Date.now();
     try {
         if (!req.user) throw new AgentUnauthorizedError();
 
-        const resolved = await resolveAgentParam(req.params.id, req.user.uid);
-        const result = await agentChannelService.removeChannel(resolved.id, req.params.channelId, req.user.uid);
+        const svc = getSandboxService();
+        const sbId = await requireRunningSandbox(svc, req.user.uid);
+        const provider = getDaytonaProvider(svc);
 
-        syncModuleClaudeMdToWorkspace(req.user.uid, resolved.id, getSyncDeps()).catch((error) => {
-            const message = error instanceof Error ? error.message : 'Unknown error';
-            console.warn(`[agents] CLAUDE.md sync failed for agent ${resolved.id} after channel remove (best-effort): ${message}`);
-        });
+        const resolved = await resolveAgentParam(req.params.id, req.user.uid);
+        const result = await agentChannelService.removeChannel(provider, sbId, resolved.id, req.params.channelSlug, req.user.uid);
 
         sendResponse(res, 200, result, startTime);
     } catch (err) {
@@ -103,19 +103,18 @@ router.delete('/:id/channels/:channelId', auth, async (req: AuthenticatedRequest
     }
 });
 
-// POST /api/v1/agents/:id/channels/:channelId/primary - Set as primary channel
-router.post('/:id/channels/:channelId/primary', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+// POST /api/v1/agents/:id/channels/:channelSlug/primary - Set as primary channel
+router.post('/:id/channels/:channelSlug/primary', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const startTime = res.locals.startTime || Date.now();
     try {
         if (!req.user) throw new AgentUnauthorizedError();
 
-        const resolved = await resolveAgentParam(req.params.id, req.user.uid);
-        const result = await agentChannelService.setPrimaryChannel(resolved.id, req.params.channelId, req.user.uid);
+        const svc = getSandboxService();
+        const sbId = await requireRunningSandbox(svc, req.user.uid);
+        const provider = getDaytonaProvider(svc);
 
-        syncModuleClaudeMdToWorkspace(req.user.uid, resolved.id, getSyncDeps()).catch((error) => {
-            const message = error instanceof Error ? error.message : 'Unknown error';
-            console.warn(`[agents] CLAUDE.md sync failed for agent ${resolved.id} after set-primary (best-effort): ${message}`);
-        });
+        const resolved = await resolveAgentParam(req.params.id, req.user.uid);
+        const result = await agentChannelService.setPrimaryChannel(provider, sbId, resolved.id, req.params.channelSlug, req.user.uid);
 
         sendResponse(res, 200, result, startTime);
     } catch (err) {

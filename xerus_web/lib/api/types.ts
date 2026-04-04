@@ -11,6 +11,17 @@ export type ThinkingLevel = 'low' | 'medium' | 'high';
 export type AutonomyLevel = 'supervised' | 'semi_autonomous' | 'autonomous';
 
 // ===========================
+// ADAPTER TYPE
+// ===========================
+
+export const VALID_ADAPTER_TYPES = ['claudecode', 'codex'] as const;
+export type AdapterType = typeof VALID_ADAPTER_TYPES[number];
+
+export function isValidAdapterType(value: unknown): value is AdapterType {
+    return typeof value === 'string' && VALID_ADAPTER_TYPES.includes(value as AdapterType);
+}
+
+// ===========================
 // WORKFLOW CONFIGURATION
 // ===========================
 
@@ -73,6 +84,7 @@ export interface Assistant {
   avatarUrl?: string | null; // Mascot config string or image URL
   thinkingLevel?: ThinkingLevel;   // Reasoning depth: low, medium, high
   autonomyLevel?: AutonomyLevel;   // Permission mode: supervised, semi_autonomous, autonomous
+  adapter_type?: AdapterType;      // CLI adapter: claudecode or codex
 }
 
 export interface AgentTeamMembership {
@@ -108,6 +120,7 @@ export interface BackendAgent {
   system_prompt?: string | null;
   thinking_level?: ThinkingLevel;   // Reasoning depth: low=1K, medium=8K, high=32K tokens
   autonomy_level?: AutonomyLevel;   // Permission mode: supervised, semi_autonomous, autonomous
+  adapter_type?: AdapterType;       // CLI adapter: claudecode or codex
 }
 
 export interface AgentCreateInput {
@@ -120,6 +133,7 @@ export interface AgentCreateInput {
   search_all_knowledge?: boolean;
   thinking_level?: ThinkingLevel;
   autonomy_level?: AutonomyLevel;
+  adapter_type?: AdapterType;
 }
 
 export interface AgentUpdateInput extends Partial<AgentCreateInput> {

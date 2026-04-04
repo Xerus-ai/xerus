@@ -5,13 +5,14 @@ import { ExternalLink, Eye, EyeOff, RefreshCw, Network, Shield, ArrowUpRight } f
 import { motion } from 'framer-motion'
 import { toast } from '@/lib/toast'
 import { useRedirectIfNotAuth } from '@/utils/AuthContext'
-import { saveApiKey, checkApiKeyStatus, deleteApiKey, getAllApiKeys } from '@/lib/api/user'
+import { saveApiKey, checkApiKeyStatus, deleteApiKey, getAllApiKeys, getCliAuthStatus, type CliAuthStatus } from '@/lib/api/user'
+import { CLIAuthStatusPanel } from './CLIAuthStatusPanel'
 
 const PROVIDERS = [
   {
     id: 'openrouter',
     name: 'OpenRouter',
-    description: 'Unified API gateway powering all agent AI models.',
+    description: 'Unified API gateway powering all agent AI models. Provides access to Claude, GPT, Gemini, DeepSeek, and 230+ more.',
     Icon: Network,
     keyUrl: 'https://openrouter.ai/keys',
     docsUrl: 'https://openrouter.ai/docs',
@@ -28,12 +29,15 @@ export default function ApiKeysPage() {
   const [apiKeyStatus, setApiKeyStatus] = useState<Record<string, boolean>>({})
   const [apiKeys, setApiKeys] = useState<Record<string, string | null>>({})
   const [isHydrated, setIsHydrated] = useState(false)
+  const [cliAuthStatus, setCliAuthStatus] = useState<CliAuthStatus | null>(null)
 
   const updateApiKeyStatus = (newStatus: Record<string, boolean>) => {
     setApiKeyStatus(newStatus)
     try {
       localStorage.setItem('apiKeyStatus', JSON.stringify(newStatus))
-    } catch {}
+    } catch (e) {
+      console.warn('Failed to persist API key status:', e)
+    }
   }
 
   useEffect(() => {
@@ -41,13 +45,18 @@ export default function ApiKeysPage() {
     try {
       const stored = localStorage.getItem('apiKeyStatus')
       if (stored) setApiKeyStatus(JSON.parse(stored))
-    } catch {}
+    } catch (e) {
+      console.warn('Failed to read API key status from localStorage:', e)
+    }
   }, [])
 
   useEffect(() => {
     if (!user) return
     checkApiKeyStatus().then(updateApiKeyStatus)
     getAllApiKeys().then(setApiKeys)
+    getCliAuthStatus().then(setCliAuthStatus).catch(() => {
+      // CLI auth status endpoint may not be available yet
+    })
   }, [user])
 
   const getMaskedPreview = (provider: string): string | undefined => {
@@ -100,6 +109,9 @@ export default function ApiKeysPage() {
           Connect your provider keys to power agent execution
         </p>
       </motion.div>
+
+      {/* CLI Authentication Status Section */}
+      <CLIAuthStatusPanel cliAuthStatus={cliAuthStatus} onStatusChange={setCliAuthStatus} />
 
       <div className="space-y-5">
         {PROVIDERS.map((provider, index) => {
@@ -214,53 +226,55 @@ export default function ApiKeysPage() {
                 </div>
               </div>
 
-              {/* OpenRouter info panel */}
-              <div className="border-t border-surface-active/30 bg-surface-hover/20 px-5 py-4">
-                <p className="text-[11px] font-medium text-text-secondary mb-2">
-                  Available Models
-                </p>
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  {['Claude 4.5', 'GPT-5', 'Gemini 2.5', 'DeepSeek V3', 'Qwen 3'].map(
-                    (model) => (
-                      <span
-                        key={model}
-                        className="text-[10px] font-medium text-text-secondary bg-white/80 border border-surface-active/40 px-2 py-0.5 rounded-md"
-                      >
-                        {model}
-                      </span>
-                    )
-                  )}
-                  <span className="text-[10px] font-medium text-text-secondary px-1 py-0.5">
-                    +230 more
-                  </span>
+              {/* OpenRouter info panel - only show for OpenRouter */}
+              {provider.id === 'openrouter' && (
+                <div className="border-t border-surface-active/30 bg-surface-hover/20 px-5 py-4">
+                  <p className="text-[11px] font-medium text-text-secondary mb-2">
+                    Available Models
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    {['Claude 4.5', 'GPT-5', 'Gemini 2.5', 'DeepSeek V3', 'Qwen 3'].map(
+                      (model) => (
+                        <span
+                          key={model}
+                          className="text-[10px] font-medium text-text-secondary bg-white/80 border border-surface-active/40 px-2 py-0.5 rounded-md"
+                        >
+                          {model}
+                        </span>
+                      )
+                    )}
+                    <span className="text-[10px] font-medium text-text-secondary px-1 py-0.5">
+                      +230 more
+                    </span>
+                  </div>
+                  <div className="flex gap-4">
+                    <a
+                      href="https://openrouter.ai/models"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-text-secondary hover:text-text-secondary transition-colors inline-flex items-center gap-1"
+                    >
+                      View all models <ExternalLink className="w-2.5 h-2.5" />
+                    </a>
+                    <a
+                      href="https://openrouter.ai/activity"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-text-secondary hover:text-text-secondary transition-colors inline-flex items-center gap-1"
+                    >
+                      Check usage <ExternalLink className="w-2.5 h-2.5" />
+                    </a>
+                    <a
+                      href="https://openrouter.ai/docs"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-text-secondary hover:text-text-secondary transition-colors inline-flex items-center gap-1"
+                    >
+                      Docs <ExternalLink className="w-2.5 h-2.5" />
+                    </a>
+                  </div>
                 </div>
-                <div className="flex gap-4">
-                  <a
-                    href={provider.modelsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[11px] text-text-secondary hover:text-text-secondary transition-colors inline-flex items-center gap-1"
-                  >
-                    View all models <ExternalLink className="w-2.5 h-2.5" />
-                  </a>
-                  <a
-                    href={provider.usageUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[11px] text-text-secondary hover:text-text-secondary transition-colors inline-flex items-center gap-1"
-                  >
-                    Check usage <ExternalLink className="w-2.5 h-2.5" />
-                  </a>
-                  <a
-                    href={provider.docsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[11px] text-text-secondary hover:text-text-secondary transition-colors inline-flex items-center gap-1"
-                  >
-                    Docs <ExternalLink className="w-2.5 h-2.5" />
-                  </a>
-                </div>
-              </div>
+              )}
             </motion.div>
           )
         })}

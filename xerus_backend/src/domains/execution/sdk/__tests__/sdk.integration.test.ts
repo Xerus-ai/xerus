@@ -1,14 +1,14 @@
 // SDK Integration Tests
 // Credit calculation, SDK configuration tests
 // executeAgent tests removed: execution now flows through v2 pipeline
-// (ExecutionService -> runner inside sandbox), not SDKService.executeAgent()
+// (ExecutionService -> runner inside sandbox), not PricingService.executeAgent()
 // Run with: npm test -- --testPathPattern="sdk.integration"
 
 import {
     SDK_CONFIG,
     buildSDKEnvironment,
 } from '../sdk.config';
-import { SDKService } from '../sdk.service';
+import { PricingService } from '../pricing.service';
 
 // Test DB that returns pricing data matching model_registry
 function createTestDb(pricing: Array<{ id: string; pricing_input_cents: string; pricing_output_cents: string }>) {
@@ -31,9 +31,9 @@ const STANDARD_PRICING = [
     { id: 'deepseek/deepseek-chat-v3', pricing_input_cents: '270', pricing_output_cents: '1100' },
 ];
 
-async function createLoadedService(pricing = STANDARD_PRICING): Promise<SDKService> {
+async function createLoadedService(pricing = STANDARD_PRICING): Promise<PricingService> {
     const db = createTestDb(pricing);
-    const service = new SDKService(db);
+    const service = new PricingService(db);
     await service.loadPricing();
     return service;
 }
@@ -42,8 +42,8 @@ async function createLoadedService(pricing = STANDARD_PRICING): Promise<SDKServi
 // Credit Calculation Tests
 // -----------------------------------------------------------------------------
 
-describe('SDKService Credit Calculation', () => {
-    let service: SDKService;
+describe('PricingService Credit Calculation', () => {
+    let service: PricingService;
 
     beforeEach(async () => {
         service = await createLoadedService();

@@ -1,19 +1,32 @@
 // Task Routes
 // REST API endpoints for the kanban task board.
-// Tasks are created by agents (via metadata_sync) or humans (via POST).
-// Dual-write: DB is authoritative, sandbox .beads/issues.jsonl is best-effort.
+// Tasks live in workspace.db (SQLite on sandbox). Workspace DB is source of truth.
+// .beads/issues.jsonl is kept in sync for agent access via `bd` tool.
 // Frontend reads these to render the CompanyBoard kanban.
 
 import { Router, Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../../types';
 import { sendResponse } from '../../utils/response';
+import { UnauthorizedError, BadRequestError, NotFoundError } from '../../utils/errors';
 import { authenticateFirebaseToken } from '../../middleware/auth';
-import { query } from '../../database/connection';
-import { SANDBOX_CONFIG } from '../execution';
-import type { SandboxService, DaytonaProvider } from '../execution';
+import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
+import type { SandboxService } from '../sandbox-infra/sandbox/sandbox.service';
+import type { DaytonaProvider } from '../sandbox-infra/sandbox/providers/daytona.provider';
+import { requireRunningSandbox, getDaytonaProvider } from '../sandbox-infra/sandbox/sandbox-route-helpers';
 import { shellEscape } from '../../utils/shell-safety';
 import { sanitizeSlug } from '../../shared/slugify';
-import { VALID_STATUSES, VALID_PRIORITIES, DB_TO_SANDBOX_STATUS } from './task.constants';
+import { VALID_STATUSES, VALID_PRIORITIES } from './task.constants';
+import {
+    listTasks,
+    listTasksByChannel,
+    createTask,
+    updateTaskStatus,
+    resolveAgentsFromWorkspace,
+} from './task-workspace-db.service';
+import type { WorkspaceTaskRow, WorkspaceAgentRow } from './task-workspace-db.service';
+import { logger } from '../../utils/logger';
+
+const log = logger('TaskRoutes');
 
 const router = Router();
 const auth = authenticateFirebaseToken;
@@ -27,72 +40,55 @@ let deps: TaskRoutesDeps | null = null;
 export function setTaskRoutesDeps(d: TaskRoutesDeps): void { deps = d; }
 
 // -------------------------------------------------------------------------
-// Types
-// -------------------------------------------------------------------------
-
-interface TaskRow {
-    id: string;
-    beads_id: string;
-    title: string;
-    description: string;
-    status: string;
-    priority: string;
-    assigned_agents: string[];
-    subtasks: Array<{ text: string; done: boolean }>;
-    labels: Array<{ name: string; color: string }>;
-    start_date: string | null;
-    due_date: string | null;
-    created_at: string;
-    metadata: Record<string, unknown>;
-    channel_tag: string;
-}
-
-interface AgentRow { slug: string; name: string; status: string }
-
-// -------------------------------------------------------------------------
 // Helpers
 // -------------------------------------------------------------------------
 
-function formatTask(row: TaskRow, agentMap: Map<string, AgentRow>) {
-    const subtasks = Array.isArray(row.subtasks) ? row.subtasks : [];
-    const assignedAgents = (row.assigned_agents || []).map(slug => {
-        const agent = agentMap.get(slug);
-        return agent
-            ? { id: slug, name: agent.name, slug: agent.slug, status: agent.status }
-            : { id: slug, name: slug, slug, status: 'idle' };
-    });
+function getDeps(): TaskRoutesDeps {
+    if (!deps) {
+        throw new Error('TaskRoutes dependencies not initialized');
+    }
+    return deps;
+}
+
+function parseLabels(raw: string | null): Array<{ name: string; color: string }> {
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+        throw new Error(`Expected labels to be an array, got ${typeof parsed}`);
+    }
+    return parsed;
+}
+
+function formatTask(row: WorkspaceTaskRow, agentMap: Map<string, WorkspaceAgentRow>) {
+    const assignedAgents: Array<{ id: string; name: string; slug: string; status: string }> = [];
+    if (row.assigned_agent) {
+        const agent = agentMap.get(row.assigned_agent);
+        assignedAgents.push(
+            agent
+                ? { id: agent.slug, name: agent.name, slug: agent.slug, status: agent.status }
+                : { id: row.assigned_agent, name: row.assigned_agent, slug: row.assigned_agent, status: 'idle' },
+        );
+    }
 
     return {
-        id: row.beads_id,
+        id: row.id,
         title: row.title,
         description: row.description || undefined,
         status: row.status,
         priority: row.priority,
         assignedAgents,
-        channelTag: row.channel_tag || undefined,
-        labels: Array.isArray(row.labels) ? row.labels : [],
-        subtasks: { total: subtasks.length, completed: subtasks.filter(s => s.done).length },
-        startDate: row.start_date || undefined,
+        channelTag: row.project_slug || undefined,
+        labels: parseLabels(row.labels),
+        subtasks: { total: 0, completed: 0 },
         dueDate: row.due_date || undefined,
         createdAt: row.created_at,
-        metadata: row.metadata || {},
+        metadata: {},
     };
 }
 
-async function resolveAgentMap(userId: string, slugs: string[]): Promise<Map<string, AgentRow>> {
-    const map = new Map<string, AgentRow>();
-    if (slugs.length === 0) return map;
-    const unique = [...new Set(slugs)];
-    const result = await query<AgentRow>(
-        `SELECT slug, slug AS name, 'active' AS status FROM agent_registry WHERE user_id = $1 AND slug = ANY($2)`,
-        [userId, unique],
-    );
-    for (const row of result.rows) map.set(row.slug, row);
-    return map;
-}
-
 // -------------------------------------------------------------------------
-// Sandbox Dual-Write: append task to .beads/issues.jsonl
+// Beads JSONL Write: append/update task in .beads/issues.jsonl
+// Agents read these via `bd` tool — keep in sync with workspace DB.
 // Best-effort: failures are logged, never block the API response.
 // -------------------------------------------------------------------------
 
@@ -104,59 +100,40 @@ function buildBeadsDir(channelTag: string): string {
     return `${SANDBOX_CONFIG.workspacePath}/projects/${sanitizeSlug(channelTag)}/.beads`;
 }
 
-async function syncTaskToSandbox(
-    userId: string,
+async function appendBeadsEntry(
+    provider: DaytonaProvider,
+    sandboxId: string,
     channelTag: string,
     beadsEntry: Record<string, unknown>,
 ): Promise<void> {
-    if (!deps) return;
-    const { sandboxService } = deps;
-    const status = await sandboxService.getSandboxStatus(userId);
-    if (status.status !== 'running' || !status.sandboxId) return;
-
-    const provider = sandboxService.getProvider() as DaytonaProvider;
-    if (typeof provider.executeCommand !== 'function') return;
-
     const beadsDir = buildBeadsDir(channelTag);
     const issuesPath = `${beadsDir}/issues.jsonl`;
-
-    // Atomic append via shell — avoids read-modify-write race condition.
-    // Matches how the MCP handler uses fs.appendFile inside the sandbox.
     const jsonLine = JSON.stringify(beadsEntry);
     await provider.executeCommand(
-        status.sandboxId,
+        sandboxId,
         `mkdir -p ${shellEscape(beadsDir)} && printf '%s\\n' ${shellEscape(jsonLine)} >> ${shellEscape(issuesPath)}`,
     );
 }
 
-async function updateTaskInSandbox(
-    userId: string,
+async function updateBeadsEntry(
+    provider: DaytonaProvider,
+    sandboxId: string,
     channelTag: string,
     beadsId: string,
     updates: Record<string, unknown>,
 ): Promise<void> {
-    if (!deps) return;
-    const { sandboxService } = deps;
-    const status = await sandboxService.getSandboxStatus(userId);
-    if (status.status !== 'running' || !status.sandboxId) return;
-
-    const provider = sandboxService.getProvider() as DaytonaProvider;
-    if (typeof provider.readFile !== 'function') return;
-
     const beadsDir = buildBeadsDir(channelTag);
     const issuesPath = `${beadsDir}/issues.jsonl`;
 
     let existing = '';
     try {
-        existing = await provider.readFile(status.sandboxId, issuesPath);
+        existing = await provider.readFile(sandboxId, issuesPath);
     } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         if (msg.includes('ENOENT') || msg.includes('not found') || msg.includes('No such file')) return;
         throw err;
     }
 
-    // Parse JSONL, find and update the matching task.
-    // Read-modify-write is unavoidable for updates (must find + replace a specific line).
     const lines = existing.split('\n').filter(l => l.trim());
     const updated = lines.map(line => {
         const entry = JSON.parse(line) as Record<string, unknown>;
@@ -164,7 +141,7 @@ async function updateTaskInSandbox(
         return line;
     });
 
-    await provider.writeFile(status.sandboxId, issuesPath, updated.join('\n') + '\n');
+    await provider.writeFile(sandboxId, issuesPath, updated.join('\n') + '\n');
 }
 
 // -------------------------------------------------------------------------
@@ -176,32 +153,24 @@ router.get('/tasks', auth, async (req: AuthenticatedRequest, res: Response, next
     try {
         const userId = req.user?.uid;
         if (!userId) {
-            res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
-            return;
+            throw new UnauthorizedError();
         }
 
         const limit = Math.min(parseInt(req.query.limit as string, 10) || 50, 100);
         const offset = Math.max(parseInt(req.query.offset as string, 10) || 0, 0);
 
-        const result = await query(
-            `SELECT t.id::text, t.beads_id, t.title, t.description, t.status,
-                    t.priority, t.assigned_agents, t.subtasks, t.labels,
-                    t.start_date, t.due_date, t.created_at, t.metadata,
-                    d.slug || '/' || c.slug AS channel_tag
-             FROM tasks t
-             JOIN channels c ON c.id = t.channel_id
-             JOIN domains d ON d.id = c.domain_id
-             WHERE t.user_id = $1
-             ORDER BY t.created_at DESC
-             LIMIT $2 OFFSET $3`,
-            [userId, limit, offset],
-        );
+        const { sandboxService } = getDeps();
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
 
-        const rows = result.rows as unknown as TaskRow[];
-        const allSlugs = rows.flatMap(r => r.assigned_agents || []);
-        const agentMap = await resolveAgentMap(userId, allSlugs);
+        const result = await listTasks(provider, sandboxId, { limit, offset });
 
-        sendResponse(res, 200, { tasks: rows.map(r => formatTask(r, agentMap)) }, startTime);
+        const allSlugs = result.tasks
+            .map(r => r.assigned_agent)
+            .filter((s): s is string => s !== null && s !== '');
+        const agentMap = await resolveAgentsFromWorkspace(provider, sandboxId, allSlugs);
+
+        sendResponse(res, 200, { tasks: result.tasks.map(r => formatTask(r, agentMap)) }, startTime);
     } catch (err) {
         next(err);
     }
@@ -209,6 +178,7 @@ router.get('/tasks', auth, async (req: AuthenticatedRequest, res: Response, next
 
 // -------------------------------------------------------------------------
 // GET /api/v1/channels/:channelId/tasks - Tasks for one channel
+// channelId is now a project_slug (e.g. "domain-slug/channel-slug")
 // -------------------------------------------------------------------------
 
 router.get('/channels/:channelId/tasks', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
@@ -216,44 +186,25 @@ router.get('/channels/:channelId/tasks', auth, async (req: AuthenticatedRequest,
     try {
         const userId = req.user?.uid;
         if (!userId) {
-            res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
-            return;
+            throw new UnauthorizedError();
         }
 
         const { channelId } = req.params;
         const limit = Math.min(parseInt(req.query.limit as string, 10) || 50, 100);
         const offset = Math.max(parseInt(req.query.offset as string, 10) || 0, 0);
 
-        const channelCheck = await query(
-            `SELECT c.id FROM channels c
-             JOIN domains d ON d.id = c.domain_id
-             WHERE c.id::text = $1 AND d.user_id = $2`,
-            [channelId, userId],
-        );
-        if (channelCheck.rows.length === 0) {
-            res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Channel not found' } });
-            return;
-        }
+        const { sandboxService } = getDeps();
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
 
-        const result = await query(
-            `SELECT t.id::text, t.beads_id, t.title, t.description, t.status,
-                    t.priority, t.assigned_agents, t.subtasks, t.labels,
-                    t.start_date, t.due_date, t.created_at, t.metadata,
-                    d.slug || '/' || c.slug AS channel_tag
-             FROM tasks t
-             JOIN channels c ON c.id = t.channel_id
-             JOIN domains d ON d.id = c.domain_id
-             WHERE t.channel_id::text = $1 AND t.user_id = $2
-             ORDER BY t.created_at DESC
-             LIMIT $3 OFFSET $4`,
-            [channelId, userId, limit, offset],
-        );
+        const result = await listTasksByChannel(provider, sandboxId, channelId, { limit, offset });
 
-        const rows = result.rows as unknown as TaskRow[];
-        const allSlugs = rows.flatMap(r => r.assigned_agents || []);
-        const agentMap = await resolveAgentMap(userId, allSlugs);
+        const allSlugs = result.tasks
+            .map(r => r.assigned_agent)
+            .filter((s): s is string => s !== null && s !== '');
+        const agentMap = await resolveAgentsFromWorkspace(provider, sandboxId, allSlugs);
 
-        sendResponse(res, 200, { tasks: rows.map(r => formatTask(r, agentMap)) }, startTime);
+        sendResponse(res, 200, { tasks: result.tasks.map(r => formatTask(r, agentMap)) }, startTime);
     } catch (err) {
         next(err);
     }
@@ -268,65 +219,49 @@ router.post('/channels/:channelId/tasks', auth, async (req: AuthenticatedRequest
     try {
         const userId = req.user?.uid;
         if (!userId) {
-            res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
-            return;
+            throw new UnauthorizedError();
         }
 
         const { channelId } = req.params;
-        const { title, description, priority, assigned_agents, subtasks, labels } = req.body;
+        const { title, description, priority, assigned_agents, labels } = req.body;
 
         if (!title || typeof title !== 'string') {
-            res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'title is required' } });
-            return;
+            throw new BadRequestError('title is required');
         }
 
-        const channelCheck = await query(
-            `SELECT c.id, d.slug AS domain_slug, c.slug AS channel_slug FROM channels c
-             JOIN domains d ON d.id = c.domain_id
-             WHERE c.id::text = $1 AND d.user_id = $2`,
-            [channelId, userId],
-        );
-        if (channelCheck.rows.length === 0) {
-            res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Channel not found' } });
-            return;
-        }
+        const { sandboxService } = getDeps();
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
 
         const beadsId = `task-${Date.now()}`;
         const taskPriority = VALID_PRIORITIES.has(priority) ? priority : 'medium';
-        const subtaskItems = Array.isArray(subtasks) ? subtasks : [];
+        // Workspace DB uses single assigned_agent; take first from array if provided
+        const assignedAgent = Array.isArray(assigned_agents) && assigned_agents.length > 0
+            ? assigned_agents[0]
+            : null;
+        const labelNames = Array.isArray(labels) ? labels : [];
 
-        const result = await query(
-            `INSERT INTO tasks (beads_id, channel_id, user_id, title, description, status, priority, assigned_agents, subtasks, labels)
-             VALUES ($1, $2::uuid, $3, $4, $5, 'todo', $6, $7, $8, $9)
-             RETURNING id::text, beads_id, title, description, status, priority, assigned_agents,
-                       subtasks, labels, start_date, due_date, created_at, metadata`,
-            [
-                beadsId, channelId, userId, title,
-                description ?? '', taskPriority,
-                assigned_agents ?? [], JSON.stringify(subtaskItems), JSON.stringify(labels ?? []),
-            ],
+        const row = await createTask(
+            provider, sandboxId, beadsId, channelId, title,
+            description ?? null, taskPriority, assignedAgent, labelNames,
         );
 
-        const row = result.rows[0] as unknown as TaskRow;
-        const channelRow = channelCheck.rows[0] as { domain_slug: string; channel_slug: string };
-        const channelTag = `${channelRow.domain_slug}/${channelRow.channel_slug}`;
-        row.channel_tag = channelTag;
-
-        // Dual-write: sync new task to sandbox .beads/issues.jsonl (best-effort)
+        // Write to .beads/issues.jsonl for agent access via `bd` tool
         const beadsEntry = {
-            id: beadsId, title, description: description ?? '', priority: taskPriority,
-            assigned_agents: assigned_agents ?? [],
-            subtasks: subtaskItems.map((s: string | { text: string; done: boolean }) =>
-                typeof s === 'string' ? { text: s, done: false } : s,
-            ),
+            id: beadsId,
+            title,
+            description: description ?? '',
+            priority: taskPriority,
+            assigned_agents: assignedAgent ? [assignedAgent] : [],
             status: 'open',
             created_at: new Date().toISOString(),
         };
-        syncTaskToSandbox(userId, channelTag, beadsEntry).catch(err =>
-            console.warn(`[TaskRoutes] Sandbox sync failed for create: ${err.message}`),
+        appendBeadsEntry(provider, sandboxId, channelId, beadsEntry).catch(err =>
+            log.warn('Beads JSONL sync failed for create', { error: err instanceof Error ? err.message : String(err) }),
         );
 
-        const agentMap = await resolveAgentMap(userId, row.assigned_agents || []);
+        const allSlugs = row.assigned_agent ? [row.assigned_agent] : [];
+        const agentMap = await resolveAgentsFromWorkspace(provider, sandboxId, allSlugs);
         sendResponse(res, 201, { task: formatTask(row, agentMap) }, startTime);
     } catch (err) {
         next(err);
@@ -342,53 +277,34 @@ router.post('/tasks/:taskId/status', auth, async (req: AuthenticatedRequest, res
     try {
         const userId = req.user?.uid;
         if (!userId) {
-            res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
-            return;
+            throw new UnauthorizedError();
         }
 
         const { taskId } = req.params;
         const { status } = req.body;
 
         if (!status || !VALID_STATUSES.has(status)) {
-            res.status(400).json({
-                success: false,
-                error: { code: 'VALIDATION_ERROR', message: `Invalid status. Must be one of: ${[...VALID_STATUSES].join(', ')}` },
-            });
-            return;
+            throw new BadRequestError(`Invalid status. Must be one of: ${[...VALID_STATUSES].join(', ')}`);
         }
 
-        const result = await query(
-            `UPDATE tasks SET status = $1, updated_at = NOW()
-             WHERE (beads_id = $2 OR id::text = $2) AND user_id = $3
-             RETURNING id::text, beads_id, title, description, status, priority, assigned_agents,
-                       subtasks, labels, start_date, due_date, created_at, metadata`,
-            [status, taskId, userId],
-        );
+        const { sandboxService } = getDeps();
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
 
-        if (result.rows.length === 0) {
-            res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Task not found' } });
-            return;
+        const row = await updateTaskStatus(provider, sandboxId, taskId, status);
+        if (!row) {
+            throw new NotFoundError('Task');
         }
 
-        const row = result.rows[0] as unknown as TaskRow;
-        const tagResult = await query(
-            `SELECT d.slug || '/' || c.slug AS channel_tag
-             FROM tasks t
-             JOIN channels c ON c.id = t.channel_id
-             JOIN domains d ON d.id = c.domain_id
-             WHERE t.id::text = $1`,
-            [row.id],
-        );
-        const channelTag = (tagResult.rows[0] as { channel_tag: string })?.channel_tag || '';
-        row.channel_tag = channelTag;
+        // Update status in .beads/issues.jsonl for agent access via `bd` tool
+        if (row.project_slug) {
+            updateBeadsEntry(provider, sandboxId, row.project_slug, taskId, { status }).catch(err =>
+                log.warn('Beads JSONL sync failed for status update', { error: err instanceof Error ? err.message : String(err) }),
+            );
+        }
 
-        // Dual-write: update status in sandbox .beads/issues.jsonl (best-effort)
-        const sandboxStatus = DB_TO_SANDBOX_STATUS[status] || status;
-        updateTaskInSandbox(userId, channelTag, row.beads_id, { status: sandboxStatus }).catch(err =>
-            console.warn(`[TaskRoutes] Sandbox sync failed for status update: ${err.message}`),
-        );
-
-        const agentMap = await resolveAgentMap(userId, row.assigned_agents || []);
+        const allSlugs = row.assigned_agent ? [row.assigned_agent] : [];
+        const agentMap = await resolveAgentsFromWorkspace(provider, sandboxId, allSlugs);
         sendResponse(res, 200, { task: formatTask(row, agentMap) }, startTime);
     } catch (err) {
         next(err);

@@ -8,7 +8,7 @@ import type {
     TriggerDefinition,
     EventNormalizationMetadata,
     TriggerProvider,
-} from '../heartbeat/normalized-event.types';
+} from './trigger.types';
 
 // -----------------------------------------------------------------------------
 // Trigger Source Adapter Interface

@@ -4,17 +4,17 @@
 
 import { EventEmitter } from 'events';
 import { ExecutionService, ExecutionServiceDeps, AgentRow, ExecutionDatabase } from '../execution.service';
-import { SDKService } from '../sdk/sdk.service';
-import { SandboxService } from '../sandbox/sandbox.service';
+import { PricingService } from '../sdk/pricing.service';
+import { SandboxService } from '../../sandbox-infra/sandbox/sandbox.service';
 import {
     SandboxProvider,
     ProviderSandbox,
     CreateProviderSandboxOptions,
     ProviderSandboxStatus,
     ProviderCapabilities,
-} from '../sandbox/providers';
+} from '../../sandbox-infra/sandbox/providers';
 import { ExecutionQueueService } from '../queue/execution-queue.service';
-import { CreditTracker, CreditTrackerDeps } from '../credits/credit-tracker.service';
+import { CreditTracker, CreditTrackerDeps } from '../../credits/credit-tracker.service';
 import { StreamingResponse } from '../streaming/stream.handler';
 import { ThinkingLevel, AutonomyLevel } from '../types';
 
@@ -35,6 +35,7 @@ function createTestAgent(overrides?: Partial<AgentRow>): AgentRow {
         ai_model: 'anthropic/claude-sonnet-4',
         thinking_level: 'medium' as ThinkingLevel,
         autonomy_level: 'supervised' as AutonomyLevel,
+        adapter_type: 'claudecode',
         primary_use_case: 'testing',
         workspace_id: 'ws-123',
         user_id: 'user-123',
@@ -120,8 +121,8 @@ function createTestSandboxDb(): { query: <T>(sql: string, params?: unknown[]) =>
     };
 }
 
-// SDKService is now credit-only (estimateCredits, calculateActualCredits).
-// Execution flows through the v2 pipeline, not through SDKService.executeAgent().
+// PricingService is now credit-only (estimateCredits, calculateActualCredits).
+// Execution flows through the v2 pipeline, not through PricingService.executeAgent().
 
 function createTestSdkDb() {
     return {
@@ -169,7 +170,7 @@ function createTestStream(): TestStreamState {
 // v2 deps: sdkService, sandboxService, queueService, creditTracker, db, hitlHandler, activeStreamEmitter
 function createTestDeps(overrides?: Partial<ExecutionServiceDeps>): ExecutionServiceDeps {
     return {
-        sdkService: new SDKService(createTestSdkDb()),
+        sdkService: new PricingService(createTestSdkDb()),
         sandboxService: new SandboxService(createTestSandboxDb(), new TestSandboxProvider()),
         queueService: new ExecutionQueueService(),
         creditTracker: new CreditTracker(createTestCreditTrackerDeps()),

@@ -11,6 +11,9 @@ import { AuthenticatedRequest } from '../types';
 import { UnauthorizedError } from '../utils/errors';
 import { sendResponse } from '../utils/response';
 import { authenticateFirebaseToken } from './auth';
+import { logger } from '../utils/logger';
+
+const log = logger('SSEAuth');
 
 // -----------------------------------------------------------------------------
 // Constants
@@ -53,7 +56,7 @@ export function shutdownSseAuth(): void {
 export function sseAuth(req: AuthenticatedRequest, _res: Response, next: NextFunction): void {
     const queryToken = req.query.token as string | undefined;
     if (!queryToken) {
-        console.warn('[SSE Auth] Token missing from query params');
+        log.warn('Token missing from query params');
         next(new UnauthorizedError('SSE token required'));
         return;
     }
@@ -61,7 +64,7 @@ export function sseAuth(req: AuthenticatedRequest, _res: Response, next: NextFun
     const tokenPrefix = queryToken.slice(0, 8);
     const entry = sseTokenStore.get(queryToken);
     if (!entry) {
-        console.warn(`[SSE Auth] Token ${tokenPrefix}... not found in store (store size: ${sseTokenStore.size}). Likely consumed on prior request or lost on server restart.`);
+        log.warn('Token not found in store', { token_prefix: `${tokenPrefix}...`, store_size: sseTokenStore.size });
         next(new UnauthorizedError('Invalid SSE token'));
         return;
     }
@@ -69,7 +72,7 @@ export function sseAuth(req: AuthenticatedRequest, _res: Response, next: NextFun
     // Check expiry before consuming the token
     if (entry.expires <= Date.now()) {
         sseTokenStore.delete(queryToken);
-        console.warn(`[SSE Auth] Token ${tokenPrefix}... expired (age: ${Date.now() - (entry.expires - SSE_TOKEN_TTL_MS)}ms)`);
+        log.warn('Token expired', { token_prefix: `${tokenPrefix}...`, age_ms: Date.now() - (entry.expires - SSE_TOKEN_TTL_MS) });
         next(new UnauthorizedError('SSE token expired'));
         return;
     }

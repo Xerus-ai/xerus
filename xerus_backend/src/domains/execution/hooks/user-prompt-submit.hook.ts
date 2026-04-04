@@ -3,7 +3,10 @@
 // Delegates to Context Builder which writes context files (memory, KB, ACE).
 // Returns short additionalContext pointing to context/index.md - NOT injecting tokens.
 
+import { logger } from '../../../utils/logger';
 import { UserPromptSubmitInput, HookResult } from './hooks.types';
+
+const log = logger('UserPromptSubmitHook');
 
 // -----------------------------------------------------------------------------
 // Types
@@ -225,10 +228,7 @@ export class UserPromptSubmitHandler {
         try {
             await this.deps.workspaceManager.refreshContextIndex(this.context.agent_slug);
         } catch (error) {
-            console.warn(
-                '[UserPromptSubmitHook] Failed to refresh context index:',
-                (error as Error).message
-            );
+            log.warn('Failed to refresh context index', { error: (error as Error).message });
         }
     }
 }

@@ -1,25 +1,11 @@
 // Runner Configuration Types
 // Agent configuration, session state, and transport types
-// Used by runner process for agent management and sandbox setup
+// Used by runner and daytona-runner for agent management and sandbox setup
 
 // -----------------------------------------------------------------------------
 // Agent Configuration
-// Canonical AgentConfig is in process-manager.ts (used by runner)
-// This file retains supporting config types only
+// Supporting config types for runner transport and session management
 // -----------------------------------------------------------------------------
-
-export interface HeartbeatConfig {
-    enabled: boolean;
-    interval_minutes: number;
-    offset_minutes?: number;
-}
-
-export interface ActiveHoursConfig {
-    timezone: string;
-    start_hour: number;
-    end_hour: number;
-    days: number[];
-}
 
 export interface McpServerConfig {
     type: 'http' | 'stdio';
@@ -30,7 +16,7 @@ export interface McpServerConfig {
 }
 
 // -----------------------------------------------------------------------------
-// Session State (persisted to .xerus-sessions.json by runner)
+// Session State (tracked by Daytona sessions per agent)
 // -----------------------------------------------------------------------------
 
 export interface SessionState {

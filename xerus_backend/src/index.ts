@@ -2,44 +2,46 @@ import express, { Application } from 'express';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 
+import { logger } from './utils/logger';
 import { requestMeta } from './middleware/request-meta';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
 import { generalRateLimit } from './middleware/rate-limit';
 import { shutdownSseAuth } from './middleware/sse-auth';
 import { testConnection, warmPool } from './database/connection';
 import { startAllJobs } from './jobs';
-import { StorageService } from './domains/execution/storage/storage.service';
-import { S3BackupService } from './domains/execution/storage/s3-backup.service';
+import { StorageService } from './domains/sandbox-infra/storage/storage.service';
+import { S3BackupService } from './domains/sandbox-infra/storage/s3-backup.service';
 
-import usersRoutes from './domains/users/routes';
+import usersRoutes, { setUserRoutesDeps } from './domains/users/routes';
 import adminRoutes from './routes/admin.routes';
 import agentRoutes, { setAgentRoutesDeps } from './domains/agents/routes';
 import { toolsRouter } from './domains/tools/routes';
-import executeRoutes, { setExecutionService } from './domains/execution/execution.routes';
+import executeRoutes, { setExecutionService, setExecutionRoutesDeps } from './domains/execution/execution.routes';
+import { internalMcpRouter } from './domains/platform-tools/internal-mcp';
 import { setAgentFilesDeps } from './domains/execution/agent-files.routes';
+import { setConversationRoutesDeps } from './domains/conversations/conversation.routes';
+import { setScheduleRoutesDeps } from './domains/platform-tools/internal-mcp/schedule.routes';
 import { webhookReceiverRouter } from './domains/triggers';
-import { ExecutionService } from './domains/execution/execution.service';
+import { ExecutionService, setExecutionApiKeyLookup } from './domains/execution/execution.service';
+import { apiKeyService } from './domains/users/api-key-service';
 import { query } from './database/connection';
-import { SDKService } from './domains/execution/sdk/sdk.service';
-import { SandboxService } from './domains/execution/sandbox/sandbox.service';
-import type { SandboxProvider } from './domains/execution/sandbox/providers';
+import { PricingService } from './domains/execution/sdk/pricing.service';
+import { SandboxService } from './domains/sandbox-infra/sandbox/sandbox.service';
+import type { SandboxProvider } from './domains/sandbox-infra/sandbox/providers';
 import { ExecutionQueueService } from './domains/execution/queue/execution-queue.service';
-import { createCreditTracker } from './domains/execution/credits/credit-tracker.service';
+import { createCreditTracker } from './domains/credits/credit-tracker.service';
 import { CreditService } from './domains/users/credit-service';
-import { DatabaseUsageStore } from './domains/execution/credits/usage-store';
-import { inboxRoutes } from './domains/inbox';
+import { DatabaseUsageStore } from './domains/credits/usage-store';
+import { inboxRoutes, setInboxRoutesDeps } from './domains/inbox';
 import { companyRoutes, setCompanyRoutesDeps, taskRoutes, setTaskRoutesDeps } from './domains/company';
 import { onboardingRoutes, setOnboardingDeps } from './domains/onboarding';
-import { historyRoutes } from './domains/history';
 import { memoryRoutes } from './domains/memory';
 import { modelsRoutes } from './domains/models';
 import { driveRouter, setDriveDeps, DriveService } from './domains/drive';
 import skillRoutes, { setSkillRoutesDeps, agentSkillsRouter } from './domains/skills/routes';
 import { agentChannelsRouter, setAgentChannelsDeps } from './domains/agents/agent-channels.routes';
-import { scheduleRoutes } from './domains/schedules';
 import inviteCodeRoutes from './domains/invite-codes/routes';
 import { createMessageBridgeService } from './domains/inbox/messaging/message-bridge.service';
-import { MessageBridgeRepository } from './domains/inbox/messaging/message-bridge.repository';
 import { HITLHandler } from './domains/execution/hitl/hitl.handler';
 import { HITLPauseRepositoryImpl } from './domains/execution/hitl/hitl-pause.repository';
 import { ActiveStreamEmitter } from './domains/execution/hitl/active-stream-emitter';
@@ -47,6 +49,8 @@ import { sseRegistry } from './domains/execution/streaming/sse-registry';
 import { createMemorySearchIndexService } from './domains/memory/git-memory/memory-search-index.service';
 
 dotenv.config();
+
+const log = logger('Server');
 
 const app: Application = express();
 
@@ -104,13 +108,12 @@ app.use('/api/v1/inbox', inboxRoutes);
 app.use('/api/v1/company', companyRoutes);
 app.use('/api/v1', taskRoutes);
 app.use('/api/v1/onboarding', onboardingRoutes);
-app.use('/api/v1/history', historyRoutes);
 app.use('/api/v1/memory', memoryRoutes);
 app.use('/api/v1/models', modelsRoutes);
 app.use('/api/v1/workspace', driveRouter);
 app.use('/api/v1/skills', skillRoutes);
-app.use('/api/v1/schedules', scheduleRoutes);
 app.use('/api/v1/invite-codes', inviteCodeRoutes);
+app.use('/api/v1/internal/mcp', internalMcpRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
@@ -122,8 +125,8 @@ async function startServer(): Promise<void> {
     await warmPool();
 
     const server = app.listen(PORT, () => {
-        console.log(`Server running on port ${PORT}`);
-        console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+        log.info('Server running', { port: PORT });
+        log.info('Environment', { env: process.env.NODE_ENV || 'development' });
     });
 
     // SSE streams are long-lived — disable Node.js timeouts that kill idle connections.
@@ -134,18 +137,17 @@ async function startServer(): Promise<void> {
 
     // Crash diagnostics — capture unhandled rejections before they kill the process
     process.on('unhandledRejection', (reason, promise) => {
-        console.error('[CRASH] Unhandled promise rejection:', reason);
-        console.error('[CRASH] Promise:', promise);
+        log.error('Unhandled promise rejection', { reason: String(reason), promise: String(promise) });
     });
 
     process.on('uncaughtException', (err) => {
-        console.error('[CRASH] Uncaught exception:', err.message, err.stack);
+        log.error('Uncaught exception', err);
         process.exit(1);
     });
 
     // Graceful shutdown: clean up SSE sweep timer and close server
     process.on('SIGTERM', () => {
-        console.log('[Shutdown] SIGTERM received, cleaning up...');
+        log.info('SIGTERM received, cleaning up...');
         shutdownSseAuth();
         sseRegistry.shutdown();
         server.close();
@@ -161,7 +163,7 @@ async function startServer(): Promise<void> {
             },
         };
 
-        const sdkService = new SDKService(executionDb);
+        const sdkService = new PricingService(executionDb);
         await sdkService.loadPricing();
         const queueService = new ExecutionQueueService();
         queueService.startPeriodicCleanup();
@@ -185,9 +187,9 @@ async function startServer(): Promise<void> {
                 delete: storageService.delete.bind(storageService),
                 list: storageService.list.bind(storageService),
             });
-            console.log('[Boot] S3BackupService initialized');
+            log.info('S3BackupService initialized');
         } else {
-            console.warn('[Boot] S3_BUCKET or S3_REGION not set - S3 backup disabled');
+            log.warn('S3_BUCKET or S3_REGION not set - S3 backup disabled');
         }
 
         const sandboxService = new SandboxService(executionDb, undefined, backupService);
@@ -217,19 +219,31 @@ async function startServer(): Promise<void> {
         let memorySearchIndex = null;
         if (process.env.OPENAI_API_KEY) {
             memorySearchIndex = createMemorySearchIndexService();
-            console.log('[Boot] MemorySearchIndexService initialized (pgvector indexing enabled)');
+            log.info('MemorySearchIndexService initialized (pgvector indexing enabled)');
         } else {
-            console.warn('[Boot] OPENAI_API_KEY not set - memory pgvector indexing disabled');
+            log.warn('OPENAI_API_KEY not set - memory pgvector indexing disabled');
         }
 
-        const messageBridgeRepo = new MessageBridgeRepository(executionDb);
-        const messageBridge = createMessageBridgeService({ repository: messageBridgeRepo });
+        const messageBridge = createMessageBridgeService();
+
+        // Wire SessionDispatcher: bridges inbox messaging -> execution sandbox sessions
+        messageBridge.setSessionDispatcher({
+            async sendToAgent(userId: string, agentSlug: string, message: string): Promise<boolean> {
+                const handle = sandboxService.getAgentHandle(userId, agentSlug);
+                if (!handle) return false;
+                await handle.sendInput(message + '\n');
+                return true;
+            },
+        });
 
         const activeStreamEmitter = new ActiveStreamEmitter();
         const hitlHandler = new HITLHandler({
             pauseRepository: new HITLPauseRepositoryImpl(),
             sseEmitter: activeStreamEmitter,
         });
+
+        // Wire cross-domain API key lookup (execution -> users)
+        setExecutionApiKeyLookup(apiKeyService);
 
         const executionService = new ExecutionService({
             sdkService,
@@ -243,19 +257,24 @@ async function startServer(): Promise<void> {
             activeStreamEmitter,
         });
         setExecutionService(executionService);
+        setExecutionRoutesDeps({ sandboxService });
         setAgentFilesDeps({ sandboxService });
+        setConversationRoutesDeps({ sandboxService });
+        setInboxRoutesDeps({ sandboxService });
+        setScheduleRoutesDeps({ sandboxService });
         setAgentRoutesDeps({ sandboxService });
         setAgentChannelsDeps({ sandboxService });
         setTaskRoutesDeps({ sandboxService });
-        setCompanyRoutesDeps({ sandboxService });
+        setCompanyRoutesDeps({ sandboxService, messageBridge });
         setOnboardingDeps({ sandboxService });
+        setUserRoutesDeps({ sandboxService });
 
         setDriveDeps(new DriveService(sandboxService, backupService));
 
         setSkillRoutesDeps({ sandboxService });
 
         sandboxProvider = sandboxService.getProvider();
-        console.log('[Startup] ExecutionService initialized');
+        log.info('ExecutionService initialized');
 
         // Start background jobs with full dependencies
         try {
@@ -266,11 +285,11 @@ async function startServer(): Promise<void> {
                 db: executionDb,
             });
         } catch (error) {
-            console.error('Failed to start background jobs:', error);
+            log.error('Failed to start background jobs', error instanceof Error ? error : new Error(String(error)));
             throw error;
         }
     } catch (error) {
-        console.error('[Startup] Failed to initialize ExecutionService:', error);
+        log.error('Failed to initialize ExecutionService', error instanceof Error ? error : new Error(String(error)));
         throw error;
     }
 }

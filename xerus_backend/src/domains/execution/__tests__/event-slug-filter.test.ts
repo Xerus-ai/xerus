@@ -7,18 +7,18 @@
 // Both write to the same stdout buffer. Without filtering, master's
 // reasoning ("I am Xerus, the CEO") leaks into the domain agent's SSE stream.
 
-import { PersistentLogBuffer } from '../sandbox/providers/daytona-runner';
+import { PersistentLogBuffer } from '../../sandbox-infra/sandbox/providers/daytona-runner';
 import { streamRunnerEvents } from '../execution-pipeline';
 import type { PipelineContext, ResolvedExecutionDeps, AgentRow, ExecutionDatabase } from '../execution-pipeline.types';
 import type { StreamEventType } from '../types';
-import type { SessionHandle } from '../sandbox/providers/daytona-runner';
+import type { SessionHandle } from '../../sandbox-infra/sandbox/providers/daytona-runner';
 import {
     CreditTracker,
     type CreditService,
     type UsageStore,
     type ToolUsageRecord,
     type SessionUsage,
-} from '../credits/credit-tracker.service';
+} from '../../credits/credit-tracker.service';
 
 // -----------------------------------------------------------------------------
 // In-memory implementations (real objects, not mocks)
@@ -64,7 +64,7 @@ class FakeStream {
 function createAgent(slug: string): AgentRow {
     return {
         id: 1, name: slug, slug, description: '', ai_model: 'claude-sonnet-4-5-20250929',
-        thinking_level: 'medium', autonomy_level: 'supervised', primary_use_case: '',
+        thinking_level: 'medium', autonomy_level: 'supervised', adapter_type: 'claudecode', primary_use_case: '',
         workspace_id: 'ws-1', user_id: 'user-1',
     };
 }
@@ -79,7 +79,7 @@ function createContext(agentSlug: string, overrides?: Partial<PipelineContext>):
         toolCallCount: 0, status: 'running', streamOffset: 0, conversationId: null,
         responseText: '', responseChunks: [], creditsUsed: 0, keySource: null,
         agentSessionCount: 0, announceQueue: null, thinkingChunks: [], toolCallDetails: [],
-        eventsFiltered: 0, setupReport: null, hookHealth: null,
+        eventsFiltered: 0, setupReport: null, hookHealth: null, sdkSessionId: null, triggerType: 'user_message' as const, toolCallMap: new Map(),
         ...overrides,
     };
 }
@@ -102,7 +102,7 @@ function createDeps(): ResolvedExecutionDeps {
 
 function buildHandle(buffer: PersistentLogBuffer): SessionHandle {
     return {
-        sessionId: 'test', commandId: 'cmd-1',
+        sessionId: 'test', commandId: 'cmd-1', agentSlug: 'test-agent',
         sendInput: async () => {},
         streamLogs: async () => {},
         logBuffer: buffer,
@@ -254,6 +254,7 @@ describe('Event slug filtering in processEventStream', () => {
         const deps = createDeps();
         const handle = buildHandle(buffer);
         ctx.sessionHandle = handle;
+        const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
         pushAndClose(buffer, [
             // agent_slug inside data field (StdoutEmitter wraps payloads)
@@ -264,11 +265,19 @@ describe('Event slug filtering in processEventStream', () => {
 
         await streamRunnerEvents(handle, ctx, deps);
 
-        // Only Carla's hook_log should have been written to DB
+        // hook_executions table deprecated in migration 081 -- handleHookLog now logs only.
+        // Master's hook_log should be filtered out; only Carla's hook_log should be logged.
         const db = deps.db as InMemoryDatabase;
         const hookQueries = db.queries.filter(q => q.sql.includes('hook_executions'));
-        expect(hookQueries.length).toBe(1);
-        // The agent_slug in the INSERT should be curator-carla (from requireAgent(ctx))
-        expect(hookQueries[0].params[2]).toBe('curator-carla');
+        expect(hookQueries.length).toBe(0);
+
+        // Verify Carla's hook_log was logged (not master's)
+        const hookLogCalls = logSpy.mock.calls.filter(
+            call => typeof call[0] === 'string' && call[0].includes('hook_log')
+        );
+        expect(hookLogCalls.length).toBe(1);
+        expect(hookLogCalls[0][0]).toContain('curator-carla');
+
+        logSpy.mockRestore();
     });
 });

@@ -28,11 +28,3 @@ export const getFeaturedModels = async (): Promise<ModelEntry[]> => {
   return json.data;
 };
 
-export const getAllModels = async (): Promise<ModelEntry[]> => {
-  const response = await apiCall('/models', { method: 'GET' });
-  const json = await response.json();
-  if (!Array.isArray(json.data)) {
-    throw new Error('Unexpected response from /models: missing data array');
-  }
-  return json.data;
-};

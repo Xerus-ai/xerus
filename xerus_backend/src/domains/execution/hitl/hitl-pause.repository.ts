@@ -5,7 +5,19 @@
 import { query } from '../../../database/connection';
 import type { HITLPauseRepository } from './hitl.handler';
 import type { HITLPauseState, HITLRequestData } from './hitl.types';
-import type { PauseReason, PauseResolution, ExecutionPauseStateRow } from '../../history/sessions/session.types';
+import type { PauseReason, PauseResolution } from '../../../shared/types/execution-shared.types';
+
+// Inlined from deleted history/sessions/session.types.ts
+interface ExecutionPauseStateRow {
+    id: string;
+    execution_id: string;
+    paused_at: Date;
+    reason: PauseReason;
+    request_data: Record<string, unknown> | null;
+    resolved_at: Date | null;
+    resolution: PauseResolution | null;
+    resolved_by: string | null;
+}
 
 // -----------------------------------------------------------------------------
 // Repository Implementation

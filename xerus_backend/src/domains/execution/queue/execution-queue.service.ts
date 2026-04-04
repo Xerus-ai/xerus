@@ -4,6 +4,7 @@
 
 import { randomUUID } from 'crypto';
 import { EventEmitter } from 'events';
+import { logger } from '../../../utils/logger';
 import {
     ExecutionQueueRequest,
     CreateExecutionRequest,
@@ -17,6 +18,8 @@ import {
     StaleLaneCleanupResult,
 } from './execution-lane.types';
 import { AgentAlreadyRunningError, QueueFullError, LaneNotFoundError } from './execution-queue.errors';
+
+const log = logger('ExecutionQueueService');
 
 export class ExecutionQueueService extends EventEmitter {
     private readonly config: QueueConfig;
@@ -330,15 +333,7 @@ export class ExecutionQueueService extends EventEmitter {
 
         // Log cleanup summary if any lanes were cleaned
         if (cleanedLanes.length > 0) {
-            console.warn(
-                `[ExecutionQueue] Cleaned up ${cleanedLanes.length} stale lane(s):`,
-                cleanedLanes.map((l) => ({
-                    lane: l.lane_id.slice(0, 8),
-                    user: l.user_id,
-                    agent: l.agent_slug,
-                    age: `${Math.round(l.age_ms / 1000)}s`,
-                }))
-            );
+            log.warn('Cleaned up stale lanes', { count: cleanedLanes.length, lanes: cleanedLanes.map((l) => ({ lane: l.lane_id.slice(0, 8), user: l.user_id, agent: l.agent_slug, age_s: Math.round(l.age_ms / 1000) })) });
         }
 
         return cleanedLanes;

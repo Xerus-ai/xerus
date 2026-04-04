@@ -109,6 +109,7 @@ export class AgentService {
             ai_model: validatedData.ai_model || DEFAULT_MODEL,
             thinking_level: validatedData.thinking_level || 'medium',
             autonomy_level: validatedData.autonomy_level || 'supervised',
+            adapter_type: validatedData.adapter_type || 'claudecode',
             is_verified: false,
             clone_count: 0,
             tags: validatedData.tags || [],
@@ -333,6 +334,7 @@ export class AgentService {
         if (validatedData.is_default !== undefined) config.is_default = validatedData.is_default;
         if (validatedData.thinking_level !== undefined) config.thinking_level = validatedData.thinking_level;
         if (validatedData.autonomy_level !== undefined) config.autonomy_level = validatedData.autonomy_level;
+        if (validatedData.adapter_type !== undefined) config.adapter_type = validatedData.adapter_type;
         if (validatedData.agent_type !== undefined) {
             await this.registry.updateType(id, validatedData.agent_type);
         }

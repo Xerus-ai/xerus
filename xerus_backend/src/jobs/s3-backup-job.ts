@@ -5,10 +5,13 @@
 
 import cron from 'node-cron';
 import { query } from '../database/connection';
-import { SANDBOX_CONFIG, BACKUP_TAR_EXCLUDE_FLAGS } from '../domains/execution/sandbox/sandbox.config';
-import type { SandboxService } from '../domains/execution/sandbox/sandbox.service';
-import type { S3BackupService } from '../domains/execution/storage/s3-backup.service';
-import type { DaytonaProvider } from '../domains/execution/sandbox/providers/daytona.provider';
+import { SANDBOX_CONFIG, BACKUP_TAR_EXCLUDE_FLAGS } from '../domains/sandbox-infra/sandbox/sandbox.config';
+import type { SandboxService } from '../domains/sandbox-infra/sandbox/sandbox.service';
+import type { S3BackupService } from '../domains/sandbox-infra/storage/s3-backup.service';
+import type { DaytonaProvider } from '../domains/sandbox-infra/sandbox/providers/daytona.provider';
+import { logger } from '../utils/logger';
+
+const log = logger('Job:Backup');
 
 const TAR_TEMP_PATH = '/tmp/workspace-backup.tar.gz';
 
@@ -50,27 +53,27 @@ async function backupSingleWorkspace(
 
     const content = Buffer.from(base64Result.result.trim(), 'base64');
     const result = await backupService.createSnapshot(sandbox.user_id, content);
-    console.log(`[Job:Backup] Snapshot for user ${sandbox.user_id}: ${result.snapshotKey} (${result.sizeBytes} bytes)`);
+    log.info('Snapshot created', { user_id: sandbox.user_id, snapshot_key: result.snapshotKey, size_bytes: result.sizeBytes });
 }
 
 async function runBackupCycle(
     sandboxService: SandboxService,
     backupService: S3BackupService,
 ): Promise<void> {
-    console.log('[Job:Backup] Starting workspace backup cycle...');
+    log.info('Starting workspace backup cycle...');
 
     const { rows: sandboxes } = await query<SandboxRow>(
         `SELECT sandbox_id, user_id FROM workspaces WHERE sandbox_status = 'running' AND sandbox_id IS NOT NULL`,
     );
 
     if (sandboxes.length === 0) {
-        console.log('[Job:Backup] No running sandboxes, skipping');
+        log.info('No running sandboxes, skipping');
         return;
     }
 
     const provider = sandboxService.getProvider() as DaytonaProvider;
     if (typeof provider.executeCommand !== 'function') {
-        console.error('[Job:Backup] Provider does not support executeCommand');
+        log.error('Provider does not support executeCommand');
         return;
     }
 
@@ -80,11 +83,11 @@ async function runBackupCycle(
 
     const failures = results.filter((r: PromiseSettledResult<void>) => r.status === 'rejected');
     for (const failure of failures) {
-        console.error('[Job:Backup] Backup failed:', (failure as PromiseRejectedResult).reason);
+        log.error('Backup failed', { reason: String((failure as PromiseRejectedResult).reason) });
     }
 
     const succeeded = results.filter((r: PromiseSettledResult<void>) => r.status === 'fulfilled').length;
-    console.log(`[Job:Backup] Complete: ${succeeded}/${sandboxes.length} sandboxes backed up`);
+    log.info('Backup cycle complete', { succeeded, total: sandboxes.length });
 }
 
 export function startBackupSchedulerJob(
@@ -97,10 +100,10 @@ export function startBackupSchedulerJob(
 
     backupTask = cron.schedule(cronExpr, () => {
         runBackupCycle(sandboxService, backupService).catch(err => {
-            console.error('[Job:Backup] Cycle failed:', err instanceof Error ? err.message : String(err));
+            log.error('Cycle failed', { error: err instanceof Error ? err.message : String(err) });
         });
     });
 
-    console.log(`[Job:Backup] Scheduled with: ${cronExpr}`);
+    log.info('Scheduled', { cron: cronExpr });
 }
 

@@ -10,7 +10,7 @@ import { skillService } from './service';
 import { skillSecretsService } from './secrets.service';
 import { SkillUnauthorizedError, SkillValidationError } from './errors';
 import type { PaginatedSkills } from './types';
-import type { SandboxService } from '../execution/sandbox/sandbox.service';
+import type { SandboxService } from '../sandbox-infra/sandbox/sandbox.service';
 import { SkillWorkspaceService } from './workspace.service';
 import skillImportRouter from './skill-import.routes';
 
@@ -22,6 +22,7 @@ export interface SkillRoutesDeps {
 export function setSkillRoutesDeps(d: SkillRoutesDeps): void {
     const workspaceService = new SkillWorkspaceService(d.sandboxService);
     skillService.setWorkspaceService(workspaceService);
+    skillSecretsService.setSandboxService(d.sandboxService);
 }
 
 const router = Router();

@@ -15,7 +15,7 @@ import {
     type UsageStore,
     type ToolUsageRecord,
     type SessionUsage,
-} from '../credits/credit-tracker.service';
+} from '../../credits/credit-tracker.service';
 import { ChannelNotFoundError } from '../../inbox/messaging';
 
 // -----------------------------------------------------------------------------
@@ -109,6 +109,7 @@ function createTestAgent(): AgentRow {
         ai_model: 'claude-sonnet-4-5-20250929',
         thinking_level: 'medium',
         autonomy_level: 'supervised',
+        adapter_type: 'claudecode',
         primary_use_case: 'testing',
         workspace_id: 'ws-001',
         user_id: 'user-123',
@@ -138,6 +139,7 @@ function createTestContext(overrides?: Partial<PipelineContext>): PipelineContex
         status: 'running',
         streamOffset: 0,
         conversationId: null,
+        sdkSessionId: null,
         responseText: '',
         responseChunks: [],
         creditsUsed: 0,
@@ -146,9 +148,11 @@ function createTestContext(overrides?: Partial<PipelineContext>): PipelineContex
         announceQueue: null,
         thinkingChunks: [],
         toolCallDetails: [],
+        toolCallMap: new Map(),
         eventsFiltered: 0,
         setupReport: null,
         hookHealth: null,
+        triggerType: 'user_message',
         ...overrides,
     };
 }
@@ -581,35 +585,43 @@ describe('routeEventToBackend', () => {
     });
 
     describe('hook_log', () => {
-        it('should insert hook execution into DB', async () => {
+        // hook_executions table deprecated in migration 081. handleHookLog now logs only.
+
+        it('should log hook event without DB insert', async () => {
             const ctx = createTestContext({ sessionId: 'session-001' });
             const { deps, db } = createTestDeps();
+            const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
             await routeEventToBackend('hook_log', {
                 data: { hook_event: 'PreToolUse', duration_ms: 15, success: true },
             }, ctx, deps);
 
-            expect(db.queries).toHaveLength(1);
-            const q = db.getLastQuery()!;
-            expect(q.sql).toContain('INSERT INTO hook_executions');
-            expect(q.params[0]).toBe('session-001');
-            expect(q.params[1]).toBe('PreToolUse');
-            expect(q.params[2]).toBe('test-agent');  // agent_slug
-            expect(q.params[3]).toBe('user-123');    // user_id
-            expect(q.params[6]).toBe(false);          // blocked = !success
-            expect(q.params[7]).toBe(15);             // duration_ms
+            expect(db.queries).toHaveLength(0);
+            expect(logSpy).toHaveBeenCalledWith(
+                expect.stringContaining('hook_log'),
+            );
+
+            logSpy.mockRestore();
         });
 
-        it('should set blocked=true when success is false', async () => {
+        it('should include success and duration in log output', async () => {
             const ctx = createTestContext({ sessionId: 'session-001' });
             const { deps, db } = createTestDeps();
+            const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
             await routeEventToBackend('hook_log', {
-                data: { hook_event: 'PreToolUse', success: false, error: 'denied' },
+                data: { hook_event: 'PreToolUse', success: false, error: 'denied', duration_ms: 42 },
             }, ctx, deps);
 
-            const q = db.getLastQuery()!;
-            expect(q.params[6]).toBe(true); // blocked = !false = true
+            expect(db.queries).toHaveLength(0);
+            expect(logSpy).toHaveBeenCalledWith(
+                expect.stringContaining('success=false'),
+            );
+            expect(logSpy).toHaveBeenCalledWith(
+                expect.stringContaining('duration=42ms'),
+            );
+
+            logSpy.mockRestore();
         });
 
         it('should log instead of DB insert when sessionId is empty', async () => {

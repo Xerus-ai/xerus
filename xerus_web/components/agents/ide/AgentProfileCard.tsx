@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectGroup, SelectLabel, SelectSeparator } from "@/components/ui/select"
 import { Pencil, Globe, Lock } from 'lucide-react'
 import { ModelIcon } from '../AgentAvatar'
 import { isMascotConfig } from '@/lib/mascot-config'
@@ -12,6 +12,7 @@ import { useAuth } from '@/utils/AuthContext'
 import { canEditAgent } from '@/utils/agentLabels'
 import { formatModelName } from '@/utils/models'
 import { getFeaturedModels, type ModelEntry } from '@/lib/api/models'
+import type { AdapterType } from '@/lib/api/types'
 
 interface Agent {
     id: number
@@ -29,6 +30,7 @@ interface Agent {
     isVerified?: boolean
     cloneCount?: number
     tags?: string[]
+    adapter_type?: AdapterType
 }
 
 interface AgentProfileCardProps {
@@ -91,8 +93,42 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
 
     const handleModelChange = async (value: string) => {
         handleChange('model', value)
-        await onUpdate({ ai_model: value })
+        // Auto-detect adapter_type from the selected model's provider
+        const selectedModel = models.find(m => m.id === value)
+        let newAdapterType: AdapterType = localAgent.adapter_type || 'claudecode'
+        if (selectedModel) {
+            if (selectedModel.provider === 'anthropic') {
+                newAdapterType = 'claudecode'
+            } else if (selectedModel.provider === 'openai') {
+                newAdapterType = 'codex'
+            } else if (selectedModel.provider === 'openrouter') {
+                // Infer from model ID for OpenRouter models
+                const modelId = value.toLowerCase()
+                if (modelId.includes('claude') || modelId.includes('anthropic')) {
+                    newAdapterType = 'claudecode'
+                } else if (modelId.includes('gpt') || modelId.includes('openai') || modelId.includes('o1') || modelId.includes('o3')) {
+                    newAdapterType = 'codex'
+                }
+            }
+        }
+        if (newAdapterType !== localAgent.adapter_type) {
+            setLocalAgent(prev => ({ ...prev, adapter_type: newAdapterType }))
+            await onUpdate({ ai_model: value, adapter_type: newAdapterType })
+        } else {
+            await onUpdate({ ai_model: value })
+        }
     }
+
+    // Group models by engine type for the selector
+    const claudeCodeModels = models.filter(m =>
+        m.provider === 'anthropic' || (m.provider === 'openrouter' && (m.id.toLowerCase().includes('claude') || m.id.toLowerCase().includes('anthropic')))
+    )
+    const codexModels = models.filter(m =>
+        m.provider === 'openai' || (m.provider === 'openrouter' && (m.id.toLowerCase().includes('gpt') || m.id.toLowerCase().includes('openai') || m.id.toLowerCase().includes('o1') || m.id.toLowerCase().includes('o3')))
+    )
+    const otherModels = models.filter(m =>
+        !claudeCodeModels.includes(m) && !codexModels.includes(m)
+    )
 
     return (
         <div className="flex items-start gap-6">
@@ -120,24 +156,64 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                                     <span className="text-[10px] font-bold text-text-secondary whitespace-nowrap">{formatModelName(localAgent.model)}</span>
                                 </div>
                             </SelectTrigger>
-                            <SelectContent className="bg-white border border-surface-active rounded-md shadow-lg min-w-[200px]">
+                            <SelectContent className="bg-white border border-surface-active rounded-md shadow-lg min-w-[220px] max-h-[320px]">
                                 {isLoadingModels ? (
                                     <SelectItem value="__loading" disabled>
                                         <span className="text-xs text-text-secondary">Loading models...</span>
                                     </SelectItem>
-                                ) : models.length === 0 ? (
-                                    <SelectItem value="__empty" disabled>
-                                        <span className="text-xs text-text-secondary">No models available</span>
-                                    </SelectItem>
                                 ) : (
-                                    models.map((m) => (
-                                        <SelectItem key={m.id} value={m.id}>
-                                            <div className="flex items-center gap-1.5">
-                                                <ModelIcon model={m.id} size="sm" />
-                                                <span className="text-xs">{m.displayName.replace(/^[^:]+:\s*/, '')}</span>
-                                            </div>
-                                        </SelectItem>
-                                    ))
+                                    <>
+                                        {claudeCodeModels.length > 0 && (
+                                            <SelectGroup>
+                                                <SelectLabel className="text-[10px] font-semibold uppercase tracking-wide text-text-secondary/70 px-2 py-1">Claude Code</SelectLabel>
+                                                {claudeCodeModels.map((m) => (
+                                                    <SelectItem key={m.id} value={m.id}>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <ModelIcon model={m.id} size="sm" />
+                                                            <span className="text-xs">{m.displayName.replace(/^[^:]+:\s*/, '')}</span>
+                                                        </div>
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectGroup>
+                                        )}
+                                        {codexModels.length > 0 && (
+                                            <>
+                                                {claudeCodeModels.length > 0 && <SelectSeparator />}
+                                                <SelectGroup>
+                                                    <SelectLabel className="text-[10px] font-semibold uppercase tracking-wide text-text-secondary/70 px-2 py-1">Codex</SelectLabel>
+                                                    {codexModels.map((m) => (
+                                                        <SelectItem key={m.id} value={m.id}>
+                                                            <div className="flex items-center gap-1.5">
+                                                                <ModelIcon model={m.id} size="sm" />
+                                                                <span className="text-xs">{m.displayName.replace(/^[^:]+:\s*/, '')}</span>
+                                                            </div>
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectGroup>
+                                            </>
+                                        )}
+                                        {otherModels.length > 0 && (
+                                            <>
+                                                {(claudeCodeModels.length > 0 || codexModels.length > 0) && <SelectSeparator />}
+                                                <SelectGroup>
+                                                    <SelectLabel className="text-[10px] font-semibold uppercase tracking-wide text-text-secondary/70 px-2 py-1">Other</SelectLabel>
+                                                    {otherModels.map((m) => (
+                                                        <SelectItem key={m.id} value={m.id}>
+                                                            <div className="flex items-center gap-1.5">
+                                                                <ModelIcon model={m.id} size="sm" />
+                                                                <span className="text-xs">{m.displayName.replace(/^[^:]+:\s*/, '')}</span>
+                                                            </div>
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectGroup>
+                                            </>
+                                        )}
+                                        {claudeCodeModels.length === 0 && codexModels.length === 0 && otherModels.length === 0 && (
+                                            <SelectItem value="__empty" disabled>
+                                                <span className="text-xs text-text-secondary">No models available</span>
+                                            </SelectItem>
+                                        )}
+                                    </>
                                 )}
                             </SelectContent>
                         </Select>

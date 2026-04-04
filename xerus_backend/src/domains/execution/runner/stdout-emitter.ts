@@ -61,21 +61,6 @@ export class StdoutEmitter {
         });
     }
 
-    heartbeatFired(agentSlug: string): void {
-        this.emit({
-            event: 'heartbeat_fired',
-            agent_slug: agentSlug,
-        });
-    }
-
-    heartbeatSkipped(agentSlug: string, reason: string): void {
-        this.emit({
-            event: 'heartbeat_skipped',
-            agent_slug: agentSlug,
-            data: { reason },
-        });
-    }
-
     agentMessage(agentSlug: string, project: string, channel: string, content: string): void {
         this.emit({
             event: 'agent_message',

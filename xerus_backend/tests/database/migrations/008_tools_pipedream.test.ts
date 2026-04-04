@@ -232,7 +232,7 @@ describe('Migration 008: Tools Pipedream', () => {
          RETURNING user_id`,
         [`test_user_${Date.now()}`, `test_${Date.now()}@example.com`]
       );
-      testUserId = userResult.rows[0].user_id;
+      testUserId = (userResult.rows[0] as { user_id: string }).user_id;
 
       const agentResult = await query(
         `INSERT INTO agents (name, description, system_prompt, user_id, agent_type)
@@ -240,7 +240,7 @@ describe('Migration 008: Tools Pipedream', () => {
          RETURNING id`,
         [`Test Agent ${Date.now()}`, 'Test Description', '""', testUserId]
       );
-      testAgentId = agentResult.rows[0].id;
+      testAgentId = (agentResult.rows[0] as { id: number }).id;
     });
 
     afterAll(async () => {

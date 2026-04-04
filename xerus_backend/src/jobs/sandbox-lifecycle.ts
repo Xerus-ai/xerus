@@ -4,10 +4,14 @@
 
 import cron from 'node-cron';
 import { query } from '../database/connection';
-import { SandboxSchedulerService } from '../domains/execution/sandbox/sandbox-scheduler.service';
-import { LifecycleCleanupService } from '../domains/execution/sandbox/lifecycle-cleanup.service';
-import type { SandboxProvider } from '../domains/execution/sandbox/providers';
-import type { SandboxService } from '../domains/execution/sandbox/sandbox.service';
+import { SandboxSchedulerService } from '../domains/sandbox-infra/sandbox/sandbox-scheduler.service';
+import { LifecycleCleanupService } from '../domains/sandbox-infra/sandbox/lifecycle-cleanup.service';
+import type { SandboxProvider } from '../domains/sandbox-infra/sandbox/providers';
+import type { SandboxService } from '../domains/sandbox-infra/sandbox/sandbox.service';
+import { logger } from '../utils/logger';
+
+const logScheduler = logger('Job:SandboxScheduler');
+const logCleanup = logger('Job:SandboxCleanup');
 
 // Typed query wrapper matching SchedulerDatabase interface
 async function typedQuery<T>(sql: string, params?: unknown[]): Promise<{ rows: T[] }> {
@@ -32,7 +36,7 @@ export function startSandboxSchedulerJob(provider?: SandboxProvider, sandboxServ
             if (provider) {
                 await provider.connect(sandboxId);
             }
-            console.log(`[Job:SandboxScheduler] Wake completed for ${sandboxId}`);
+            logScheduler.info('Wake completed', { sandbox_id: sandboxId });
         },
         sleepHandler: async (sandboxId: string, userId: string) => {
             if (provider) {
@@ -41,12 +45,12 @@ export function startSandboxSchedulerJob(provider?: SandboxProvider, sandboxServ
             if (sandboxService) {
                 sandboxService.clearCachedSession(userId);
             }
-            console.log(`[Job:SandboxScheduler] Sleep completed for ${sandboxId}`);
+            logScheduler.info('Sleep completed', { sandbox_id: sandboxId });
         },
     });
 
     schedulerInstance.start();
-    console.log('[Job:SandboxScheduler] Started');
+    logScheduler.info('Started');
 }
 
 // -----------------------------------------------------------------------------
@@ -145,7 +149,7 @@ export function startSandboxCleanupJob(provider?: SandboxProvider, sandboxServic
                 if (sandboxService) {
                     sandboxService.clearCachedSession(userId);
                 }
-                console.log(`[Job:SandboxCleanup] Killed sandbox ${sandboxId}`);
+                logCleanup.info('Killed sandbox', { sandbox_id: sandboxId });
             },
             async pause(sandboxId: string, userId: string) {
                 if (provider) {
@@ -154,7 +158,7 @@ export function startSandboxCleanupJob(provider?: SandboxProvider, sandboxServic
                 if (sandboxService) {
                     sandboxService.clearCachedSession(userId);
                 }
-                console.log(`[Job:SandboxCleanup] Paused sandbox ${sandboxId}`);
+                logCleanup.info('Paused sandbox', { sandbox_id: sandboxId });
             },
         },
         userLookup: {
@@ -168,10 +172,10 @@ export function startSandboxCleanupJob(provider?: SandboxProvider, sandboxServic
     });
 
     cron.schedule(CLEANUP_CRON_SCHEDULE, async () => {
-        console.log('[Job:SandboxCleanup] Starting cleanup...');
+        logCleanup.info('Starting cleanup...');
         const result = await cleanupService.runFullCleanup();
-        console.log('[Job:SandboxCleanup] Result:', JSON.stringify(result));
+        logCleanup.info('Cleanup result', { result });
     });
 
-    console.log('[Job:SandboxCleanup] Scheduled (every 6 hours)');
+    logCleanup.info('Scheduled (every 6 hours)');
 }

@@ -10,7 +10,8 @@ import {
   updateAgent,
   getAssistants,
 } from "@/lib/api/agents"
-import { getSchedules } from "@/lib/api/schedules"
+import type { ScheduledExecution } from "@/lib/api/types"
+import { listSchedules, type ScheduleEntry } from "@/lib/api/schedules"
 import { getAgentKnowledgeBases } from "@/lib/api/agent-kb"
 import { getTree, type FileNode } from "@/lib/api/workspace"
 import { canEditAgent, isSystemTemplate } from "@/utils/agentLabels"
@@ -80,10 +81,25 @@ export default function AgentDetailsClient({ agentId }: AgentDetailsClientProps)
   // Marketplace agents are read-only catalog entries (id: -1, no DB record)
   const isMarketplace = agent ? isSystemTemplate(agent.userId, agent.agentType) : false
 
-  // Schedules use numeric agent ID (from loaded agent) — skip for marketplace
+  // Schedules fetched from workspace.db via backend proxy
   const { data: schedulesData } = useSWR(
-    isAuthReady && agent && !isMarketplace ? ['schedules', agent.id] : null,
-    () => agent ? getSchedules({ agentId: agent.id }) : Promise.resolve([])
+    isAuthReady && agent?.slug && !isMarketplace ? ['schedules', agent.id] : null,
+    async () => {
+      const result = await listSchedules({ agent_slug: agent!.slug! })
+      return result.schedules.map((s: ScheduleEntry): ScheduledExecution => ({
+        id: s.id,
+        name: s.name,
+        description: s.prompt,
+        agentId: agent!.id,
+        scheduleType: 'cron',
+        scheduleConfig: { cron: s.rrule ?? undefined },
+        timezone: 'UTC',
+        enabled: s.status === 'active',
+        taskPrompt: s.prompt,
+        lastRunAt: s.last_run_at ? new Date(s.last_run_at * 1000).toISOString() : undefined,
+        nextRunAt: s.next_run_at ? new Date(s.next_run_at * 1000).toISOString() : undefined,
+      }))
+    }
   )
 
   const { data: allAgentsData } = useSWR(
@@ -119,6 +135,7 @@ export default function AgentDetailsClient({ agentId }: AgentDetailsClientProps)
     handleScheduleDelete,
   } = useScheduleHandlers({
     agentId: agent?.id ?? 0,
+    agentSlug: agent?.slug ?? '',
     setSchedules: setLocalSchedules,
   })
 

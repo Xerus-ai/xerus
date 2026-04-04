@@ -1,12 +1,23 @@
 // Execution API Routes
 // REST endpoints for agent execution lifecycle:
-// - GET  /execute/conversations/:id/stream   -> Long-lived SSE stream per conversation
-// - POST /execute/conversations/:id/messages  -> Submit message (returns 202)
-// - POST /execute/:id/respond                -> HITL response
-// - POST /execute/:id/cancel                 -> Cancel execution
-// - GET  /execute/:id/status                 -> Get execution status
+// - GET    /execute/conversations              -> List conversations (workspace.db)
+// - GET    /execute/conversations/:id          -> Get conversation with messages
+// - POST   /execute/conversations              -> Create conversation
+// - PATCH  /execute/conversations/:id          -> Update conversation title
+// - DELETE /execute/conversations/:id          -> Delete conversation (soft)
+// - GET    /execute/conversations/:id/stream   -> Long-lived SSE stream per conversation
+// - POST   /execute/conversations/:id/messages -> Submit message (returns 202)
+// - POST   /execute/:id/respond                -> HITL response
+// - POST   /execute/:id/cancel                 -> Cancel execution
+// - GET    /execute/:id/status                 -> Get execution status
+// - GET    /execute/schedules                  -> List schedules (workspace.db)
+// - POST   /execute/schedules                  -> Create schedule
+// - PATCH  /execute/schedules/:id              -> Update schedule
+// - DELETE /execute/schedules/:id              -> Delete schedule
+// - GET    /execute/schedules/runs             -> List schedule runs (workspace.db)
 
 import { Router, Response, NextFunction } from 'express';
+import { logger } from '../../utils/logger';
 import rateLimit from 'express-rate-limit';
 import { AuthenticatedRequest } from '../../types';
 import { sendResponse } from '../../utils/response';
@@ -17,7 +28,7 @@ import { query } from '../../database/connection';
 import { ExecutionService } from './execution.service';
 import { StreamingResponse } from './streaming/stream.handler';
 import { sseRegistry } from './streaming/sse-registry';
-import { getSessionControlService } from './platform/tools/session-control.tools';
+import { getSessionControlService } from '../platform-tools/platform/tools/session-control.tools';
 import {
     serializeExecutionStatus,
     serializeHITLAcknowledgment,
@@ -29,13 +40,18 @@ import {
     validateRespondBody,
     validateCancelBody,
 } from './execution.validators';
+import type { SandboxService } from '../sandbox-infra/sandbox/sandbox.service';
+import { requireRunningSandbox, getDaytonaProvider } from '../sandbox-infra/sandbox/sandbox-route-helpers';
 import agentFilesRouter from './agent-files.routes';
-import conversationRouter from '../history/conversations/conversation.routes';
+import conversationRouter from '../conversations/conversation.routes';
+import scheduleFrontendRouter, { setScheduleFrontendRoutesDeps } from './schedule.routes';
+import { getConversation } from '../conversations/workspace-db.service';
 
 // -----------------------------------------------------------------------------
 // Constants
 // -----------------------------------------------------------------------------
 
+const log = logger('ExecutionRoutes');
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const MAX_STREAMS_PER_USER = 10;
 
@@ -55,6 +71,25 @@ const executionRateLimit = rateLimit({
     validate: { xForwardedForHeader: false },
 });
 
+export interface ExecutionRoutesDeps {
+    sandboxService: SandboxService;
+}
+
+let deps: ExecutionRoutesDeps | null = null;
+
+export function setExecutionRoutesDeps(d: ExecutionRoutesDeps): void {
+    deps = d;
+    // Also initialize schedule frontend routes with the same sandbox service
+    setScheduleFrontendRoutesDeps({ sandboxService: d.sandboxService });
+}
+
+function getDeps(): ExecutionRoutesDeps {
+    if (!deps) {
+        throw new Error('ExecutionRoutes dependencies not initialized');
+    }
+    return deps;
+}
+
 // -----------------------------------------------------------------------------
 // Router
 // -----------------------------------------------------------------------------
@@ -65,8 +100,65 @@ const auth = authenticateFirebaseToken;
 // Mount agent file API sub-routes
 router.use('/agents', agentFilesRouter);
 
-// Mount conversation CRUD routes
+// Mount conversation CRUD routes (workspace.db queries)
+// MUST be before /conversations/:id/stream to ensure proper route matching
 router.use('/conversations', conversationRouter);
+
+// Mount schedule CRUD + run history routes (workspace.db queries)
+router.use('/schedules', scheduleFrontendRouter);
+
+// GET /api/v1/execute/sessions - List execution sessions (Neon PostgreSQL)
+// Supports ?agent_slug=... &limit=... &offset=...
+router.get('/sessions', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const startTime = res.locals.startTime || Date.now();
+    try {
+        if (!req.user) throw new UnauthorizedError();
+
+        const agentSlug = req.query.agent_slug as string | undefined;
+        const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
+        const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : 0;
+
+        if (isNaN(limit) || limit < 1) {
+            throw new BadRequestError('limit must be a positive integer');
+        }
+        if (isNaN(offset) || offset < 0) {
+            throw new BadRequestError('offset must be a non-negative integer');
+        }
+
+        const params: unknown[] = [req.user.uid, limit, offset];
+        let agentFilter = '';
+        if (agentSlug) {
+            agentFilter = 'AND es.agent_slug = $4';
+            params.push(agentSlug);
+        }
+
+        const result = await query<SessionListRow>(
+            `SELECT es.id, es.agent_slug, es.status, es.trigger_type,
+                    es.user_prompt, es.input_tokens, es.output_tokens,
+                    es.credits_used, es.started_at, es.completed_at, es.created_at
+             FROM execution_sessions es
+             JOIN workspaces w ON es.workspace_id = w.id
+             WHERE w.user_id = $1 ${agentFilter}
+             ORDER BY es.created_at DESC
+             LIMIT $2 OFFSET $3`,
+            params,
+        );
+
+        const countResult = await query<{ count: string }>(
+            `SELECT COUNT(*) as count
+             FROM execution_sessions es
+             JOIN workspaces w ON es.workspace_id = w.id
+             WHERE w.user_id = $1 ${agentFilter}`,
+            agentSlug ? [req.user.uid, agentSlug] : [req.user.uid],
+        );
+
+        const total = parseInt(countResult.rows[0]?.count ?? '0', 10);
+
+        sendResponse(res, 200, { sessions: result.rows, total }, startTime);
+    } catch (err) {
+        next(err);
+    }
+});
 
 // POST /api/v1/execute/sse-token - Issue a short-lived, single-use token for SSE auth
 router.post('/sse-token', auth, createSseTokenHandler());
@@ -81,17 +173,17 @@ router.get('/conversations/:id/stream', sseAuth, async (req: AuthenticatedReques
         const conversationId = req.params.id;
         validateUUID(conversationId, 'conversation id');
 
+        const { sandboxService } = getDeps();
+        const sandboxId = await requireRunningSandbox(sandboxService, req.user.uid);
+        const provider = getDaytonaProvider(sandboxService);
+
         // Enforce per-user stream limit
         if (sseRegistry.countForUser(req.user.uid) >= MAX_STREAMS_PER_USER) {
             throw new BadRequestError(`Too many active streams (max ${MAX_STREAMS_PER_USER})`);
         }
 
-        // Verify conversation belongs to this user
-        const result = await query<{ id: string; agent_slug: string | null }>(
-            `SELECT id, agent_slug FROM conversations WHERE id = $1 AND user_id = $2`,
-            [conversationId, req.user.uid],
-        );
-        if (result.rows.length === 0) {
+        const conversation = await getConversation(provider, sandboxId, conversationId);
+        if (!conversation) {
             throw new NotFoundError('Conversation');
         }
 
@@ -99,7 +191,7 @@ router.get('/conversations/:id/stream', sseAuth, async (req: AuthenticatedReques
         const stream = new StreamingResponse(res);
         sseRegistry.register(req.user.uid, conversationId, stream);
 
-        console.log(`[SSE] Stream opened for user=${req.user.uid} conv=${conversationId}`);
+        log.info('SSE stream opened', { user_id: req.user.uid, conversation_id: conversationId });
 
         // Send initial meta event so frontend knows connection is live
         stream.send('meta', { conversationId });
@@ -117,7 +209,7 @@ router.get('/conversations/:id/stream', sseAuth, async (req: AuthenticatedReques
         // the active one. A newer connectStream call may have replaced it in the
         // registry; blindly unregistering would delete the replacement stream.
         res.on('close', () => {
-            console.log(`[SSE] Stream closed for user=${req.user!.uid} conv=${conversationId} (was open ${Math.round((Date.now() - (res.locals.startTime || Date.now())) / 1000)}s)`);
+            log.info('SSE stream closed', { user_id: req.user!.uid, conversation_id: conversationId, open_seconds: Math.round((Date.now() - (res.locals.startTime || Date.now())) / 1000) });
             clearInterval(heartbeatInterval);
             const current = sseRegistry.get(req.user!.uid, conversationId);
             if (current === stream) {
@@ -127,7 +219,7 @@ router.get('/conversations/:id/stream', sseAuth, async (req: AuthenticatedReques
 
         // Log if the underlying socket errors or closes unexpectedly
         req.socket.once('error', (err) => {
-            console.error(`[SSE] Socket error for conv=${conversationId}:`, err.message);
+            log.error('SSE socket error', { conversation_id: conversationId, error: err.message });
         });
 
         // Do NOT call next() or end the response — stream stays open
@@ -148,16 +240,16 @@ router.post('/conversations/:id/messages', auth, executionRateLimit, async (req:
         validateUUID(conversationId, 'conversation id');
         const validated = validateMessageBody(req.body);
 
-        // Look up conversation to get agent_id (ownership verified by user_id WHERE clause)
-        const convResult = await query<{ id: string; agent_slug: string | null }>(
-            `SELECT id, agent_slug FROM conversations WHERE id = $1 AND user_id = $2`,
-            [conversationId, req.user.uid],
-        );
-        if (convResult.rows.length === 0) {
+        const { sandboxService } = getDeps();
+        const sandboxId = await requireRunningSandbox(sandboxService, req.user.uid);
+        const provider = getDaytonaProvider(sandboxService);
+
+        const conversation = await getConversation(provider, sandboxId, conversationId);
+        if (!conversation) {
             throw new NotFoundError('Conversation');
         }
 
-        const agentSlug = convResult.rows[0].agent_slug;
+        const agentSlug = conversation.agent_slug;
         if (!agentSlug) {
             throw new BadRequestError('Conversation has no associated agent');
         }
@@ -189,7 +281,7 @@ router.post('/conversations/:id/messages', auth, executionRateLimit, async (req:
             stream,
             triggerType: 'user_message',
         }).catch(err => {
-            console.error('[ExecutionRoutes] Background execution failed:', (err as Error).message);
+            log.error('Background execution failed', { error: (err as Error).message });
             if (!stream.isClosed()) {
                 stream.sendError(new Error('Execution failed to start'));
             }
@@ -308,7 +400,7 @@ router.get('/:id/status', auth, async (req: AuthenticatedRequest, res: Response,
 
         const result = await query<StatusRow>(
             `SELECT es.id, es.status, es.agent_slug, es.started_at, es.completed_at,
-                    es.input_tokens, es.output_tokens, es.credits_used, es.message_metadata
+                    es.input_tokens, es.output_tokens, es.credits_used, es.message_metadata, es.key_source
              FROM execution_sessions es
              JOIN workspaces w ON es.workspace_id = w.id
              WHERE es.id = $1::uuid AND w.user_id = $2`,
@@ -343,6 +435,7 @@ router.get('/:id/status', auth, async (req: AuthenticatedRequest, res: Response,
                     : 0,
                 toolCalls,
                 agentsUsed: 1,
+                billingType: row.key_source ?? undefined,
             } : undefined,
         });
 
@@ -366,6 +459,21 @@ interface StatusRow {
     output_tokens: number | null;
     credits_used: string | null;
     message_metadata: { tool_calls?: unknown[] } | null;
+    key_source: 'byok' | 'platform' | null;
+}
+
+interface SessionListRow {
+    id: string;
+    agent_slug: string;
+    status: string;
+    trigger_type: string | null;
+    user_prompt: string | null;
+    input_tokens: number | null;
+    output_tokens: number | null;
+    credits_used: string | null;
+    started_at: Date | null;
+    completed_at: Date | null;
+    created_at: Date;
 }
 
 // -----------------------------------------------------------------------------

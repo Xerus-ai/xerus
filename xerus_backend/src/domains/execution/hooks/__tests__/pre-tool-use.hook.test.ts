@@ -14,7 +14,7 @@ import {
     HookExecutionRecord,
 } from '../pre-tool-use.hook';
 import { PreToolUseInput, PreToolUseOutput } from '../hooks.types';
-import type { AgentType } from '../../orchestrator/tool.filter';
+import type { AgentType } from '../../../platform-tools/orchestrator/tool.filter';
 
 // -----------------------------------------------------------------------------
 // Test Helpers

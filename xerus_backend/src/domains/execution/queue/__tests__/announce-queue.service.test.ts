@@ -13,6 +13,7 @@ import {
     AnnounceContext,
     DROP_POLICIES,
 } from '../announce-queue.service';
+import { AnnounceQueueDrainError } from '../command-queue.errors';
 
 // -----------------------------------------------------------------------------
 // Mock Types
@@ -207,7 +208,6 @@ describe('AnnounceQueueService', () => {
             const result = await service.drain();
 
             expect(result.drained_count).toBe(3);
-            expect(result.success).toBe(true);
         });
 
         it('should skip drain if queue is empty', async () => {
@@ -316,7 +316,7 @@ describe('AnnounceQueueService', () => {
     });
 
     describe('error handling', () => {
-        it('should return failure on inbox write error', async () => {
+        it('should throw AnnounceQueueDrainError on inbox write error', async () => {
             const failingInbox = {
                 writeToInbox: async () => {
                     throw new Error('Inbox unavailable');
@@ -330,10 +330,8 @@ describe('AnnounceQueueService', () => {
 
             failingService.enqueue(createTestItem());
 
-            const result = await failingService.drain();
-
-            expect(result.success).toBe(false);
-            expect(result.error).toContain('Inbox unavailable');
+            await expect(failingService.drain()).rejects.toThrow(AnnounceQueueDrainError);
+            await expect(failingService.drain()).rejects.toThrow('Inbox unavailable');
         });
 
         it('should keep queue intact on drain failure', async () => {
@@ -350,7 +348,12 @@ describe('AnnounceQueueService', () => {
 
             failingService.enqueue(createTestItem());
 
-            await failingService.drain();
+            // Drain throws, so we catch to verify queue state
+            try {
+                await failingService.drain();
+            } catch {
+                // Expected to throw
+            }
 
             // Queue should still have the item for retry
             expect(failingService.getQueueSize()).toBe(1);

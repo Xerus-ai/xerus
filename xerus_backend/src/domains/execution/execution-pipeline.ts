@@ -11,22 +11,62 @@
 // See: docs/planning/execution/EXECUTION_ARCHITECTURE_v2.md Section 10
 
 import { randomUUID } from 'crypto';
-import { ExecutionSummary, STREAM_EVENT_TYPES, StreamEventType } from './types';
+import { logger } from '../../utils/logger';
+import { BillingType, ExecutionSummary, STREAM_EVENT_TYPES, StreamEventType, type AdapterType } from './types';
+import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
 import { DEFAULT_MODEL } from '../agents/types';
-import {
-    createConversation,
-    incrementMessageCount,
-} from '../history/conversations/conversation.service';
 import type { TriggerType } from './queue/execution-lane.types';
 import {
     SDKExecutionError,
 } from './errors';
 import { AgentAlreadyRunningError, QueueFullError } from './queue/execution-queue.errors';
-import { sendCommand, streamEvents } from './sandbox';
-import type { SessionHandle } from './sandbox';
+import { sendCommand, sendMessage, streamEvents } from '../sandbox-infra/sandbox';
+import type { SessionHandle } from '../sandbox-infra/sandbox';
 import { routeEventToBackend } from './runner-event-router';
+import { createHealthGuard, type HealthGuard } from './execution-health-guard';
+import {
+    resolveToolIcon,
+    type PersistedToolIcon,
+} from './execution-conversation.helpers';
+import {
+    getConversation,
+    createConversation as createWorkspaceConversation,
+    incrementConversationMessageCount,
+    writeChatExecution,
+} from '../conversations/workspace-db.service';
 
-type PersistedToolIcon = 'read' | 'write' | 'search' | 'bash' | 'web' | 'think' | 'agent' | 'skill' | 'task' | 'question';
+// -----------------------------------------------------------------------------
+// Conversation Resolution (workspace.db only — no Neon)
+// -----------------------------------------------------------------------------
+
+export interface ResolvedConversation {
+    id: string;
+    sdkSessionId: string | null;
+}
+
+export async function resolveConversation(
+    deps: ResolvedExecutionDeps,
+    ctx: PipelineContext,
+): Promise<ResolvedConversation> {
+    const { agentSlug, conversationId, task } = ctx.request;
+    if (!ctx.sandboxId) {
+        throw new SDKExecutionError('Sandbox is required before resolving a conversation');
+    }
+
+    const provider = deps.sandboxService.getDaytonaProvider();
+
+    if (conversationId) {
+        const conv = await getConversation(provider, ctx.sandboxId, conversationId);
+        if (conv) {
+            return { id: conversationId, sdkSessionId: conv.sdk_session_id };
+        }
+        throw new SDKExecutionError(`Conversation ${conversationId} not found or access denied`);
+    }
+
+    const title = task.length > 60 ? task.slice(0, 57) + '...' : task;
+    const newConv = await createWorkspaceConversation(provider, ctx.sandboxId, agentSlug, title);
+    return { id: newConv.id, sdkSessionId: null };
+}
 
 type PersistedMessagePart =
     | { id: string; type: 'text'; text: string }
@@ -43,21 +83,6 @@ type PersistedMessagePart =
         target?: string;
         durationMs?: number;
     };
-
-function resolveToolIcon(name: string): PersistedToolIcon {
-    const lowerName = name.toLowerCase();
-    if (lowerName === 'agent' || lowerName === 'task') return 'agent';
-    if (lowerName === 'skill') return 'skill';
-    if (lowerName === 'todowrite') return 'task';
-    if (lowerName === 'askuserquestion') return 'question';
-    if (lowerName.includes('read') || lowerName.includes('glob') || lowerName.includes('grep')) return 'read';
-    if (lowerName.includes('write') || lowerName.includes('edit') || lowerName.includes('notebook')) return 'write';
-    if (lowerName.includes('bash') || lowerName.includes('exec') || lowerName.includes('command')) return 'bash';
-    if (lowerName.includes('web') || lowerName.includes('fetch')) return 'web';
-    if (lowerName.includes('search') || lowerName.includes('toolsearch')) return 'search';
-    if (lowerName.includes('think') || lowerName.includes('plan') || lowerName.includes('reason')) return 'think';
-    return 'search';
-}
 
 export type {
     ExecutionServiceDeps,
@@ -88,6 +113,7 @@ const QUEUE_WAIT_TIMEOUT_MS = 120_000; // 2 minutes
 const SANDBOX_CREATION_TIMEOUT_MS = 120_000; // 2 minutes
 
 export const LOG_PREFIX = '[ExecutionPipeline]';
+const log = logger('ExecutionPipeline');
 
 // -----------------------------------------------------------------------------
 // Step 1: Validate Agent + Auth
@@ -125,6 +151,7 @@ export async function loadAgent(
     // The runner reads config.json locally and reports the real model via session_started event,
     // which updates ctx.agent.ai_model in handleSessionStarted.
     // Defaults here are overridden by the runner — they are NOT fabricated stubs.
+    // adapter_type defaults to 'claudecode' — resolved from config.json by resolveAdapterType().
     return {
         id: entry.id,
         name: entry.slug,
@@ -133,10 +160,96 @@ export async function loadAgent(
         ai_model: DEFAULT_MODEL,
         thinking_level: 'medium',
         autonomy_level: 'supervised',
+        adapter_type: 'claudecode',
         primary_use_case: '',
         workspace_id: workspaceId,
         user_id: entry.user_id || userId,
     };
+}
+
+/**
+ * Read agent's adapter_type from config.json on the sandbox filesystem.
+ * Falls back to 'claudecode' if config is missing or unreadable.
+ * Must be called after sandbox is available (sandboxId resolved).
+ */
+export async function resolveAdapterType(
+    deps: ResolvedExecutionDeps,
+    sandboxId: string,
+    agentSlug: string,
+): Promise<AdapterType> {
+    try {
+        const configPath = `${SANDBOX_CONFIG.workspacePath}/agents/${agentSlug}/config.json`;
+        const raw = await deps.sandboxService.getDaytonaProvider().readFile(sandboxId, configPath);
+        const config = JSON.parse(raw) as { adapter_type?: string };
+        if (config.adapter_type === 'codex') return 'codex';
+        return 'claudecode';
+    } catch (err: unknown) {
+        // File not found is acceptable — default to claudecode
+        const message = err instanceof Error ? err.message : String(err);
+        if (message.includes('ENOENT') || message.includes('No such file') || message.includes('not found')) {
+            return 'claudecode';
+        }
+        // Config exists but is corrupt or unreadable — fail fast
+        throw err;
+    }
+}
+
+/**
+ * Read agent identity files (SOUL.md + Module CLAUDE.md) from the sandbox.
+ * Combined content is passed as --append-system-prompt so the agent knows who it is.
+ * Tries both .claude/agents/{slug}/ and agents/{slug}/ paths.
+ * Returns empty string if no identity files found (agent runs as generic Claude).
+ */
+export async function resolveAgentIdentity(
+    deps: ResolvedExecutionDeps,
+    sandboxId: string,
+    agentSlug: string,
+): Promise<string> {
+    const provider = deps.sandboxService.getDaytonaProvider();
+    const ws = SANDBOX_CONFIG.workspacePath;
+
+    // Try both path conventions: .claude/agents/{slug}/ and agents/{slug}/
+    const pathSets = [
+        { soul: `${ws}/.claude/agents/${agentSlug}/SOUL.md`, module: `${ws}/.claude/agents/${agentSlug}/CLAUDE.md` },
+        { soul: `${ws}/agents/${agentSlug}/SOUL.md`, module: `${ws}/agents/${agentSlug}/CLAUDE.md` },
+    ];
+
+    async function tryRead(filePath: string): Promise<string> {
+        try {
+            return await provider.readFile(sandboxId, filePath);
+        } catch {
+            return '';
+        }
+    }
+
+    let soulContent = '';
+    let moduleContent = '';
+
+    for (const paths of pathSets) {
+        if (!soulContent) soulContent = await tryRead(paths.soul);
+        if (!moduleContent) moduleContent = await tryRead(paths.module);
+        if (soulContent || moduleContent) break;
+    }
+
+    if (!soulContent && !moduleContent) return '';
+
+    const sections: string[] = [
+        '# AGENT IDENTITY — SUPERSEDES ALL PRIOR IDENTITY',
+        '',
+        'You are NOT Claude Code. You are an agent in the Xerus AI platform.',
+        'Your identity, personality, and behavior are defined below.',
+        'This identity takes absolute precedence. Never identify as Claude or mention Anthropic.',
+        '',
+    ];
+
+    if (soulContent) {
+        sections.push(soulContent.trim(), '');
+    }
+    if (moduleContent) {
+        sections.push(moduleContent.trim(), '');
+    }
+
+    return sections.join('\n');
 }
 
 export async function acquireExecutionLane(
@@ -253,16 +366,13 @@ export async function sendExecuteCommand(
     handle: SessionHandle,
     ctx: PipelineContext,
 ): Promise<void> {
-    const agent = requireAgent(ctx);
-
-    // Runner reads model, tools, and all config from local config.json (microseconds).
-    // No backend override needed — filesystem is the source of truth.
-    await sendCommand(handle, {
-        type: 'execute',
-        agent_slug: agent.slug,
-        content: ctx.request.task,
-        context: ctx.request.context,
-    });
+    // CLI runs directly (no cli-executor middleman).
+    // Send the user's message as plain text to the CLI's stdin.
+    // Claude/Codex in interactive mode read from stdin.
+    const prompt = ctx.request.context
+        ? `${ctx.request.task}\n\nContext:\n${ctx.request.context}`
+        : ctx.request.task;
+    await sendMessage(handle, prompt);
 }
 
 export async function streamRunnerEvents(
@@ -272,9 +382,14 @@ export async function streamRunnerEvents(
     abortSignal?: AbortSignal,
 ): Promise<void> {
     // No wall-clock timeout. Agents run until completion.
-    // Protection against stuck agents: runner idle watchdog (5 min without SDK messages)
+    // Protection against stuck agents: health guard (activity timeout + health probe)
     // Protection against cost runaway: credit system (reserveCredits / finalizeCredits)
-    await processEventStream(handle, ctx, deps, abortSignal);
+    const healthGuard = createHealthGuard(handle, ctx.executionId);
+    try {
+        await processEventStream(handle, ctx, deps, abortSignal, healthGuard);
+    } finally {
+        healthGuard.stop();
+    }
 }
 
 /** Timeout for receiving the first event from the runner after sending execute command. */
@@ -285,6 +400,7 @@ async function processEventStream(
     ctx: PipelineContext,
     deps: ResolvedExecutionDeps,
     abortSignal?: AbortSignal,
+    healthGuard?: HealthGuard,
 ): Promise<void> {
     // The runner is a persistent process shared by all agents in the sandbox.
     // Multiple agents can execute concurrently (e.g. inbox watcher triggers master
@@ -297,12 +413,13 @@ async function processEventStream(
     // Safety: abort if no events arrive within FIRST_EVENT_TIMEOUT_MS.
     // This catches cases where the runner process crashed silently or the SDK never starts.
     const firstEventAc = new AbortController();
-    const combinedSignal = abortSignal
-        ? AbortSignal.any([abortSignal, firstEventAc.signal])
-        : firstEventAc.signal;
+    const signals: AbortSignal[] = [firstEventAc.signal];
+    if (abortSignal) signals.push(abortSignal);
+    if (healthGuard) signals.push(healthGuard.signal);
+    const combinedSignal = AbortSignal.any(signals);
     const firstEventTimer = setTimeout(() => {
         if (eventsProcessed === 0) {
-            console.error(`${LOG_PREFIX} No events received from runner within ${FIRST_EVENT_TIMEOUT_MS}ms — runner may have crashed`);
+            log.error('No events received from runner within timeout', { timeout_ms: FIRST_EVENT_TIMEOUT_MS });
             firstEventAc.abort();
         }
     }, FIRST_EVENT_TIMEOUT_MS);
@@ -315,12 +432,15 @@ async function processEventStream(
         }
 
         const raw = event as unknown as Record<string, unknown>;
-        const eventType = typeof raw.event === 'string' && raw.event ? raw.event : null;
+        // Claude CLI stream-json uses `type` field, old SDK runner used `event` field.
+        const eventType = (typeof raw.event === 'string' && raw.event)
+            || (typeof raw.type === 'string' && raw.type)
+            || null;
 
         // Events without a recognized event field are untyped runner output (e.g. raw SDK stdout).
         // Log for debugging but never forward to the frontend.
         if (!eventType) {
-            console.warn(`${LOG_PREFIX} Untyped runner event (no event field), skipping:`, JSON.stringify(raw).slice(0, 200));
+            log.warn('Untyped runner event (no event field), skipping', { raw_preview: JSON.stringify(raw).slice(0, 200) });
             continue;
         }
 
@@ -330,13 +450,14 @@ async function processEventStream(
         const eventSlug = (raw.agent_slug || (raw.data as Record<string, unknown> | undefined)?.agent_slug) as string | undefined;
         if (eventSlug && eventSlug !== '_transport' && eventSlug !== expectedSlug) {
             if (ctx.eventsFiltered < 5) {
-                console.warn(`${LOG_PREFIX} Filtered event: type=${eventType} slug=${eventSlug} expected=${expectedSlug}`);
+                log.warn('Filtered event (slug mismatch)', { event_type: eventType, event_slug: eventSlug, expected_slug: expectedSlug });
             }
             ctx.eventsFiltered++;
             continue;
         }
 
         eventsProcessed++;
+        if (healthGuard) healthGuard.recordActivity();
 
         await routeEventToBackend(eventType, raw, ctx, deps);
 
@@ -350,7 +471,8 @@ async function processEventStream(
 
         // Runner is a persistent process — it stays alive after the session ends.
         // Break the loop so the pipeline can finalize credits and close the stream.
-        if (eventType === 'session_ended' || eventType === 'session_completed') {
+        // CLI stream-json uses `result` as the completion event.
+        if (eventType === 'session_ended' || eventType === 'session_completed' || eventType === 'result') {
             break;
         }
 
@@ -359,13 +481,20 @@ async function processEventStream(
         if (eventType === 'error') {
             const data = raw.data as Record<string, unknown> | undefined;
             const code = data?.code as string || '';
-            console.error(`${LOG_PREFIX} Fatal runner error: code=${code} — breaking stream loop`);
+            log.error('Fatal runner error, breaking stream loop', { code });
             break;
         }
     }
 
     clearTimeout(firstEventTimer);
-    console.log(`${LOG_PREFIX} ${expectedSlug}: ${eventsProcessed} events processed, ${ctx.eventsFiltered} filtered (slug mismatch)`);
+    log.info('Event stream finished', { agent_slug: expectedSlug, events_processed: eventsProcessed, events_filtered: ctx.eventsFiltered });
+
+    // If the health guard detected a dead runner, fail-fast with a clear error
+    if (healthGuard?.signal.aborted) {
+        throw new SDKExecutionError(
+            `Runner for agent '${expectedSlug}' became unresponsive mid-execution (no events after health probe)`,
+        );
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -380,9 +509,9 @@ export async function createSessionRecord(
     const sessionId = randomUUID();
 
     await deps.db.query(
-        `INSERT INTO execution_sessions (id, workspace_id, agent_slug, sandbox_id, status, trigger_type, conversation_id, user_prompt, started_at, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())`,
-        [sessionId, agent.workspace_id, agent.slug, ctx.sandboxId, 'running', ctx.triggerType, ctx.conversationId, ctx.request.task],
+        `INSERT INTO execution_sessions (id, workspace_id, agent_slug, sandbox_id, status, trigger_type, conversation_id, user_prompt, key_source, started_at, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())`,
+        [sessionId, agent.workspace_id, agent.slug, ctx.sandboxId, 'running', ctx.triggerType, ctx.conversationId, ctx.request.task, ctx.keySource],
     );
 
     deps.creditTracker.setSessionId(sessionId);
@@ -402,9 +531,7 @@ export async function finalizeCredits(
     // BYOK users: track usage for analytics but skip credit deduction
     if (ctx.keySource === 'byok') {
         const usage = await deps.creditTracker.getSessionUsage(ctx.sessionId);
-        console.log(
-            `${LOG_PREFIX} BYOK execution ${ctx.executionId}: ${usage.total_input_tokens + usage.total_output_tokens} tokens tracked (no credits deducted)`,
-        );
+        log.info('BYOK execution tracked (no credits deducted)', { execution_id: ctx.executionId, total_tokens: usage.total_input_tokens + usage.total_output_tokens });
         return { total_credits_deducted: 0 };
     }
 
@@ -482,14 +609,27 @@ export async function updateSessionRecord(
          ctx.hookHealth ? JSON.stringify(ctx.hookHealth) : null],
     );
 
-    // Message count is non-critical — don't fail the session if it errors
-    if (ctx.conversationId) {
+    // Persist chat turn to workspace.db for conversation history reload.
+    // Non-critical — don't fail the session if it errors.
+    if (ctx.conversationId && ctx.sandboxId) {
         try {
-            await incrementMessageCount(ctx.conversationId);
+            const provider = deps.sandboxService.getDaytonaProvider();
+            await Promise.all([
+                incrementConversationMessageCount(provider, ctx.sandboxId, ctx.conversationId),
+                writeChatExecution(
+                    provider,
+                    ctx.sandboxId,
+                    ctx.conversationId,
+                    ctx.sessionId || null,
+                    ctx.request.task,
+                    ctx.responseText || null,
+                    ctx.inputTokens + ctx.outputTokens,
+                    Date.now() - ctx.startedAt,
+                    messageMetadata,
+                ),
+            ]);
         } catch (err) {
-            console.error(
-                `${LOG_PREFIX} Failed to increment message count for ${ctx.conversationId}: ${(err as Error).message}`,
-            );
+            log.error('Failed to persist chat execution', { conversation_id: ctx.conversationId, error: (err as Error).message });
         }
     }
 }
@@ -500,36 +640,8 @@ export function buildSummary(ctx: PipelineContext): ExecutionSummary {
         durationMs: Date.now() - ctx.startedAt,
         toolCalls: ctx.toolCallCount,
         agentsUsed: Math.max(ctx.agentSessionCount, 1),
+        billingType: ctx.keySource as BillingType | undefined,
     };
-}
-
-// -----------------------------------------------------------------------------
-// Conversation Resolution
-// If conversationId is provided, verify it exists. Otherwise create one.
-// -----------------------------------------------------------------------------
-
-export async function resolveConversation(
-    deps: ResolvedExecutionDeps,
-    ctx: PipelineContext,
-): Promise<string> {
-    const { userId, agentSlug, conversationId, task } = ctx.request;
-
-    if (conversationId) {
-        // Verify the conversation exists and belongs to this user
-        const result = await deps.db.query<{ id: string }>(
-            `SELECT id FROM conversations WHERE id = $1 AND user_id = $2`,
-            [conversationId, userId],
-        );
-        if (result.rows.length > 0) {
-            return conversationId;
-        }
-        throw new SDKExecutionError(`Conversation ${conversationId} not found or access denied`);
-    }
-
-    // Create new conversation with title from first ~60 chars of task
-    const title = task.length > 60 ? task.slice(0, 57) + '...' : task;
-    const conv = await createConversation(userId, agentSlug, title);
-    return conv.id;
 }
 
 // -----------------------------------------------------------------------------

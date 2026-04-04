@@ -104,3 +104,24 @@ export class CommandLaneNotFoundError extends DomainError {
         this.laneId = laneId;
     }
 }
+
+// -----------------------------------------------------------------------------
+// Announce Queue Errors
+// -----------------------------------------------------------------------------
+
+export class AnnounceQueueDrainError extends DomainError {
+    public readonly channelId: string;
+    public readonly itemCount: number;
+    public readonly originalError?: Error;
+
+    constructor(channelId: string, itemCount: number, reason: string, originalError?: Error) {
+        super(
+            `Failed to drain announce queue (${itemCount} items) to channel ${channelId}: ${reason}`,
+            500,
+            'ANNOUNCE_QUEUE_DRAIN_FAILED'
+        );
+        this.channelId = channelId;
+        this.itemCount = itemCount;
+        this.originalError = originalError;
+    }
+}

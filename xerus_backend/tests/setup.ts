@@ -37,8 +37,8 @@ process.env.FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || 'test-proje
 import admin from 'firebase-admin';
 import { query, closePool } from '../src/database/connection';
 import { setAgentRoutesDeps } from '../src/domains/agents/routes';
-import { SANDBOX_CONFIG } from '../src/domains/execution/sandbox/sandbox.config';
-import type { SandboxFileSystem } from '../src/domains/execution/workspace/workspace.manager';
+import { SANDBOX_CONFIG } from '../src/domains/sandbox-infra/sandbox/sandbox.config';
+import type { SandboxFileSystem } from '../src/domains/sandbox-infra/workspace/workspace.manager';
 
 class InMemorySandboxFs implements SandboxFileSystem {
   private readonly files = new Map<string, string>();

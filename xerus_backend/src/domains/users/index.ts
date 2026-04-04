@@ -56,6 +56,8 @@ export { userRepository, UserRepository } from './repository';
 export { userService, UserService } from './service';
 export { creditService, CreditService } from './credit-service';
 export { apiKeyService, ApiKeyService } from './api-key-service';
+export { cliAuthService, CLIAuthService } from './cli-auth.service';
+export type { CLIAuthStatus, CLIAuthResult, AuthMethod } from './cli-auth.service';
 
 // Routes
-export { default as usersRouter } from './routes';
+export { default as usersRouter, setUserRoutesDeps } from './routes';

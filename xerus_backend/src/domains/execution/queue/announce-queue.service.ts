@@ -2,7 +2,12 @@
 // Batches subagent completion notifications for user inbox
 // Task: xerus-y5v.4.40
 
-import { XERUS_MASTER_SLUG } from '../agents/xerus-master.types';
+import { logger } from '../../../utils/logger';
+import { AnnounceQueueDrainError } from './command-queue.errors';
+
+const log = logger('AnnounceQueueService');
+
+const XERUS_MASTER_SLUG = 'xerus-master';
 
 // -----------------------------------------------------------------------------
 // Drop Policies
@@ -39,10 +44,8 @@ export interface EnqueueResult {
 }
 
 export interface DrainResult {
-    success: boolean;
     drained_count: number;
     skipped?: boolean;
-    error?: string;
 }
 
 export interface AnnounceQueueConfig {
@@ -117,7 +120,7 @@ export class AnnounceQueueService {
 
     async drain(): Promise<DrainResult> {
         if (this.queue.length === 0) {
-            return { success: true, drained_count: 0, skipped: true };
+            return { drained_count: 0, skipped: true };
         }
 
         const itemsToDrain = [...this.queue];
@@ -136,16 +139,17 @@ export class AnnounceQueueService {
             this.queue = [];
 
             return {
-                success: true,
                 drained_count: itemsToDrain.length,
             };
         } catch (error) {
-            const message = error instanceof Error ? error.message : 'Unknown error';
-            return {
-                success: false,
-                drained_count: 0,
-                error: message,
-            };
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            const originalError = error instanceof Error ? error : undefined;
+            throw new AnnounceQueueDrainError(
+                this.context.primary_channel_id,
+                itemsToDrain.length,
+                errorMessage,
+                originalError
+            );
         }
     }
 
@@ -159,7 +163,13 @@ export class AnnounceQueueService {
 
         this.drainTimeoutId = setTimeout(async () => {
             this.drainTimeoutId = null;
-            await this.drain();
+            try {
+                await this.drain();
+            } catch (error) {
+                // Scheduled drains are background operations - log error, don't crash
+                // Queue remains intact for retry on next scheduleDrain call
+                log.error('Scheduled drain failed', { error: error instanceof Error ? error.message : String(error) });
+            }
         }, delay);
     }
 

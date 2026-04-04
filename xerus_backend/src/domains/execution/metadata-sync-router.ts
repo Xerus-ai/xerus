@@ -2,13 +2,14 @@
 // Handles metadata_sync events from the runner — routes to entity-specific DB handlers.
 // Extracted from runner-event-router.ts to keep files under 400 lines.
 
+import { logger } from '../../utils/logger';
 import type { PipelineContext, ResolvedExecutionDeps } from './execution-pipeline.types';
 import { agentRegistryRepository } from '../agents/agent-registry.repository';
-import { createMetadataSyncService } from './metadata-sync/metadata-sync.service';
-import type { SyncEntityType } from './metadata-sync/metadata-sync.types';
-import { handleTriggerSync, handleNotificationSync, handleKbSync, handleToolSync, handleSessionSync, handleMemorySync, handleHeartbeatSync } from './entity-sync-handlers';
+import { createMetadataSyncService } from '../sandbox-infra/metadata-sync/metadata-sync.service';
+import type { SyncEntityType, WorkspaceSyncPayload } from '../sandbox-infra/metadata-sync/metadata-sync.types';
+import { handleTriggerSync, handleNotificationSync, handleKbSync, handleToolSync, handleSessionSync, handleMemorySync } from './entity-sync-handlers';
 
-const LOG_PREFIX = '[EventRouter]';
+const log = logger('MetadataSyncRouter');
 
 const DANGEROUS_KEYS = ['__proto__', 'constructor', 'prototype'];
 
@@ -23,7 +24,7 @@ function sanitizeSyncData(data: Record<string, unknown>): Record<string, unknown
 }
 
 const SUPPORTED_SYNC_ENTITIES = new Set<string>([
-    'workspace', 'domain', 'channel', 'channel_message', 'task',
+    'workspace',
 ]);
 
 export async function handleMetadataSync(
@@ -34,7 +35,7 @@ export async function handleMetadataSync(
     const rawData = d.data as Record<string, unknown> | undefined;
 
     if (!entity || !action || !rawData) {
-        console.warn(`${LOG_PREFIX} metadata_sync: missing entity=${entity} action=${action} or data`);
+        log.warn('metadata_sync missing fields', { entity, action });
         return;
     }
 
@@ -54,7 +55,8 @@ export async function handleMetadataSync(
         return;
     }
     if (entity === 'heartbeat') {
-        await handleHeartbeatSync(data, action, ctx, deps);
+        // Heartbeat tables dropped in migration 081. Log and skip.
+        log.info('metadata_sync heartbeat sync ignored (tables deprecated)');
         return;
     }
     if (entity === 'trigger') {
@@ -85,10 +87,10 @@ export async function handleMetadataSync(
                     );
                     if (connectionCheck.rows.length === 0) {
                         ctx.stream.send('tool_auth_required', { app_slug: appSlug, agent_slug: agentSlug });
-                        console.log(`${LOG_PREFIX} tool_auth_required: sent SSE for app=${appSlug} agent=${agentSlug}`);
+                        log.info('tool_auth_required sent via SSE', { app_slug: appSlug, agent_slug: agentSlug });
                     }
                 } else {
-                    console.warn(`${LOG_PREFIX} tool connect: agent slug=${agentSlug} not found for user=${userId}`);
+                    log.warn('Tool connect: agent not found', { agent_slug: agentSlug, user_id: userId });
                 }
             }
         }
@@ -99,23 +101,35 @@ export async function handleMetadataSync(
         handleSkillSync(data, action, userId);
         return;
     }
+    if (entity === 'task') {
+        log.info('metadata_sync task sync ignored (workspace DB is source of truth)');
+        return;
+    }
+    if (entity === 'domain') {
+        log.info('metadata_sync domain sync ignored (workspace DB is source of truth)');
+        return;
+    }
+    if (entity === 'channel') {
+        log.info('metadata_sync channel sync ignored (workspace DB is source of truth)');
+        return;
+    }
+    if (entity === 'channel_message') {
+        log.info('metadata_sync channel_message sync ignored (workspace DB is source of truth)');
+        return;
+    }
 
     if (!SUPPORTED_SYNC_ENTITIES.has(entity as SyncEntityType)) {
-        console.warn(`${LOG_PREFIX} metadata_sync: unsupported entity='${entity}'`);
+        log.warn('metadata_sync unsupported entity', { entity });
         return;
     }
 
     const syncService = createMetadataSyncService(deps.db);
-    const payload = entity === 'channel'
-        ? { domain_slug: data.domain as string, slug: data.slug, name: data.name, description: data.description, agent_count: data.agent_count }
-        : data;
-
     const result = await syncService.sync({
         entity: entity as SyncEntityType,
         user_id: userId,
-        payload: payload as never,
+        payload: data as unknown as WorkspaceSyncPayload,
     });
-    console.log(`${LOG_PREFIX} metadata_sync: synced ${entity} id=${result.id} for user=${userId}`);
+    log.info('metadata_sync synced', { entity, id: result.id, user_id: userId });
 }
 
 async function handleAgentMetadataSync(
@@ -123,7 +137,7 @@ async function handleAgentMetadataSync(
 ): Promise<void> {
     const slug = data.slug as string | undefined;
     if (!slug) {
-        console.warn(`${LOG_PREFIX} metadata_sync: missing slug in agent data`);
+        log.warn('metadata_sync agent missing slug');
         return;
     }
 
@@ -135,19 +149,19 @@ async function handleAgentMetadataSync(
             if (!existing) {
                 await agentRegistryRepository.register(slug, userId, 'private');
             }
-            console.log(`${LOG_PREFIX} metadata_sync: registered agent slug=${slug} for user=${userId}`);
+            log.info('metadata_sync agent registered', { slug, user_id: userId });
             break;
         }
         case 'update':
             // Config.json is the source of truth; registry only tracks slug/id/type
-            console.log(`${LOG_PREFIX} metadata_sync: agent update slug=${slug} (config.json is source of truth)`);
+            log.info('metadata_sync agent update (config.json is source of truth)', { slug });
             break;
         case 'delete':
             await agentRegistryRepository.deleteBySlug(slug, userId);
-            console.log(`${LOG_PREFIX} metadata_sync: deleted agent slug=${slug} for user=${userId}`);
+            log.info('metadata_sync agent deleted', { slug, user_id: userId });
             break;
         default:
-            console.warn(`${LOG_PREFIX} metadata_sync: unknown action '${action}' for agent slug=${slug}`);
+            log.warn('metadata_sync unknown action for agent', { action, slug });
             break;
     }
 }
@@ -157,5 +171,5 @@ function handleSkillSync(data: Record<string, unknown>, action: string, _userId:
     // The runner handles skill installation directly in the sandbox.
     // This handler just logs the event.
     const skillSlug = data.skill_slug as string || '';
-    console.log(`${LOG_PREFIX} skill sync: action=${action} slug=${skillSlug} (filesystem-based, no DB write)`);
+    log.info('Skill sync (filesystem-based, no DB write)', { action, skill_slug: skillSlug });
 }

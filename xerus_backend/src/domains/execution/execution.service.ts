@@ -16,7 +16,8 @@ import {
     updateSessionRecord,
     buildSummary,
     resolveConversation,
-    LOG_PREFIX,
+    resolveAdapterType,
+    resolveAgentIdentity,
 } from './execution-pipeline';
 import { requireAgent } from './pipeline-guards';
 
@@ -36,16 +37,37 @@ import type {
     StartExecutionOptions,
 } from './execution-pipeline';
 
-import { sendCommand } from './sandbox';
-import { DomainError } from '../../utils/errors';
+import { logger } from '../../utils/logger';
+import { sendCommand } from '../sandbox-infra/sandbox';
 import { resolveApiKey, type ResolvedKey } from './key-resolver.service';
-import { buildSDKEnvironment } from './sdk/sdk.config';
-import type { SessionHandle } from './sandbox/providers/daytona-runner';
+import { handleExecutionError, cleanupExecution } from './execution-lifecycle';
+import { buildSDKEnvironment, type UserCliKeys } from './sdk/sdk.config';
+import type { SessionHandle } from '../sandbox-infra/sandbox/providers/daytona-runner';
 import { skillSecretsService } from '../skills/secrets.service';
 import { createAnnounceQueueService } from './queue/announce-queue.service';
 import { createWorkspaceInboxWriter } from './queue/database-inbox-writer';
-import { checkHookHealth } from './sandbox/hook-health';
-import { SANDBOX_CONFIG } from './sandbox/sandbox.config';
+import { checkHookHealth } from '../sandbox-infra/sandbox/hook-health';
+import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
+
+const log = logger('ExecutionService');
+// -----------------------------------------------------------------------------
+// Cross-domain dependency injection (avoids importing from users domain)
+// -----------------------------------------------------------------------------
+
+export interface UserApiKeyLookup {
+    get(userId: string, provider: 'anthropic' | 'openai'): Promise<string | null>;
+}
+
+let apiKeyLookup: UserApiKeyLookup | null = null;
+
+export function setExecutionApiKeyLookup(lookup: UserApiKeyLookup): void {
+    apiKeyLookup = lookup;
+}
+
+function getApiKeyLookup(): UserApiKeyLookup {
+    if (!apiKeyLookup) throw new Error('Execution API key lookup not initialized');
+    return apiKeyLookup;
+}
 
 interface ActiveExecution {
     handle: SessionHandle;
@@ -100,6 +122,7 @@ export class ExecutionService {
             status: 'pending',
             streamOffset: 0,
             conversationId: request.conversationId ?? null,
+            sdkSessionId: null,
             responseText: '',
             responseChunks: [],
             creditsUsed: 0,
@@ -108,6 +131,7 @@ export class ExecutionService {
             announceQueue: null,
             thinkingChunks: [],
             toolCallDetails: [],
+            toolCallMap: new Map(),
             eventsFiltered: 0,
             setupReport: null,
             hookHealth: null,
@@ -117,47 +141,47 @@ export class ExecutionService {
         // Track preflight promises for cleanup if early failure occurs
         let preSandbox: Promise<string> | null = null;
         let preApiKey: Promise<ResolvedKey> | null = null;
-        let preSecrets: Promise<Record<string, string>> | null = null;
+        let preCliKeys: Promise<UserCliKeys> | null = null;
 
         try {
             // -----------------------------------------------------------------
-            // Preflight: fire all independent work at T=0 (all need only userId)
+            // Preflight: fire independent work at T=0 (agent, API key, sandbox, CLI keys)
+            // Skill secrets depend on sandbox being ready (workspace DB is on sandbox)
             // -----------------------------------------------------------------
-            const tag = `${LOG_PREFIX} [${executionId.slice(0,8)}]`;
-            const T = () => `T+${Date.now() - startedAt}ms`;
-            console.log(`${tag} ${T()} Preflight: agent + API key + sandbox + skills`);
+            log.info('Preflight started', { execution_id: executionId, phase: 'agent+apikey+sandbox+clikeys' });
             stream.send('progress', { phase: 'sandbox', message: 'Preparing sandbox', percent: 10 });
 
             const preAgent = loadAgent(resolved, request.agentSlug, request.userId);
             preApiKey = resolveApiKey(request.userId, 'openrouter')
-                .then(r => { console.log(`${tag} ${T()} preApiKey resolved`); return r; });
+                .then(r => { log.debug('preApiKey resolved', { execution_id: executionId, duration_ms: Date.now() - startedAt }); return r; });
             preSandbox = ensureSandbox(resolved, ctx)
-                .then(r => { console.log(`${tag} ${T()} preSandbox resolved`); return r; });
-            preSecrets = skillSecretsService.resolveAllSecrets(request.userId)
-                .then(r => { console.log(`${tag} ${T()} preSecrets resolved (${Object.keys(r).length} keys)`); return r; });
+                .then(r => { log.debug('preSandbox resolved', { execution_id: executionId, duration_ms: Date.now() - startedAt }); return r; });
+            // Fetch user's BYOK CLI keys (anthropic/openai) for sandbox env injection
+            preCliKeys = this.resolveUserCliKeys(request.userId)
+                .then(r => { log.debug('preCliKeys resolved', { execution_id: executionId, duration_ms: Date.now() - startedAt, has_anthropic: !!r.anthropicKey, has_openai: !!r.openaiKey }); return r; });
 
             // -----------------------------------------------------------------
             // Await agent first — needed for lane acquisition
             // -----------------------------------------------------------------
             ctx.agent = await preAgent;
-            console.log(`${tag} ${T()} preAgent resolved`);
+            log.debug('preAgent resolved', { execution_id: executionId, duration_ms: Date.now() - startedAt });
 
             // Acquire execution lane (stale lanes cleaned periodically, not per-execution)
             const lane = await acquireExecutionLane(resolved, ctx, triggerType || 'user_message');
             ctx.laneId = lane.lane_id;
-            console.log(`${tag} ${T()} lane acquired (queued=${lane.queued})`);
+            log.debug('Lane acquired', { execution_id: executionId, duration_ms: Date.now() - startedAt, queued: lane.queued });
 
             // -----------------------------------------------------------------
-            // Await remaining preflight (started at T=0, likely settled by now)
+            // Await sandbox + independent preflight, then resolve secrets from workspace DB
             // -----------------------------------------------------------------
-            const [resolvedKey, sandboxId, skillSecrets] = await Promise.all([
+            const [resolvedKey, sandboxId, userCliKeys] = await Promise.all([
                 preApiKey,
                 preSandbox,
-                preSecrets,
+                preCliKeys,
             ]);
             ctx.keySource = resolvedKey.source;
             ctx.sandboxId = sandboxId;
-            console.log(`${tag} ${T()} Promise.all resolved`);
+            log.debug('Preflight Promise.all resolved', { execution_id: executionId, duration_ms: Date.now() - startedAt });
 
             if (!ctx.sandboxId) {
                 throw new Error('Sandbox not available after creation');
@@ -165,39 +189,56 @@ export class ExecutionService {
 
             const daytonaProvider = resolved.sandboxService.getDaytonaProvider();
 
-            // Build runner environment with the resolved API key + skill secrets
-            const runnerEnvVars = buildSDKEnvironment(resolvedKey.apiKey, skillSecrets);
+            // Resolve skill secrets from workspace SQLite DB (requires sandbox to be ready)
+            const skillSecrets = await skillSecretsService.resolveAllSecrets(daytonaProvider, ctx.sandboxId);
+            log.debug('preSecrets resolved', { execution_id: executionId, duration_ms: Date.now() - startedAt, secret_count: Object.keys(skillSecrets).length });
 
-            console.log(`${tag} ${T()} Getting/creating runner`);
+            // Build runner environment with the resolved API key + skill secrets + CLI BYOK keys
+            const runnerEnvVars = buildSDKEnvironment(resolvedKey.apiKey, skillSecrets, userCliKeys);
+
+            // Resolve conversation first to get sdk_session_id for --resume
+            await reserveCredits(resolved, ctx);
+            log.debug('Credits reserved', { execution_id: executionId, duration_ms: Date.now() - startedAt });
+
+            const conversation = await resolveConversation(resolved, ctx);
+            ctx.conversationId = conversation.id;
+            ctx.sdkSessionId = conversation.sdkSessionId;
+            log.debug('Conversation resolved', { execution_id: executionId, duration_ms: Date.now() - startedAt, has_sdk_session: !!ctx.sdkSessionId });
+
+            // Resolve adapter_type and agent identity from sandbox filesystem
+            const agentForTracking = requireAgent(ctx);
+            const [adapterType, agentIdentity] = await Promise.all([
+                resolveAdapterType(resolved, ctx.sandboxId, agentForTracking.slug),
+                resolveAgentIdentity(resolved, ctx.sandboxId, agentForTracking.slug),
+            ]);
+            agentForTracking.adapter_type = adapterType;
+            log.debug('Agent resolved', { execution_id: executionId, duration_ms: Date.now() - startedAt, adapter_type: adapterType, has_identity: agentIdentity.length > 0 });
+
+            // Create per-agent session (direct CLI, no cli-executor middleman)
+            log.debug('Getting/creating agent session', { execution_id: executionId, duration_ms: Date.now() - startedAt, agent_slug: agentForTracking.slug });
             const handle = await resolved.sandboxService.getOrCreateRunner(
                 request.userId, ctx.sandboxId, runnerEnvVars,
+                agentForTracking.slug, adapterType, agentIdentity || undefined,
             );
             ctx.sessionHandle = handle;
-            console.log(`${tag} ${T()} Runner ready, sessionId=${handle.sessionId}`);
+            log.debug('Agent session ready', { execution_id: executionId, duration_ms: Date.now() - startedAt, session_id: handle.sessionId });
 
-            // Track active execution so cancelExecution() can send interrupt
-            const agentForTracking = requireAgent(ctx);
             this.activeExecutions.set(executionId, {
                 handle,
                 agentSlug: agentForTracking.slug,
                 stream,
             });
-
-            // Runner reads agents/{slug}/config.json locally (microseconds).
-            // No scaffold check or hydrate needed — workspace-health syncs agent
-            // files on sandbox create/resume, and syncConfigToWorkspace keeps
-            // config.json updated on agent edits. Meta SSE is deferred to
-            // session_started event (runner emits the real model).
-
-            await reserveCredits(resolved, ctx);
-            console.log(`${tag} ${T()} Credits reserved`);
-
-            ctx.conversationId = await resolveConversation(resolved, ctx);
-            console.log(`${tag} ${T()} Conversation resolved`);
             stream.send('progress', { phase: 'executing', message: 'Starting agent', percent: 20 });
             ctx.sessionId = await createSessionRecord(resolved, ctx);
-            console.log(`${tag} ${T()} Session record created`);
-            stream.send('meta', { conversationId: ctx.conversationId });
+            log.debug('Session record created', { execution_id: executionId, duration_ms: Date.now() - startedAt });
+            // Meta event with agentName triggers streamingTurn creation on frontend.
+            // Without agentName, all streaming events (token, tool_call, reasoning)
+            // are silently dropped because streamingTurn is null.
+            stream.send('meta', {
+                conversationId: ctx.conversationId,
+                agentSlug: agentForTracking.slug,
+                agentName: agentForTracking.name || agentForTracking.slug,
+            });
             ctx.status = 'running';
 
             // Register stream for HITL guidance events (keyed by sessionId since that's what HITL uses as execution_id)
@@ -208,8 +249,7 @@ export class ExecutionService {
             const inboxWriter = createWorkspaceInboxWriter(
                 { writeFile: (sid, path, content) => daytonaProvider.writeFile(sid, path, content) },
                 ctx.sandboxId,
-                resolved.db,
-                request.userId,
+                daytonaProvider,
             );
             ctx.announceQueue = createAnnounceQueueService(
                 { inboxWriter },
@@ -221,13 +261,13 @@ export class ExecutionService {
             // not replayed events from previous executions on the same runner.
             ctx.streamOffset = handle.logBuffer.position;
 
-            console.log(`${tag} ${T()} Sending execute command, streamOffset=${ctx.streamOffset}`);
+            log.debug('Sending execute command', { execution_id: executionId, duration_ms: Date.now() - startedAt, stream_offset: ctx.streamOffset });
             await sendExecuteCommand(handle, ctx);
 
             // Step 4: Stream events back to frontend via SSE
-            console.log(`${LOG_PREFIX} [${executionId.slice(0,8)}] Streaming runner events...`);
+            log.info('Streaming runner events', { execution_id: executionId });
             await streamRunnerEvents(handle, ctx, resolved);
-            console.log(`${LOG_PREFIX} [${executionId.slice(0,8)}] Stream completed`);
+            log.info('Stream completed', { execution_id: executionId });
 
             // Drain any queued subagent announcements before finalizing
             if (ctx.announceQueue && ctx.announceQueue.getQueueSize() > 0) {
@@ -260,7 +300,7 @@ export class ExecutionService {
 
         } catch (error) {
             ctx.status = 'failed';
-            await this.handleExecutionError(ctx, error);
+            await handleExecutionError(this.deps, ctx, error);
         } finally {
             // If sandbox was preflight'd but pipeline failed before ctx.sandboxId was set,
             // the sandbox may still have resolved and incremented execution count.
@@ -269,15 +309,31 @@ export class ExecutionService {
                 preSandbox
                     .then(() => resolved.sandboxService.decrementExecutionCount(request.userId))
                     .catch((err: unknown) => {
-                        console.warn(`${LOG_PREFIX} Preflight sandbox failed for ${request.userId}: ${(err as Error).message}`);
+                        log.warn('Preflight sandbox failed', { user_id: request.userId, error: (err as Error).message });
                     });
             }
             // Catch dangling preflight promises to prevent unhandled rejections
             if (preApiKey) preApiKey.catch(() => {});
-            if (preSecrets) preSecrets.catch(() => {});
+            if (preCliKeys) preCliKeys.catch(() => {});
             this.activeExecutions.delete(executionId);
-            this.cleanup(resolved, ctx);
+            cleanupExecution(resolved, ctx);
         }
+    }
+
+    /**
+     * Resolve user's BYOK CLI keys (anthropic/openai) from user_api_keys table.
+     * These are injected into sandbox env vars so CLI auth-detector sees 'api' billing.
+     */
+    private async resolveUserCliKeys(userId: string): Promise<UserCliKeys> {
+        const lookup = getApiKeyLookup();
+        const [anthropicKey, openaiKey] = await Promise.all([
+            lookup.get(userId, 'anthropic'),
+            lookup.get(userId, 'openai'),
+        ]);
+        return {
+            anthropicKey: anthropicKey || undefined,
+            openaiKey: openaiKey || undefined,
+        };
     }
 
     /**
@@ -309,7 +365,7 @@ export class ExecutionService {
         // Send interrupt command to the runner process.
         // The runner's processManager.interruptAgent() aborts the SDK query.
         sendCommand(active.handle, { type: 'interrupt', agent_slug: active.agentSlug })
-            .catch(err => console.error(`${LOG_PREFIX} Failed to send interrupt: ${(err as Error).message}`));
+            .catch(err => log.error('Failed to send interrupt', { error: (err as Error).message }));
 
         // Send stop event — do NOT close the stream (it belongs to the conversation, not the execution)
         if (!active.stream.isClosed()) {
@@ -319,84 +375,4 @@ export class ExecutionService {
         return true;
     }
 
-    private async handleExecutionError(ctx: PipelineContext, error: unknown): Promise<void> {
-        const err = error instanceof Error ? error : new Error(String(error));
-        console.error(`${LOG_PREFIX} Execution ${ctx.executionId} failed:`, err.message);
-
-        if (ctx.sessionId) {
-            try {
-                await this.deps.db.query(
-                    `UPDATE execution_sessions SET status = 'failed', agent_response = $2, completed_at = NOW() WHERE id = $1`,
-                    [ctx.sessionId, ctx.responseText || null],
-                );
-            } catch (dbErr) {
-                // Cleanup errors are intentionally caught and logged, not re-thrown.
-                // Re-throwing here would mask the original execution error.
-                console.error(
-                    `${LOG_PREFIX} Failed to update session ${ctx.sessionId}: ${(dbErr as Error).message}`,
-                );
-            }
-        } else if (ctx.conversationId && ctx.conversationId !== ctx.request.conversationId) {
-            // Conversation was created by this execution but session record was never inserted.
-            // Delete the orphan to avoid ghost conversations in the sidebar.
-            try {
-                await this.deps.db.query(
-                    `DELETE FROM conversations WHERE id = $1 AND message_count = 0`,
-                    [ctx.conversationId],
-                );
-            } catch (dbErr) {
-                console.error(
-                    `${LOG_PREFIX} Failed to clean up orphaned conversation ${ctx.conversationId}: ${(dbErr as Error).message}`,
-                );
-            }
-        }
-
-        if (!ctx.stream.isClosed()) {
-            // Sanitize: only expose error details for known DomainError types.
-            // Unknown errors get a generic message to prevent leaking internals.
-            const sanitizedError = err instanceof DomainError
-                ? err
-                : new Error('An internal error occurred');
-            ctx.stream.sendError(sanitizedError, {
-                requestId: ctx.executionId,
-                traceId: ctx.executionId,
-                responseTimeMs: Date.now() - ctx.startedAt,
-            });
-        }
-    }
-
-    private cleanup(resolved: ResolvedExecutionDeps, ctx: PipelineContext): void {
-        // Runner persists between executions. Don't send 'done'.
-        // Runner is killed when sandbox pauses/stops (scheduler handles this).
-
-        // Unregister stream from HITL emitter
-        if (ctx.sessionId && resolved.activeStreamEmitter) {
-            resolved.activeStreamEmitter.unregister(ctx.sessionId);
-        }
-
-        if (ctx.laneId) {
-            try {
-                resolved.queueService.release(ctx.laneId);
-            } catch (releaseErr) {
-                // Cleanup errors are intentionally caught and logged, not re-thrown.
-                // Re-throwing here would mask the original execution error.
-                console.error(
-                    `${LOG_PREFIX} Failed to release lane ${ctx.laneId}: ${(releaseErr as Error).message}`,
-                );
-            }
-        }
-
-        if (ctx.sandboxId) {
-            resolved.sandboxService.decrementExecutionCount(ctx.request.userId);
-        }
-
-        resolved.creditTracker.resetContext();
-
-        if (ctx.announceQueue) {
-            ctx.announceQueue.dispose();
-        }
-
-        // Stream belongs to the conversation (long-lived SSE), NOT this execution.
-        // Do NOT close it here — the GET /stream route manages stream lifecycle.
-    }
 }

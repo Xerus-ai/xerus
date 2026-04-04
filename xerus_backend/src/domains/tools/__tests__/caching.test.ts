@@ -80,7 +80,7 @@ describe('Pipedream Apps Caching System', () => {
                 const result = await toolsRepository.listAppsFromDB({
                     page: 1,
                     limit: 20,
-                    category: testCategory,
+                    categories: [testCategory],
                 });
 
                 expect(result.apps.length).toBeGreaterThan(0);

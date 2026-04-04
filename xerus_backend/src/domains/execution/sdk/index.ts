@@ -2,4 +2,4 @@
 
 export * from './sdk.types';
 export * from './sdk.config';
-export { SDKService } from './sdk.service';
+export { PricingService } from './pricing.service';

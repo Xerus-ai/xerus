@@ -10,7 +10,7 @@ import type {
     TriggerRegistrationResult,
     TriggerDefinition,
     EventNormalizationMetadata,
-} from '../../heartbeat/normalized-event.types';
+} from '../trigger.types';
 
 // Test implementation of BaseTriggerAdapter
 class TestAdapter extends BaseTriggerAdapter {
@@ -246,7 +246,7 @@ describe('TriggerAdapterRegistry', () => {
         });
 
         it('should throw for unregistered provider', () => {
-            expect(() => registry.get('zapier')).toThrow('No adapter registered for provider: zapier');
+            expect(() => registry.get('zapier' as TriggerProvider)).toThrow('No adapter registered for provider: zapier');
         });
     });
 
@@ -257,7 +257,7 @@ describe('TriggerAdapterRegistry', () => {
         });
 
         it('should return false for unregistered adapter', () => {
-            expect(registry.has('zapier')).toBe(false);
+            expect(registry.has('zapier' as TriggerProvider)).toBe(false);
         });
     });
 

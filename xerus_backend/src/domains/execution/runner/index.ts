@@ -1,5 +1,5 @@
 // Runner Module Exports
-// Agent runner types and components for sandbox execution
+// CLI-native runner types and components for sandbox execution
 
 // Protocol Types (canonical - unified event system)
 export type {
@@ -10,8 +10,6 @@ export type {
     SessionStartedEvent,
     SessionEndedEvent,
     AgentMessageEvent as RunnerAgentMessageEvent,
-    HeartbeatFiredEvent,
-    HeartbeatSkippedEvent,
     HealthResponseEvent,
     SessionsListEvent as RunnerSessionsListEvent,
     CreditCheckEvent,
@@ -33,7 +31,6 @@ export type {
     ScaffoldFile,
     SessionInfo,
     AgentConfig as RunnerAgentConfig,
-    ActiveHoursConfig,
     SessionState,
     CreditResponseCommand,
 } from './runner.types';
@@ -42,7 +39,6 @@ export type {
 export type {
     RunnerConfig,
     McpServerConfig,
-    HeartbeatConfig,
 } from './runner.types';
 export { RUNNER_ENV } from './runner.types';
 
@@ -59,27 +55,23 @@ export type {
     StdoutEvent,
 } from './stdout-emitter';
 
-export { SessionManager } from './session-manager';
-
-export { ProcessManager } from './process-manager';
-export type { AgentConfig as ProcessAgentConfig, PresetSystemPrompt, SystemPrompt } from './process-manager';
-
 export { buildSoulAppend } from './soul-append-builder';
 
-export { InboxWatcher } from './inbox-watcher';
-export type { InboxMessage } from './inbox-watcher';
+export { detectAllAuth, detectAuthForAdapter, resolveBillingType } from './auth-detector';
+export type { PlatformAuthStatus, SandboxExecutor } from './auth-detector';
 
-export { ChannelWatcher } from './channel-watcher';
-export type { ChannelPost } from './channel-watcher';
+export { parseClaudeStreamLine, parseCodexStreamLine, clearAccumulator } from './stream-parser';
 
-export { HeartbeatRunner, isWithinActiveHours } from './heartbeat-runner';
-export type { HeartbeatRunnerOptions } from './heartbeat-runner';
+// CLI adapter types
+export type {
+    CLIAdapter,
+    AdapterType,
+    AgentConfig as CLIAgentConfig,
+    AuthResult,
+    CLIBillingType,
+} from './cli-adapters/types';
 
-export { AgentRunnerProcess } from './agent-runner';
-
-export { createPlatformMcpServer } from './platform-mcp-server';
-
-export { RunnerHealthMonitor, createRunnerHealthMonitor } from './health-monitor';
+export { RunnerHealthMonitor } from './health-monitor';
 export type {
     RunnerHealthMonitorDeps,
     HealthMonitorConfig,
@@ -91,7 +83,5 @@ export type {
 export { SandboxMemoryExtractor, EXTRACTION_SYSTEM_PROMPT } from './sandbox-memory-extractor';
 export type { SandboxMemoryExtractorOptions } from './sandbox-memory-extractor';
 
-export { bridgeToSDKHooks } from './hook-sdk-bridge';
-export type { SDKHooksRecord } from './hook-sdk-bridge';
 export { buildRuntimeHookHandlers } from './runtime-hook-factory';
 export type { RuntimeHookContext } from './runtime-hook-factory';

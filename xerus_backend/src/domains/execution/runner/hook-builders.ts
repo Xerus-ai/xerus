@@ -14,7 +14,7 @@ import { TaskCompletedHandler } from '../hooks/task-completed.hook';
 import { TeammateIdleHandler } from '../hooks/teammate-idle.hook';
 import { SubagentStartHandler } from '../hooks/subagent-start.hook';
 import { SubagentStopHandler } from '../hooks/subagent-stop.hook';
-import { evaluateHitlRule, getHitlRequirement } from '../platform/hitl-rules';
+import { evaluateHitlRule, getHitlRequirement } from '../../platform-tools/platform/hitl-rules';
 import { DEFAULT_HITL_TIMEOUT_SECONDS } from '../hitl/hitl.types';
 import { registerPause } from './hitl-pause-registry';
 import type { StdoutEmitter } from './stdout-emitter';

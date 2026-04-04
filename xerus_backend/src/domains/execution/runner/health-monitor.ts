@@ -3,8 +3,10 @@
 // Monitors via stdout activity + health probes
 // Spec: xerus-y5v.4.146
 
+import { logger } from '../../../utils/logger';
 import type { HealthCommand } from './stdin-parser';
-import { SANDBOX_CONFIG } from '../sandbox/sandbox.config';
+
+const log = logger('HealthMonitor');
 
 // -----------------------------------------------------------------------------
 // Types
@@ -82,7 +84,7 @@ const DEFAULT_CONFIG: HealthMonitorConfig = {
     max_restart_attempts: 3,
     backoff_base_ms: 1_000,
     backoff_max_ms: 30_000,
-    runner_start_command: `node ${SANDBOX_CONFIG.runnerScriptPath}`,
+    runner_start_command: 'claude --output-format stream-json --dangerously-skip-permissions',
 };
 
 // -----------------------------------------------------------------------------
@@ -138,14 +140,6 @@ export class RunnerHealthMonitor {
         }
     }
 
-    recordHealthResponse(sandboxId: string): void {
-        const entry = this.entries.get(sandboxId);
-        if (entry) {
-            entry.last_activity = Date.now();
-            entry.healthy = true;
-        }
-    }
-
     getLastActivity(sandboxId: string): number | undefined {
         return this.entries.get(sandboxId)?.last_activity;
     }
@@ -175,7 +169,7 @@ export class RunnerHealthMonitor {
             entry.last_probe_sent = Date.now();
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
-            console.error(`[HealthMonitor] Health probe failed for ${sandboxId}: ${msg}`);
+            log.error('Health probe failed', { sandbox_id: sandboxId, error: msg });
             entry.healthy = false;
         }
     }
@@ -227,7 +221,7 @@ export class RunnerHealthMonitor {
             await this.deps.sandboxManager.killSession(sandboxId);
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
-            console.error(`[HealthMonitor] killSession failed for ${sandboxId} (continuing restart): ${msg}`);
+            log.error('killSession failed (continuing restart)', { sandbox_id: sandboxId, error: msg });
         }
 
         // Start new session
@@ -290,13 +284,3 @@ export class RunnerHealthMonitor {
     }
 }
 
-// -----------------------------------------------------------------------------
-// Factory
-// -----------------------------------------------------------------------------
-
-export function createRunnerHealthMonitor(
-    deps: RunnerHealthMonitorDeps,
-    config?: Partial<HealthMonitorConfig>
-): RunnerHealthMonitor {
-    return new RunnerHealthMonitor(deps, config);
-}

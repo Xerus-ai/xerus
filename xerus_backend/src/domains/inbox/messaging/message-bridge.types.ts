@@ -1,14 +1,15 @@
 // Message Bridge Types
 // Types for bidirectional message routing between frontend, backend, and runner
 // Reference: EXECUTION_ARCHITECTURE_v2.md Section 4, Section 10
+// Migrated from Neon to workspace-DB: uses slug-based channel identification.
 
 // -----------------------------------------------------------------------------
-// Channel Message (Neon DB row)
+// Channel Message (workspace-DB row)
 // -----------------------------------------------------------------------------
 
 export interface ChannelMessageRow {
     id: string;
-    channel_id: string;
+    channel_slug: string;
     sender_type: SenderType;
     sender_slug: string;
     content: string;
@@ -39,7 +40,7 @@ export interface OutboundMessage {
 
 export interface StoreMessageResult {
     message_id: string;
-    channel_id: string;
+    channel_slug: string;
 }
 
 // -----------------------------------------------------------------------------
@@ -49,7 +50,7 @@ export interface StoreMessageResult {
 
 export interface InboundMessage {
     user_id: string;
-    channel_id: string;
+    channel_slug: string;
     content: string;
     target_agent?: string;
 }
@@ -68,7 +69,7 @@ export interface RunnerCommand {
 // -----------------------------------------------------------------------------
 
 export interface QueryMessagesOptions {
-    channel_id: string;
+    channel_slug: string;
     limit?: number;
     before?: string;
     after?: string;
@@ -77,3 +78,16 @@ export interface QueryMessagesOptions {
 
 export const DEFAULT_MESSAGE_LIMIT = 50;
 export const MAX_MESSAGE_LIMIT = 200;
+
+// -----------------------------------------------------------------------------
+// Session Dispatcher (injected from execution domain to avoid circular deps)
+// Used to route inbound/mention messages to Daytona agent sessions.
+// -----------------------------------------------------------------------------
+
+export interface SessionDispatcher {
+    /**
+     * Send a plain text message to a specific agent's Daytona session stdin.
+     * Returns true if the agent had an active session and the message was sent.
+     */
+    sendToAgent(userId: string, agentSlug: string, message: string): Promise<boolean>;
+}

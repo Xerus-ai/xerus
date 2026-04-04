@@ -375,137 +375,15 @@ Validate that agent creation works correctly.
     });
   });
 
-  describe('validateSystemPrompt', () => {
-    const validSystemPrompt = `# Test Agent - Assistant
-
-## Role
-You are a test agent for validating system prompts.
-
-## Objective
-Validate system prompts correctly.
-
-## Guidelines
-- Be helpful and accurate
-
-## Constraints
-- Do not provide harmful information`;
-
-    it('should validate valid system prompt string', () => {
-      const result = validator.validateSystemPrompt(validSystemPrompt);
-
-      expect(typeof result).toBe('string');
-      expect(result).toContain('Test Agent');
-    });
-
-    it('should return empty string for null', () => {
-      const result = validator.validateSystemPrompt(null);
-
-      expect(result).toBe('');
-    });
-
-    it('should return empty string for undefined', () => {
-      const result = validator.validateSystemPrompt(undefined);
-
-      expect(result).toBe('');
-    });
-
-    it('should reject non-string input', () => {
-      const invalid = { identity: { name: 'Test' } };
-
-      expect(() => validator.validateSystemPrompt(invalid))
-        .toThrow(AgentValidationError);
-    });
-
-    it('should accept empty string', () => {
-      const result = validator.validateSystemPrompt('');
-
-      expect(result).toBe('');
-    });
-
-    it('should reject string exceeding max length', () => {
-      const tooLong = 'x'.repeat(50001);
-
-      expect(() => validator.validateSystemPrompt(tooLong))
-        .toThrow(AgentValidationError);
-    });
-
-    it('should accept string at max length', () => {
-      const atLimit = 'x'.repeat(50000);
-
-      const result = validator.validateSystemPrompt(atLimit);
-      expect(result.length).toBe(50000);
-    });
-  });
-
-  describe('validateCapabilities', () => {
-    it('should validate capabilities with defaults for arrays', () => {
-      const result = validator.validateCapabilities({});
-
-      expect(result.tools).toEqual([]);
-      expect(result.skills).toEqual([]);
-    });
-
-    it('should apply defaults when permissions and constraints provided', () => {
-      const result = validator.validateCapabilities({
-        permissions: {},
-        constraints: {}
-      });
-
-      expect(result.permissions?.can_write_files).toBe(false);
-      expect(result.constraints?.max_concurrent_tools).toBe(3);
-    });
-
-    it('should validate custom capabilities', () => {
-      const capabilities = {
-        tools: ['web_search', 'file_read'],
-        skills: ['research', 'writing'],
-        permissions: {
-          can_write_files: true,
-          can_send_emails: true
-        },
-        constraints: {
-          max_concurrent_tools: 5,
-          timeout_seconds: 300
-        }
-      };
-
-      const result = validator.validateCapabilities(capabilities);
-
-      expect(result.tools).toEqual(['web_search', 'file_read']);
-      expect(result.permissions?.can_write_files).toBe(true);
-      expect(result.constraints?.max_concurrent_tools).toBe(5);
-    });
-
-    it('should reject invalid max_concurrent_tools', () => {
-      expect(() => validator.validateCapabilities({
-        constraints: { max_concurrent_tools: 20 }
-      })).toThrow(AgentValidationError);
-    });
-
-    it('should reject invalid timeout_seconds', () => {
-      expect(() => validator.validateCapabilities({
-        constraints: { timeout_seconds: 1000 }
-      })).toThrow(AgentValidationError);
-    });
-
-    it('should validate model_config', () => {
-      const result = validator.validateCapabilities({
-        model_config: {
-          temperature: 0.7,
-          max_tokens: 4096,
-          top_p: 0.9
-        }
-      });
-
-      expect(result.model_config?.temperature).toBe(0.7);
-      expect(result.model_config?.max_tokens).toBe(4096);
-    });
-  });
+  // Note: validateSystemPrompt and validateCapabilities have been removed from AgentValidator.
+  // system_prompt is now a plain string field validated via Joi in validateCreate/validateUpdate.
+  // capabilities has been removed from the Agent type.
 
   describe('validatePublishRequirements', () => {
     const createValidAgent = (): Agent => ({
       id: 1,
       name: 'Publishable Agent',
+      slug: 'publishable-agent',
       description: 'A fully configured agent ready for publishing',
       personality_type: 'professional',
       avatar_url: null,
@@ -526,37 +404,12 @@ Assist users effectively with various tasks while maintaining high quality and u
 - Never provide harmful or misleading information
 - Do not engage in unethical activities
 - Respect user privacy at all times`,
-      capabilities: {
-        tools: [],
-        skills: [],
-        permissions: {
-          can_write_files: false,
-          can_send_emails: false,
-          can_create_tasks: false
-        },
-        constraints: {
-          max_concurrent_tools: 3,
-          timeout_seconds: 120
-        },
-        model_config: {},
-        style: {}
-      },
       ai_model: 'gpt-4o',
       user_id: 'user123',
       agent_type: 'private',
       thinking_level: 'medium',
       autonomy_level: 'supervised',
       source_agent_id: null,
-      workflow_config: {
-        executionMode: 'simple',
-        coordinationMode: 'sequential',
-        workflowStrategy: null,
-        selectedTemplateId: null,
-        workflowSteps: [],
-        teamAgents: [],
-        teamId: null,
-        isMultiAgent: false
-      },
       tags: ['productivity'],
       public_metadata: {
         description: 'A comprehensive agent designed to help users with productivity tasks and daily workflows.'

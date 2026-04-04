@@ -5,7 +5,7 @@ import { PipedreamTriggerAdapter } from '../adapters/pipedream-trigger.adapter';
 import type {
     TriggerRegistration,
     EventNormalizationMetadata,
-} from '../../heartbeat/normalized-event.types';
+} from '../trigger.types';
 import { TriggerRegistrationError, TriggerDeregistrationError, EventNormalizationError, TriggerAdapterError } from '../trigger.errors';
 import { ToolNotConnectedError } from '../../tools/errors';
 

@@ -3,9 +3,10 @@
 // per-agent event queues, and dispatches to the heartbeat runner.
 
 import { query } from '../../database/connection';
-import type { NormalizedEvent, AgentTriggerRow } from '../heartbeat/normalized-event.types';
-import { heartbeatRunnerService } from '../heartbeat/heartbeat-runner.service';
-import { heartbeatStateRepository } from '../heartbeat/heartbeat-state.repository';
+import type { NormalizedEvent, AgentTriggerRow } from './trigger.types';
+import { logger } from '../../utils/logger';
+
+const log = logger('EventRouter');
 
 // -----------------------------------------------------------------------------
 // Constants
@@ -70,9 +71,7 @@ export class EventRouterService {
         // 2. Check rate limit
         const maxPerHour = await this.getMaxEventsPerHour(agentId);
         if (this.isRateLimited(agentId, maxPerHour)) {
-            console.warn(
-                `[EventRouter] Rate limited: agent ${agentId} exceeded ${maxPerHour} events/hour`
-            );
+            log.warn('Rate limited', { agent_id: agentId, max_per_hour: maxPerHour });
             return { routed: false, reason: 'rate_limited' };
         }
 
@@ -199,20 +198,9 @@ export class EventRouterService {
         entry.count++;
     }
 
-    private async getMaxEventsPerHour(agentId: number): Promise<number> {
-        const result = await query<{ max_alerts_per_hour: number }>(
-            `SELECT max_alerts_per_hour FROM heartbeat_configs WHERE agent_id = $1`,
-            [agentId]
-        );
-
-        if (result.rows.length === 0) {
-            throw new Error(
-                `No heartbeat config found for agent ${agentId}. ` +
-                `Agent must have heartbeat configured to receive events.`
-            );
-        }
-
-        return result.rows[0].max_alerts_per_hour;
+    private async getMaxEventsPerHour(_agentId: number): Promise<number> {
+        // Heartbeat tables deprecated in migration 081. Use sensible default.
+        return 60;
     }
 
     // -------------------------------------------------------------------------
@@ -220,14 +208,14 @@ export class EventRouterService {
     // -------------------------------------------------------------------------
 
     private async isAgentBusy(agentId: number): Promise<boolean> {
-        const state = await heartbeatStateRepository.getByAgentId(agentId);
-        if (!state) {
-            return false;
-        }
-        // Agent is busy if current_focus is set and suppressed_until is in the future
-        return state.current_focus !== null &&
-               state.suppressed_until !== null &&
-               state.suppressed_until > new Date();
+        // Check if agent has a running execution session
+        const result = await query<{ count: string }>(
+            `SELECT COUNT(*) as count FROM execution_sessions es
+             JOIN agent_registry ar ON ar.slug = es.agent_slug
+             WHERE ar.id = $1 AND es.status = 'running'`,
+            [agentId]
+        );
+        return parseInt(result.rows[0]?.count ?? '0', 10) > 0;
     }
 
     // -------------------------------------------------------------------------
@@ -243,10 +231,10 @@ export class EventRouterService {
 
         if (queue.length >= MAX_QUEUE_SIZE) {
             const dropped = queue.shift();
-            console.warn(
-                `[EventRouter] Queue full for agent ${agentId}, dropping oldest event: ` +
-                `${dropped?.event.app}.${dropped?.event.event_type}`
-            );
+            log.warn('Queue full, dropping oldest event', {
+                agent_id: agentId,
+                dropped_event: `${dropped?.event.app}.${dropped?.event.event_type}`,
+            });
         }
 
         queue.push({
@@ -269,20 +257,35 @@ export class EventRouterService {
         await this.updateTriggerStats(trigger.id);
 
         // Log event dispatch for traceability
-        console.log(
-            `[EventRouter] Dispatching ${event.app}.${event.event_type} to agent ${agentId} ` +
-            `(trigger ${trigger.id})`
-        );
-
-        // Dispatch heartbeat with trigger_type='event'
-        // Fire-and-forget: event dispatches run asynchronously
-        heartbeatRunnerService.runHeartbeatOnce(agentId, 'event').catch((err) => {
-            console.error(
-                `[EventRouter] Failed to dispatch event heartbeat for agent ${agentId} ` +
-                `(${event.app}.${event.event_type}):`,
-                err instanceof Error ? err.message : err
-            );
+        log.info('Dispatching event', {
+            app: event.app,
+            event_type: event.event_type,
+            agent_id: agentId,
+            trigger_id: trigger.id,
         });
+
+        // Create a pending execution session for the triggered event.
+        // The execution pipeline picks up pending sessions and runs them.
+        try {
+            await query(
+                `INSERT INTO execution_sessions
+                 (workspace_id, agent_slug, status, trigger_type, user_prompt, created_at)
+                 SELECT w.id, ar.slug, 'pending', 'event',
+                        $3, NOW()
+                 FROM agent_registry ar
+                 JOIN workspaces w ON w.user_id = ar.user_id
+                 WHERE ar.id = $1
+                 LIMIT 1`,
+                [agentId, trigger.id, `Event: ${event.app}.${event.event_type}`]
+            );
+        } catch (err) {
+            log.error('Failed to create execution session', {
+                agent_id: agentId,
+                app: event.app,
+                event_type: event.event_type,
+                error: err instanceof Error ? err.message : String(err),
+            });
+        }
     }
 
     private async updateTriggerStats(triggerId: number): Promise<void> {

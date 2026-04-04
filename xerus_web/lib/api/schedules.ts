@@ -1,166 +1,139 @@
 /**
- * Schedules API Module
- * Operations for scheduled agent executions
+ * Schedules API Client
+ * CRUD for schedules + run history (workspace.db on sandbox via backend proxy)
+ * Backend routes: /api/v1/execute/schedules/*
  */
-import { toast } from '@/lib/toast';
 import { apiCall } from './client';
-import { mapScheduleToFrontend, mapScheduleToBackend, type BackendSchedule } from './mappers';
-import type { ScheduledExecution, ExecutionResult, ScheduleFilters } from './types';
 
-/**
- * Create a new scheduled execution
- */
-export const createSchedule = async (
-  schedule: ScheduledExecution
-): Promise<ScheduledExecution> => {
-  const response = await apiCall('/schedules', {
-    method: 'POST',
-    body: JSON.stringify(mapScheduleToBackend(schedule)),
-  });
+// -----------------------------------------------------------------------------
+// Types
+// -----------------------------------------------------------------------------
 
-  const result = await response.json();
-  const data = result.data || result;
-  toast.success('Schedule created', { description: 'Your agent will run on the set schedule.' });
-  return mapScheduleToFrontend((data.schedule || data) as BackendSchedule);
-};
+export interface ScheduleEntry {
+    id: string;
+    agent_slug: string;
+    name: string;
+    prompt: string;
+    rrule: string | null;
+    adapter_type: string;
+    model: string | null;
+    status: string;
+    max_budget_usd: number | null;
+    allowed_tools: string | null;
+    system_prompt: string | null;
+    next_run_at: number | null;
+    last_run_at: number | null;
+    created_at: number;
+    updated_at: number;
+}
 
-/**
- * Get all schedules with optional filters
- */
-export const getSchedules = async (
-  filters?: ScheduleFilters
-): Promise<ScheduledExecution[]> => {
-  const params = new URLSearchParams();
+export interface ScheduleRunEntry {
+    id: string;
+    schedule_id: string;
+    session_id: string | null;
+    status: string;
+    output: string | null;
+    result: string | null;
+    error: string | null;
+    cost_usd: number | null;
+    duration_ms: number | null;
+    num_turns: number | null;
+    started_at: number | null;
+    completed_at: number | null;
+    created_at: number;
+    agent_slug: string;
+    schedule_name: string;
+    schedule_prompt: string;
+}
 
-  if (filters?.agentId) {
-    params.append('agent_id', filters.agentId.toString());
-  }
-  if (filters?.enabled !== undefined) {
-    params.append('enabled', filters.enabled.toString());
-  }
+export interface CreateScheduleInput {
+    agent_slug: string;
+    name: string;
+    prompt: string;
+    rrule?: string;
+    adapter_type?: string;
+    model?: string;
+    max_budget_usd?: number;
+    allowed_tools?: string[];
+    system_prompt?: string;
+}
 
-  const queryString = params.toString();
-  const url = queryString ? `/schedules?${queryString}` : '/schedules';
+export interface UpdateScheduleInput {
+    name?: string;
+    prompt?: string;
+    rrule?: string;
+    status?: string;
+    model?: string;
+    max_budget_usd?: number;
+    allowed_tools?: string[];
+    system_prompt?: string;
+}
 
-  const response = await apiCall(url, { method: 'GET' });
-  const result = await response.json();
-  const data = result.data || result;
-  return (Array.isArray(data) ? data : [] as BackendSchedule[]).map(mapScheduleToFrontend);
-};
+// -----------------------------------------------------------------------------
+// Schedule CRUD
+// -----------------------------------------------------------------------------
 
-/**
- * Get a single schedule by ID
- */
-export const getSchedule = async (id: string): Promise<ScheduledExecution> => {
-  const response = await apiCall(`/schedules/${id}`, { method: 'GET' });
-  const result = await response.json();
-  const data = result.data || result;
-  return mapScheduleToFrontend((data.schedule || data) as BackendSchedule);
-};
+const BASE = '/execute/schedules';
 
-/**
- * Update a schedule
- */
-export const updateSchedule = async (
-  id: string,
-  updates: Partial<ScheduledExecution>
-): Promise<ScheduledExecution> => {
-  const backendUpdates: Record<string, unknown> = {};
+export async function listSchedules(params?: {
+    agent_slug?: string;
+    status?: string;
+}): Promise<{ schedules: ScheduleEntry[]; total: number }> {
+    const qs = new URLSearchParams();
+    if (params?.agent_slug) qs.set('agent_slug', params.agent_slug);
+    if (params?.status) qs.set('status', params.status);
+    const query = qs.toString();
 
-  if (updates.name !== undefined) backendUpdates.name = updates.name;
-  if (updates.description !== undefined) backendUpdates.description = updates.description;
-  if (updates.agentId !== undefined) backendUpdates.agent_id = updates.agentId;
-  if (updates.workflowConfig !== undefined) backendUpdates.workflow_config = updates.workflowConfig;
-  if (updates.scheduleType !== undefined) backendUpdates.schedule_type = updates.scheduleType;
-  if (updates.scheduleConfig !== undefined) backendUpdates.schedule_config = updates.scheduleConfig;
-  if (updates.timezone !== undefined) backendUpdates.timezone = updates.timezone;
-  if (updates.enabled !== undefined) backendUpdates.enabled = updates.enabled;
-  if (updates.taskPrompt !== undefined) backendUpdates.task_prompt = updates.taskPrompt;
-  if (updates.taskContext !== undefined) backendUpdates.task_context = updates.taskContext;
+    const response = await apiCall(`${BASE}${query ? `?${query}` : ''}`, { method: 'GET' });
+    const json = await response.json();
+    return json.data ?? json;
+}
 
-  const response = await apiCall(`/schedules/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(backendUpdates),
-  });
+export async function createSchedule(input: CreateScheduleInput): Promise<{ schedule: ScheduleEntry }> {
+    const response = await apiCall(BASE, {
+        method: 'POST',
+        body: JSON.stringify(input),
+    });
+    const json = await response.json();
+    return json.data ?? json;
+}
 
-  const result = await response.json();
-  const data = result.data || result;
-  toast.success('Schedule updated', { description: 'Your changes have been applied.' });
-  return mapScheduleToFrontend((data.schedule || data) as BackendSchedule);
-};
+export async function updateSchedule(
+    scheduleId: string,
+    input: UpdateScheduleInput,
+): Promise<{ schedule: ScheduleEntry }> {
+    const response = await apiCall(`${BASE}/${scheduleId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+    });
+    const json = await response.json();
+    return json.data ?? json;
+}
 
-/**
- * Delete a schedule
- */
-export const deleteSchedule = async (id: string): Promise<void> => {
-  await apiCall(`/schedules/${id}`, { method: 'DELETE' });
-  toast.success('Schedule deleted', { description: 'This schedule has been removed.' });
-};
+export async function deleteSchedule(scheduleId: string): Promise<{ schedule_id: string; deleted_at: string }> {
+    const response = await apiCall(`${BASE}/${scheduleId}`, {
+        method: 'DELETE',
+    });
+    const json = await response.json();
+    return json.data ?? json;
+}
 
-/**
- * Enable a schedule
- */
-export const enableSchedule = async (id: string): Promise<ScheduledExecution> => {
-  const response = await apiCall(`/schedules/${id}/enable`, { method: 'POST' });
-  const result = await response.json();
-  const data = result.data || result;
-  toast.success('Schedule enabled', { description: 'Your agent will resume running on schedule.' });
-  return mapScheduleToFrontend((data.schedule || data) as BackendSchedule);
-};
+// -----------------------------------------------------------------------------
+// Schedule Runs (Run History)
+// -----------------------------------------------------------------------------
 
-/**
- * Disable a schedule
- */
-export const disableSchedule = async (id: string): Promise<ScheduledExecution> => {
-  const response = await apiCall(`/schedules/${id}/disable`, { method: 'POST' });
-  const result = await response.json();
-  const data = result.data || result;
-  toast.success('Schedule paused', { description: 'Your agent will stop running until re-enabled.' });
-  return mapScheduleToFrontend((data.schedule || data) as BackendSchedule);
-};
+export async function listScheduleRuns(params?: {
+    agent_slug?: string;
+    limit?: number;
+    offset?: number;
+}): Promise<{ runs: ScheduleRunEntry[]; total: number }> {
+    const qs = new URLSearchParams();
+    if (params?.agent_slug) qs.set('agent_slug', params.agent_slug);
+    if (params?.limit !== undefined) qs.set('limit', String(params.limit));
+    if (params?.offset !== undefined) qs.set('offset', String(params.offset));
+    const query = qs.toString();
 
-/**
- * Manually trigger a schedule execution
- */
-export const triggerSchedule = async (id: string): Promise<ExecutionResult> => {
-  const response = await apiCall(`/schedules/${id}/trigger`, { method: 'POST' });
-  const result = await response.json();
-  const data = result.data || result;
-  toast.success('Schedule triggered', { description: 'Your agent is starting a new run now.' });
-  return data.execution || data;
-};
-
-/**
- * Get execution history for a schedule
- */
-export const getScheduleExecutions = async (
-  scheduleId: string,
-  limit = 10
-): Promise<ExecutionResult[]> => {
-  const response = await apiCall(
-    `/schedules/${scheduleId}/executions?limit=${limit}`,
-    { method: 'GET' }
-  );
-  const result = await response.json();
-  const data = result.data || result;
-  return Array.isArray(data) ? data : [];
-};
-
-/**
- * Get a specific execution result
- */
-export const getExecutionResult = async (executionId: string): Promise<ExecutionResult> => {
-  const response = await apiCall(`/execute/${executionId}/status`, { method: 'GET' });
-  const result = await response.json();
-  return result.data || result;
-};
-
-/**
- * Toggle schedule enabled state
- */
-export const toggleSchedule = async (id: string, enabled: boolean): Promise<ScheduledExecution> => {
-  if (enabled) {
-    return enableSchedule(id);
-  }
-  return disableSchedule(id);
-};
+    const response = await apiCall(`${BASE}/runs${query ? `?${query}` : ''}`, { method: 'GET' });
+    const json = await response.json();
+    return json.data ?? json;
+}

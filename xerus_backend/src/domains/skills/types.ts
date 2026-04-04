@@ -147,24 +147,23 @@ export interface CustomSkillConfig {
     updated_at?: string;
 }
 
-// Skill secrets (per-user encrypted env vars, keyed by skill_slug)
+// Skill secrets (per-workspace encrypted env vars, keyed by skill_slug)
+// Stored in workspace SQLite DB (no user_id — workspace is user-scoped)
 export interface SkillSecretRow {
     id: number;
-    user_id: string;
     skill_slug: string;
-    env_key: string;
+    secret_name: string;
     encrypted_value: string;
-    hint: string;
-    created_at: Date;
-    updated_at: Date;
+    created_at: string | null;
+    updated_at: string | null;
 }
 
 // What the API returns (masked, never raw values)
 export interface SkillSecretStatus {
-    env_key: string;
+    secret_name: string;
     has_value: boolean;
     hint: string; // e.g. "sk-l****3kf9" or "" if no value
-    updated_at: Date;
+    updated_at: string | null;
 }
 
 // Slug validation pattern (re-exported from shared slug utility)

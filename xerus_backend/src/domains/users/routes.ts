@@ -8,13 +8,20 @@ import { authenticateFirebaseToken, verifyFirebaseToken } from '../../middleware
 import { userService } from './service';
 import { creditService } from './credit-service';
 import { apiKeyService } from './api-key-service';
+import { cliAuthService } from './cli-auth.service';
 import { UserUnauthorizedError, UserForbiddenError } from './errors';
 import { userValidator } from './validators';
 import { strictRateLimit } from '../../middleware/rate-limit';
 import { query } from '../../database/connection';
+import type { SandboxService } from '../sandbox-infra/sandbox/sandbox.service';
 
 const router = Router();
 const auth = authenticateFirebaseToken;
+
+// Dependency injection for SandboxService
+export function setUserRoutesDeps(deps: { sandboxService: SandboxService }): void {
+    cliAuthService.setSandboxService(deps.sandboxService);
+}
 
 // POST /api/v1/users/find-or-create - Login/Register
 // Uses verifyFirebaseToken (no DB lookup) so new users can be created
@@ -324,6 +331,75 @@ router.post('/api-keys/:provider/validate', auth, strictRateLimit, async (req: A
             },
             startTime
         );
+    } catch (err) {
+        next(err);
+    }
+});
+
+// ===== CLI AUTH ENDPOINTS =====
+
+// POST /api/v1/users/cli-auth-trigger - Trigger CLI auth login in sandbox
+// Runs `claude auth login` or `codex auth login` and returns the auth URL
+router.post('/cli-auth-trigger', auth, strictRateLimit, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const startTime = res.locals.startTime || Date.now();
+    try {
+        if (!req.user) {
+            throw new UserUnauthorizedError();
+        }
+
+        const { adapter } = req.body;
+        if (!adapter || !['claudecode', 'codex'].includes(adapter)) {
+            throw new UserForbiddenError('Invalid adapter type. Must be "claudecode" or "codex".');
+        }
+
+        const currentUser = await userService.getByFirebaseUid(req.user.uid);
+        const result = await cliAuthService.triggerLogin(currentUser.user_id, adapter);
+
+        sendResponse(res, 200, result, startTime);
+    } catch (err) {
+        next(err);
+    }
+});
+
+// POST /api/v1/users/cli-auth-complete - Complete CLI auth by delivering the OAuth code
+// User pastes the code from the failed localhost redirect; backend delivers it to the CLI inside the sandbox
+router.post('/cli-auth-complete', auth, strictRateLimit, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const startTime = res.locals.startTime || Date.now();
+    try {
+        if (!req.user) {
+            throw new UserUnauthorizedError();
+        }
+
+        const { adapter, code } = req.body;
+        if (!adapter || !['claudecode', 'codex'].includes(adapter)) {
+            throw new UserForbiddenError('Invalid adapter type. Must be "claudecode" or "codex".');
+        }
+        if (!code || typeof code !== 'string' || code.trim().length === 0) {
+            throw new UserForbiddenError('Authorization code is required.');
+        }
+
+        const currentUser = await userService.getByFirebaseUid(req.user.uid);
+        const result = await cliAuthService.completeLogin(currentUser.user_id, adapter, code);
+
+        sendResponse(res, 200, result, startTime);
+    } catch (err) {
+        next(err);
+    }
+});
+
+// GET /api/v1/users/cli-auth-status - Get CLI authentication status
+// Checks sandbox credential files and user API keys to determine auth method
+router.get('/cli-auth-status', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const startTime = res.locals.startTime || Date.now();
+    try {
+        if (!req.user) {
+            throw new UserUnauthorizedError();
+        }
+
+        const currentUser = await userService.getByFirebaseUid(req.user.uid);
+        const authStatus = await cliAuthService.fetchAuthStatus(currentUser.user_id);
+
+        sendResponse(res, 200, authStatus, startTime);
     } catch (err) {
         next(err);
     }

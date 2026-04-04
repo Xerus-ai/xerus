@@ -104,6 +104,16 @@ const AgentCardComponent = ({ agent, onClone, onChat, onClick, isCloning, isOwne
                             </div>
                         </TooltipProvider>
                     )}
+                    {/* Adapter Type Badge */}
+                    {agent.adapter_type && (
+                        <div className={`flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${
+                            agent.adapter_type === 'codex'
+                                ? 'text-green-700 bg-green-50 border-green-200'
+                                : 'text-blue-700 bg-blue-50 border-blue-200'
+                        }`}>
+                            {agent.adapter_type === 'codex' ? 'CX' : 'CC'}
+                        </div>
+                    )}
                     {/* Visibility Badge */}
                     <div className={`flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-md border ${agent.agentType === 'public' ? 'text-text-secondary bg-surface-alt border-surface-active' : getAgentVisibilityClass(agent.agentType)}`}>
                         {getVisibilityIcon()}

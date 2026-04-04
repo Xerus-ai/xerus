@@ -358,7 +358,7 @@ describe('MemorySearchIndexService', () => {
             const options = createIndexFileOptions({
                 scope: 'channel',
                 projectId: 5,
-                channelId: 12,
+                channelId: '12',
                 agentId: undefined,
             });
 

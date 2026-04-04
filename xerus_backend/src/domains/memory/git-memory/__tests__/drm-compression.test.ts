@@ -52,6 +52,12 @@ class InMemoryFileSystem implements GitMemoryFileSystem {
         return this.directories.has(path);
     }
 
+    async tryExclusiveCreate(path: string, content: string): Promise<boolean> {
+        if (this.files.has(path)) return false;
+        this.files.set(path, content);
+        return true;
+    }
+
     getContent(path: string): string | undefined {
         return this.files.get(path);
     }
