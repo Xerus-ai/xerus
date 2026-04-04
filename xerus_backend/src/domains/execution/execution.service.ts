@@ -17,6 +17,7 @@ import {
     buildSummary,
     resolveConversation,
     resolveAdapterType,
+    resolveAgentIdentity,
 } from './execution-pipeline';
 import { requireAgent } from './pipeline-guards';
 
@@ -204,17 +205,20 @@ export class ExecutionService {
             ctx.sdkSessionId = conversation.sdkSessionId;
             log.debug('Conversation resolved', { execution_id: executionId, duration_ms: Date.now() - startedAt, has_sdk_session: !!ctx.sdkSessionId });
 
-            // Resolve adapter_type from agent's config.json on sandbox filesystem
+            // Resolve adapter_type and agent identity from sandbox filesystem
             const agentForTracking = requireAgent(ctx);
-            const adapterType = await resolveAdapterType(resolved, ctx.sandboxId, agentForTracking.slug);
+            const [adapterType, agentIdentity] = await Promise.all([
+                resolveAdapterType(resolved, ctx.sandboxId, agentForTracking.slug),
+                resolveAgentIdentity(resolved, ctx.sandboxId, agentForTracking.slug),
+            ]);
             agentForTracking.adapter_type = adapterType;
-            log.debug('Adapter type resolved', { execution_id: executionId, duration_ms: Date.now() - startedAt, adapter_type: adapterType });
+            log.debug('Agent resolved', { execution_id: executionId, duration_ms: Date.now() - startedAt, adapter_type: adapterType, has_identity: agentIdentity.length > 0 });
 
             // Create per-agent session (direct CLI, no cli-executor middleman)
             log.debug('Getting/creating agent session', { execution_id: executionId, duration_ms: Date.now() - startedAt, agent_slug: agentForTracking.slug });
             const handle = await resolved.sandboxService.getOrCreateRunner(
                 request.userId, ctx.sandboxId, runnerEnvVars,
-                agentForTracking.slug, adapterType,
+                agentForTracking.slug, adapterType, agentIdentity || undefined,
             );
             ctx.sessionHandle = handle;
             log.debug('Agent session ready', { execution_id: executionId, duration_ms: Date.now() - startedAt, session_id: handle.sessionId });
@@ -227,7 +231,14 @@ export class ExecutionService {
             stream.send('progress', { phase: 'executing', message: 'Starting agent', percent: 20 });
             ctx.sessionId = await createSessionRecord(resolved, ctx);
             log.debug('Session record created', { execution_id: executionId, duration_ms: Date.now() - startedAt });
-            stream.send('meta', { conversationId: ctx.conversationId });
+            // Meta event with agentName triggers streamingTurn creation on frontend.
+            // Without agentName, all streaming events (token, tool_call, reasoning)
+            // are silently dropped because streamingTurn is null.
+            stream.send('meta', {
+                conversationId: ctx.conversationId,
+                agentSlug: agentForTracking.slug,
+                agentName: agentForTracking.name || agentForTracking.slug,
+            });
             ctx.status = 'running';
 
             // Register stream for HITL guidance events (keyed by sessionId since that's what HITL uses as execution_id)

@@ -14,10 +14,11 @@ export class ClaudeCodeAdapter implements CLIAdapter {
 
     /**
      * Build command for persistent stream-json Claude session.
+     * No --print flag: Claude stays alive after each result, reading stdin for next turn.
      * --input-format stream-json: reads NDJSON from stdin without waiting for EOF.
      * --output-format stream-json --verbose: full event firehose to stdout.
      * Stdin messages: {"type":"user","message":{"role":"user","content":"..."}}
-     * --resume for multi-turn: reattach to existing Claude conversation.
+     * --resume for multi-turn: reattach to existing Claude conversation on fresh CLI.
      */
     buildCommand(_prompt: string, config: AgentConfig): string[] {
         validateAgentConfig(config);
@@ -27,7 +28,6 @@ export class ClaudeCodeAdapter implements CLIAdapter {
             '--input-format', 'stream-json',
             '--output-format', 'stream-json',
             '--verbose',
-            '--print',
             '--include-partial-messages',
             '--dangerously-skip-permissions',
         ];

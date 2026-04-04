@@ -75,6 +75,11 @@ export class PersistentLogBuffer {
         return this.trimOffset + this.buffer.length;
     }
 
+    /** Whether the underlying log stream has ended (process exited or stream failed). */
+    get isStreamClosed(): boolean {
+        return this.closed;
+    }
+
     /** Parse a complete line as JSON or wrap as transport output. */
     private pushLine(line: string): void {
         try {

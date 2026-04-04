@@ -32,6 +32,7 @@ import {
     getConversation,
     createConversation as createWorkspaceConversation,
     incrementConversationMessageCount,
+    writeChatExecution,
 } from '../conversations/workspace-db.service';
 
 // -----------------------------------------------------------------------------
@@ -191,6 +192,64 @@ export async function resolveAdapterType(
         // Config exists but is corrupt or unreadable — fail fast
         throw err;
     }
+}
+
+/**
+ * Read agent identity files (SOUL.md + Module CLAUDE.md) from the sandbox.
+ * Combined content is passed as --append-system-prompt so the agent knows who it is.
+ * Tries both .claude/agents/{slug}/ and agents/{slug}/ paths.
+ * Returns empty string if no identity files found (agent runs as generic Claude).
+ */
+export async function resolveAgentIdentity(
+    deps: ResolvedExecutionDeps,
+    sandboxId: string,
+    agentSlug: string,
+): Promise<string> {
+    const provider = deps.sandboxService.getDaytonaProvider();
+    const ws = SANDBOX_CONFIG.workspacePath;
+
+    // Try both path conventions: .claude/agents/{slug}/ and agents/{slug}/
+    const pathSets = [
+        { soul: `${ws}/.claude/agents/${agentSlug}/SOUL.md`, module: `${ws}/.claude/agents/${agentSlug}/CLAUDE.md` },
+        { soul: `${ws}/agents/${agentSlug}/SOUL.md`, module: `${ws}/agents/${agentSlug}/CLAUDE.md` },
+    ];
+
+    async function tryRead(filePath: string): Promise<string> {
+        try {
+            return await provider.readFile(sandboxId, filePath);
+        } catch {
+            return '';
+        }
+    }
+
+    let soulContent = '';
+    let moduleContent = '';
+
+    for (const paths of pathSets) {
+        if (!soulContent) soulContent = await tryRead(paths.soul);
+        if (!moduleContent) moduleContent = await tryRead(paths.module);
+        if (soulContent || moduleContent) break;
+    }
+
+    if (!soulContent && !moduleContent) return '';
+
+    const sections: string[] = [
+        '# AGENT IDENTITY — SUPERSEDES ALL PRIOR IDENTITY',
+        '',
+        'You are NOT Claude Code. You are an agent in the Xerus AI platform.',
+        'Your identity, personality, and behavior are defined below.',
+        'This identity takes absolute precedence. Never identify as Claude or mention Anthropic.',
+        '',
+    ];
+
+    if (soulContent) {
+        sections.push(soulContent.trim(), '');
+    }
+    if (moduleContent) {
+        sections.push(moduleContent.trim(), '');
+    }
+
+    return sections.join('\n');
 }
 
 export async function acquireExecutionLane(
@@ -550,16 +609,27 @@ export async function updateSessionRecord(
          ctx.hookHealth ? JSON.stringify(ctx.hookHealth) : null],
     );
 
-    // Message count is non-critical — don't fail the session if it errors
-    if (ctx.conversationId) {
+    // Persist chat turn to workspace.db for conversation history reload.
+    // Non-critical — don't fail the session if it errors.
+    if (ctx.conversationId && ctx.sandboxId) {
         try {
-            if (!ctx.sandboxId) {
-                throw new Error('sandboxId is missing while updating conversation counts');
-            }
             const provider = deps.sandboxService.getDaytonaProvider();
-            await incrementConversationMessageCount(provider, ctx.sandboxId, ctx.conversationId);
+            await Promise.all([
+                incrementConversationMessageCount(provider, ctx.sandboxId, ctx.conversationId),
+                writeChatExecution(
+                    provider,
+                    ctx.sandboxId,
+                    ctx.conversationId,
+                    ctx.sessionId || null,
+                    ctx.request.task,
+                    ctx.responseText || null,
+                    ctx.inputTokens + ctx.outputTokens,
+                    Date.now() - ctx.startedAt,
+                    messageMetadata,
+                ),
+            ]);
         } catch (err) {
-            log.error('Failed to increment message count', { conversation_id: ctx.conversationId, error: (err as Error).message });
+            log.error('Failed to persist chat execution', { conversation_id: ctx.conversationId, error: (err as Error).message });
         }
     }
 }

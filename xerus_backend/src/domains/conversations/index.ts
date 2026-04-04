@@ -11,9 +11,12 @@ export {
     deleteConversation,
     incrementConversationMessageCount,
     updateSdkSessionId,
+    writeChatExecution,
 } from './workspace-db.service';
 
 export type {
     ConversationRow,
     ExecutionSessionRow,
+    ConversationMessageRow,
+    ConversationDetailResponse,
 } from './workspace-db.service';

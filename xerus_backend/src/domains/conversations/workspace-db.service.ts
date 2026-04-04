@@ -83,24 +83,97 @@ export async function getConversation(
     return rows[0] ?? null;
 }
 
+export interface ConversationMessageRow {
+    id: number;
+    conversation_id: string;
+    session_id: string | null;
+    role: 'user' | 'assistant';
+    content: string;
+    execution_id: string | null;
+    created_at: string;
+    input_tokens: number | null;
+    output_tokens: number | null;
+    credits_used: number | null;
+    thinking: string | null;
+    message_metadata: { parts?: unknown[]; tool_calls?: unknown[] } | null;
+}
+
+/**
+ * Return type matches the frontend ConversationDetail interface:
+ * a flat object with all conversation fields + messages array at root.
+ */
+export interface ConversationDetailResponse extends ConversationRow {
+    messages: ConversationMessageRow[];
+}
+
 export async function getConversationWithMessages(
     provider: DaytonaProvider,
     sandboxId: string,
     conversationId: string,
-): Promise<{ conversation: ConversationRow; messages: ExecutionSessionRow[] } | null> {
+): Promise<ConversationDetailResponse | null> {
     const conv = await getConversation(provider, sandboxId, conversationId);
     if (!conv) return null;
 
-    const messagesSql = `
-        SELECT id, agent_slug, conversation_id, status, trigger_type,
-               started_at, ended_at, tokens_input, tokens_output, cost_usd, result_summary
-        FROM execution_sessions
+    // Query chat_executions (user_message + agent_response pairs) and
+    // expand each row into user + assistant messages for the frontend.
+    const chatSql = `
+        SELECT id, conversation_id, session_id, user_message, agent_response,
+               response_time_ms, tokens_used, message_metadata, created_at
+        FROM chat_executions
         WHERE conversation_id = '${escapeSQL(conversationId)}'
-        ORDER BY started_at ASC
+        ORDER BY created_at ASC
     `;
-    const messages = await executeWorkspaceJsonQuery<ExecutionSessionRow>(provider, sandboxId, messagesSql);
 
-    return { conversation: conv, messages };
+    const rows = await executeWorkspaceJsonQuery<{
+        id: number; conversation_id: string; session_id: string | null;
+        user_message: string; agent_response: string | null;
+        response_time_ms: number | null; tokens_used: number;
+        message_metadata: string | null; created_at: string;
+    }>(provider, sandboxId, chatSql);
+
+    const messages: ConversationMessageRow[] = [];
+    for (const row of rows) {
+        // User message
+        messages.push({
+            id: row.id * 2,
+            conversation_id: row.conversation_id,
+            session_id: row.session_id,
+            role: 'user',
+            content: row.user_message,
+            execution_id: row.session_id,
+            created_at: row.created_at,
+            input_tokens: null,
+            output_tokens: null,
+            credits_used: null,
+            thinking: null,
+            message_metadata: null,
+        });
+        // Assistant response (if present)
+        if (row.agent_response) {
+            // Parse message_metadata from JSON string to object for frontend consumption
+            let parsedMeta: Record<string, unknown> | null = null;
+            if (row.message_metadata) {
+                try { parsedMeta = JSON.parse(row.message_metadata); } catch { /* corrupt JSON — skip */ }
+            }
+            messages.push({
+                id: row.id * 2 + 1,
+                conversation_id: row.conversation_id,
+                session_id: row.session_id,
+                role: 'assistant',
+                content: row.agent_response,
+                execution_id: row.session_id,
+                created_at: row.created_at,
+                input_tokens: null,
+                output_tokens: row.tokens_used || null,
+                credits_used: null,
+                thinking: null,
+                message_metadata: parsedMeta as ConversationMessageRow['message_metadata'],
+            });
+        }
+    }
+
+    // Flat structure: spread conversation fields + messages at root
+    return { ...conv, messages };
 }
 
 export async function createConversation(
@@ -189,6 +262,41 @@ export async function incrementConversationMessageCount(
         SET message_count = message_count + 1,
             updated_at = '${now}'
         WHERE id = '${escapeSQL(conversationId)}' AND status != 'deleted'
+    `;
+    await executeWorkspaceQuery(provider, sandboxId, sql);
+}
+
+/**
+ * Persist a chat turn (user message + agent response) to workspace.db chat_executions.
+ * Called at the end of each execution so conversation history survives page reloads.
+ */
+export async function writeChatExecution(
+    provider: DaytonaProvider,
+    sandboxId: string,
+    conversationId: string,
+    sessionId: string | null,
+    userMessage: string,
+    agentResponse: string | null,
+    tokensUsed: number,
+    responseTimeMs: number | null,
+    messageMetadata: string | null,
+): Promise<void> {
+    // Ensure message_metadata column exists (added after initial schema)
+    try {
+        await executeWorkspaceQuery(provider, sandboxId,
+            `ALTER TABLE chat_executions ADD COLUMN message_metadata TEXT`);
+    } catch {
+        // Column already exists — expected
+    }
+
+    const sessionValue = sessionId ? `'${escapeSQL(sessionId)}'` : 'NULL';
+    const responseValue = agentResponse ? `'${escapeSQL(agentResponse)}'` : 'NULL';
+    const timeValue = responseTimeMs !== null ? String(responseTimeMs) : 'NULL';
+    const metaValue = messageMetadata ? `'${escapeSQL(messageMetadata)}'` : 'NULL';
+
+    const sql = `
+        INSERT INTO chat_executions (conversation_id, session_id, user_message, agent_response, response_time_ms, tokens_used, message_metadata)
+        VALUES ('${escapeSQL(conversationId)}', ${sessionValue}, '${escapeSQL(userMessage)}', ${responseValue}, ${timeValue}, ${tokensUsed}, ${metaValue})
     `;
     await executeWorkspaceQuery(provider, sandboxId, sql);
 }

@@ -308,12 +308,13 @@ export class SandboxService {
         envVars: Record<string, string>,
         agentSlug?: string,
         adapterType?: import('./providers').AgentSessionOptions['adapterType'],
+        systemPrompt?: string,
     ): Promise<SessionHandle> {
         const session = this.sessions.get(userId);
         if (!session || session.status !== 'running') {
             throw new Error('No running sandbox for user');
         }
-        return getOrCreateRunnerSession(session, sandboxId, envVars, this.getDaytonaProvider(), agentSlug, adapterType);
+        return getOrCreateRunnerSession(session, sandboxId, envVars, this.getDaytonaProvider(), agentSlug, adapterType, systemPrompt);
     }
 
     /**

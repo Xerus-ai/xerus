@@ -167,10 +167,14 @@ export async function routeEventToBackend(
 
         case 'stream_event': {
             // Real-time streaming deltas from --include-partial-messages.
-            // Contains content_block_start, content_block_delta, content_block_stop events.
-            const streamType = d.subtype as string | undefined;
-            const contentBlock = d.content_block as Record<string, unknown> | undefined;
-            const delta = d.delta as Record<string, unknown> | undefined;
+            // Claude CLI wraps Anthropic API streaming events inside an `event` field:
+            //   {"type":"stream_event","event":{"type":"content_block_delta","delta":{...}}}
+            const nestedEvent = d.event as Record<string, unknown> | undefined;
+            if (!nestedEvent) break;
+
+            const streamType = nestedEvent.type as string | undefined;
+            const contentBlock = nestedEvent.content_block as Record<string, unknown> | undefined;
+            const delta = nestedEvent.delta as Record<string, unknown> | undefined;
 
             if (streamType === 'content_block_delta' && delta) {
                 if (delta.type === 'text_delta' && typeof delta.text === 'string') {
@@ -217,7 +221,13 @@ export async function routeEventToBackend(
         }
 
         case 'assistant': {
-            // Map CLI assistant content blocks to typed frontend SSE events
+            // Full assistant message with all content blocks.
+            // With --include-partial-messages, text/thinking/tool_use blocks were
+            // already streamed in real-time via stream_event deltas. Here we:
+            // - Track text/thinking for persistence (ctx.responseText, ctx.thinkingChunks)
+            //   but DON'T re-emit as SSE (prevents duplicate tokens on frontend)
+            // - Emit tool_result SSE — only source for tool execution results
+            // - Track tool_use for metrics if not already seen in stream_event
             const msg = d.message as Record<string, unknown> | undefined;
             if (msg) {
                 const content = msg.content as Array<Record<string, unknown>> | undefined;
@@ -228,22 +238,33 @@ export async function routeEventToBackend(
                                 const text = block.text as string;
                                 if (text) {
                                     ctx.responseText = text;
-                                    ctx.responseChunks.push(text);
-                                    ctx.stream.send('token' as StreamEventType, { text, tokenCount: ctx.outputTokens });
+                                    // Only emit token SSE if stream_event didn't stream it
+                                    if (ctx.responseChunks.length === 0) {
+                                        ctx.responseChunks.push(text);
+                                        ctx.stream.send('token' as StreamEventType, { text, tokenCount: ctx.outputTokens });
+                                    }
                                 }
                                 break;
                             }
                             case 'tool_use': {
-                                ctx.toolCallCount++;
-                                const callId = (block.id as string) || `tc-${ctx.toolCallCount}`;
+                                const callId = (block.id as string) || `tc-${ctx.toolCallCount + 1}`;
                                 const toolName = (block.name as string) || 'unknown';
                                 const args = (block.input as Record<string, unknown>) || {};
-                                ctx.toolCallDetails.push({ call_id: callId, tool_name: toolName, arguments: args, started_at: Date.now() });
-                                ctx.toolCallMap.set(callId, ctx.toolCallDetails[ctx.toolCallDetails.length - 1]);
-                                ctx.stream.send('tool_call' as StreamEventType, { toolName, arguments: args, callId });
+                                // Only emit if not already tracked by stream_event content_block_start
+                                if (!ctx.toolCallMap.has(callId)) {
+                                    ctx.toolCallCount++;
+                                    ctx.toolCallDetails.push({ call_id: callId, tool_name: toolName, arguments: args, started_at: Date.now() });
+                                    ctx.toolCallMap.set(callId, ctx.toolCallDetails[ctx.toolCallDetails.length - 1]);
+                                    ctx.stream.send('tool_call' as StreamEventType, { toolName, arguments: args, callId });
+                                } else {
+                                    // Update arguments (stream_event only had empty args from block_start)
+                                    const tracked = ctx.toolCallMap.get(callId)!;
+                                    tracked.arguments = args;
+                                }
                                 break;
                             }
                             case 'tool_result': {
+                                // Tool results are NOT in stream_event — always emit
                                 const callId = (block.tool_use_id as string) || '';
                                 const resultContent = block.content;
                                 const resultText = typeof resultContent === 'string'
@@ -260,8 +281,11 @@ export async function routeEventToBackend(
                             case 'thinking': {
                                 const thought = (block.thinking as string) || (block.text as string) || '';
                                 if (thought) {
-                                    ctx.thinkingChunks.push(thought);
-                                    ctx.stream.send('reasoning' as StreamEventType, { thought });
+                                    // Only emit reasoning SSE if stream_event didn't stream it
+                                    if (ctx.thinkingChunks.length === 0) {
+                                        ctx.thinkingChunks.push(thought);
+                                        ctx.stream.send('reasoning' as StreamEventType, { thought });
+                                    }
                                 }
                                 break;
                             }

@@ -6,7 +6,7 @@
 import { logger } from '../../../utils/logger';
 import type { DaytonaProvider } from './providers/daytona.provider';
 import type { SessionHandle, AgentSessionOptions } from './providers';
-import { sendCommand, createAgentSession } from './providers';
+import { createAgentSession } from './providers';
 import type { SandboxSession } from './sandbox.types';
 import type { AdapterType } from '../../execution/runner/cli-adapters/types';
 
@@ -18,7 +18,7 @@ const HEALTH_CHECK_GRACE_MS = 30_000;
 // Timeout for the entire getOrCreateRunner flow (getSandboxInstance + createAgentSession)
 const RUNNER_CREATION_TIMEOUT_MS = 30_000;
 
-// Timeout for individual Daytona API calls (sendCommand for health check)
+// Timeout for individual Daytona API calls (getSandboxInstance)
 const DAYTONA_CALL_TIMEOUT_MS = 10_000;
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
@@ -45,6 +45,7 @@ export async function getOrCreateRunnerSession(
     provider: DaytonaProvider,
     agentSlug?: string,
     adapterType?: AdapterType,
+    systemPrompt?: string,
 ): Promise<SessionHandle> {
     const userId = session.userId;
     const slug = agentSlug || 'default';
@@ -61,13 +62,13 @@ export async function getOrCreateRunnerSession(
             const lastUsed = existing.handle.lastUsedAt ?? 0;
             const withinGrace = (Date.now() - lastUsed) < HEALTH_CHECK_GRACE_MS;
             log.debug('Existing session found', { agent_slug: slug, user_id: userId, within_grace: withinGrace, last_used_ms_ago: Date.now() - lastUsed });
-            const healthy = withinGrace || await checkRunnerHealth(existing.handle);
+            const healthy = withinGrace || checkRunnerHealth(existing.handle);
             if (healthy) {
                 existing.handle.lastUsedAt = Date.now();
                 log.debug('Reusing existing session', { agent_slug: slug, grace: withinGrace });
                 return existing.handle;
             }
-            log.info('Health check failed, creating new session', { agent_slug: slug, user_id: userId });
+            log.info('Health check failed (process exited), creating new session', { agent_slug: slug, user_id: userId });
             session.agentSessions.delete(slug);
         }
     } else {
@@ -80,7 +81,7 @@ export async function getOrCreateRunnerSession(
         if (!envChanged) {
             const lastUsed = session.runnerHandle.lastUsedAt ?? 0;
             const withinGrace = (Date.now() - lastUsed) < HEALTH_CHECK_GRACE_MS;
-            const healthy = withinGrace || await checkRunnerHealth(session.runnerHandle);
+            const healthy = withinGrace || checkRunnerHealth(session.runnerHandle);
             if (healthy) {
                 session.runnerHandle.lastUsedAt = Date.now();
                 return session.runnerHandle;
@@ -102,6 +103,7 @@ export async function getOrCreateRunnerSession(
     const agentOpts: AgentSessionOptions = {
         agentSlug: slug,
         adapterType: adapter,
+        systemPrompt,
     };
 
     log.info('Creating session', { adapter, agent_slug: slug, sandbox_id: sandboxId });
@@ -123,40 +125,21 @@ export async function getOrCreateRunnerSession(
     return handle;
 }
 
-async function checkRunnerHealth(handle: SessionHandle): Promise<boolean> {
-    const HEALTH_TIMEOUT_MS = 5000;
-    const startPos = handle.logBuffer.position;
-
-    try {
-        await withTimeout(
-            sendCommand(handle, { type: 'health' }),
-            DAYTONA_CALL_TIMEOUT_MS,
-            'sendCommand(health)',
-        );
-    } catch (err) {
-        log.debug('Health check sendCommand failed', { error: (err as Error).message });
+/**
+ * Check if the CLI process is still alive by inspecting the log buffer stream state.
+ * The PersistentLogBuffer closes when its underlying Daytona log stream ends
+ * (process exit, stream error). If not closed, the process is alive and accepting stdin.
+ *
+ * Previous approach (sending {"type":"health"} to stdin) doesn't work with persistent
+ * Claude CLI sessions — Claude's stream-json input only handles "user" and
+ * "control_request" message types and ignores unknown types.
+ */
+function checkRunnerHealth(handle: SessionHandle): boolean {
+    if (handle.logBuffer.isStreamClosed) {
+        log.debug('Health check: log stream closed (process exited)');
         return false;
     }
-
-    const deadline = Date.now() + HEALTH_TIMEOUT_MS;
-    let pos = startPos;
-    while (Date.now() < deadline) {
-        const event = handle.logBuffer.peek(pos);
-        if (event === undefined) {
-            await new Promise(r => setTimeout(r, 50));
-            continue;
-        }
-        if (event === null) {
-            return false;
-        }
-        if (event.event === 'health') {
-            return (event as { status: string }).status === 'ok';
-        }
-        pos++;
-    }
-
-    log.debug('Health check timed out', { timeout_ms: HEALTH_TIMEOUT_MS });
-    return false;
+    return true;
 }
 
 /**
