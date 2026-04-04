@@ -246,8 +246,10 @@ export class CLIAuthService {
 
         try {
             const result = await provider.executeCommand(session.sandboxId, script);
-            // Strip ANSI escape codes from CLI output (color codes like \x1B[0m corrupt URLs)
-            const output = (result.result || '').replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '');
+            // Strip ANSI escape codes from CLI output (color codes corrupt URLs)
+            const ESC = String.fromCharCode(0x1b);
+            const ansiPattern = new RegExp(ESC + '\\[[0-9;]*[a-zA-Z]', 'g');
+            const output = (result.result || '').replace(ansiPattern, '');
 
             // Both CLIs: parse external auth URL + localhost port for code-paste flow.
             return this.parseOAuthOutput(output, userId, adapter);
