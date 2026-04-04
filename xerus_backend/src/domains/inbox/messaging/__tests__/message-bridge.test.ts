@@ -2,10 +2,7 @@
 // Tests for bidirectional message routing: runner <-> backend <-> frontend
 // Uses real NeonDB PostgreSQL database
 
-import dotenv from 'dotenv';
-import path from 'path';
 
-dotenv.config({ path: path.join(__dirname, '..', '..', '..', '..', '..', '.env') });
 
 import { query } from '../../../../database/connection';
 import {

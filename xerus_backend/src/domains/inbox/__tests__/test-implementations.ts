@@ -3,10 +3,7 @@
 // DatabaseInboxItemRepository now uses workspace DB (requires sandbox),
 // so tests use a standalone in-memory implementation.
 
-import dotenv from 'dotenv';
-import path from 'path';
 
-dotenv.config({ path: path.join(__dirname, '..', '..', '..', '..', '.env') });
 
 // CallTracker copied locally to avoid cross-domain test import from execution
 interface MethodCall<TArgs extends unknown[] = unknown[], TResult = unknown> {

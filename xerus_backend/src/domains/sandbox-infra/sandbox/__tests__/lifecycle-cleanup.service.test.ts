@@ -1,10 +1,7 @@
 // Sandbox Lifecycle Cleanup Service Tests
 // Tests for stale sandbox GC, orphan detection, stuck session cleanup
 
-import dotenv from 'dotenv';
-import path from 'path';
 
-dotenv.config({ path: path.join(__dirname, '..', '..', '..', '..', '..', '.env') });
 
 import {
     LifecycleCleanupService,

@@ -2,10 +2,8 @@
 // Tests for @mention parsing and message routing
 // Uses real local filesystem for workspace writes, real DB for agent resolution
 
-import dotenv from 'dotenv';
 import path from 'path';
 
-dotenv.config({ path: path.join(__dirname, '..', '..', '..', '..', '..', '.env') });
 
 import * as fs from 'fs/promises';
 import * as os from 'os';

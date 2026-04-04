@@ -1,10 +1,7 @@
 // SubagentStop Hook Tests
 // Tests for delegation tracking when subagents complete
 
-import dotenv from 'dotenv';
-import path from 'path';
 
-dotenv.config({ path: path.join(__dirname, '..', '..', '..', '..', '..', '.env') });
 
 import {
     SubagentStopHandler,

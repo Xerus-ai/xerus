@@ -1,8 +1,7 @@
-import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
-import dotenv from 'dotenv';
-import { logger } from '../utils/logger';
+import '../config/env';
 
-dotenv.config();
+import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
+import { logger } from '../utils/logger';
 
 const log = logger('Database');
 

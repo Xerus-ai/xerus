@@ -2,10 +2,7 @@
 // Tests for pause/resume approval workflow
 // NO MOCKS - uses real in-memory implementations
 
-import dotenv from 'dotenv';
-import path from 'path';
 
-dotenv.config({ path: path.join(__dirname, '..', '..', '..', '..', '..', '.env') });
 
 import {
     HITLHandler,
