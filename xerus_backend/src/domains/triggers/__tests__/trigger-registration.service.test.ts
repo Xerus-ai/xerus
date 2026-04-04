@@ -64,30 +64,6 @@ describe('TriggerRegistrationService', () => {
                 is_active = EXCLUDED.is_active
         `);
 
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS user_pipedream_connections (
-                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                user_id VARCHAR(255) NOT NULL,
-                app_slug VARCHAR(100) NOT NULL,
-                account_id VARCHAR(255) NOT NULL,
-                is_active BOOLEAN DEFAULT true NOT NULL,
-                created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-                UNIQUE(user_id, app_slug)
-            )
-        `);
-
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS user_native_connections (
-                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                user_id VARCHAR(255) NOT NULL,
-                app_slug VARCHAR(100) NOT NULL,
-                account_id VARCHAR(255) NOT NULL,
-                is_active BOOLEAN DEFAULT true NOT NULL,
-                created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-                UNIQUE(user_id, app_slug)
-            )
-        `);
-
         // Ensure user exists (must come before agents due to FK constraint)
         await pool.query(`
             INSERT INTO users (user_id, email) VALUES ($1, 'trigger-reg-test@test.com')
@@ -107,17 +83,15 @@ describe('TriggerRegistrationService', () => {
             ON CONFLICT (id) DO NOTHING
         `, [TEST_AGENT_ID_2, 'test-agent-trigger-reg-2', TEST_USER_ID]);
 
-        // Setup pipedream connections for test user
+        // Setup connected_accounts for test user (used by trigger-resolver.service.ts)
         await pool.query(`
-            INSERT INTO user_pipedream_connections (user_id, app_slug, account_id, is_active)
+            INSERT INTO connected_accounts (user_id, pipedream_account_id, app_slug, app_name, created_at)
             VALUES
-                ($1, 'gmail', 'acct_gmail_reg', true),
-                ($1, 'github', 'acct_github_reg', true),
-                ($1, 'slack', 'acct_slack_reg', true),
-                ($1, 'stripe', 'acct_stripe_reg', true)
-            ON CONFLICT (user_id, app_slug) DO UPDATE SET
-                account_id = EXCLUDED.account_id,
-                is_active = EXCLUDED.is_active
+                ($1, 'acct_gmail_reg', 'gmail', 'Gmail', NOW()),
+                ($1, 'acct_github_reg', 'github', 'GitHub', NOW()),
+                ($1, 'acct_slack_reg', 'slack', 'Slack', NOW()),
+                ($1, 'acct_stripe_reg', 'stripe', 'Stripe', NOW())
+            ON CONFLICT DO NOTHING
         `, [TEST_USER_ID]);
     });
 
@@ -134,7 +108,7 @@ describe('TriggerRegistrationService', () => {
     afterAll(async () => {
         // Clean up test data
         await pool.query(`DELETE FROM agent_triggers WHERE agent_id IN ($1, $2)`, [TEST_AGENT_ID, TEST_AGENT_ID_2]);
-        await pool.query(`DELETE FROM user_pipedream_connections WHERE user_id = $1`, [TEST_USER_ID]);
+        await pool.query(`DELETE FROM connected_accounts WHERE user_id = $1`, [TEST_USER_ID]);
     });
 
     // -------------------------------------------------------------------------
