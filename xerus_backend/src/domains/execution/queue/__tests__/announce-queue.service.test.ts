@@ -1,10 +1,7 @@
 // Subagent Announce Queue Tests
 // Tests for batching and delivering subagent completion notifications to user inbox
 
-import dotenv from 'dotenv';
-import path from 'path';
 
-dotenv.config({ path: path.join(__dirname, '..', '..', '..', '..', '..', '.env') });
 
 import {
     AnnounceQueueService,

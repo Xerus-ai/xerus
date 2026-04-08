@@ -1,10 +1,7 @@
 // Teammate Idle Hook Tests
 // Tests for teammate idle notification routing via StdoutEmitter
 
-import dotenv from 'dotenv';
-import path from 'path';
 
-dotenv.config({ path: path.join(__dirname, '..', '..', '..', '..', '..', '.env') });
 
 import {
     TeammateIdleHandler,

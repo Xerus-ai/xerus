@@ -2,10 +2,7 @@
 // Tests for the integration between execution triggers and inbox system
 // Uses real DatabaseInboxItemRepository via test-implementations
 
-import dotenv from 'dotenv';
-import path from 'path';
 
-dotenv.config({ path: path.join(__dirname, '..', '..', '..', '..', '.env') });
 
 import { ExecutionInboxService } from '../inbox.service';
 import type {

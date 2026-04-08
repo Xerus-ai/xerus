@@ -122,3 +122,15 @@ export const apiPost = async <T>(
   return response.json();
 };
 
+// Helper for PATCH requests
+export const apiPatch = async <T>(
+  endpoint: string,
+  data: unknown,
+): Promise<T> => {
+  const response = await apiCall(endpoint, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+  return response.json();
+};
+

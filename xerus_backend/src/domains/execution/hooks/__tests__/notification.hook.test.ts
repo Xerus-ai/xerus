@@ -1,10 +1,7 @@
 // Notification Hook Tests
 // Tests for routing notifications to inbox and push notifications
 
-import dotenv from 'dotenv';
-import path from 'path';
 
-dotenv.config({ path: path.join(__dirname, '..', '..', '..', '..', '..', '.env') });
 
 import {
     NotificationHandler,

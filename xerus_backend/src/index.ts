@@ -1,6 +1,7 @@
+import './config/env'; // Must be first — loads .env.local or .env.production
+
 import express, { Application } from 'express';
 import helmet from 'helmet';
-import dotenv from 'dotenv';
 
 import { logger } from './utils/logger';
 import { requestMeta } from './middleware/request-meta';
@@ -47,8 +48,6 @@ import { HITLPauseRepositoryImpl } from './domains/execution/hitl/hitl-pause.rep
 import { ActiveStreamEmitter } from './domains/execution/hitl/active-stream-emitter';
 import { sseRegistry } from './domains/execution/streaming/sse-registry';
 import { createMemorySearchIndexService } from './domains/memory/git-memory/memory-search-index.service';
-
-dotenv.config();
 
 const log = logger('Server');
 
@@ -265,7 +264,7 @@ async function startServer(): Promise<void> {
         setAgentRoutesDeps({ sandboxService });
         setAgentChannelsDeps({ sandboxService });
         setTaskRoutesDeps({ sandboxService });
-        setCompanyRoutesDeps({ sandboxService, messageBridge });
+        setCompanyRoutesDeps({ sandboxService, messageBridge, executionService });
         setOnboardingDeps({ sandboxService });
         setUserRoutesDeps({ sandboxService });
 

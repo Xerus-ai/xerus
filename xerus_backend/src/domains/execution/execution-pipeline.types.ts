@@ -3,7 +3,7 @@
 // Prompt assembly, context building, hooks removed - runner handles those.
 // See: docs/planning/execution/EXECUTION_ARCHITECTURE_v2.md Section 10
 
-import type { StreamingResponse } from './streaming/stream.handler';
+import type { StreamSink } from './streaming/stream.handler';
 import type { PricingService } from './sdk/pricing.service';
 import type { SandboxService } from '../sandbox-infra/sandbox/sandbox.service';
 import type { ExecutionQueueService } from './queue/execution-queue.service';
@@ -52,6 +52,9 @@ export interface ResolvedExecutionDeps {
     messageBridge: MessageBridgeService | null;
     hitlHandler: HITLHandler;
     activeStreamEmitter: ActiveStreamEmitter | null;
+    /** Callback to trigger execution for an agent that isn't running (e.g. @mention to offline agent).
+     *  Avoids circular dep: runner-event-router → ExecutionService. Wired at startup. */
+    triggerAgentExecution?: (userId: string, agentSlug: string, message: string, channelSlug: string) => Promise<void>;
 }
 
 export interface ExecutionDatabase {
@@ -82,7 +85,7 @@ export interface AgentRow {
 
 export interface StartExecutionOptions {
     request: ExecutionRequest;
-    stream: StreamingResponse;
+    stream: StreamSink;
     triggerType?: TriggerType;
 }
 
@@ -98,7 +101,7 @@ export interface ToolCallDetail {
 
 export interface PipelineContext {
     executionId: string;
-    stream: StreamingResponse;
+    stream: StreamSink;
     request: ExecutionRequest;
     agent: AgentRow | null;
     sandboxId: string | null;

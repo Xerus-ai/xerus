@@ -6,6 +6,7 @@ import { Response } from 'express';
 import { randomUUID } from 'crypto';
 import { StreamEvent, StreamEventType, DoneEventMeta, ExecutionErrorInfo, ExecutionSummary } from '../types';
 import { classifyErrorFromObject, extractErrorCode } from './error-classifier';
+import { logger } from '../../../utils/logger';
 
 // -----------------------------------------------------------------------------
 // SSE Headers
@@ -19,10 +20,35 @@ const SSE_HEADERS = {
 } as const;
 
 // -----------------------------------------------------------------------------
+// StreamSink Interface
+// Common interface for all stream implementations (SSE, Null, etc.)
+// Used by the execution pipeline so it can work with both real SSE streams
+// (conversation-scoped) and no-op streams (channel-scoped background execution).
+// -----------------------------------------------------------------------------
+
+export interface StreamSink {
+    getExecutionId(): string;
+    setExecutionId(executionId: string): void;
+    setParentToolUseId(parentToolUseId: string): void;
+    clearParentToolUseId(): void;
+    send(type: StreamEventType, content: unknown, meta?: unknown): void;
+    sendError(error: Error | ExecutionErrorInfo, meta?: Partial<DoneEventMeta>): void;
+    sendDone(
+        finalResponse: string | undefined,
+        summary: ExecutionSummary,
+        meta?: Partial<DoneEventMeta>,
+        options?: { databaseUpdated?: boolean; conversationId?: string | null },
+    ): void;
+    sendHeartbeat(): void;
+    close(): void;
+    isClosed(): boolean;
+}
+
+// -----------------------------------------------------------------------------
 // StreamingResponse Class
 // -----------------------------------------------------------------------------
 
-export class StreamingResponse {
+export class StreamingResponse implements StreamSink {
     private readonly res: Response;
     private executionId: string;
     private parentToolUseId: string | null = null;
@@ -233,5 +259,69 @@ export class StreamingResponse {
             toolCalls: 0,
             agentsUsed: 0,
         };
+    }
+}
+
+// -----------------------------------------------------------------------------
+// NullStreamingResponse
+// A no-op stream that implements StreamSink but discards all output.
+// Used for background executions triggered from channel messages where no
+// frontend SSE connection exists.
+// -----------------------------------------------------------------------------
+
+export class NullStreamingResponse implements StreamSink {
+    private executionId: string;
+    private closed = false;
+
+    constructor(executionId?: string) {
+        this.executionId = executionId ?? randomUUID();
+    }
+
+    getExecutionId(): string {
+        return this.executionId;
+    }
+
+    setExecutionId(executionId: string): void {
+        this.executionId = executionId;
+    }
+
+    setParentToolUseId(_parentToolUseId: string): void {
+        // no-op
+    }
+
+    clearParentToolUseId(): void {
+        // no-op
+    }
+
+    send(_type: StreamEventType, _content: unknown, _meta?: unknown): void {
+        // no-op: discard streaming events for background channel executions
+    }
+
+    sendError(error: Error | ExecutionErrorInfo, _meta?: Partial<DoneEventMeta>): void {
+        // Log errors so background channel executions are observable
+        const log = logger('NullStream');
+        const msg = error instanceof Error ? error.message : (error as ExecutionErrorInfo).message ?? 'Unknown error';
+        log.error('Background execution error', { execution_id: this.executionId, error: msg });
+    }
+
+    sendDone(
+        _finalResponse: string | undefined,
+        _summary: ExecutionSummary,
+        _meta?: Partial<DoneEventMeta>,
+        _options?: { databaseUpdated?: boolean; conversationId?: string | null },
+    ): void {
+        // no-op
+    }
+
+    sendHeartbeat(): void {
+        // no-op
+    }
+
+    close(): void {
+        this.closed = true;
+    }
+
+    isClosed(): boolean {
+        return this.closed;
     }
 }

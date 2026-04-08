@@ -3,8 +3,7 @@
 // Fetches all apps from Pipedream API and syncs to database
 // Usage: ts-node src/scripts/syncPipedreamApps.ts
 
-import dotenv from 'dotenv';
-dotenv.config();
+import '../config/env';
 
 import { toolsService } from '../domains/tools/service';
 import { toolsRepository } from '../domains/tools/repository';

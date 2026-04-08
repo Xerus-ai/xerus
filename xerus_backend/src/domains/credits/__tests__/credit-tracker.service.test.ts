@@ -1,10 +1,7 @@
 // Credit Tracker Service Tests
 // Tests for execution-level credit tracking
 
-import dotenv from 'dotenv';
-import path from 'path';
 
-dotenv.config({ path: path.join(__dirname, '..', '..', '..', '..', '.env') });
 
 import {
     CreditTracker,

@@ -39,6 +39,7 @@ interface KanbanBoardProps {
   columns?: KanbanColumn[]
   onDragEnd: (taskId: string, newStatus: string) => void
   onTaskClick?: (task: KanbanTask) => void
+  onColumnAdd?: (columnId: string) => void
   renderCard?: (task: KanbanTask) => React.ReactNode
   filters?: React.ReactNode
   className?: string
@@ -52,10 +53,10 @@ const DEFAULT_COLUMNS: KanbanColumn[] = [
 ]
 
 const COLUMN_BG: Record<string, string> = {
-  todo: 'bg-surface-alt/60',
-  in_progress: 'bg-surface-alt/60',
-  done: 'bg-surface-alt/60',
-  needs_approval: 'bg-surface-alt/60',
+  todo: 'bg-[#FDF8F3]',
+  in_progress: 'bg-[#FDF8F3]',
+  done: 'bg-[#FDF8F3]',
+  needs_approval: 'bg-[#FDF8F3]',
 }
 
 // --- Sortable Task Item ---
@@ -107,6 +108,7 @@ interface DroppableColumnProps {
   column: KanbanColumn
   tasks: KanbanTask[]
   onTaskClick?: (task: KanbanTask) => void
+  onColumnAdd?: (columnId: string) => void
   renderCard?: (task: KanbanTask) => React.ReactNode
 }
 
@@ -114,6 +116,7 @@ function DroppableColumn({
   column,
   tasks,
   onTaskClick,
+  onColumnAdd,
   renderCard,
 }: DroppableColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
@@ -140,7 +143,11 @@ function DroppableColumn({
           <span className="text-xs text-text-muted">{tasks.length}</span>
         </div>
         <div className="flex items-center gap-1">
-          <button className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-surface-hover text-text-muted transition-colors" aria-label="Add task">
+          <button
+            className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-surface-hover text-text-muted transition-colors"
+            aria-label="Add task"
+            onClick={() => onColumnAdd?.(column.id)}
+          >
             <Plus className="w-3.5 h-3.5" />
           </button>
           <button className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-surface-hover text-text-muted transition-colors" aria-label="Column options">
@@ -179,6 +186,7 @@ export function KanbanBoard({
   columns = DEFAULT_COLUMNS,
   onDragEnd,
   onTaskClick,
+  onColumnAdd,
   renderCard,
   filters,
   className,
@@ -288,6 +296,7 @@ export function KanbanBoard({
               column={column}
               tasks={tasksByColumn[column.id] || []}
               onTaskClick={onTaskClick}
+              onColumnAdd={onColumnAdd}
               renderCard={renderCard}
             />
           ))}

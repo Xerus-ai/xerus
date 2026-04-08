@@ -3,7 +3,8 @@
 import React from 'react'
 import { Calendar, MessageSquare, Circle } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { PresenceAvatars, type Agent } from './PresenceAvatars'
+import { getAgentColor, getLabelColor, formatShortDate } from '@/lib/task-utils'
+import type { Agent } from './PresenceAvatars'
 
 export interface KanbanTask {
   id: string
@@ -32,9 +33,8 @@ interface TaskCardProps {
   className?: string
 }
 
-function formatShortDate(dateString: string): string {
-  const d = new Date(dateString)
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+function getInitial(name: string): string {
+  return name.charAt(0).toUpperCase()
 }
 
 export function TaskCard({
@@ -72,20 +72,31 @@ export function TaskCard({
         }
       }}
     >
-      {/* Row 1: Title + Agent avatars */}
+      {/* Row 1: Checkbox circle + Title + Agent avatars */}
       <div className="flex items-start gap-2.5">
         <Circle className="w-[18px] h-[18px] text-surface-active mt-0.5 flex-shrink-0" strokeWidth={1.5} />
         <h4 className="text-[13px] font-semibold text-text leading-snug flex-1 line-clamp-2">
           {task.title}
         </h4>
         {task.assignedAgents && task.assignedAgents.length > 0 && (
-          <div className="flex-shrink-0 mt-px">
-            <PresenceAvatars
-              agents={task.assignedAgents}
-              size="sm"
-              maxVisible={2}
-              showStatus={false}
-            />
+          <div className="flex items-center flex-shrink-0 mt-px">
+            {task.assignedAgents.slice(0, 3).map((agent, index) => {
+              const color = getAgentColor(agent.name)
+              return (
+                <div
+                  key={agent.id}
+                  className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold text-white ring-2 ring-surface"
+                  style={{
+                    backgroundColor: color,
+                    marginLeft: index === 0 ? 0 : -6,
+                    zIndex: 3 - index,
+                  }}
+                  title={agent.name}
+                >
+                  {getInitial(agent.name)}
+                </div>
+              )
+            })}
           </div>
         )}
       </div>
@@ -97,18 +108,28 @@ export function TaskCard({
         </p>
       )}
 
-      {/* Row 3: Labels */}
+      {/* Row 3: Labels with colored dot prefix */}
       {task.labels && task.labels.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-3 pl-[30px]">
-          {task.labels.map((label) => (
-            <span
-              key={label.name}
-              className="inline-block rounded-md px-2 py-0.5 text-[11px] font-medium leading-tight"
-              style={{ backgroundColor: label.color + '15', color: label.color, border: `1px solid ${label.color}30` }}
-            >
-              {label.name}
-            </span>
-          ))}
+          {task.labels.map((label) => {
+            const color = getLabelColor(label)
+            return (
+              <span
+                key={label.name}
+                className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium leading-tight"
+                style={{
+                  backgroundColor: color + '12',
+                  color: color,
+                  border: `1px solid ${color}30`,
+                }}
+              >
+                <svg width="6" height="6" viewBox="0 0 6 6" fill="none" className="flex-shrink-0">
+                  <circle cx="3" cy="3" r="3" fill={color} />
+                </svg>
+                {label.name}
+              </span>
+            )
+          })}
         </div>
       )}
 

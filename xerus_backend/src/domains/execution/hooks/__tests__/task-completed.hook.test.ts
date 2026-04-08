@@ -1,10 +1,7 @@
 // Task Completed Hook Tests
 // Tests for task completion tracking and notification via StdoutEmitter
 
-import dotenv from 'dotenv';
-import path from 'path';
 
-dotenv.config({ path: path.join(__dirname, '..', '..', '..', '..', '..', '.env') });
 
 import {
     TaskCompletedHandler,

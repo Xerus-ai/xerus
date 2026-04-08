@@ -1,7 +1,4 @@
-import dotenv from 'dotenv';
-import path from 'path';
-
-dotenv.config({ path: path.join(__dirname, '..', '.env') });
+import '../src/config/env';
 
 // Default workspace root for tests (sandbox.config.ts requires XERUS_WORKSPACE_ROOT)
 process.env.XERUS_WORKSPACE_ROOT = process.env.XERUS_WORKSPACE_ROOT || '/tmp/xerus-test-workspace';

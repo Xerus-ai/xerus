@@ -1,10 +1,7 @@
 // Runner Health Monitor Tests
 // Tests for crash detection and automatic recovery
 
-import dotenv from 'dotenv';
-import path from 'path';
 
-dotenv.config({ path: path.join(__dirname, '..', '..', '..', '..', '..', '.env') });
 
 import {
     RunnerHealthMonitor,

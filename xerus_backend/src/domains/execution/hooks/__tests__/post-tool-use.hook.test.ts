@@ -1,10 +1,7 @@
 // PostToolUse Hook Tests
 // Tests for context threshold monitoring after tool execution
 
-import dotenv from 'dotenv';
-import path from 'path';
 
-dotenv.config({ path: path.join(__dirname, '..', '..', '..', '..', '..', '.env') });
 
 import {
     PostToolUseHandler,

@@ -2,10 +2,7 @@
 // Tests for runner-backend credit protocol handling
 // Uses real NeonDB PostgreSQL database for CreditService and SessionStore
 
-import dotenv from 'dotenv';
-import path from 'path';
 
-dotenv.config({ path: path.join(__dirname, '..', '..', '..', '..', '.env') });
 
 import { query } from '../../../database/connection';
 import {

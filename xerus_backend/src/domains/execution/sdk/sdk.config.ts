@@ -88,9 +88,9 @@ export function buildSDKEnvironment(
     const env: Record<string, string> = {
         ...filtered,
         ANTHROPIC_BASE_URL: SDK_CONFIG.openRouterBaseUrl,
-        ANTHROPIC_AUTH_TOKEN: apiKey,
-        // Do NOT set ANTHROPIC_API_KEY — empty string confuses CLI auth detection.
-        // ANTHROPIC_AUTH_TOKEN provides Bearer auth for OpenRouter.
+        // Claude CLI v2.1.91+ uses ANTHROPIC_API_KEY for auth detection.
+        // ANTHROPIC_AUTH_TOKEN is no longer recognized by the CLI.
+        ANTHROPIC_API_KEY: apiKey,
         XERUS_WORKSPACE_ROOT: process.env.XERUS_WORKSPACE_ROOT || '/home/daytona',
     };
 
@@ -100,9 +100,8 @@ export function buildSDKEnvironment(
     // The sandbox auth-detector checks these env vars to determine billing type.
     if (userCliKeys?.anthropicKey) {
         env.ANTHROPIC_API_KEY = userCliKeys.anthropicKey;
-        // Clear OpenRouter auth when using direct Anthropic key
+        // Clear OpenRouter base URL when using direct Anthropic key
         delete env.ANTHROPIC_BASE_URL;
-        delete env.ANTHROPIC_AUTH_TOKEN;
     }
     if (userCliKeys?.openaiKey) {
         env.OPENAI_API_KEY = userCliKeys.openaiKey;

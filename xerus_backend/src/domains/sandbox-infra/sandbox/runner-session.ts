@@ -46,6 +46,8 @@ export async function getOrCreateRunnerSession(
     agentSlug?: string,
     adapterType?: AdapterType,
     systemPrompt?: string,
+    model?: string,
+    sdkSessionId?: string,
 ): Promise<SessionHandle> {
     const userId = session.userId;
     const slug = agentSlug || 'default';
@@ -104,6 +106,8 @@ export async function getOrCreateRunnerSession(
         agentSlug: slug,
         adapterType: adapter,
         systemPrompt,
+        model,
+        sessionId: sdkSessionId,
     };
 
     log.info('Creating session', { adapter, agent_slug: slug, sandbox_id: sandboxId });

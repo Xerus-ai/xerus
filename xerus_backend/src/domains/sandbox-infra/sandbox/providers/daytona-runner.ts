@@ -80,10 +80,12 @@ function agentSessionName(agentSlug: string): string {
 /**
  * Build the CLI command string for a Daytona session.
  * Combines env exports + CLI args into a single shell command.
+ * System prompts are passed via file to avoid shell escaping issues with newlines.
  */
 function buildSessionCommand(
     envVars: Record<string, string>,
     agentOpts: AgentSessionOptions,
+    systemPromptFilePath?: string,
 ): string {
     const adapter = adapters[agentOpts.adapterType];
 
@@ -95,23 +97,37 @@ function buildSessionCommand(
         model: agentOpts.model,
         max_budget_usd: agentOpts.maxBudgetUsd,
         allowed_tools: agentOpts.allowedTools,
-        system_prompt: agentOpts.systemPrompt,
+        // system_prompt omitted — passed via file to avoid shellEscape newline rejection
         session_id: agentOpts.sessionId,
         cwd: SANDBOX_CONFIG.workspacePath,
     };
 
     const cliArgs = adapter.buildCommand('', agentConfig);
 
+    // Inject per-agent env vars that hooks need (XERUS_AGENT_SLUG identifies the agent
+    // to session-start.sh, task-context generation, and all other hook scripts)
+    const fullEnv: Record<string, string> = {
+        ...envVars,
+        XERUS_AGENT_SLUG: agentOpts.agentSlug,
+    };
+
     // Build environment export prefix
-    const envExports = Object.entries(envVars)
+    const envExports = Object.entries(fullEnv)
         .map(([k, v]) => `export ${k}=${shellEscape(v)}`)
         .join(' && ');
 
     const cliCommand = cliArgs.map(a => shellEscape(a)).join(' ');
 
+    // Append system prompt from file using shell substitution.
+    // The file contains multiline content that can't pass through shellEscape,
+    // so we use $(cat file) inside double quotes to preserve newlines.
+    const promptSuffix = systemPromptFilePath
+        ? ` --append-system-prompt "$(cat ${shellEscape(systemPromptFilePath)})"`
+        : '';
+
     return envExports
-        ? `${envExports} && cd ${shellEscape(SANDBOX_CONFIG.workspacePath)} && exec ${cliCommand}`
-        : `cd ${shellEscape(SANDBOX_CONFIG.workspacePath)} && exec ${cliCommand}`;
+        ? `${envExports} && cd ${shellEscape(SANDBOX_CONFIG.workspacePath)} && exec ${cliCommand}${promptSuffix}`
+        : `cd ${shellEscape(SANDBOX_CONFIG.workspacePath)} && exec ${cliCommand}${promptSuffix}`;
 }
 
 /**
@@ -152,7 +168,18 @@ export async function createAgentSession(
         await sandbox.fs.uploadFile(Buffer.from(configToml, 'utf-8'), `${codexHome}/config.toml`);
     }
 
-    const command = buildSessionCommand(envVars, agentOpts);
+    // Write system prompt to a file in the sandbox to avoid shellEscape rejecting newlines.
+    // Multiline system prompts (SOUL.md + CLAUDE.md) contain \n which shellEscape blocks.
+    let systemPromptFilePath: string | undefined;
+    if (agentOpts.systemPrompt) {
+        systemPromptFilePath = `/tmp/xerus-prompt-${agentOpts.agentSlug}.md`;
+        await sandbox.fs.uploadFile(
+            Buffer.from(agentOpts.systemPrompt, 'utf-8'),
+            systemPromptFilePath,
+        );
+    }
+
+    const command = buildSessionCommand(envVars, agentOpts, systemPromptFilePath);
 
     const envKeys = Object.keys(envVars);
     log.info('Executing CLI', { adapter_type: agentOpts.adapterType, agent_slug: agentOpts.agentSlug, env_var_count: envKeys.length });

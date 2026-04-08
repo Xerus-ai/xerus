@@ -2,10 +2,7 @@
 // Tests for tool access validation, allowed tools checking, and HITL rule evaluation
 // NO MOCKS - uses real implementations with in-memory test dependencies
 
-import dotenv from 'dotenv';
-import path from 'path';
 
-dotenv.config({ path: path.join(__dirname, '..', '..', '..', '..', '..', '.env') });
 
 import {
     PreToolUseHandler,

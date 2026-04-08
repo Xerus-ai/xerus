@@ -10,7 +10,8 @@ import type { HITLRequest } from './hitl/hitl.types';
 import { handleMetadataSync } from './metadata-sync-router';
 import { handleTriggerIndexing } from './indexing-event-handler';
 import { ChannelNotFoundError, MentionParser } from '../inbox';
-import { workspaceSSEBroadcaster } from '../drive';
+// triggerAgentExecution callback is wired via ResolvedExecutionDeps (no circular dep)
+import { workspaceSSEBroadcaster, reverseSyncToDB } from '../drive';
 import { updateSdkSessionId } from '../conversations/workspace-db.service';
 import {
     assertToolCallData,
@@ -86,6 +87,13 @@ export async function routeEventToBackend(
                     entry.result = tr.result;
                     entry.success = tr.success ?? true;
                     entry.duration_ms = Date.now() - entry.started_at;
+
+                    // Sync to Neon AFTER write succeeds (not on tool_call)
+                    // Prevents phantom agent_registry entries from failed writes
+                    if (entry.success !== false && FILE_WRITE_TOOLS.has(entry.tool_name)) {
+                        syncFileChangeToNeon(entry, ctx)
+                            .catch(err => log.warn('Neon sync failed (non-critical)', { error: (err as Error).message }));
+                    }
                 }
             }
             break;
@@ -416,6 +424,15 @@ async function handleSessionStarted(
     if (ctx.sandboxId) {
         const provider = deps.sandboxService.getDaytonaProvider();
         await updateSdkSessionId(provider, ctx.sandboxId, ctx.conversationId, evt.session_id);
+
+        // Update agent status to 'running' in workspace.db so frontend shows online count
+        const agentSlug = evt.agent_slug || ctx.agent?.slug;
+        if (agentSlug) {
+            const { executeWorkspaceQuery } = await import('../conversations/workspace-db.helpers');
+            executeWorkspaceQuery(provider, ctx.sandboxId,
+                `UPDATE agents SET status = 'running', updated_at = '${new Date().toISOString()}' WHERE slug = '${agentSlug}'`,
+            ).catch(err => log.warn('Failed to update agent status to running', { error: (err as Error).message }));
+        }
     }
     logEvent('session_started', d);
 }
@@ -444,6 +461,16 @@ async function handleSessionCompleted(
         );
     }
     log.info('session_completed', { status: data.status, reason: data.reason });
+
+    // Update agent status back to 'idle' in workspace.db
+    const agentSlug = ctx.agent?.slug;
+    if (agentSlug && ctx.sandboxId) {
+        const provider = deps.sandboxService.getDaytonaProvider();
+        const { executeWorkspaceQuery } = await import('../conversations/workspace-db.helpers');
+        executeWorkspaceQuery(provider, ctx.sandboxId,
+            `UPDATE agents SET status = 'idle', updated_at = '${new Date().toISOString()}' WHERE slug = '${agentSlug}'`,
+        ).catch(err => log.warn('Failed to update agent status to idle', { error: (err as Error).message }));
+    }
 }
 
 function handleCreditUsage(d: Record<string, unknown>, ctx: PipelineContext): void {
@@ -548,9 +575,35 @@ async function handleAgentMessage(
     const mentions = mentionParser.parseMentions(data.content);
     for (const mention of mentions) {
         if (mention.target === agentSlug) continue;
+
+        // Try live dispatch first; if target agent isn't running, trigger execution immediately
         deps.messageBridge.dispatchMention(
             ctx.request.userId, agentSlug, mention.target, mention.message, data.project || '', data.channel,
-        ).catch(err => {
+        ).then(async (dispatched) => {
+            if (dispatched) return;
+
+            // Target agent not running — fire their execution immediately
+            const channelSlug = data.project && data.channel
+                ? `${data.project}--${data.channel}`
+                : data.channel;
+
+            log.info('Mention target not running, triggering execution', {
+                from: agentSlug, target: mention.target, channel: channelSlug,
+            });
+
+            if (deps.triggerAgentExecution) {
+                await deps.triggerAgentExecution(
+                    ctx.request.userId,
+                    mention.target,
+                    mention.message,
+                    channelSlug,
+                );
+            } else {
+                log.warn('triggerAgentExecution not wired, mention to offline agent dropped', {
+                    target: mention.target,
+                });
+            }
+        }).catch(err => {
             log.warn('agent_message mention dispatch failed', { target: mention.target, error: (err as Error).message });
         });
     }
@@ -652,6 +705,39 @@ async function handleHitlRequest(
 }
 
 const FILE_WRITE_TOOLS = new Set(['Write', 'Edit', 'NotebookEdit']);
+
+// Regex patterns for paths that need Neon DB sync
+const AGENT_CONFIG_PATTERN = /^agents\/([a-zA-Z0-9._-]+)\/config\.json$/;
+
+/**
+ * Sync agent file changes to Neon agent_registry.
+ * Fires on Write/Edit of agents/{slug}/config.json.
+ * This ensures Neon stays in sync when agents create other agents via native Write tool,
+ * without requiring the agent to emit metadata_sync events manually.
+ * Non-critical — errors are caught by the caller and logged as warnings.
+ */
+async function syncFileChangeToNeon(
+    entry: { tool_name: string; arguments?: Record<string, unknown> },
+    ctx: PipelineContext,
+): Promise<void> {
+    const args = entry.arguments;
+    if (!args) return;
+
+    const rawPath = typeof args.file_path === 'string' ? args.file_path
+        : typeof args.path === 'string' ? args.path
+        : undefined;
+    if (!rawPath) return;
+
+    const pathResult = validateWorkspacePath(rawPath);
+    if (!pathResult.valid) return;
+
+    const match = pathResult.normalized.match(AGENT_CONFIG_PATTERN);
+    if (!match) return;
+
+    const syncAction = entry.tool_name === 'Write' ? 'create' : 'update';
+    await reverseSyncToDB(syncAction, pathResult.normalized, null, ctx.request.userId);
+    log.debug('Neon agent_registry synced from tool_result', { path: pathResult.normalized, action: syncAction, user_id: ctx.request.userId });
+}
 
 function emitFileChangedFromToolCall(d: Record<string, unknown>, ctx: PipelineContext): void {
     const tc = assertToolCallData(d);

@@ -1,10 +1,7 @@
 // PreCompact Hook Tests
 // Tests for graduated context threshold steering and memory preservation before compaction
 
-import dotenv from 'dotenv';
-import path from 'path';
 
-dotenv.config({ path: path.join(__dirname, '..', '..', '..', '..', '..', '.env') });
 
 import {
     PreCompactHandler,

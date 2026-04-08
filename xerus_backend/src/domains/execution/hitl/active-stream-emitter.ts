@@ -6,15 +6,15 @@
 import { logger } from '../../../utils/logger';
 import type { HITLSSEEmitter } from './hitl.handler';
 import type { StreamEvent, StreamEventType } from '../types';
-import type { StreamingResponse } from '../streaming/stream.handler';
+import type { StreamSink } from '../streaming/stream.handler';
 
 const log = logger('ActiveStreamEmitter');
 
 export class ActiveStreamEmitter implements HITLSSEEmitter {
-    private streams = new Map<string, StreamingResponse>();
+    private streams = new Map<string, StreamSink>();
 
     /** Register an execution's stream. Call when execution starts. */
-    register(executionId: string, stream: StreamingResponse): void {
+    register(executionId: string, stream: StreamSink): void {
         this.streams.set(executionId, stream);
     }
 
