@@ -14,7 +14,7 @@ import {
 } from './errors';
 import { configToAgent, canUserView, canUserModify } from './agent-helpers';
 import type { DaytonaProvider } from '../sandbox-infra/sandbox/providers/daytona.provider';
-import { escapeSQL, executeWorkspaceJsonQuery } from '../conversations/workspace-db.helpers';
+import { escapeSQL, executeWorkspaceJsonQuery, executeWorkspaceQuery } from '../conversations/workspace-db.helpers';
 
 // -----------------------------------------------------------------------------
 // Types
@@ -173,6 +173,23 @@ export class AgentChannelService {
         const primarySlug = channelMap.get(primaryChannel)?.slug || '';
         await fs.updateIndexChannels(userId, entry.slug, channelMeta.domain_slug, primarySlug, slugs);
 
+        // Sync to channel_members table so GET /company/channels/:slug/agents works
+        const role = primaryChannel === channelSlug ? 'lead' : 'member';
+        const memberSql = `
+            INSERT OR IGNORE INTO channel_members (channel_slug, agent_slug, role)
+            VALUES ('${escapeSQL(channelSlug)}', '${escapeSQL(entry.slug)}', '${role}');
+        `;
+        await executeWorkspaceQuery(provider, sandboxId, memberSql).catch(() => {});
+
+        // Auto-set lead_agent_slug if channel has no lead yet.
+        // This ensures findChannelLead() can route messages to an agent.
+        const setLeadSql = `
+            UPDATE channels
+            SET lead_agent_slug = '${escapeSQL(entry.slug)}', updated_at = '${new Date().toISOString()}'
+            WHERE slug = '${escapeSQL(channelSlug)}' AND lead_agent_slug IS NULL;
+        `;
+        await executeWorkspaceQuery(provider, sandboxId, setLeadSql).catch(() => {});
+
         return {
             channels: this.toEntries(channelMap, channels, primaryChannel),
             primary_channel: primaryChannel,
@@ -216,6 +233,13 @@ export class AgentChannelService {
             ? (channelMap.get(channels[0])?.domain_slug || '')
             : undefined;
         await fs.updateIndexChannels(userId, entry.slug, domainSlug, primarySlug, slugs);
+
+        // Sync removal from channel_members table
+        const deleteSql = `
+            DELETE FROM channel_members
+            WHERE channel_slug = '${escapeSQL(channelSlug)}' AND agent_slug = '${escapeSQL(entry.slug)}';
+        `;
+        await executeWorkspaceQuery(provider, sandboxId, deleteSql).catch(() => {});
 
         return {
             channels: this.toEntries(channelMap, channels, primaryChannel),

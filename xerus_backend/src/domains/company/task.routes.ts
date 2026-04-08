@@ -1,8 +1,5 @@
-// Task Routes
-// REST API endpoints for the kanban task board.
-// Tasks live in workspace.db (SQLite on sandbox). Workspace DB is source of truth.
-// .beads/issues.jsonl is kept in sync for agent access via `bd` tool.
-// Frontend reads these to render the CompanyBoard kanban.
+// Task Routes — REST endpoints for the kanban task board.
+// Tasks live in workspace.db (SQLite). Beads JSONL kept in sync for agent access.
 
 import { Router, Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../../types';
@@ -17,13 +14,12 @@ import { shellEscape } from '../../utils/shell-safety';
 import { sanitizeSlug } from '../../shared/slugify';
 import { VALID_STATUSES, VALID_PRIORITIES } from './task.constants';
 import {
-    listTasks,
-    listTasksByChannel,
-    createTask,
-    updateTaskStatus,
-    resolveAgentsFromWorkspace,
+    listTasks, listTasksByChannel, createTask, getTask, updateTask, updateTaskStatus, resolveAgentsFromWorkspace,
+    listChannelDeliverables,
+    type WorkspaceTaskRow, type WorkspaceAgentRow, type UpdateTaskFields,
 } from './task-workspace-db.service';
-import type { WorkspaceTaskRow, WorkspaceAgentRow } from './task-workspace-db.service';
+import { createSystemEvent } from './company-workspace-db.service';
+import { strictRateLimit } from '../../middleware/rate-limit';
 import { logger } from '../../utils/logger';
 
 const log = logger('TaskRoutes');
@@ -31,17 +27,13 @@ const log = logger('TaskRoutes');
 const router = Router();
 const auth = authenticateFirebaseToken;
 
-// -------------------------------------------------------------------------
 // Dependency Injection (set from index.ts at startup)
-// -------------------------------------------------------------------------
 
 interface TaskRoutesDeps { sandboxService: SandboxService }
 let deps: TaskRoutesDeps | null = null;
 export function setTaskRoutesDeps(d: TaskRoutesDeps): void { deps = d; }
 
-// -------------------------------------------------------------------------
 // Helpers
-// -------------------------------------------------------------------------
 
 function getDeps(): TaskRoutesDeps {
     if (!deps) {
@@ -86,12 +78,7 @@ function formatTask(row: WorkspaceTaskRow, agentMap: Map<string, WorkspaceAgentR
     };
 }
 
-// -------------------------------------------------------------------------
-// Beads JSONL Write: append/update task in .beads/issues.jsonl
-// Agents read these via `bd` tool — keep in sync with workspace DB.
-// Best-effort: failures are logged, never block the API response.
-// -------------------------------------------------------------------------
-
+// Beads JSONL Write: keep .beads/issues.jsonl in sync (best-effort)
 function buildBeadsDir(channelTag: string): string {
     const parts = channelTag.split('/');
     if (parts.length >= 2) {
@@ -144,10 +131,7 @@ async function updateBeadsEntry(
     await provider.writeFile(sandboxId, issuesPath, updated.join('\n') + '\n');
 }
 
-// -------------------------------------------------------------------------
 // GET /api/v1/tasks - All tasks for user (company board)
-// -------------------------------------------------------------------------
-
 router.get('/tasks', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const startTime = res.locals.startTime || Date.now();
     try {
@@ -176,11 +160,7 @@ router.get('/tasks', auth, async (req: AuthenticatedRequest, res: Response, next
     }
 });
 
-// -------------------------------------------------------------------------
 // GET /api/v1/channels/:channelId/tasks - Tasks for one channel
-// channelId is now a project_slug (e.g. "domain-slug/channel-slug")
-// -------------------------------------------------------------------------
-
 router.get('/channels/:channelId/tasks', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const startTime = res.locals.startTime || Date.now();
     try {
@@ -210,11 +190,9 @@ router.get('/channels/:channelId/tasks', auth, async (req: AuthenticatedRequest,
     }
 });
 
-// -------------------------------------------------------------------------
 // POST /api/v1/channels/:channelId/tasks - Human creates task
-// -------------------------------------------------------------------------
 
-router.post('/channels/:channelId/tasks', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+router.post('/channels/:channelId/tasks', auth, strictRateLimit, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const startTime = res.locals.startTime || Date.now();
     try {
         const userId = req.user?.uid;
@@ -223,7 +201,7 @@ router.post('/channels/:channelId/tasks', auth, async (req: AuthenticatedRequest
         }
 
         const { channelId } = req.params;
-        const { title, description, priority, assigned_agents, labels } = req.body;
+        const { title, description, priority, assigned_agents, labels, due_date } = req.body;
 
         if (!title || typeof title !== 'string') {
             throw new BadRequestError('title is required');
@@ -240,10 +218,11 @@ router.post('/channels/:channelId/tasks', auth, async (req: AuthenticatedRequest
             ? assigned_agents[0]
             : null;
         const labelNames = Array.isArray(labels) ? labels : [];
+        const dueDate = typeof due_date === 'string' && due_date.trim() ? due_date.trim() : null;
 
         const row = await createTask(
             provider, sandboxId, beadsId, channelId, title,
-            description ?? null, taskPriority, assignedAgent, labelNames,
+            description ?? null, taskPriority, assignedAgent, labelNames, dueDate,
         );
 
         // Write to .beads/issues.jsonl for agent access via `bd` tool
@@ -260,6 +239,14 @@ router.post('/channels/:channelId/tasks', auth, async (req: AuthenticatedRequest
             log.warn('Beads JSONL sync failed for create', { error: err instanceof Error ? err.message : String(err) }),
         );
 
+        // System event: task created (and optionally assigned)
+        const assignedLabel = assignedAgent ? ` and assigned it to ${assignedAgent}` : '';
+        createSystemEvent(
+            provider, sandboxId, channelId,
+            `created task "${title}"${assignedLabel}`,
+            { event_type: 'task_created', task_id: beadsId },
+        ).catch(err => log.warn('System event failed', { error: err instanceof Error ? err.message : String(err) }));
+
         const allSlugs = row.assigned_agent ? [row.assigned_agent] : [];
         const agentMap = await resolveAgentsFromWorkspace(provider, sandboxId, allSlugs);
         sendResponse(res, 201, { task: formatTask(row, agentMap) }, startTime);
@@ -268,9 +255,131 @@ router.post('/channels/:channelId/tasks', auth, async (req: AuthenticatedRequest
     }
 });
 
-// -------------------------------------------------------------------------
+// GET /api/v1/tasks/:taskId - Single task detail
+
+router.get('/tasks/:taskId', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const startTime = res.locals.startTime || Date.now();
+    try {
+        const userId = req.user?.uid;
+        if (!userId) {
+            throw new UnauthorizedError();
+        }
+
+        const { taskId } = req.params;
+
+        const { sandboxService } = getDeps();
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
+
+        const row = await getTask(provider, sandboxId, taskId);
+        if (!row) {
+            throw new NotFoundError('Task');
+        }
+
+        const allSlugs = row.assigned_agent ? [row.assigned_agent] : [];
+        const agentMap = await resolveAgentsFromWorkspace(provider, sandboxId, allSlugs);
+        sendResponse(res, 200, { task: formatTask(row, agentMap) }, startTime);
+    } catch (err) {
+        next(err);
+    }
+});
+
+// PATCH /api/v1/tasks/:taskId - Update task fields
+
+router.patch('/tasks/:taskId', auth, strictRateLimit, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const startTime = res.locals.startTime || Date.now();
+    try {
+        const userId = req.user?.uid;
+        if (!userId) {
+            throw new UnauthorizedError();
+        }
+
+        const { taskId } = req.params;
+        const { title, description, priority, assigned_agent, labels, due_date, status } = req.body;
+
+        const fields: UpdateTaskFields = {};
+        if (title !== undefined) {
+            if (typeof title !== 'string' || !title.trim()) {
+                throw new BadRequestError('title must be a non-empty string');
+            }
+            fields.title = title.trim();
+        }
+        if (description !== undefined) {
+            fields.description = typeof description === 'string' ? description : null;
+        }
+        if (priority !== undefined) {
+            if (!VALID_PRIORITIES.has(priority)) {
+                throw new BadRequestError(`Invalid priority. Must be one of: ${[...VALID_PRIORITIES].join(', ')}`);
+            }
+            fields.priority = priority;
+        }
+        if (assigned_agent !== undefined) {
+            fields.assigned_agent = typeof assigned_agent === 'string' && assigned_agent.trim()
+                ? assigned_agent.trim()
+                : null;
+        }
+        if (labels !== undefined) {
+            fields.labels = Array.isArray(labels) ? labels : null;
+        }
+        if (due_date !== undefined) {
+            fields.due_date = typeof due_date === 'string' && due_date.trim()
+                ? due_date.trim()
+                : null;
+        }
+        if (status !== undefined) {
+            if (!VALID_STATUSES.has(status)) {
+                throw new BadRequestError(`Invalid status. Must be one of: ${[...VALID_STATUSES].join(', ')}`);
+            }
+            fields.status = status;
+        }
+
+        if (Object.keys(fields).length === 0) {
+            throw new BadRequestError('No valid fields to update');
+        }
+
+        const { sandboxService } = getDeps();
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
+
+        const row = await updateTask(provider, sandboxId, taskId, fields);
+        if (!row) {
+            throw new NotFoundError('Task');
+        }
+
+        // Sync status change to .beads/issues.jsonl
+        if (fields.status && row.project_slug) {
+            updateBeadsEntry(provider, sandboxId, row.project_slug, taskId, { status: fields.status }).catch(err =>
+                log.warn('Beads JSONL sync failed for task update', { error: err instanceof Error ? err.message : String(err) }),
+            );
+        }
+
+        // System events for meaningful task updates
+        if (row.project_slug) {
+            if (fields.assigned_agent) {
+                createSystemEvent(
+                    provider, sandboxId, row.project_slug,
+                    `assigned task "${row.title}" to ${fields.assigned_agent}`,
+                    { event_type: 'task_assigned', task_id: taskId, assigned_to: fields.assigned_agent },
+                ).catch(err => log.warn('System event failed', { error: err instanceof Error ? err.message : String(err) }));
+            }
+            if (fields.status) {
+                createSystemEvent(
+                    provider, sandboxId, row.project_slug,
+                    `moved task "${row.title}" to ${fields.status}`,
+                    { event_type: 'task_status_changed', task_id: taskId, new_status: fields.status },
+                ).catch(err => log.warn('System event failed', { error: err instanceof Error ? err.message : String(err) }));
+            }
+        }
+
+        const allSlugs = row.assigned_agent ? [row.assigned_agent] : [];
+        const agentMap = await resolveAgentsFromWorkspace(provider, sandboxId, allSlugs);
+        sendResponse(res, 200, { task: formatTask(row, agentMap) }, startTime);
+    } catch (err) {
+        next(err);
+    }
+});
+
 // POST /api/v1/tasks/:taskId/status - Update task status (drag-drop)
-// -------------------------------------------------------------------------
 
 router.post('/tasks/:taskId/status', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const startTime = res.locals.startTime || Date.now();
@@ -301,11 +410,61 @@ router.post('/tasks/:taskId/status', auth, async (req: AuthenticatedRequest, res
             updateBeadsEntry(provider, sandboxId, row.project_slug, taskId, { status }).catch(err =>
                 log.warn('Beads JSONL sync failed for status update', { error: err instanceof Error ? err.message : String(err) }),
             );
+
+            // System event: task status changed
+            const agentLabel = row.assigned_agent ? ` (${row.assigned_agent})` : '';
+            createSystemEvent(
+                provider, sandboxId, row.project_slug,
+                `moved task "${row.title}" to ${status}${agentLabel}`,
+                { event_type: 'task_status_changed', task_id: taskId, new_status: status },
+            ).catch(err => log.warn('System event failed', { error: err instanceof Error ? err.message : String(err) }));
         }
 
         const allSlugs = row.assigned_agent ? [row.assigned_agent] : [];
         const agentMap = await resolveAgentsFromWorkspace(provider, sandboxId, allSlugs);
         sendResponse(res, 200, { task: formatTask(row, agentMap) }, startTime);
+    } catch (err) {
+        next(err);
+    }
+});
+
+// GET /api/v1/channels/:channelId/deliverables - Deliverables for a channel
+router.get('/channels/:channelId/deliverables', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const startTime = res.locals.startTime || Date.now();
+    try {
+        const userId = req.user?.uid;
+        if (!userId) throw new UnauthorizedError();
+
+        const { channelId } = req.params;
+        const limit = Math.min(parseInt(req.query.limit as string, 10) || 50, 100);
+        const offset = Math.max(parseInt(req.query.offset as string, 10) || 0, 0);
+
+        const { sandboxService } = getDeps();
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
+
+        const result = await listChannelDeliverables(provider, sandboxId, channelId, limit, offset);
+
+        // Map to frontend-compatible shape
+        const deliverables = result.deliverables.map(d => {
+            const meta = d.metadata ? JSON.parse(d.metadata) : {};
+            return {
+                id: String(d.id),
+                filename: d.title,
+                file_type: d.output_type === 'code' ? 'code'
+                    : d.output_type === 'report' ? 'markdown'
+                    : d.output_type === 'data' ? 'other'
+                    : d.output_type as string,
+                content: d.content_preview ?? undefined,
+                author_slug: d.agent_slug,
+                file_size_bytes: meta.size ?? 0,
+                file_path: d.file_path ?? undefined,
+                description: d.description ?? undefined,
+                created_at: d.created_at,
+            };
+        });
+
+        sendResponse(res, 200, { deliverables }, startTime);
     } catch (err) {
         next(err);
     }

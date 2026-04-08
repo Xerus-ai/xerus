@@ -1,8 +1,9 @@
 'use client'
 
+import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { ArrowRight, Check, X, MessageSquare } from 'lucide-react'
+import { ArrowRight, Check, X, MessageSquare, Loader2 } from 'lucide-react'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import type { ChannelMessage } from './ChannelActivity'
@@ -27,7 +28,17 @@ function formatRelativeTime(dateString: string): string {
 }
 
 function getInitials(name: string): string {
+  // For multi-word names like "Research Rachel", use first letter of each word
+  const words = name.split(/[\s-]+/).filter(Boolean)
+  if (words.length >= 2) {
+    return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase()
+  }
   return name.charAt(0).toUpperCase()
+}
+
+/** Resolve display name: prefer sender_name from backend, fall back to sender_slug */
+function displayName(message: ChannelMessage): string {
+  return message.sender_name || message.sender_slug
 }
 
 // ---------------------------------------------------------------------------
@@ -44,19 +55,21 @@ export function PostMessage({
   const executionId = message.metadata?.execution_id as string | undefined
   const avatarUrl = message.metadata?.avatar_url as string | undefined
 
+  const name = displayName(message)
+
   return (
-    <div className="flex gap-3 py-3 px-2 group" role="article" aria-label={`Message from ${message.sender_slug}`}>
+    <div className="flex gap-3 py-3 px-2 group" role="article" aria-label={`Message from ${name}`}>
       <Avatar className="w-8 h-8 flex-shrink-0 ring-2 ring-white">
-        {avatarUrl ? <AvatarImage src={avatarUrl} alt={message.sender_slug} /> : null}
+        {avatarUrl ? <AvatarImage src={avatarUrl} alt={name} /> : null}
         <AvatarFallback className="text-xs text-text-secondary bg-surface-hover">
-          {getInitials(message.sender_slug)}
+          {getInitials(name)}
         </AvatarFallback>
       </Avatar>
 
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2 mb-1">
           <span className="text-sm font-medium text-text">
-            {message.sender_slug}
+            {name}
           </span>
           <span className="text-xs text-text-muted">
             {formatRelativeTime(message.created_at)}
@@ -83,16 +96,6 @@ export function PostMessage({
               <ArrowRight className="w-3 h-3" />
             </button>
           )}
-          <button
-            type="button"
-            className={cn(
-              'inline-flex items-center gap-1 text-xs text-text-muted hover:text-text-secondary font-medium',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded'
-            )}
-          >
-            <MessageSquare className="w-3 h-3" />
-            Reply in thread
-          </button>
         </div>
       </div>
     </div>
@@ -103,25 +106,100 @@ export function PostMessage({
 // EscalationMessage
 // ---------------------------------------------------------------------------
 
-export function EscalationMessage({ message }: { message: ChannelMessage }) {
+interface EscalationMessageProps {
+  message: ChannelMessage
+  onApprove?: (executionId: string) => Promise<void>
+  onReject?: (executionId: string) => Promise<void>
+  onDiscuss?: (executionId: string) => Promise<void>
+}
+
+type EscalationAction = 'approved' | 'rejected' | 'discussing' | null
+
+export function EscalationMessage({
+  message,
+  onApprove,
+  onReject,
+  onDiscuss,
+}: EscalationMessageProps) {
   const avatarUrl = message.metadata?.avatar_url as string | undefined
+  const executionId = message.metadata?.execution_id as string | undefined
+
+  // Track resolved action and in-flight state
+  const existingResolution = message.metadata?.resolution as EscalationAction | undefined
+  const [resolvedAction, setResolvedAction] = useState<EscalationAction>(existingResolution ?? null)
+  const [pendingAction, setPendingAction] = useState<EscalationAction>(null)
+
+  const isResolved = resolvedAction !== null
+  const isActionInFlight = pendingAction !== null
+
+  async function handleAction(
+    action: EscalationAction,
+    handler?: (executionId: string) => Promise<void>,
+  ) {
+    if (!executionId || !handler || isResolved || isActionInFlight) return
+    setPendingAction(action)
+    try {
+      await handler(executionId)
+      setResolvedAction(action)
+    } finally {
+      setPendingAction(null)
+    }
+  }
+
+  function renderActionButton(
+    action: EscalationAction,
+    label: string,
+    resolvedLabel: string,
+    icon: React.ReactNode,
+    handler: ((executionId: string) => Promise<void>) | undefined,
+    baseClassName: string,
+    resolvedClassName: string,
+  ) {
+    const isThisAction = resolvedAction === action
+    const isThisPending = pendingAction === action
+    const disabled = !executionId || isResolved || isActionInFlight
+
+    if (isResolved && !isThisAction) return null
+
+    return (
+      <button
+        type="button"
+        aria-label={isThisAction ? resolvedLabel : `${label} this escalation`}
+        disabled={disabled}
+        onClick={() => handleAction(action, handler)}
+        className={cn(
+          'inline-flex items-center gap-1.5 font-medium py-1.5 px-3 rounded-xl text-xs transition-colors',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+          isThisAction ? resolvedClassName : baseClassName,
+          disabled && !isThisAction && 'opacity-50 cursor-not-allowed',
+        )}
+      >
+        {isThisPending ? (
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+        ) : (
+          icon
+        )}
+        {isThisAction ? resolvedLabel : label}
+      </button>
+    )
+  }
 
   return (
     <div
       className="flex gap-3 py-3 px-2 border-l-4 border-l-orange-400 bg-orange-50/50 rounded-r-2xl"
       role="article"
-      aria-label={`Escalation from ${message.sender_slug}`}
+      aria-label={`Escalation from ${displayName(message)}`}
     >
       <Avatar className="w-8 h-8 flex-shrink-0 ring-2 ring-white">
-        {avatarUrl ? <AvatarImage src={avatarUrl} alt={message.sender_slug} /> : null}
+        {avatarUrl ? <AvatarImage src={avatarUrl} alt={displayName(message)} /> : null}
         <AvatarFallback className="text-xs text-text-secondary bg-surface-hover">
-          {getInitials(message.sender_slug)}
+          {getInitials(displayName(message))}
         </AvatarFallback>
       </Avatar>
 
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2 mb-1">
-          <span className="text-sm font-medium text-text">{message.sender_slug}</span>
+          <span className="text-sm font-medium text-text">{displayName(message)}</span>
           <span className="text-[10px] font-semibold uppercase tracking-widest text-orange-600">
             Needs Approval
           </span>
@@ -137,45 +215,42 @@ export function EscalationMessage({ message }: { message: ChannelMessage }) {
         </div>
 
         <div className="flex items-center gap-2 mt-3">
-          <button
-            type="button"
-            aria-label="Approve this escalation"
-            className={cn(
-              'inline-flex items-center gap-1.5',
-              'bg-primary hover:bg-primary/90 text-white font-medium py-1.5 px-3 rounded-xl text-xs',
-              'transition-colors active:scale-95',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
-            )}
-          >
-            <Check className="w-3.5 h-3.5" />
-            Approve
-          </button>
-          <button
-            type="button"
-            aria-label="Reject this escalation"
-            className={cn(
-              'inline-flex items-center gap-1.5',
-              'bg-surface-hover hover:bg-surface-pressed text-text font-medium py-1.5 px-3 rounded-xl text-xs',
-              'transition-colors active:scale-95',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
-            )}
-          >
-            <X className="w-3.5 h-3.5" />
-            Reject
-          </button>
-          <button
-            type="button"
-            aria-label="Discuss this escalation"
-            className={cn(
-              'inline-flex items-center gap-1.5',
-              'text-primary hover:bg-[#FFF4E6] font-medium py-1.5 px-3 rounded-xl text-xs',
-              'transition-colors active:scale-95',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
-            )}
-          >
-            <MessageSquare className="w-3.5 h-3.5" />
-            Discuss
-          </button>
+          {renderActionButton(
+            'approved',
+            'Approve',
+            'Approved',
+            <Check className="w-3.5 h-3.5" />,
+            onApprove,
+            cn(
+              'bg-primary hover:bg-primary/90 text-white',
+              'active:scale-95',
+            ),
+            'bg-emerald-500/10 text-emerald-700 cursor-default',
+          )}
+          {renderActionButton(
+            'rejected',
+            'Reject',
+            'Rejected',
+            <X className="w-3.5 h-3.5" />,
+            onReject,
+            cn(
+              'bg-surface-hover hover:bg-surface-pressed text-text',
+              'active:scale-95',
+            ),
+            'bg-red-500/10 text-red-700 cursor-default',
+          )}
+          {renderActionButton(
+            'discussing',
+            'Discuss',
+            'Discussion started',
+            <MessageSquare className="w-3.5 h-3.5" />,
+            onDiscuss,
+            cn(
+              'text-primary hover:bg-[#FFF4E6]',
+              'active:scale-95',
+            ),
+            'bg-blue-500/10 text-blue-700 cursor-default',
+          )}
         </div>
       </div>
     </div>
@@ -190,9 +265,9 @@ export function CoordinationMessage({ message }: { message: ChannelMessage }) {
   const target = (message.metadata?.target_agent as string) ?? ''
 
   return (
-    <div className="flex items-baseline gap-2 py-1 px-2 opacity-70" role="article" aria-label={`Coordination: ${message.sender_slug} to ${target}`}>
+    <div className="flex items-baseline gap-2 py-1 px-2 opacity-70" role="article" aria-label={`Coordination: ${displayName(message)} to ${target}`}>
       <span className="text-[13px] text-text-secondary font-medium">
-        {message.sender_slug}
+        {displayName(message)}
       </span>
       {target && (
         <>

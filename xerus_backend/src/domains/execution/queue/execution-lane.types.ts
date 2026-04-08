@@ -10,6 +10,7 @@ import { ExecutionStatus, CoordinationMode } from '../types';
 
 export const TRIGGER_PRIORITIES = {
     user_message: 1, // Highest - user is waiting
+    channel_message: 1, // Same priority as user_message - human sent in channel
     mention: 2, // User-initiated via @mention
     team: 3, // Another agent delegated
     schedule: 4, // Scheduled trigger

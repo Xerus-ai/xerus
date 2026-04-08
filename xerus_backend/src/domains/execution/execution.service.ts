@@ -3,7 +3,7 @@
 // See: docs/planning/execution/EXECUTION_ARCHITECTURE_v2.md Section 10
 
 import { randomUUID } from 'crypto';
-import type { StreamingResponse } from './streaming/stream.handler';
+import type { StreamSink } from './streaming/stream.handler';
 import {
     loadAgent,
     acquireExecutionLane,
@@ -16,7 +16,7 @@ import {
     updateSessionRecord,
     buildSummary,
     resolveConversation,
-    resolveAdapterType,
+    resolveAgentConfig,
     resolveAgentIdentity,
 } from './execution-pipeline';
 import { requireAgent } from './pipeline-guards';
@@ -48,6 +48,8 @@ import { createAnnounceQueueService } from './queue/announce-queue.service';
 import { createWorkspaceInboxWriter } from './queue/database-inbox-writer';
 import { checkHookHealth } from '../sandbox-infra/sandbox/hook-health';
 import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
+import { createChannelMessage } from '../company/company-workspace-db.service';
+import { syncMessageToSandbox } from '../company/channel-execution.service';
 
 const log = logger('ExecutionService');
 // -----------------------------------------------------------------------------
@@ -72,7 +74,7 @@ function getApiKeyLookup(): UserApiKeyLookup {
 interface ActiveExecution {
     handle: SessionHandle;
     agentSlug: string;
-    stream: StreamingResponse;
+    stream: StreamSink;
 }
 
 export class ExecutionService {
@@ -96,7 +98,18 @@ export class ExecutionService {
                 'ExecutionService runtime deps not initialized. hitlHandler must be set before execution.',
             );
         }
-        return { sdkService, sandboxService, queueService, creditTracker, db, memorySearchIndex: memorySearchIndex ?? null, messageBridge: messageBridge ?? null, hitlHandler, activeStreamEmitter: activeStreamEmitter ?? null };
+        // Bind triggerAgentExecution callback so runner-event-router can trigger
+        // execution for @mentioned agents without circular dep on ExecutionService
+        const self = this;
+        const triggerAgentExecution = async (userId: string, agentSlug: string, message: string, channelSlug: string) => {
+            const { triggerChannelExecution } = await import('../company/channel-execution.service');
+            const provider = sandboxService.getProvider() as import('../sandbox-infra/sandbox/providers/daytona.provider').DaytonaProvider;
+            const status = await sandboxService.getSandboxStatus(userId);
+            if (!status.sandboxId || status.status !== 'running') return;
+            await triggerChannelExecution(self, provider, status.sandboxId, userId, agentSlug, message, channelSlug);
+        };
+
+        return { sdkService, sandboxService, queueService, creditTracker, db, memorySearchIndex: memorySearchIndex ?? null, messageBridge: messageBridge ?? null, hitlHandler, activeStreamEmitter: activeStreamEmitter ?? null, triggerAgentExecution };
     }
 
     async startExecution(options: StartExecutionOptions): Promise<void> {
@@ -205,20 +218,22 @@ export class ExecutionService {
             ctx.sdkSessionId = conversation.sdkSessionId;
             log.debug('Conversation resolved', { execution_id: executionId, duration_ms: Date.now() - startedAt, has_sdk_session: !!ctx.sdkSessionId });
 
-            // Resolve adapter_type and agent identity from sandbox filesystem
+            // Resolve adapter_type, model, and agent identity from sandbox filesystem
             const agentForTracking = requireAgent(ctx);
-            const [adapterType, agentIdentity] = await Promise.all([
-                resolveAdapterType(resolved, ctx.sandboxId, agentForTracking.slug),
+            const [agentConfig, agentIdentity] = await Promise.all([
+                resolveAgentConfig(resolved, ctx.sandboxId, agentForTracking.slug),
                 resolveAgentIdentity(resolved, ctx.sandboxId, agentForTracking.slug),
             ]);
-            agentForTracking.adapter_type = adapterType;
-            log.debug('Agent resolved', { execution_id: executionId, duration_ms: Date.now() - startedAt, adapter_type: adapterType, has_identity: agentIdentity.length > 0 });
+            agentForTracking.adapter_type = agentConfig.adapterType;
+            if (agentConfig.model) agentForTracking.ai_model = agentConfig.model;
+            log.debug('Agent resolved', { execution_id: executionId, duration_ms: Date.now() - startedAt, adapter_type: agentConfig.adapterType, model: agentConfig.model, has_identity: agentIdentity.length > 0 });
 
             // Create per-agent session (direct CLI, no cli-executor middleman)
             log.debug('Getting/creating agent session', { execution_id: executionId, duration_ms: Date.now() - startedAt, agent_slug: agentForTracking.slug });
             const handle = await resolved.sandboxService.getOrCreateRunner(
                 request.userId, ctx.sandboxId, runnerEnvVars,
-                agentForTracking.slug, adapterType, agentIdentity || undefined,
+                agentForTracking.slug, agentConfig.adapterType, agentIdentity || undefined,
+                agentConfig.model, ctx.sdkSessionId || undefined,
             );
             ctx.sessionHandle = handle;
             log.debug('Agent session ready', { execution_id: executionId, duration_ms: Date.now() - startedAt, session_id: handle.sessionId });
@@ -268,6 +283,43 @@ export class ExecutionService {
             log.info('Streaming runner events', { execution_id: executionId });
             await streamRunnerEvents(handle, ctx, resolved);
             log.info('Stream completed', { execution_id: executionId });
+
+            // Channel message routing: write agent response to channel_messages
+            // so it appears in the /inbox activity feed (not just /chat).
+            const channelSlug = ctx.request.context?.channel_slug as string | undefined;
+            if (ctx.triggerType === 'channel_message' && channelSlug && ctx.responseText && ctx.sandboxId) {
+                const agentSlug = ctx.agent?.slug || ctx.request.agentSlug;
+                log.info('Writing agent response to channel_messages', {
+                    channel: channelSlug, agent: agentSlug, length: ctx.responseText.length,
+                });
+
+                // Join response chunks if responseText is empty but chunks exist
+                const responseText = ctx.responseText || ctx.responseChunks.join('');
+                if (responseText) {
+                    await createChannelMessage(
+                        daytonaProvider, ctx.sandboxId,
+                        channelSlug, 'agent', agentSlug,
+                        responseText, 'post', {},
+                    ).catch(err => log.warn('Failed to write agent response to channel_messages', {
+                        error: err instanceof Error ? err.message : String(err),
+                    }));
+
+                    // Also sync to posts.jsonl for agent IPC
+                    const parts = channelSlug.split('--');
+                    if (parts.length === 2) {
+                        const channelTag = `${parts[0]}/${parts[1]}`;
+                        syncMessageToSandbox(resolved.sandboxService, request.userId, channelTag, {
+                            sender_type: 'agent',
+                            sender_slug: agentSlug,
+                            content: responseText,
+                            message_type: 'post',
+                            posted_at: new Date().toISOString(),
+                        }).catch(err => log.warn('Failed to sync agent response to posts.jsonl', {
+                            error: err instanceof Error ? err.message : String(err),
+                        }));
+                    }
+                }
+            }
 
             // Drain any queued subagent announcements before finalizing
             if (ctx.announceQueue && ctx.announceQueue.getQueueSize() > 0) {

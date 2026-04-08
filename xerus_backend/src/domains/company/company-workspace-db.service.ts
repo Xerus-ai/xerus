@@ -131,6 +131,32 @@ export async function createChannel(
     return rows[0];
 }
 
+export async function updateChannel(
+    provider: DaytonaProvider,
+    sandboxId: string,
+    channelSlug: string,
+    updates: { name?: string; description?: string },
+): Promise<ChannelRow | null> {
+    const setClauses: string[] = [];
+    if (updates.name !== undefined) {
+        setClauses.push(`name = '${escapeSQL(updates.name)}'`);
+    }
+    if (updates.description !== undefined) {
+        setClauses.push(`description = '${escapeSQL(updates.description)}'`);
+    }
+    if (setClauses.length === 0) return null;
+
+    const now = new Date().toISOString();
+    setClauses.push(`updated_at = '${now}'`);
+    const sql = `
+        UPDATE channels SET ${setClauses.join(', ')} WHERE slug = '${escapeSQL(channelSlug)}';
+        SELECT slug, name, domain_slug, lead_agent_slug, description, goals, config, created_at, updated_at
+        FROM channels WHERE slug = '${escapeSQL(channelSlug)}';
+    `;
+    const rows = await executeWorkspaceJsonQuery<ChannelRow>(provider, sandboxId, sql);
+    return rows[0] ?? null;
+}
+
 // -----------------------------------------------------------------------------
 // Channel Message Queries
 // -----------------------------------------------------------------------------
@@ -142,12 +168,17 @@ export async function listChannelMessages(
     limit: number,
     offset: number,
 ): Promise<ChannelMessageRow[]> {
+    // Sub-select with DESC to get latest N messages, then wrap in ASC for
+    // chronological display (oldest first, like Slack).
     const sql = `
-        SELECT id, channel_slug, agent_slug, content, message_type, metadata, posted_at
-        FROM channel_messages
-        WHERE channel_slug = '${escapeSQL(channelSlug)}'
-        ORDER BY posted_at DESC
-        LIMIT ${limit} OFFSET ${offset}
+        SELECT * FROM (
+            SELECT id, channel_slug, agent_slug, content, message_type, metadata, posted_at
+            FROM channel_messages
+            WHERE channel_slug = '${escapeSQL(channelSlug)}'
+            ORDER BY posted_at DESC
+            LIMIT ${limit} OFFSET ${offset}
+        ) sub
+        ORDER BY posted_at ASC
     `;
     return executeWorkspaceJsonQuery<ChannelMessageRow>(provider, sandboxId, sql);
 }
@@ -218,4 +249,52 @@ export async function getChannelWithDomain(
     `;
     const rows = await executeWorkspaceJsonQuery<{ channel_slug: string; domain_slug: string }>(provider, sandboxId, sql);
     return rows[0] ?? null;
+}
+
+// -----------------------------------------------------------------------------
+// System Events — insert system-type messages for channel activity feed
+// -----------------------------------------------------------------------------
+
+export async function createSystemEvent(
+    provider: DaytonaProvider,
+    sandboxId: string,
+    channelSlug: string,
+    content: string,
+    metadata?: Record<string, unknown>,
+): Promise<void> {
+    const now = new Date().toISOString();
+    const enrichedMetadata = { sender_type: 'system', ...metadata };
+    const metadataJson = JSON.stringify(enrichedMetadata);
+    const sql = `
+        INSERT INTO channel_messages (channel_slug, agent_slug, content, message_type, metadata, posted_at)
+        VALUES ('${escapeSQL(channelSlug)}', 'system', '${escapeSQL(content)}', 'system', '${escapeSQL(metadataJson)}', '${now}')
+    `;
+    await executeWorkspaceJsonQuery(provider, sandboxId, sql);
+}
+
+// -----------------------------------------------------------------------------
+// Channel Members
+// -----------------------------------------------------------------------------
+
+export interface ChannelMemberRow {
+    agent_slug: string;
+    agent_name: string;
+    agent_status: string;
+    role: string;
+}
+
+export async function listChannelAgents(
+    provider: DaytonaProvider,
+    sandboxId: string,
+    channelSlug: string,
+): Promise<ChannelMemberRow[]> {
+    const sql = `
+        SELECT cm.agent_slug, COALESCE(a.name, cm.agent_slug) AS agent_name,
+               COALESCE(a.status, 'idle') AS agent_status, cm.role
+        FROM channel_members cm
+        LEFT JOIN agents a ON a.slug = cm.agent_slug
+        WHERE cm.channel_slug = '${escapeSQL(channelSlug)}'
+        ORDER BY cm.role ASC, cm.joined_at ASC
+    `;
+    return executeWorkspaceJsonQuery<ChannelMemberRow>(provider, sandboxId, sql);
 }

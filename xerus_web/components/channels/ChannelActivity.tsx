@@ -1,13 +1,16 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { XerusLoader } from '@/components/common/XerusLoader'
 import { cn } from '@/lib/utils'
+import { apiPost } from '@/lib/api/client'
+import { toast } from '@/lib/toast'
 import { SystemEvent } from './SystemEvent'
 import { CoordinationGroup } from './CoordinationGroup'
 import { PostMessage, EscalationMessage, CoordinationMessage } from './activity-messages'
 import { MentionInput } from './MentionInput'
+import { SkillsRibbon } from './SkillsRibbon'
 import { ExecutionDetail } from './ExecutionDetail'
 import { useChannelMessages } from '@/hooks/useChannelData'
 import { getAssistants } from '@/lib/api/agents'
@@ -22,6 +25,7 @@ export interface ChannelMessage {
   channel_id: string
   sender_type: 'agent' | 'human' | 'system'
   sender_slug: string
+  sender_name?: string
   content: string
   message_type: 'post' | 'coordination' | 'system'
   metadata?: Record<string, unknown>
@@ -118,9 +122,10 @@ function groupMessages(messages: ChannelMessage[]): MessageGroup[] {
 // ---------------------------------------------------------------------------
 
 export function ChannelActivity({ channelId, className }: ChannelActivityProps) {
-  const { messages, isLoading, error, sendMessage } = useChannelMessages(channelId)
+  const { messages, isLoading, error, sendMessage, refetch } = useChannelMessages(channelId)
   const [viewingExecution, setViewingExecution] = useState<string | null>(null)
   const [channelAgents, setChannelAgents] = useState<Agent[]>([])
+  const insertRef = useRef<((text: string) => void) | null>(null)
 
   const [agentError, setAgentError] = useState<string | null>(null)
 
@@ -152,6 +157,55 @@ export function ChannelActivity({ channelId, className }: ChannelActivityProps) 
   const handleViewWork = useCallback((executionId: string) => {
     setViewingExecution(executionId)
   }, [])
+
+  // -----------------------------------------------------------------------
+  // Escalation HITL handlers
+  // -----------------------------------------------------------------------
+
+  const respondToExecution = useCallback(
+    async (executionId: string, response: 'approved' | 'rejected' | 'discuss', feedback?: string) => {
+      await apiPost(`/execute/${executionId}/respond`, { response, feedback })
+      // Silently refetch messages so the UI picks up any backend-side resolution metadata
+      refetch()
+    },
+    [refetch],
+  )
+
+  const handleApprove = useCallback(
+    async (executionId: string) => {
+      try {
+        await respondToExecution(executionId, 'approved')
+        toast.success('Escalation approved')
+      } catch {
+        toast.error('Failed to approve escalation', { description: 'Please try again.' })
+      }
+    },
+    [respondToExecution],
+  )
+
+  const handleReject = useCallback(
+    async (executionId: string) => {
+      try {
+        await respondToExecution(executionId, 'rejected')
+        toast.info('Escalation rejected')
+      } catch {
+        toast.error('Failed to reject escalation', { description: 'Please try again.' })
+      }
+    },
+    [respondToExecution],
+  )
+
+  const handleDiscuss = useCallback(
+    async (executionId: string) => {
+      try {
+        await respondToExecution(executionId, 'discuss')
+        toast.info('Discussion started')
+      } catch {
+        toast.error('Failed to start discussion', { description: 'Please try again.' })
+      }
+    },
+    [respondToExecution],
+  )
 
   const handleSend = useCallback(
     (content: string) => {
@@ -220,6 +274,9 @@ export function ChannelActivity({ channelId, className }: ChannelActivityProps) 
                     <EscalationMessage
                       key={group.message.id}
                       message={group.message}
+                      onApprove={handleApprove}
+                      onReject={handleReject}
+                      onDiscuss={handleDiscuss}
                     />
                   )
                 }
@@ -252,11 +309,18 @@ export function ChannelActivity({ channelId, className }: ChannelActivityProps) 
         </div>
       </ScrollArea>
 
+      {/* Skills ribbon above message input */}
+      <SkillsRibbon
+        channelSlug={channelId}
+        onSkillClick={(slug) => insertRef.current?.(`/${slug} `)}
+      />
+
       {/* Message input with @mention support */}
       <MentionInput
         agents={channelAgents}
         onSend={handleSend}
         placeholder="Message this channel..."
+        insertRef={insertRef}
       />
 
       {/* Execution detail slide-over */}

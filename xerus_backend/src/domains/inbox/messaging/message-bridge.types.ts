@@ -19,10 +19,27 @@ export interface ChannelMessageRow {
 }
 
 export type SenderType = 'agent' | 'human' | 'system';
-export type MessageType = 'chat' | 'task_update' | 'status' | 'system';
+// Workspace DB schema: CHECK(message_type IN ('post', 'coordination', 'system'))
+export type MessageType = 'post' | 'coordination' | 'system';
+
+// Runner events may use these legacy types — map to workspace DB types via toDbMessageType()
+export type RunnerMessageType = 'chat' | 'task_update' | 'status' | 'system' | 'post' | 'coordination';
 
 export const SENDER_TYPES: readonly SenderType[] = ['agent', 'human', 'system'] as const;
-export const MESSAGE_TYPES: readonly MessageType[] = ['chat', 'task_update', 'status', 'system'] as const;
+export const MESSAGE_TYPES: readonly MessageType[] = ['post', 'coordination', 'system'] as const;
+
+/** Map runner/API message types to workspace DB CHECK-constraint-safe values */
+export function toDbMessageType(type: string | undefined): MessageType {
+    switch (type) {
+        case 'system': return 'system';
+        case 'coordination': return 'coordination';
+        case 'post':
+        case 'chat':
+        case 'task_update':
+        case 'status':
+        default: return 'post';
+    }
+}
 
 // -----------------------------------------------------------------------------
 // Outbound: Runner -> Backend -> Frontend
@@ -34,7 +51,7 @@ export interface OutboundMessage {
     project: string;
     channel: string;
     content: string;
-    message_type?: MessageType;
+    message_type?: RunnerMessageType | MessageType | string;
     metadata?: Record<string, unknown>;
 }
 

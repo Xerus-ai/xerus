@@ -11,12 +11,15 @@ import { authenticateFirebaseToken } from '../../middleware/auth';
 import { query } from '../../database/connection';
 import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
 import type { SandboxService } from '../sandbox-infra/sandbox/sandbox.service';
-import type { DaytonaProvider } from '../sandbox-infra/sandbox/providers/daytona.provider';
 import { requireRunningSandbox, getDaytonaProvider } from '../sandbox-infra/sandbox/sandbox-route-helpers';
 import type { MessageBridgeService } from '../inbox/messaging/message-bridge.service';
-import { shellEscape, shellEscapePath } from '../../utils/shell-safety';
+import { findChannelLead } from '../inbox/messaging/message-bridge.repository';
+import type { ExecutionService } from '../execution/execution.service';
+import { triggerChannelExecution, syncMessageToSandbox } from './channel-execution.service';
+import { shellEscapePath } from '../../utils/shell-safety';
 import { slugify, sanitizeSlug } from '../../shared/slugify';
 import { strictRateLimit } from '../../middleware/rate-limit';
+import { executeWorkspaceJsonQuery as execWsQuery } from '../conversations/workspace-db.helpers';
 import {
     listDomainsWithChannels,
     createDomain,
@@ -25,6 +28,7 @@ import {
     createChannelMessage,
     domainExists,
     getChannelWithDomain,
+    updateChannel,
 } from './company-workspace-db.service';
 import { logger } from '../../utils/logger';
 
@@ -41,40 +45,13 @@ const auth = authenticateFirebaseToken;
 // Dependency Injection (set from index.ts at startup)
 // -------------------------------------------------------------------------
 
-interface CompanyRoutesDeps { sandboxService: SandboxService; messageBridge?: MessageBridgeService | null }
+interface CompanyRoutesDeps {
+    sandboxService: SandboxService;
+    messageBridge?: MessageBridgeService | null;
+    executionService?: ExecutionService | null;
+}
 let companyDeps: CompanyRoutesDeps | null = null;
 export function setCompanyRoutesDeps(d: CompanyRoutesDeps): void { companyDeps = d; }
-
-// -------------------------------------------------------------------------
-// Sandbox Dual-Write: append message to posts.jsonl
-// This is agent IPC (inter-process communication), not Neon sync.
-// -------------------------------------------------------------------------
-
-async function syncMessageToSandbox(
-    userId: string,
-    channelTag: string,
-    messageEntry: Record<string, unknown>,
-): Promise<void> {
-    if (!companyDeps) return;
-    const { sandboxService } = companyDeps;
-    const status = await sandboxService.getSandboxStatus(userId);
-    if (status.status !== 'running' || !status.sandboxId) return;
-
-    const provider = sandboxService.getProvider() as DaytonaProvider;
-    if (typeof provider.executeCommand !== 'function') return;
-
-    const parts = channelTag.split('/');
-    const domainSlug = sanitizeSlug(parts[0] || '');
-    const channelSlug = sanitizeSlug(parts[1] || '');
-    const postsDir = `${SANDBOX_CONFIG.workspacePath}/projects/${domainSlug}/channels/${channelSlug}`;
-    const postsPath = `${postsDir}/posts.jsonl`;
-
-    const jsonLine = JSON.stringify(messageEntry);
-    await provider.executeCommand(
-        status.sandboxId,
-        `mkdir -p ${shellEscapePath(postsDir)} && printf '%s\\n' ${shellEscape(jsonLine)} >> ${shellEscapePath(postsPath)}`,
-    );
-}
 
 // -------------------------------------------------------------------------
 // GET /api/v1/company/domains - List domains with nested channels
@@ -106,20 +83,26 @@ router.get('/domains', auth, async (req: AuthenticatedRequest, res: Response, ne
 
         const domainsWithChannels = await listDomainsWithChannels(provider, sandboxId);
 
-        // Map workspace DB shape to frontend-compatible response
-        const domains = domainsWithChannels.map(d => ({
-            id: d.slug,
-            slug: d.slug,
-            name: d.name,
-            description: d.description,
-            channels: d.channels.map(c => ({
-                id: c.slug,
-                slug: c.slug,
-                name: c.name,
-                description: c.description,
-                agent_count: 0,
-            })),
-        }));
+        // Map workspace DB shape to frontend-compatible response.
+        // Channel DB slugs are domain-scoped (e.g. "marketing--general").
+        // We provide both the full DB slug (as `id` for API calls) and a
+        // short URL-friendly slug (strip the domain prefix) for routing.
+        const domains = domainsWithChannels.map(d => {
+            const prefix = `${d.slug}--`;
+            return {
+                id: d.slug,
+                slug: d.slug,
+                name: d.name,
+                description: d.description,
+                channels: d.channels.map(c => ({
+                    id: c.slug,
+                    slug: c.slug.startsWith(prefix) ? c.slug.slice(prefix.length) : c.slug,
+                    name: c.name,
+                    description: c.description,
+                    agent_count: 0,
+                })),
+            };
+        });
 
         sendResponse(res, 200, { workspace, domains }, startTime);
     } catch (err) {
@@ -175,7 +158,10 @@ router.post('/domains', auth, strictRateLimit, async (req: AuthenticatedRequest,
         await provider.executeCommand(sandboxId, `mkdir -p ${shellEscapePath(domainDir)}`);
 
         // Auto-create #general channel in the new project
-        const channel = await createChannel(provider, sandboxId, slug, 'general', 'General', 'Default channel');
+        // Channel slug is domain-scoped (e.g. "marketing--general") to satisfy the
+        // channels.slug PRIMARY KEY uniqueness constraint.
+        const generalSlug = `${slug}--general`;
+        const channel = await createChannel(provider, sandboxId, slug, generalSlug, 'General', 'Default channel');
 
         // Create the channel directory on sandbox filesystem
         const channelDir = `${domainDir}/channels/general`;
@@ -235,15 +221,17 @@ router.post('/domains/:domainId/channels', auth, strictRateLimit, async (req: Au
             throw new NotFoundError('Project');
         }
 
-        const slug = slugify(name);
-        if (!slug) {
+        const nameSlug = slugify(name);
+        if (!nameSlug) {
             throw new BadRequestError('name must contain at least one alphanumeric character');
         }
+        // Channel slug is domain-scoped to satisfy channels.slug PRIMARY KEY uniqueness
+        const channelDbSlug = `${domainId}--${nameSlug}`;
         const description = (req.body.description as string || '').trim().slice(0, MAX_DESCRIPTION_LENGTH);
 
         let channel;
         try {
-            channel = await createChannel(provider, sandboxId, domainId, slug, name, description);
+            channel = await createChannel(provider, sandboxId, domainId, channelDbSlug, name, description);
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             if (msg.includes('UNIQUE constraint failed') || msg.includes('already exists')) {
@@ -253,17 +241,133 @@ router.post('/domains/:domainId/channels', auth, strictRateLimit, async (req: Au
         }
 
         // Create the channel directory on sandbox filesystem
-        const channelDir = `${SANDBOX_CONFIG.workspacePath}/projects/${sanitizeSlug(domainId)}/channels/${sanitizeSlug(slug)}`;
+        const channelDir = `${SANDBOX_CONFIG.workspacePath}/projects/${sanitizeSlug(domainId)}/channels/${sanitizeSlug(nameSlug)}`;
         await provider.executeCommand(sandboxId, `mkdir -p ${shellEscapePath(channelDir)}`);
 
         sendResponse(res, 201, {
             channel: {
                 id: channel.slug,
-                slug: channel.slug,
+                slug: nameSlug,
                 name: channel.name,
                 description: channel.description,
             },
         }, startTime);
+    } catch (err) {
+        next(err);
+    }
+});
+
+// -------------------------------------------------------------------------
+// PATCH /api/v1/company/channels/:channelId - Update channel name/description
+// -------------------------------------------------------------------------
+
+router.patch('/channels/:channelId', auth, strictRateLimit, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const startTime = res.locals.startTime || Date.now();
+    try {
+        const userId = req.user?.uid;
+        if (!userId) throw new UnauthorizedError();
+        if (!companyDeps) throw new Error('Company routes dependencies not initialized');
+        const { sandboxService } = companyDeps;
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
+
+        const { channelId } = req.params;
+        const { name, description } = req.body;
+        const updates: { name?: string; description?: string } = {};
+        if (typeof name === 'string' && name.trim()) updates.name = name.trim().slice(0, MAX_NAME_LENGTH);
+        if (typeof description === 'string') updates.description = description.trim().slice(0, MAX_DESCRIPTION_LENGTH);
+        if (Object.keys(updates).length === 0) throw new BadRequestError('No valid fields to update');
+
+        const updated = await updateChannel(provider, sandboxId, channelId, updates);
+        if (!updated) throw new NotFoundError('Channel');
+
+        const prefix = `${updated.domain_slug}--`;
+        sendResponse(res, 200, {
+            channel: {
+                id: updated.slug,
+                slug: updated.slug.startsWith(prefix) ? updated.slug.slice(prefix.length) : updated.slug,
+                name: updated.name,
+                description: updated.description,
+            },
+        }, startTime);
+    } catch (err) {
+        next(err);
+    }
+});
+
+// -------------------------------------------------------------------------
+// GET /api/v1/company/channels/:channelId/agents - List agents in channel
+// Queries Neon for all user agents, then checks each agent's filesystem
+// config to see if it has this channel assigned. Returns matching agents
+// with their Neon metadata (name, avatar, model, status).
+// -------------------------------------------------------------------------
+
+router.get('/channels/:channelId/agents', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const startTime = res.locals.startTime || Date.now();
+    try {
+        const userId = req.user?.uid;
+        if (!userId) throw new UnauthorizedError();
+        if (!companyDeps) throw new Error('Company routes dependencies not initialized');
+        const { sandboxService } = companyDeps;
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
+
+        const channelSlug = req.params.channelId;
+
+        // Get all agent slugs for this user from Neon agent_registry
+        const registryResult = await query<{ id: string; slug: string }>(
+            `SELECT id::text, slug FROM agent_registry
+             WHERE user_id = $1 AND agent_type IN ('private', 'public')
+             ORDER BY created_at DESC LIMIT 100`,
+            [userId],
+        );
+
+        // Get real-time agent statuses from workspace.db (updated by runner events)
+        const agentStatuses = new Map<string, string>();
+        try {
+            const statusRows = await execWsQuery<{ slug: string; status: string }>(
+                provider, sandboxId,
+                `SELECT slug, status FROM agents`,
+            );
+            for (const sr of statusRows) agentStatuses.set(sr.slug, sr.status);
+        } catch {
+            // workspace.db may not have agents table populated yet
+        }
+
+        // For each agent, read config.json from sandbox and check channel membership
+        const matchingAgents: Array<Record<string, unknown>> = [];
+        for (const row of registryResult.rows) {
+            try {
+                const configRaw = await provider.readFile(
+                    sandboxId,
+                    `${SANDBOX_CONFIG.workspacePath}/agents/${row.slug}/config.json`,
+                );
+                const config = JSON.parse(configRaw);
+                const agentChannels: string[] = config.channels || [];
+                if (agentChannels.includes(channelSlug)) {
+                    const tools: string[] = (config.tools as string[]) || [];
+                    const skills: string[] = (config.skills as string[]) || [];
+                    // Use workspace.db status (real-time from runner events) over config.json
+                    const liveStatus = agentStatuses.get(row.slug) || (config.status as string) || 'idle';
+                    matchingAgents.push({
+                        id: row.id,
+                        name: config.name || row.slug,
+                        slug: row.slug,
+                        avatar_url: config.mascot || config.avatar_url || null,
+                        ai_model: config.ai_model || config.model || null,
+                        adapter_type: config.adapter_type || null,
+                        status: liveStatus,
+                        description: config.description || null,
+                        tools,
+                        skills,
+                    });
+                }
+            } catch {
+                // Agent config not found on sandbox — skip
+            }
+        }
+
+        sendResponse(res, 200, { agents: matchingAgents }, startTime);
     } catch (err) {
         next(err);
     }
@@ -302,16 +406,50 @@ router.get('/channels/:channelId/messages', auth, async (req: AuthenticatedReque
 
         const rows = await listChannelMessages(provider, sandboxId, channelId, limit, offset);
 
+        // Collect unique agent slugs for name resolution
+        const agentSlugs = new Set<string>();
+        for (const r of rows) {
+            const parsed = r.metadata ? JSON.parse(r.metadata) : {};
+            if (parsed.sender_type !== 'human' && r.message_type !== 'system') {
+                agentSlugs.add(r.agent_slug);
+            }
+        }
+
+        // Resolve agent display names from workspace agent configs
+        const agentNames = new Map<string, string>();
+        for (const slug of agentSlugs) {
+            try {
+                const configRaw = await provider.readFile(
+                    sandboxId,
+                    `${SANDBOX_CONFIG.workspacePath}/agents/${slug}/config.json`,
+                );
+                const config = JSON.parse(configRaw);
+                if (config.name) agentNames.set(slug, config.name);
+            } catch {
+                // Agent config not found — sender_name will fall back to slug
+            }
+        }
+
         // Map workspace DB fields to frontend-compatible response shape
         const messages = rows.map(r => {
             const parsedMetadata = r.metadata ? JSON.parse(r.metadata) : {};
             const senderType = parsedMetadata.sender_type || (r.message_type === 'system' ? 'system' : 'agent');
             const { sender_type: _st, ...cleanMetadata } = parsedMetadata;
+
+            // Resolve display name: "You" for humans, agent name for agents, slug fallback
+            let senderName = r.agent_slug;
+            if (senderType === 'human') {
+                senderName = 'You';
+            } else if (agentNames.has(r.agent_slug)) {
+                senderName = agentNames.get(r.agent_slug)!;
+            }
+
             return {
                 id: String(r.id),
                 channel_id: r.channel_slug,
                 sender_type: senderType,
                 sender_slug: r.agent_slug,
+                sender_name: senderName,
                 content: r.content,
                 message_type: r.message_type,
                 metadata: cleanMetadata,
@@ -330,7 +468,7 @@ router.get('/channels/:channelId/messages', auth, async (req: AuthenticatedReque
 // NOTE: channelId is now a slug, not UUID.
 // -------------------------------------------------------------------------
 
-router.post('/channels/:channelId/messages', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+router.post('/channels/:channelId/messages', auth, strictRateLimit, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const startTime = res.locals.startTime || Date.now();
     try {
         const userId = req.user?.uid;
@@ -391,20 +529,100 @@ router.post('/channels/:channelId/messages', auth, async (req: AuthenticatedRequ
         };
 
         // Write to posts.jsonl for agent IPC (not Neon sync)
-        syncMessageToSandbox(userId, channelTag, messageEntry).catch(err =>
+        syncMessageToSandbox(sandboxService, userId, channelTag, messageEntry).catch(err =>
             log.warn('Sandbox sync failed for message', { error: err instanceof Error ? err.message : String(err) }),
         );
 
-        // Forward message to running agent's CLI stdin (best-effort, non-blocking)
-        if (companyDeps?.messageBridge) {
-            companyDeps.messageBridge.dispatchInbound(provider, sandboxId, {
-                user_id: userId,
-                channel_slug: channelId,
-                content: content.trim(),
-            }).catch(err =>
-                log.warn('Runner dispatch failed', { error: err instanceof Error ? err.message : String(err) }),
-            );
-        }
+        // Resolve target agent: @mention > channel lead > first channel member
+        // Then forward to running session or trigger new execution.
+        (async () => {
+            // 1. Parse @mention from human message content (e.g. "@strategist do X")
+            const mentionMatch = content.trim().match(/(?:^|[\s])@([a-zA-Z][a-zA-Z0-9_-]*)/);
+            let targetAgent = mentionMatch ? mentionMatch[1] : null;
+
+            // 2. Fall back to channel lead
+            if (!targetAgent) {
+                targetAgent = await findChannelLead(provider, sandboxId, channelId);
+            }
+
+            // 3. Fall back to first agent assigned to this channel via config.json
+            //    (channel_members table may be empty for pre-existing assignments)
+            if (!targetAgent) {
+                const { escapeSQL: esc } = await import('../conversations/workspace-db.helpers');
+
+                // First try channel_members table
+                const memberRows = await execWsQuery<{ agent_slug: string }>(
+                    provider, sandboxId,
+                    `SELECT agent_slug FROM channel_members WHERE channel_slug = '${esc(channelId)}' LIMIT 1`,
+                ).catch(() => [] as Array<{ agent_slug: string }>);
+
+                if (memberRows.length > 0) {
+                    targetAgent = memberRows[0].agent_slug;
+                } else {
+                    // Fallback: scan agent configs from filesystem (same source as GET /channels/:id/agents)
+                    const agentRegistry = await query<{ slug: string }>(
+                        `SELECT slug FROM agent_registry WHERE user_id = $1 AND agent_type IN ('private', 'public') ORDER BY created_at DESC LIMIT 50`,
+                        [userId],
+                    );
+                    for (const row of agentRegistry.rows) {
+                        try {
+                            const cfgRaw = await provider.readFile(
+                                sandboxId,
+                                `${SANDBOX_CONFIG.workspacePath}/agents/${row.slug}/config.json`,
+                            );
+                            const cfg = JSON.parse(cfgRaw);
+                            if (Array.isArray(cfg.channels) && cfg.channels.includes(channelId)) {
+                                targetAgent = row.slug;
+                                break;
+                            }
+                        } catch { /* skip */ }
+                    }
+                }
+
+                // Backfill lead_agent_slug so future messages route directly
+                if (targetAgent) {
+                    log.info('Auto-setting channel lead', { channel: channelId, agent: targetAgent });
+                    await execWsQuery(provider, sandboxId,
+                        `UPDATE channels SET lead_agent_slug = '${esc(targetAgent)}' WHERE slug = '${esc(channelId)}' AND lead_agent_slug IS NULL`,
+                    ).catch(() => {});
+                }
+            }
+
+            if (!targetAgent) {
+                log.debug('No agents in channel, skipping execution', { channel: channelId });
+                return;
+            }
+
+            log.info('Routing channel message to agent', { channel: channelId, target: targetAgent });
+
+            // Try forwarding to already-running agent session (dispatch-only, no DB write)
+            let dispatched = false;
+            if (companyDeps?.messageBridge) {
+                dispatched = await companyDeps.messageBridge.trySendToAgent(
+                    userId, targetAgent,
+                    channelInfo.domain_slug, channelInfo.channel_slug,
+                    'user', content.trim(),
+                );
+            }
+
+            // If no active session, trigger execution via execution service
+            if (!dispatched && companyDeps?.executionService) {
+                await triggerChannelExecution(
+                    companyDeps.executionService,
+                    provider,
+                    sandboxId,
+                    userId,
+                    targetAgent,
+                    content.trim(),
+                    channelId,
+                );
+            }
+        })().catch(err =>
+            log.warn('Channel agent dispatch failed', {
+                channel: channelId,
+                error: err instanceof Error ? err.message : String(err),
+            }),
+        );
 
         sendResponse(res, 201, {
             message: {
@@ -412,6 +630,7 @@ router.post('/channels/:channelId/messages', auth, async (req: AuthenticatedRequ
                 channel_id: channelId,
                 sender_type: 'human',
                 sender_slug: userId,
+                sender_name: 'You',
                 content: content.trim(),
                 message_type: resolvedType,
                 metadata: metadata ?? {},

@@ -13,6 +13,10 @@ import { resolveAgentParam } from './resolve-agent-param';
 import type { SandboxService } from '../sandbox-infra/sandbox/sandbox.service';
 import { getSharedFsRepo } from './routes';
 import { requireRunningSandbox, getDaytonaProvider } from '../sandbox-infra/sandbox/sandbox-route-helpers';
+import { createSystemEvent } from '../company/company-workspace-db.service';
+import { logger } from '../../utils/logger';
+
+const log = logger('AgentChannelsRoutes');
 
 // -----------------------------------------------------------------------------
 // Dependency Injection
@@ -78,6 +82,13 @@ router.post('/:id/channels', auth, async (req: AuthenticatedRequest, res: Respon
         const resolved = await resolveAgentParam(req.params.id, req.user.uid);
         const result = await agentChannelService.assignChannel(provider, sbId, resolved.id, channel_slug, req.user.uid);
 
+        // System event: agent joined channel
+        createSystemEvent(
+            provider, sbId, channel_slug,
+            `${resolved.slug ?? resolved.id} joined the channel`,
+            { event_type: 'agent_joined', agent_slug: resolved.slug ?? resolved.id },
+        ).catch(err => log.warn('System event failed', { error: err instanceof Error ? err.message : String(err) }));
+
         sendResponse(res, 201, result, startTime);
     } catch (err) {
         next(err);
@@ -96,6 +107,13 @@ router.delete('/:id/channels/:channelSlug', auth, async (req: AuthenticatedReque
 
         const resolved = await resolveAgentParam(req.params.id, req.user.uid);
         const result = await agentChannelService.removeChannel(provider, sbId, resolved.id, req.params.channelSlug, req.user.uid);
+
+        // System event: agent left channel
+        createSystemEvent(
+            provider, sbId, req.params.channelSlug,
+            `${resolved.slug ?? resolved.id} left the channel`,
+            { event_type: 'agent_left', agent_slug: resolved.slug ?? resolved.id },
+        ).catch(err => log.warn('System event failed', { error: err instanceof Error ? err.message : String(err) }));
 
         sendResponse(res, 200, result, startTime);
     } catch (err) {

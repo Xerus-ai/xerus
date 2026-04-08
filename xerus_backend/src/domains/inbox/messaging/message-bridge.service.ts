@@ -19,6 +19,7 @@ import type {
     QueryMessagesOptions,
     SessionDispatcher,
 } from './message-bridge.types';
+import { toDbMessageType } from './message-bridge.types';
 import {
     insertChannelMessage,
     queryChannelMessages,
@@ -72,13 +73,13 @@ export class MessageBridgeService {
             throw new ChannelNotFoundError(message.project, message.channel);
         }
 
-        // Store in workspace-DB
+        // Store in workspace-DB (map runner message_type to DB-safe value)
         const row = await insertChannelMessage(provider, sandboxId, {
             channel_slug: channel.slug,
             sender_type: 'agent',
             sender_slug: message.agent_slug,
             content: message.content,
-            message_type: message.message_type || 'chat',
+            message_type: toDbMessageType(message.message_type),
             metadata: message.metadata,
         });
 
@@ -110,9 +111,9 @@ export class MessageBridgeService {
         const stored = await insertChannelMessage(provider, sandboxId, {
             channel_slug: message.channel_slug,
             sender_type: 'human',
-            sender_slug: 'user',
+            sender_slug: 'human',
             content: message.content,
-            message_type: 'chat',
+            message_type: 'post',
         });
 
         // Determine target agent: explicit @mention or channel lead
@@ -149,6 +150,26 @@ export class MessageBridgeService {
     ): Promise<void> {
         const prompt = formatChannelPrompt(command.project, command.channel, command.sender, command.content);
         await handle.sendInput(prompt + '\n');
+    }
+
+    /**
+     * Dispatch-only: send a message to an agent's running session WITHOUT storing it.
+     * Use when the caller has already persisted the message to workspace-DB.
+     * Returns true if the agent had an active session and the message was sent.
+     */
+    async trySendToAgent(
+        userId: string,
+        agentSlug: string,
+        project: string,
+        channel: string,
+        sender: string,
+        content: string,
+    ): Promise<boolean> {
+        if (!this.sessionDispatcher) {
+            return false;
+        }
+        const prompt = formatChannelPrompt(project, channel, sender, content);
+        return this.sessionDispatcher.sendToAgent(userId, agentSlug, prompt);
     }
 
     /**

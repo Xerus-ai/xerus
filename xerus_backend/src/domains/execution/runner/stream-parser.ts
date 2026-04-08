@@ -132,10 +132,10 @@ export function parseClaudeStreamLine(
             const msg = (event as ClaudeAssistantEvent).message;
             if (!msg?.content) break;
 
-            // Accumulate usage from message-level
+            // Accumulate usage from message-level (guard against partial usage objects)
             if (msg.usage) {
-                acc.inputTokens += msg.usage.input_tokens;
-                acc.outputTokens += msg.usage.output_tokens;
+                acc.inputTokens += msg.usage.input_tokens ?? 0;
+                acc.outputTokens += msg.usage.output_tokens ?? 0;
             }
 
             for (const block of msg.content) {

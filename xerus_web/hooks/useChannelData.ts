@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { apiGet, apiPost } from '@/lib/api/client'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { apiGet, apiPost, apiPatch } from '@/lib/api/client'
 import { toast } from '@/lib/toast'
 import type { ChannelMessage } from '@/components/channels/ChannelActivity'
 import type { KanbanTask } from '@/components/common/TaskCard'
@@ -26,6 +26,8 @@ export interface Deliverable {
 // Channel Messages
 // ---------------------------------------------------------------------------
 
+const POLL_INTERVAL_MS = 5000
+
 interface UseChannelMessagesReturn {
   messages: ChannelMessage[]
   isLoading: boolean
@@ -38,26 +40,64 @@ export function useChannelMessages(channelId: string): UseChannelMessagesReturn 
   const [messages, setMessages] = useState<ChannelMessage[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const initialLoadDone = useRef(false)
 
-  const fetchMessages = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
+  const fetchMessages = useCallback(async (silent = false) => {
+    if (!silent) {
+      setIsLoading(true)
+      setError(null)
+    }
     try {
       const result = await apiGet<{ data?: { messages: ChannelMessage[] }; messages?: ChannelMessage[] }>(
         `/company/channels/${channelId}/messages`
       )
       // Backend wraps response in { success, data: { messages }, meta }
       const payload = result.data ?? result
-      setMessages(payload.messages ?? [])
+      const incoming = payload.messages ?? []
+
+      // Only update state if the message list actually changed
+      // Compare count + first ID + last ID to catch mid-list insertions
+      setMessages(prev => {
+        if (
+          prev.length === incoming.length &&
+          prev.length > 0 &&
+          prev[0].id === incoming[0]?.id &&
+          prev[prev.length - 1].id === incoming[incoming.length - 1]?.id
+        ) {
+          return prev // no change, keep same reference to avoid re-renders
+        }
+        return incoming
+      })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch messages')
+      // Only surface errors on initial load, not on silent polls
+      if (!silent) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch messages')
+      }
     } finally {
-      setIsLoading(false)
+      if (!silent) {
+        setIsLoading(false)
+      }
     }
   }, [channelId])
 
+  // Initial fetch
   useEffect(() => {
-    fetchMessages()
+    initialLoadDone.current = false
+    fetchMessages(false).then(() => {
+      initialLoadDone.current = true
+    })
+  }, [fetchMessages])
+
+  // Polling: silent refetch every POLL_INTERVAL_MS after initial load
+  // Pauses when browser tab is hidden to save bandwidth
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (initialLoadDone.current && document.visibilityState === 'visible') {
+        fetchMessages(true)
+      }
+    }, POLL_INTERVAL_MS)
+
+    return () => clearInterval(interval)
   }, [fetchMessages])
 
   const sendMessage = useCallback(async (content: string) => {
@@ -65,7 +105,8 @@ export function useChannelMessages(channelId: string): UseChannelMessagesReturn 
       id: `msg-${Date.now()}`,
       channel_id: channelId,
       sender_type: 'human',
-      sender_slug: 'you',
+      sender_slug: 'human',
+      sender_name: 'You',
       content,
       message_type: 'post',
       created_at: new Date().toISOString(),
@@ -90,18 +131,41 @@ export function useChannelMessages(channelId: string): UseChannelMessagesReturn 
     }
   }, [channelId])
 
-  return { messages, isLoading, error, sendMessage, refetch: fetchMessages }
+  return { messages, isLoading, error, sendMessage, refetch: () => fetchMessages(false) }
 }
 
 // ---------------------------------------------------------------------------
 // Channel Tasks
 // ---------------------------------------------------------------------------
 
+export interface CreateTaskPayload {
+  title: string
+  description?: string
+  priority?: 'low' | 'medium' | 'high' | 'critical'
+  assigned_agents?: string[]
+  labels?: string[]
+  due_date?: string
+  status?: string
+}
+
+export interface UpdateTaskPayload {
+  title?: string
+  description?: string | null
+  priority?: string
+  assigned_agent?: string | null
+  labels?: string[]
+  due_date?: string | null
+  status?: string
+}
+
 interface UseChannelTasksReturn {
   tasks: KanbanTask[]
   isLoading: boolean
   error: string | null
   updateTaskStatus: (taskId: string, newStatus: string) => Promise<void>
+  createTask: (channelId: string, payload: CreateTaskPayload) => Promise<KanbanTask | null>
+  updateTask: (taskId: string, payload: UpdateTaskPayload) => Promise<KanbanTask | null>
+  getTask: (taskId: string) => Promise<KanbanTask | null>
   refetch: () => void
 }
 
@@ -136,12 +200,66 @@ export function useChannelTasks(channelId: string): UseChannelTasksReturn {
     try {
       await apiPost(`/tasks/${taskId}/status`, { status: newStatus })
     } catch {
-      toast.error("Couldn't update that task — reverting", { description: 'Your changes could not be saved. The task has been restored.' })
+      toast.error("Couldn't update that task -- reverting", { description: 'Your changes could not be saved. The task has been restored.' })
       fetchTasks()
     }
   }, [fetchTasks])
 
-  return { tasks, isLoading, error, updateTaskStatus, refetch: fetchTasks }
+  const createTaskFn = useCallback(async (chId: string, payload: CreateTaskPayload): Promise<KanbanTask | null> => {
+    try {
+      const result = await apiPost<{ data?: { task: KanbanTask }; task?: KanbanTask }>(
+        `/channels/${chId}/tasks`,
+        payload,
+      )
+      const saved = result.data?.task ?? result.task ?? null
+      if (saved) {
+        setTasks(prev => [saved, ...prev])
+      }
+      return saved
+    } catch {
+      toast.error("Couldn't create that task", { description: 'Please try again.' })
+      return null
+    }
+  }, [])
+
+  const updateTaskFn = useCallback(async (taskId: string, payload: UpdateTaskPayload): Promise<KanbanTask | null> => {
+    try {
+      const result = await apiPatch<{ data?: { task: KanbanTask }; task?: KanbanTask }>(
+        `/tasks/${taskId}`,
+        payload,
+      )
+      const updated = result.data?.task ?? result.task ?? null
+      if (updated) {
+        setTasks(prev => prev.map(t => (t.id === taskId ? updated : t)))
+      }
+      return updated
+    } catch {
+      toast.error("Couldn't update that task", { description: 'Please try again.' })
+      return null
+    }
+  }, [])
+
+  const getTaskFn = useCallback(async (taskId: string): Promise<KanbanTask | null> => {
+    try {
+      const result = await apiGet<{ data?: { task: KanbanTask }; task?: KanbanTask }>(
+        `/tasks/${taskId}`,
+      )
+      return result.data?.task ?? result.task ?? null
+    } catch {
+      return null
+    }
+  }, [])
+
+  return {
+    tasks,
+    isLoading,
+    error,
+    updateTaskStatus,
+    createTask: createTaskFn,
+    updateTask: updateTaskFn,
+    getTask: getTaskFn,
+    refetch: fetchTasks,
+  }
 }
 
 // ---------------------------------------------------------------------------
