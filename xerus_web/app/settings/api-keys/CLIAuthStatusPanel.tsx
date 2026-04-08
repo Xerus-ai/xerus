@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Sparkles, Cpu, ExternalLink, Loader2, CheckCircle2, ArrowRight } from 'lucide-react'
+import { Sparkles, Cpu, ExternalLink, Loader2, CheckCircle2, ArrowRight, ClipboardPaste, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from '@/lib/toast'
 import { triggerCliLogin, completeCliLogin, getCliAuthStatus, type CliAuthStatus } from '@/lib/api/user'
@@ -24,10 +24,11 @@ export function CLIAuthStatusPanel({ cliAuthStatus, onStatusChange }: CLIAuthSta
       if (result.authUrl) {
         window.open(result.authUrl, '_blank', 'noopener,noreferrer')
         if (result.needsCode) {
-          // OAuth flow with code paste: open auth URL, show paste input
           setPendingAdapter(adapter)
           setAuthCode('')
-          toast.info('Authenticate in the opened tab, then paste the redirect URL below.')
+          toast.info('Authenticate in the opened tab, then paste the redirect URL below.', {
+            duration: 15000,
+          })
         } else {
           toast.success('Complete login in the opened tab', {
             description: 'Once authenticated, your status will update automatically.',
@@ -40,7 +41,10 @@ export function CLIAuthStatusPanel({ cliAuthStatus, onStatusChange }: CLIAuthSta
           }, 8000)
         }
       } else {
-        toast.info(result.message)
+        // Never show raw CLI output — give a clean actionable message
+        toast.error('Could not extract login URL from the CLI.', {
+          description: 'Try again, or use the API key option below instead.',
+        })
       }
     } catch {
       toast.error('Could not start login', {
@@ -48,6 +52,15 @@ export function CLIAuthStatusPanel({ cliAuthStatus, onStatusChange }: CLIAuthSta
       })
     } finally {
       setIsLoggingIn(null)
+    }
+  }
+
+  const handlePasteFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText()
+      if (text) setAuthCode(text.trim())
+    } catch {
+      toast.error('Could not read clipboard. Please paste manually.')
     }
   }
 
@@ -74,6 +87,7 @@ export function CLIAuthStatusPanel({ cliAuthStatus, onStatusChange }: CLIAuthSta
     }
   }
 
+  const pendingLabel = pendingAdapter === 'claudecode' ? 'Claude' : 'Codex'
   const claudeAuth = cliAuthStatus?.claudecode
   const codexAuth = cliAuthStatus?.codex
   const claudeConnected = claudeAuth?.authenticated && claudeAuth.method !== 'platform'
@@ -184,51 +198,88 @@ export function CLIAuthStatusPanel({ cliAuthStatus, onStatusChange }: CLIAuthSta
         </div>
       </div>
 
-      {/* Code paste input — shown after OAuth redirect fails (both Claude and Codex) */}
+      {/* Paste redirect URL — shown after OAuth redirect (both Claude and Codex) */}
       <AnimatePresence>
         {pendingAdapter && (
           <motion.div
-            className="mt-4 p-4 bg-amber-50/50 rounded-xl border border-amber-200/50"
+            className="mt-4 bg-white rounded-xl border border-surface-active/50 overflow-hidden"
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.2 }}
           >
-            <p className="text-xs text-text-secondary mb-2">
-              After authenticating, your browser will show a page that can&#39;t load.
-              Copy the <strong>full URL</strong> from the address bar and paste it below:
-            </p>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={authCode}
-                onChange={(e) => setAuthCode(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSubmitCode()}
-                placeholder="Paste the redirect URL here (http://localhost:...)"
-                className="flex-1 px-3 py-2 text-xs bg-white rounded-lg border border-surface-active/50 focus:outline-none focus:ring-1 focus:ring-amber-400 focus:border-amber-400"
-                disabled={isSubmittingCode}
-              />
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 pt-4 pb-2">
+              <div>
+                <h3 className="text-sm font-medium text-text">Complete {pendingLabel} Login</h3>
+                <p className="text-xs text-text-secondary mt-0.5">
+                  Paste the redirect URL from your browser to finish connecting.
+                </p>
+              </div>
               <button
-                onClick={handleSubmitCode}
-                disabled={isSubmittingCode || !authCode.trim()}
-                className="flex items-center gap-1.5 px-3 py-2 bg-text text-white rounded-lg hover:bg-text/90 disabled:opacity-50 transition-colors text-xs font-medium whitespace-nowrap"
+                onClick={() => { setPendingAdapter(null); setAuthCode(''); }}
+                className="p-1 rounded-md hover:bg-surface-active/50 transition-colors text-text-secondary"
               >
-                {isSubmittingCode ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <>
-                    Submit
-                    <ArrowRight className="w-3 h-3" />
-                  </>
-                )}
+                <X className="w-4 h-4" />
               </button>
             </div>
-            <button
-              onClick={() => { setPendingAdapter(null); setAuthCode(''); }}
-              className="mt-2 text-[10px] text-text-secondary/70 hover:text-text-secondary transition-colors"
-            >
-              Cancel
-            </button>
+
+            {/* Steps */}
+            <div className="px-4 pb-3">
+              <div className="flex flex-col gap-1.5 text-[11px] text-text-secondary">
+                <div className="flex items-start gap-2">
+                  <span className="w-4 h-4 rounded-full bg-surface-active/50 flex items-center justify-center text-[10px] font-medium text-text shrink-0 mt-px">1</span>
+                  <span>Sign in on the page that just opened</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="w-4 h-4 rounded-full bg-surface-active/50 flex items-center justify-center text-[10px] font-medium text-text shrink-0 mt-px">2</span>
+                  <span>You&#39;ll see a page that won&#39;t load — that&#39;s expected</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="w-4 h-4 rounded-full bg-amber-100 flex items-center justify-center text-[10px] font-medium text-amber-700 shrink-0 mt-px">3</span>
+                  <span className="font-medium text-text">Copy the full URL from the address bar and paste it below</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Input + actions */}
+            <div className="px-4 pb-4">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={authCode}
+                  onChange={(e) => setAuthCode(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSubmitCode()}
+                  placeholder="http://localhost:1455/auth/callback?code=..."
+                  className="flex-1 px-3 py-2 text-xs bg-surface/50 rounded-lg border border-surface-active/50 focus:outline-none focus:ring-1 focus:ring-text/20 focus:border-text/30 font-mono"
+                  disabled={isSubmittingCode}
+                  autoFocus
+                />
+                <button
+                  onClick={handlePasteFromClipboard}
+                  disabled={isSubmittingCode}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-surface/50 rounded-lg border border-surface-active/50 hover:bg-surface-active/30 disabled:opacity-50 transition-colors text-xs font-medium text-text-secondary whitespace-nowrap"
+                  title="Paste from clipboard"
+                >
+                  <ClipboardPaste className="w-3.5 h-3.5" />
+                  Paste
+                </button>
+                <button
+                  onClick={handleSubmitCode}
+                  disabled={isSubmittingCode || !authCode.trim()}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-text text-white rounded-lg hover:bg-text/90 disabled:opacity-50 transition-colors text-xs font-medium whitespace-nowrap"
+                >
+                  {isSubmittingCode ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <>
+                      Connect
+                      <ArrowRight className="w-3 h-3" />
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

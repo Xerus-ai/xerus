@@ -246,10 +246,14 @@ export class CLIAuthService {
 
         try {
             const result = await provider.executeCommand(session.sandboxId, script);
-            // Strip ANSI escape codes from CLI output (color codes corrupt URLs)
-            const ESC = String.fromCharCode(0x1b);
-            const ansiPattern = new RegExp(ESC + '\\[[0-9;]*[a-zA-Z]', 'g');
-            const output = (result.result || '').replace(ansiPattern, '');
+            const rawOutput = result.result || '';
+
+            // Aggressively strip ALL non-printable/control characters except newline and space.
+            // CLI tools emit various ANSI escape sequences (CSI, OSC, SGR) that corrupt URL parsing.
+            // eslint-disable-next-line no-control-regex
+            const output = rawOutput.replace(/[\x00-\x09\x0B-\x1F\x7F]/g, '');
+
+            log.info('CLI auth output', { adapter, user_id: userId, raw_length: rawOutput.length, cleaned_length: output.length, cleaned_preview: output.substring(0, 200) });
 
             // Both CLIs: parse external auth URL + localhost port for code-paste flow.
             return this.parseOAuthOutput(output, userId, adapter);
@@ -274,10 +278,27 @@ export class CLIAuthService {
         // Extract ALL URLs from CLI output
         const allUrls = output.match(/https?:\/\/[^\s"'<>]+/g) || [];
 
+        log.info('Parsed URLs from CLI output', {
+            adapter,
+            user_id: userId,
+            url_count: allUrls.length,
+            urls: allUrls.map(u => u.substring(0, 80)),
+        });
+
         // Prefer external (non-localhost) HTTPS URLs — these are the OAuth authorization URLs.
         // Localhost URLs are the CLI's internal callback server (useless outside the sandbox).
-        const externalUrl = allUrls.find(u => !u.includes('localhost') && !u.includes('127.0.0.1'));
-        const localhostUrl = allUrls.find(u => u.includes('localhost') || u.includes('127.0.0.1'));
+        // IMPORTANT: Check the URL's hostname, NOT string contains — the external auth URL
+        // contains "localhost" inside its redirect_uri query parameter.
+        const isLocalhostUrl = (u: string): boolean => {
+            try {
+                const parsed = new URL(u);
+                return parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+            } catch {
+                return u.startsWith('http://localhost') || u.startsWith('http://127.0.0.1');
+            }
+        };
+        const externalUrl = allUrls.find(u => !isLocalhostUrl(u));
+        const localhostUrl = allUrls.find(u => isLocalhostUrl(u));
 
         // Extract redirect_uri and local port for later code delivery
         const redirectUri = externalUrl ? this.extractRedirectUri(externalUrl) : null;
@@ -325,34 +346,32 @@ export class CLIAuthService {
         }
 
         const pending = this.pendingAuth.get(`${userId}:${adapter}`);
-        if (!pending) {
-            return { success: false, message: 'No pending auth session. Click Login first to start the flow.' };
-        }
-
-        // Expire stale sessions (10 minutes)
-        if (Date.now() - pending.timestamp > 10 * 60 * 1000) {
-            this.pendingAuth.delete(`${userId}:${adapter}`);
-            return { success: false, message: 'Auth session expired. Please click Login again.' };
-        }
-
         const provider = this.sandboxService.getDaytonaProvider();
         const input = codeOrUrl.trim();
+
+        // Expire stale pending sessions (10 minutes)
+        if (pending && Date.now() - pending.timestamp > 10 * 60 * 1000) {
+            this.pendingAuth.delete(`${userId}:${adapter}`);
+        }
 
         try {
             // Determine the callback URL to hit inside the sandbox.
             // The user may paste:
-            //   (a) The full failed redirect URL: http://localhost:7775/oauth/callback?code=XYZ
+            //   (a) The full failed redirect URL: http://localhost:1455/auth/callback?code=XYZ
             //   (b) Just the code: ugWZFfyiMSIhfgJkHZO9ZapKLvGwSyRkvmKUGDcoe1tl4lfq
             let callbackUrl: string;
 
             if (input.startsWith('http://localhost') || input.startsWith('http://127.0.0.1')) {
-                // User pasted the full redirect URL — use it directly inside the sandbox
+                // User pasted the full redirect URL — use it directly inside the sandbox.
+                // No pending auth needed — the URL already contains the callback path and code.
                 callbackUrl = input;
-            } else {
-                // User pasted just the code — reconstruct the callback URL
+            } else if (pending) {
+                // User pasted just the code — reconstruct the callback URL from stored redirect_uri
                 const redirectUri = pending.redirectUri;
                 const separator = redirectUri.includes('?') ? '&' : '?';
                 callbackUrl = `${redirectUri}${separator}code=${encodeURIComponent(input)}`;
+            } else {
+                return { success: false, message: 'No pending auth session. Click Login first, or paste the full redirect URL (starting with http://localhost).' };
             }
 
             log.info('Delivering auth callback to sandbox', {

@@ -65,6 +65,8 @@ export async function installRunnerBundle(
     if (fs.existsSync(MCP_BUNDLE_PATH)) {
         const mcpContent = fs.readFileSync(MCP_BUNDLE_PATH, 'utf-8');
         await sandboxFs.writeFile(`${runnerDir}/mcp-server.js`, mcpContent);
+    } else {
+        log.error('MCP server bundle not found — platform tools will be unavailable. Run: npm run bundle:runner', { path: MCP_BUNDLE_PATH });
     }
 
     // Verify node_modules exists for pre-installed snapshots.

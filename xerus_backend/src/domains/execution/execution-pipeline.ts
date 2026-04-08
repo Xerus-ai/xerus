@@ -167,31 +167,48 @@ export async function loadAgent(
     };
 }
 
+export interface ResolvedAgentConfig {
+    adapterType: AdapterType;
+    model: string | undefined;
+}
+
 /**
- * Read agent's adapter_type from config.json on the sandbox filesystem.
- * Falls back to 'claudecode' if config is missing or unreadable.
+ * Read agent's adapter_type and model from config.json on the sandbox filesystem.
+ * Falls back to 'claudecode' and no model if config is missing or unreadable.
  * Must be called after sandbox is available (sandboxId resolved).
  */
+export async function resolveAgentConfig(
+    deps: ResolvedExecutionDeps,
+    sandboxId: string,
+    agentSlug: string,
+): Promise<ResolvedAgentConfig> {
+    try {
+        const configPath = `${SANDBOX_CONFIG.workspacePath}/agents/${agentSlug}/config.json`;
+        const raw = await deps.sandboxService.getDaytonaProvider().readFile(sandboxId, configPath);
+        const config = JSON.parse(raw) as { adapter_type?: string; model?: string };
+        return {
+            adapterType: config.adapter_type === 'codex' ? 'codex' : 'claudecode',
+            model: config.model || undefined,
+        };
+    } catch (err: unknown) {
+        // File not found is acceptable — default to claudecode, no model override
+        const message = err instanceof Error ? err.message : String(err);
+        if (message.includes('ENOENT') || message.includes('No such file') || message.includes('not found')) {
+            return { adapterType: 'claudecode', model: undefined };
+        }
+        // Config exists but is corrupt or unreadable — fail fast
+        throw err;
+    }
+}
+
+/** @deprecated Use resolveAgentConfig instead */
 export async function resolveAdapterType(
     deps: ResolvedExecutionDeps,
     sandboxId: string,
     agentSlug: string,
 ): Promise<AdapterType> {
-    try {
-        const configPath = `${SANDBOX_CONFIG.workspacePath}/agents/${agentSlug}/config.json`;
-        const raw = await deps.sandboxService.getDaytonaProvider().readFile(sandboxId, configPath);
-        const config = JSON.parse(raw) as { adapter_type?: string };
-        if (config.adapter_type === 'codex') return 'codex';
-        return 'claudecode';
-    } catch (err: unknown) {
-        // File not found is acceptable — default to claudecode
-        const message = err instanceof Error ? err.message : String(err);
-        if (message.includes('ENOENT') || message.includes('No such file') || message.includes('not found')) {
-            return 'claudecode';
-        }
-        // Config exists but is corrupt or unreadable — fail fast
-        throw err;
-    }
+    const config = await resolveAgentConfig(deps, sandboxId, agentSlug);
+    return config.adapterType;
 }
 
 /**

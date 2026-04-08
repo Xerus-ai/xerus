@@ -202,6 +202,42 @@ export async function createConversation(
     return rows[0];
 }
 
+/**
+ * Find an active conversation for an agent+channel combo, or create one.
+ * Channel conversations use a title prefix convention: "[channel:{slug}]"
+ * This ensures each agent+channel pair reuses the same conversation thread,
+ * preserving execution history and SDK session state across messages.
+ */
+export async function findOrCreateChannelConversation(
+    provider: DaytonaProvider,
+    sandboxId: string,
+    agentSlug: string,
+    channelSlug: string,
+): Promise<ConversationRow> {
+    const titlePrefix = `[channel:${escapeSQL(channelSlug)}]`;
+    // Escape LIKE metacharacters (% and _) to prevent pattern matching injection
+    const likePrefix = titlePrefix.replace(/%/g, '\\%').replace(/_/g, '\\_');
+
+    // Look for an existing active conversation for this agent+channel
+    const findSql = `
+        SELECT id, agent_slug, title, summary, message_count, sdk_session_id, status, created_at, updated_at
+        FROM conversations
+        WHERE agent_slug = '${escapeSQL(agentSlug)}'
+          AND title LIKE '${likePrefix}%' ESCAPE '\\'
+          AND status = 'active'
+        ORDER BY updated_at DESC
+        LIMIT 1
+    `;
+    const existing = await executeWorkspaceJsonQuery<ConversationRow>(provider, sandboxId, findSql);
+    if (existing[0]) {
+        return existing[0];
+    }
+
+    // Create a new conversation for this agent+channel
+    const title = `${titlePrefix} Channel conversation`;
+    return createConversation(provider, sandboxId, agentSlug, title);
+}
+
 export async function updateConversation(
     provider: DaytonaProvider,
     sandboxId: string,

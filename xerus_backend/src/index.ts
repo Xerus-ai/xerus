@@ -264,7 +264,7 @@ async function startServer(): Promise<void> {
         setAgentRoutesDeps({ sandboxService });
         setAgentChannelsDeps({ sandboxService });
         setTaskRoutesDeps({ sandboxService });
-        setCompanyRoutesDeps({ sandboxService, messageBridge });
+        setCompanyRoutesDeps({ sandboxService, messageBridge, executionService });
         setOnboardingDeps({ sandboxService });
         setUserRoutesDeps({ sandboxService });
 

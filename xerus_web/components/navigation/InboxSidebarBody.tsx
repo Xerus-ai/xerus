@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import { Plus, Hash, ChevronDown, ChevronRight, FolderOpen, Folder } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { apiCall } from '@/lib/api/client'
+import { toast } from '@/lib/toast'
 import { useDomains } from '@/hooks/useDomains'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
@@ -23,6 +24,12 @@ export function InboxSidebarBody({ counts, markRead, showNewRow, onNewRowDone }:
   const [newName, setNewName] = useState('')
   const [isCreating, setIsCreating] = useState(false)
   const newRowRef = useRef<HTMLInputElement>(null)
+
+  // Channel creation state
+  const [creatingChannelFor, setCreatingChannelFor] = useState<string | null>(null)
+  const [newChannelName, setNewChannelName] = useState('')
+  const [isCreatingChannel, setIsCreatingChannel] = useState(false)
+  const newChannelRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (domains.length > 0 && expandedDomains.size === 0) {
@@ -57,10 +64,37 @@ export function InboxSidebarBody({ counts, markRead, showNewRow, onNewRowDone }:
       setNewName('')
       onNewRowDone()
       await refreshDomains()
-    } catch (error) {
-      if (process.env.NODE_ENV === 'development') console.error(error)
+    } catch {
+      toast.error("Couldn't create project", { description: 'Please try again.' })
     } finally {
       setIsCreating(false)
+    }
+  }
+
+  // Focus channel input when it appears
+  useEffect(() => {
+    if (creatingChannelFor) {
+      setNewChannelName('')
+      setTimeout(() => newChannelRef.current?.focus(), 50)
+    }
+  }, [creatingChannelFor])
+
+  const handleCreateChannel = async (domainSlug: string) => {
+    const trimmed = newChannelName.trim()
+    if (!trimmed) return
+    setIsCreatingChannel(true)
+    try {
+      await apiCall(`/company/domains/${domainSlug}/channels`, {
+        method: 'POST',
+        body: JSON.stringify({ name: trimmed }),
+      })
+      setNewChannelName('')
+      setCreatingChannelFor(null)
+      await refreshDomains()
+    } catch {
+      toast.error("Couldn't create channel", { description: 'Please try again.' })
+    } finally {
+      setIsCreatingChannel(false)
     }
   }
 
@@ -163,6 +197,41 @@ export function InboxSidebarBody({ counts, markRead, showNewRow, onNewRowDone }:
                       </Link>
                     )
                   })}
+                  {creatingChannelFor === domain.slug ? (
+                    <div className="animate-[fadeInUp_0.15s_ease-out]">
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl">
+                        <Hash className="w-4 h-4 text-primary shrink-0" />
+                        <input
+                          ref={newChannelRef}
+                          value={newChannelName}
+                          onChange={(e) => setNewChannelName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleCreateChannel(domain.slug)
+                            if (e.key === 'Escape') { setCreatingChannelFor(null); setNewChannelName('') }
+                          }}
+                          onBlur={() => { if (!newChannelName.trim()) { setCreatingChannelFor(null); setNewChannelName('') } }}
+                          placeholder="Channel name..."
+                          disabled={isCreatingChannel}
+                          className="flex-1 bg-transparent border-none outline-none text-sm text-text placeholder:text-text-muted caret-primary"
+                        />
+                        <span className="text-[10px] text-text-muted bg-surface rounded px-1.5 py-0.5 shrink-0">&#8629;</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        if (!expandedDomains.has(domain.id)) {
+                          setExpandedDomains((prev) => new Set([...prev, domain.id]))
+                        }
+                        setCreatingChannelFor(domain.slug)
+                      }}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm text-text-muted hover:text-text-secondary hover:bg-surface-hover transition-colors w-full"
+                      aria-label={`Add channel to ${domain.name}`}
+                    >
+                      <Plus className="w-4 h-4 shrink-0" />
+                      <span>Add channel</span>
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

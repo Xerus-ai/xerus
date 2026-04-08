@@ -10,6 +10,7 @@ interface MentionInputProps {
   onSend: (content: string) => void
   placeholder?: string
   className?: string
+  insertRef?: React.MutableRefObject<((text: string) => void) | null>
 }
 
 const STATUS_DOT: Record<string, string> = {
@@ -24,8 +25,20 @@ export function MentionInput({
   onSend,
   placeholder = 'Message this channel...',
   className,
+  insertRef,
 }: MentionInputProps) {
   const [value, setValue] = useState('')
+
+  // Expose insert function so parent can add text to the input
+  useEffect(() => {
+    if (insertRef) {
+      insertRef.current = (text: string) => {
+        setValue(prev => prev + text)
+        setTimeout(() => textareaRef.current?.focus(), 0)
+      }
+    }
+    return () => { if (insertRef) insertRef.current = null }
+  }, [insertRef])
   const [focused, setFocused] = useState(false)
   const [showPicker, setShowPicker] = useState(false)
   const [query, setQuery] = useState('')

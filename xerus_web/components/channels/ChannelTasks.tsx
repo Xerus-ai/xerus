@@ -1,48 +1,173 @@
 'use client'
 
-import { useState, useCallback } from 'react'
-import { Plus, Loader2 } from 'lucide-react'
+import { useState, useCallback, useMemo } from 'react'
+import { Loader2 } from 'lucide-react'
 import { KanbanBoard } from '@/components/common/KanbanBoard'
 import type { KanbanTask } from '@/components/common/TaskCard'
+import { TaskPanel } from '@/components/channels/TaskPanel'
+import { FloatingPanelProvider } from '@/components/common/FloatingPanelContext'
 import { cn } from '@/lib/utils'
-import { apiCall } from '@/lib/api/client'
 import { useChannelTasks } from '@/hooks/useChannelData'
+import type { CreateTaskPayload } from '@/hooks/useChannelData'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 interface ChannelTasksProps {
   channelId: string
   className?: string
+  agents?: Array<{ id: string; name: string; slug: string }>
 }
 
-export function ChannelTasks({ channelId, className }: ChannelTasksProps) {
-  const { tasks, isLoading, error, updateTaskStatus, refetch } = useChannelTasks(channelId)
+// ---------------------------------------------------------------------------
+// Priority filter pills
+// ---------------------------------------------------------------------------
+
+const PRIORITY_FILTERS: readonly { value: string; label: string; color?: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'critical', label: 'Critical', color: '#EF4444' },
+  { value: 'high', label: 'High', color: '#F97316' },
+  { value: 'medium', label: 'Medium', color: '#EAB308' },
+  { value: 'low', label: 'Low', color: '#22C55E' },
+]
+
+// Map workspace DB status -> kanban column id
+const STATUS_MAP: Record<string, string> = {
+  open: 'todo',
+  in_progress: 'in_progress',
+  completed: 'done',
+  blocked: 'needs_approval',
+}
+
+// Map kanban column -> workspace DB status
+const COLUMN_TO_DB_STATUS: Record<string, string> = {
+  todo: 'open',
+  in_progress: 'in_progress',
+  done: 'completed',
+  needs_approval: 'blocked',
+}
+
+// ---------------------------------------------------------------------------
+// Filter Bar
+// ---------------------------------------------------------------------------
+
+function FilterBar({
+  priorityFilter, onPriorityChange, agentFilter, onAgentChange, agents,
+}: {
+  priorityFilter: string; onPriorityChange: (v: string) => void
+  agentFilter: string; onAgentChange: (v: string) => void
+  agents: { slug: string; name: string }[]
+}) {
+  return (
+    <div className="flex items-center gap-3 flex-wrap">
+      {PRIORITY_FILTERS.map((pf) => {
+        const isActive = priorityFilter === pf.value
+        return (
+          <button
+            key={pf.value}
+            onClick={() => onPriorityChange(pf.value)}
+            className={cn(
+              'px-5 py-2 rounded-full text-sm font-medium transition-all border',
+              isActive
+                ? 'bg-[#1C1917] text-white border-[#1C1917]'
+                : 'bg-transparent hover:bg-surface-hover text-text-secondary border-surface-active/50',
+            )}
+            style={isActive && pf.color ? { backgroundColor: pf.color, borderColor: pf.color } : undefined}
+          >
+            {pf.label}
+          </button>
+        )
+      })}
+
+      <Select value={agentFilter} onValueChange={onAgentChange}>
+        <SelectTrigger className="h-[38px] px-5 rounded-full border-surface-active/50 bg-transparent text-sm font-medium text-text-secondary gap-1.5 w-auto">
+          <SelectValue placeholder="Agent" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Agent</SelectItem>
+          {agents.map((a) => (
+            <SelectItem key={a.slug} value={a.slug}>{a.name}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Main Component
+// ---------------------------------------------------------------------------
+
+export function ChannelTasks({ channelId, className, agents = [] }: ChannelTasksProps) {
+  const { tasks, isLoading, error, updateTaskStatus, createTask, updateTask, refetch } = useChannelTasks(channelId)
+
+  const [priorityFilter, setPriorityFilter] = useState('all')
+  const [agentFilter, setAgentFilter] = useState('all')
+
+  // Panel state
+  const [panelMode, setPanelMode] = useState<'view' | 'create' | 'edit'>('view')
+  const [panelOpen, setPanelOpen] = useState(false)
+  const [selectedTask, setSelectedTask] = useState<KanbanTask | null>(null)
   const [isCreating, setIsCreating] = useState(false)
-  const [newTaskTitle, setNewTaskTitle] = useState('')
-  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [createDefaultStatus, setCreateDefaultStatus] = useState<string | undefined>(undefined)
+
+  const availableAgents = useMemo(() => {
+    const agentMap = new Map<string, { slug: string; name: string }>()
+    for (const task of tasks) {
+      if (task.assignedAgents) {
+        for (const agent of task.assignedAgents) {
+          if (!agentMap.has(agent.slug)) agentMap.set(agent.slug, { slug: agent.slug, name: agent.name })
+        }
+      }
+    }
+    return Array.from(agentMap.values())
+  }, [tasks])
+
+  const displayTasks = useMemo(() => {
+    return tasks
+      .map((t) => ({ ...t, status: STATUS_MAP[t.status] || t.status }))
+      .filter((t) => {
+        if (priorityFilter !== 'all' && t.priority !== priorityFilter) return false
+        if (agentFilter !== 'all' && !t.assignedAgents?.some((a) => a.slug === agentFilter)) return false
+        return true
+      })
+  }, [tasks, priorityFilter, agentFilter])
 
   const handleDragEnd = useCallback((taskId: string, newStatus: string) => {
-    updateTaskStatus(taskId, newStatus)
+    updateTaskStatus(taskId, COLUMN_TO_DB_STATUS[newStatus] || newStatus)
   }, [updateTaskStatus])
 
-  const handleTaskClick = useCallback((_task: KanbanTask) => {}, [])
+  const handleTaskClick = useCallback((task: KanbanTask) => {
+    setSelectedTask(task)
+    setPanelMode('view')
+    setPanelOpen(true)
+  }, [])
 
-  const handleCreateTask = async () => {
-    const title = newTaskTitle.trim()
-    if (!title) return
+  const handleColumnAdd = useCallback((columnId: string) => {
+    setCreateDefaultStatus(COLUMN_TO_DB_STATUS[columnId] || undefined)
+    setSelectedTask(null)
+    setPanelMode('create')
+    setPanelOpen(true)
+  }, [])
+
+  const handleCreateTask = useCallback(async (payload: CreateTaskPayload) => {
     setIsCreating(true)
     try {
-      await apiCall(`/channels/${channelId}/tasks`, {
-        method: 'POST',
-        body: JSON.stringify({ title }),
-      })
-      setNewTaskTitle('')
-      setShowCreateForm(false)
+      await createTask(channelId, payload)
       await refetch()
-    } catch {
-      // apiCall shows toast on error
     } finally {
       setIsCreating(false)
     }
-  }
+  }, [channelId, createTask, refetch])
+
+  const handleClosePanel = useCallback(() => {
+    setPanelOpen(false)
+    setSelectedTask(null)
+  }, [])
 
   if (isLoading) {
     return (
@@ -62,54 +187,39 @@ export function ChannelTasks({ channelId, className }: ChannelTasksProps) {
   }
 
   return (
-    <div className={cn('flex flex-col h-full', className)}>
-      <div className="flex items-center justify-between mb-4 px-1">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">
-          Channel Tasks
-        </p>
-        {showCreateForm ? (
-          <div className="flex items-center gap-2">
-            <input
-              autoFocus
-              value={newTaskTitle}
-              onChange={(e) => setNewTaskTitle(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleCreateTask(); if (e.key === 'Escape') setShowCreateForm(false) }}
-              placeholder="Task title"
-              disabled={isCreating}
-              className="px-3 py-1.5 rounded-xl bg-surface border border-surface-active text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary/40 w-48"
-            />
-            <button onClick={handleCreateTask} disabled={isCreating || !newTaskTitle.trim()} className="px-3 py-1.5 rounded-xl text-sm font-medium text-white bg-primary hover:bg-primary/90 disabled:opacity-50 transition-colors">
-              {isCreating ? '...' : 'Add'}
-            </button>
-            <button onClick={() => { setShowCreateForm(false); setNewTaskTitle('') }} className="px-2 py-1.5 rounded-xl text-sm text-text-muted hover:bg-surface-hover transition-colors">
-              Cancel
-            </button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setShowCreateForm(true)}
-            aria-label={`Create new task in channel ${channelId}`}
-            className={cn(
-              'inline-flex items-center gap-1.5',
-              'bg-primary hover:bg-primary/90 text-white font-medium py-2 px-4 rounded-xl text-sm',
-              'transition-colors active:scale-95',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
-            )}
-          >
-            <Plus className="w-4 h-4" />
-            New Task
-          </button>
-        )}
-      </div>
+    <FloatingPanelProvider>
+      <div className={cn('flex flex-col h-full', className)}>
+        <div className="flex-1 min-h-0 overflow-auto">
+          <KanbanBoard
+            tasks={displayTasks}
+            onDragEnd={handleDragEnd}
+            onTaskClick={handleTaskClick}
+            onColumnAdd={handleColumnAdd}
+            filters={
+              <FilterBar
+                priorityFilter={priorityFilter}
+                onPriorityChange={setPriorityFilter}
+                agentFilter={agentFilter}
+                onAgentChange={setAgentFilter}
+                agents={availableAgents}
+              />
+            }
+          />
+        </div>
 
-      <div className="flex-1 min-h-0 overflow-auto">
-        <KanbanBoard
-          tasks={tasks}
-          onDragEnd={handleDragEnd}
-          onTaskClick={handleTaskClick}
+        <TaskPanel
+          mode={panelMode}
+          task={selectedTask}
+          isOpen={panelOpen}
+          onClose={handleClosePanel}
+          onSubmit={handleCreateTask}
+          onUpdate={updateTask}
+          isSubmitting={isCreating}
+          defaultStatus={createDefaultStatus}
+          channelTag={channelId}
+          agents={agents}
         />
       </div>
-    </div>
+    </FloatingPanelProvider>
   )
 }
