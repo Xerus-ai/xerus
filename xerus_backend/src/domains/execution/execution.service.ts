@@ -100,13 +100,12 @@ export class ExecutionService {
         }
         // Bind triggerAgentExecution callback so runner-event-router can trigger
         // execution for @mentioned agents without circular dep on ExecutionService
-        const self = this;
         const triggerAgentExecution = async (userId: string, agentSlug: string, message: string, channelSlug: string) => {
             const { triggerChannelExecution } = await import('../company/channel-execution.service');
             const provider = sandboxService.getProvider() as import('../sandbox-infra/sandbox/providers/daytona.provider').DaytonaProvider;
             const status = await sandboxService.getSandboxStatus(userId);
             if (!status.sandboxId || status.status !== 'running') return;
-            await triggerChannelExecution(self, provider, status.sandboxId, userId, agentSlug, message, channelSlug);
+            await triggerChannelExecution(this, provider, status.sandboxId, userId, agentSlug, message, channelSlug);
         };
 
         return { sdkService, sandboxService, queueService, creditTracker, db, memorySearchIndex: memorySearchIndex ?? null, messageBridge: messageBridge ?? null, hitlHandler, activeStreamEmitter: activeStreamEmitter ?? null, triggerAgentExecution };
