@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils'
 import { apiPatch } from '@/lib/api/client'
 import { toast } from '@/lib/toast'
 import { Pencil, Plus, X, Loader2 } from 'lucide-react'
-import { AgentAvatarWithModel, ModelIcon } from '@/components/agents/AgentAvatar'
+import { AgentAvatarWithModel, ModelIcon, AdapterIcon } from '@/components/agents/AgentAvatar'
 import { formatModelName } from '@/utils/models'
 import { ChannelActivity } from './ChannelActivity'
 import { ChannelTasks } from './ChannelTasks'
@@ -252,6 +252,9 @@ export function ChannelHeader({
                               <div className="relative pb-1 shrink-0">
                                 <div className="w-10 h-10 rounded-xl overflow-hidden border border-surface-active bg-surface-hover">
                                   <AgentAvatarWithModel name={agent.name} avatarUrl={agent.avatar_url} model={agent.ai_model} hideBadge className="w-full h-full" />
+                                </div>
+                                <div className="absolute -top-1.5 -left-1.5 bg-white border border-blue-200 rounded-md p-0.5 shadow-sm z-20" title="Claude Code">
+                                  <img src="/icons/claudecode-color.svg" alt="" className="w-3.5 h-3.5 object-contain" />
                                 </div>
                                 {agent.ai_model && (
                                   <div className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 bg-white border border-surface-active rounded-md px-1 py-px shadow-sm flex items-center gap-0.5 z-10 whitespace-nowrap">

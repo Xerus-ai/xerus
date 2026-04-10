@@ -2,10 +2,10 @@
 
 import React from 'react'
 import type { Assistant } from "@/lib/api/types"
-import { AgentAvatarWithModel, ModelIcon } from './AgentAvatar'
+import { AgentAvatarWithModel, ModelIcon, AdapterIcon } from './AgentAvatar'
 import { Loader2, Lock, Users, Plus, Upload, Wrench, Settings, Copy, ArrowRight } from 'lucide-react'
 import { canCloneAgent, getAgentVisibilityClass } from "@/utils/agentLabels"
-import { formatModelName } from "@/utils/models"
+import { formatModelName, getAdapterIconPath } from "@/utils/models"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface AgentCardProps {
@@ -42,13 +42,17 @@ const AgentCardComponent = ({ agent, onClone, onChat, onClick, isCloning, isOwne
             {/* Header */}
             <div className="flex justify-between items-start mb-4">
                 {/* Icon with Model Badge */}
-                <div className="relative pb-2">
-                    <div className="w-16 h-16 rounded-2xl overflow-hidden border border-surface-active bg-surface-hover flex items-center justify-center">
+                <div className="relative pb-2 ml-1">
+                    <div className="w-16 h-16 rounded-2xl border border-surface-active bg-surface-hover flex items-center justify-center overflow-hidden">
                         <AgentAvatarWithModel agent={agent} hideBadge className="w-full h-full" />
+                    </div>
+                    {/* Claude Code adapter badge */}
+                    <div className="absolute -top-1.5 -left-1.5 bg-white border border-blue-200 rounded-md p-0.5 shadow-sm z-20" title="Claude Code">
+                        <img src="/icons/claudecode-color.svg" alt="Claude Code" className="w-4 h-4 object-contain" />
                     </div>
                     {/* Model Badge */}
                     {agent.model && (
-                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-white border border-surface-active rounded-md px-2 py-0.5 shadow-sm flex items-center gap-0.5 z-10 whitespace-nowrap">
+                        <div className="absolute -bottom-1 left-[calc(50%+4px)] -translate-x-1/2 bg-white border border-surface-active rounded-md px-2 py-0.5 shadow-sm flex items-center gap-0.5 z-10 whitespace-nowrap">
                             <ModelIcon model={agent.model} size="sm" />
                             <span className="text-[10px] font-bold text-text-secondary whitespace-nowrap">{formatModelName(agent.model)}</span>
                         </div>
@@ -106,12 +110,22 @@ const AgentCardComponent = ({ agent, onClone, onChat, onClick, isCloning, isOwne
                     )}
                     {/* Adapter Type Badge */}
                     {agent.adapter_type && (
-                        <div className={`flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${
+                        <div className={`flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${
                             agent.adapter_type === 'codex'
-                                ? 'text-green-700 bg-green-50 border-green-200'
+                                ? 'text-gray-400 bg-gray-50 border-gray-200'
                                 : 'text-blue-700 bg-blue-50 border-blue-200'
                         }`}>
-                            {agent.adapter_type === 'codex' ? 'CX' : 'CC'}
+                            {getAdapterIconPath(agent.adapter_type) && (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                    src={getAdapterIconPath(agent.adapter_type)!}
+                                    alt={agent.adapter_type}
+                                    className={`w-3 h-3 object-contain ${agent.adapter_type === 'codex' ? 'opacity-50' : ''}`}
+                                />
+                            )}
+                            {agent.adapter_type === 'codex' ? (
+                                <span>Codex <span className="text-[8px] font-normal italic">soon</span></span>
+                            ) : 'Claude Code'}
                         </div>
                     )}
                     {/* Visibility Badge */}

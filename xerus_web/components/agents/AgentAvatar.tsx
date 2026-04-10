@@ -4,36 +4,16 @@ import React from 'react'
 import type { Assistant } from "@/lib/api/types"
 import { isMascotConfig } from '@/lib/mascot-config'
 import { MascotAvatar } from './MascotAvatar'
+import { getModelIconPath } from '@/utils/models'
 
-const getModelIconPath = (modelName?: string): string | null => {
-    const modelLower = modelName?.toLowerCase();
-
-    if (modelLower?.includes('gpt') || modelLower?.includes('o1')) {
-        return '/icons/openai.svg';
-    }
-    if (modelLower?.includes('claude')) {
-        return '/icons/claude-color.svg';
-    }
-    if (modelLower?.includes('gemini')) {
-        return '/icons/gemini-color.svg';
-    }
-    if (modelLower?.includes('deepseek')) {
-        return '/icons/deepseek-color.svg';
-    }
-    if (modelLower?.includes('qwen')) {
-        return '/icons/qwen-color.svg';
-    }
-    if (modelLower?.includes('llama') || modelLower?.includes('ollama')) {
-        return '/icons/ollama.svg';
-    }
-    if (modelLower?.includes('perplexity')) {
-        return '/icons/perplexity-color.svg';
-    }
-    if (modelLower?.includes('codex')) {
-        return '/icons/openai.svg';
-    }
-
-    return null;
+// Claude Code adapter icon - shown inline left of model icon + name
+export const AdapterIcon = ({ size = 'sm' }: { size?: 'xs' | 'sm' | 'md' }) => {
+    const sizeClasses = { xs: 'w-2 h-2', sm: 'w-2.5 h-2.5', md: 'w-3.5 h-3.5' }
+    const s = sizeClasses[size]
+    return (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src="/icons/claudecode-color.svg" alt="Claude Code" className={`${s} object-contain`} />
+    )
 }
 
 // Model Icons Component using real SVG files
@@ -127,12 +107,13 @@ export const AgentAvatarWithModel = ({
                 </span>
             )}
 
-            {/* Model Badge Overlay */}
+            {/* Model Badge Overlay - bottom-right */}
             {(!hideBadge && resolvedModel && modelIconPath) && (
                 <div className="absolute -bottom-0.5 -right-0.5 bg-white border border-surface-active rounded-tl-lg px-1.5 py-0.5 shadow-sm flex items-center gap-1 z-10">
                     <ModelIcon model={resolvedModel} size="xs" />
                 </div>
             )}
+
         </div>
     )
 }

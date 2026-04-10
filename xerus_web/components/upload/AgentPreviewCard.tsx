@@ -4,6 +4,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Bot, Wrench, Shield } from 'lucide-react'
 import { ModelIcon } from '@/components/agents/AgentAvatar'
+import { formatModelName } from '@/utils/models'
 import type { AgentFrontmatter } from '@/lib/utils/parse-frontmatter'
 import { FileTreePreview, type FileEntry } from './FileTreePreview'
 
@@ -41,7 +42,7 @@ export function AgentPreviewCard({ frontmatter, markdownBody, files, warning }: 
             <div className="flex items-center gap-1.5 px-2 py-1 bg-white border border-surface-active rounded-lg shrink-0 ml-3">
               <ModelIcon model={ai_model} size="sm" />
               <span className="text-[10px] font-bold text-text-secondary max-w-[80px] truncate">
-                {ai_model.split('/').pop()}
+                {formatModelName(ai_model)}
               </span>
             </div>
           )}

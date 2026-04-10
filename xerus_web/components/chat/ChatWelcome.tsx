@@ -5,7 +5,8 @@ import Image from 'next/image'
 import {
   Wrench,
 } from 'lucide-react'
-import { ModelIcon } from '@/components/agents/AgentAvatar'
+import { ModelIcon, AdapterIcon } from '@/components/agents/AgentAvatar'
+import { formatModelName } from '@/utils/models'
 import { cn } from '@/lib/utils'
 import { Agent } from './types'
 import { XERUS_AGENT, XERUS_MASTER_SLUG } from './AgentDropdown'
@@ -304,10 +305,15 @@ function AgentProfileInline({ agent }: { agent: Agent }) {
             </span>
           )}
         </div>
+        {/* Claude Code adapter badge */}
+        <div className="absolute -top-1.5 -left-1.5 bg-white border border-blue-200 rounded-md p-0.5 shadow-sm z-20" title="Claude Code">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icons/claudecode-color.svg" alt="Claude Code" className="w-4 h-4 object-contain" />
+        </div>
         {agent.model && (
           <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 bg-white border border-surface-active rounded-md px-1.5 py-0.5 shadow-sm flex items-center gap-0.5 whitespace-nowrap">
             <ModelIcon model={agent.model} size="sm" />
-            <span className="text-[9px] font-bold text-text-secondary max-w-[50px] truncate">{agent.model}</span>
+            <span className="text-[9px] font-bold text-text-secondary max-w-[80px] truncate">{formatModelName(agent.model)}</span>
           </div>
         )}
       </div>

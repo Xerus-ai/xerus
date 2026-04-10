@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectGroup, SelectLabel, SelectSeparator } from "@/components/ui/select"
 import { Pencil, Globe, Lock } from 'lucide-react'
-import { ModelIcon } from '../AgentAvatar'
+import { ModelIcon, AdapterIcon } from '../AgentAvatar'
 import { isMascotConfig } from '@/lib/mascot-config'
 import { MascotAvatar } from '../MascotAvatar'
 import { useAuth } from '@/utils/AuthContext'
@@ -93,41 +93,22 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
 
     const handleModelChange = async (value: string) => {
         handleChange('model', value)
-        // Auto-detect adapter_type from the selected model's provider
-        const selectedModel = models.find(m => m.id === value)
-        let newAdapterType: AdapterType = localAgent.adapter_type || 'claudecode'
-        if (selectedModel) {
-            if (selectedModel.provider === 'anthropic') {
-                newAdapterType = 'claudecode'
-            } else if (selectedModel.provider === 'openai') {
-                newAdapterType = 'codex'
-            } else if (selectedModel.provider === 'openrouter') {
-                // Infer from model ID for OpenRouter models
-                const modelId = value.toLowerCase()
-                if (modelId.includes('claude') || modelId.includes('anthropic')) {
-                    newAdapterType = 'claudecode'
-                } else if (modelId.includes('gpt') || modelId.includes('openai') || modelId.includes('o1') || modelId.includes('o3')) {
-                    newAdapterType = 'codex'
-                }
-            }
-        }
-        if (newAdapterType !== localAgent.adapter_type) {
-            setLocalAgent(prev => ({ ...prev, adapter_type: newAdapterType }))
-            await onUpdate({ ai_model: value, adapter_type: newAdapterType })
+        // All models run through Claude Code adapter (Codex adapter coming soon)
+        const adapterType: AdapterType = 'claudecode'
+        if (adapterType !== localAgent.adapter_type) {
+            setLocalAgent(prev => ({ ...prev, adapter_type: adapterType }))
+            await onUpdate({ ai_model: value, adapter_type: adapterType })
         } else {
             await onUpdate({ ai_model: value })
         }
     }
 
-    // Group models by engine type for the selector
-    const claudeCodeModels = models.filter(m =>
-        m.provider === 'anthropic' || (m.provider === 'openrouter' && (m.id.toLowerCase().includes('claude') || m.id.toLowerCase().includes('anthropic')))
-    )
-    const codexModels = models.filter(m =>
-        m.provider === 'openai' || (m.provider === 'openrouter' && (m.id.toLowerCase().includes('gpt') || m.id.toLowerCase().includes('openai') || m.id.toLowerCase().includes('o1') || m.id.toLowerCase().includes('o3')))
-    )
-    const otherModels = models.filter(m =>
-        !claudeCodeModels.includes(m) && !codexModels.includes(m)
+    // Group models by provider for the selector
+    const anthropicModels = models.filter(m => m.provider === 'anthropic')
+    const openaiModels = models.filter(m => m.provider === 'openai')
+    const googleModels = models.filter(m => m.provider === 'google')
+    const remainingModels = models.filter(m =>
+        m.provider !== 'anthropic' && m.provider !== 'openai' && m.provider !== 'google'
     )
 
     return (
@@ -146,6 +127,11 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                         </span>
                     )}
                 </div>
+                {/* Claude Code adapter badge */}
+                <div className="absolute -top-2 -left-2 bg-white border border-blue-200 rounded-md p-0.5 shadow-sm z-20" title="Claude Code">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/icons/claudecode-color.svg" alt="Claude Code" className="w-5 h-5 object-contain" />
+                </div>
                 {/* Model Badge - positioned below avatar */}
                 {localAgent.model && (
                     isEditable ? (
@@ -163,10 +149,10 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                                     </SelectItem>
                                 ) : (
                                     <>
-                                        {claudeCodeModels.length > 0 && (
+                                        {anthropicModels.length > 0 && (
                                             <SelectGroup>
-                                                <SelectLabel className="text-[10px] font-semibold uppercase tracking-wide text-text-secondary/70 px-2 py-1">Claude Code</SelectLabel>
-                                                {claudeCodeModels.map((m) => (
+                                                <SelectLabel className="text-[10px] font-semibold uppercase tracking-wide text-text-secondary/70 px-2 py-1">Anthropic</SelectLabel>
+                                                {anthropicModels.map((m) => (
                                                     <SelectItem key={m.id} value={m.id}>
                                                         <div className="flex items-center gap-1.5">
                                                             <ModelIcon model={m.id} size="sm" />
@@ -176,12 +162,12 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                                                 ))}
                                             </SelectGroup>
                                         )}
-                                        {codexModels.length > 0 && (
+                                        {openaiModels.length > 0 && (
                                             <>
-                                                {claudeCodeModels.length > 0 && <SelectSeparator />}
+                                                {anthropicModels.length > 0 && <SelectSeparator />}
                                                 <SelectGroup>
-                                                    <SelectLabel className="text-[10px] font-semibold uppercase tracking-wide text-text-secondary/70 px-2 py-1">Codex</SelectLabel>
-                                                    {codexModels.map((m) => (
+                                                    <SelectLabel className="text-[10px] font-semibold uppercase tracking-wide text-text-secondary/70 px-2 py-1">OpenAI</SelectLabel>
+                                                    {openaiModels.map((m) => (
                                                         <SelectItem key={m.id} value={m.id}>
                                                             <div className="flex items-center gap-1.5">
                                                                 <ModelIcon model={m.id} size="sm" />
@@ -192,12 +178,28 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                                                 </SelectGroup>
                                             </>
                                         )}
-                                        {otherModels.length > 0 && (
+                                        {googleModels.length > 0 && (
                                             <>
-                                                {(claudeCodeModels.length > 0 || codexModels.length > 0) && <SelectSeparator />}
+                                                <SelectSeparator />
+                                                <SelectGroup>
+                                                    <SelectLabel className="text-[10px] font-semibold uppercase tracking-wide text-text-secondary/70 px-2 py-1">Google</SelectLabel>
+                                                    {googleModels.map((m) => (
+                                                        <SelectItem key={m.id} value={m.id}>
+                                                            <div className="flex items-center gap-1.5">
+                                                                <ModelIcon model={m.id} size="sm" />
+                                                                <span className="text-xs">{m.displayName.replace(/^[^:]+:\s*/, '')}</span>
+                                                            </div>
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectGroup>
+                                            </>
+                                        )}
+                                        {remainingModels.length > 0 && (
+                                            <>
+                                                <SelectSeparator />
                                                 <SelectGroup>
                                                     <SelectLabel className="text-[10px] font-semibold uppercase tracking-wide text-text-secondary/70 px-2 py-1">Other</SelectLabel>
-                                                    {otherModels.map((m) => (
+                                                    {remainingModels.map((m) => (
                                                         <SelectItem key={m.id} value={m.id}>
                                                             <div className="flex items-center gap-1.5">
                                                                 <ModelIcon model={m.id} size="sm" />
@@ -208,7 +210,7 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                                                 </SelectGroup>
                                             </>
                                         )}
-                                        {claudeCodeModels.length === 0 && codexModels.length === 0 && otherModels.length === 0 && (
+                                        {anthropicModels.length === 0 && openaiModels.length === 0 && googleModels.length === 0 && remainingModels.length === 0 && (
                                             <SelectItem value="__empty" disabled>
                                                 <span className="text-xs text-text-secondary">No models available</span>
                                             </SelectItem>
