@@ -377,7 +377,7 @@ export class CLIAuthService {
             log.info('Delivering auth callback to sandbox', {
                 adapter,
                 user_id: userId,
-                port: pending.localPort,
+                port: pending?.localPort,
                 callback_url_prefix: callbackUrl.substring(0, 60),
             });
 

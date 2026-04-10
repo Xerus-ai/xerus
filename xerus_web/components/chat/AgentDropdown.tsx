@@ -14,6 +14,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Agent } from './types'
 import { isMascotConfig } from '@/lib/mascot-config'
 import { MascotAvatar } from '@/components/agents/MascotAvatar'
+import { getModelIconPath } from '@/utils/models'
 
 export const XERUS_MASTER_SLUG = 'xerus-master'
 export const XERUS_CTO_SLUG = 'xerus-cto'
@@ -67,37 +68,8 @@ function AgentIcon({ agent, size = 20 }: { agent: Agent; size?: number }) {
   )
 }
 
-// Function to get model icon
-const getModelIcon = (model?: string): string | null => {
-  const modelLower = model?.toLowerCase() || ''
-
-  if (modelLower.includes('gpt') || modelLower.includes('o1')) {
-    return '/icons/openai.svg'
-  }
-  if (modelLower.includes('claude')) {
-    return '/icons/claude-color.svg'
-  }
-  if (modelLower.includes('gemini')) {
-    return '/icons/gemini-color.svg'
-  }
-  if (modelLower.includes('deepseek')) {
-    return '/icons/deepseek-color.svg'
-  }
-  if (modelLower.includes('qwen')) {
-    return '/icons/qwen-color.svg'
-  }
-  if (modelLower.includes('llama') || modelLower.includes('ollama')) {
-    return '/icons/ollama.svg'
-  }
-  if (modelLower.includes('perplexity')) {
-    return '/icons/perplexity-color.svg'
-  }
-  if (modelLower.includes('codex')) {
-    return '/icons/openai.svg'
-  }
-
-  return null
-}
+// Use centralized model icon mapping
+const getModelIcon = getModelIconPath
 
 export function AgentDropdown({
   agents,
@@ -162,6 +134,9 @@ export function AgentDropdown({
                   <div className="w-7 h-7 rounded-lg overflow-hidden">
                     <AgentIcon agent={display} size={28} />
                   </div>
+                  <div className="absolute -top-1 -left-1 bg-white border border-blue-200 rounded-md p-px shadow-sm z-20" title="Claude Code">
+                    <img src="/icons/claudecode-color.svg" alt="" className="w-3 h-3 object-contain" />
+                  </div>
                   {modelIcon && (
                     <div className="absolute -bottom-0.5 -right-0.5 bg-white rounded-full p-[1px]" title={display.model}>
                       <img
@@ -179,7 +154,7 @@ export function AgentDropdown({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[260px] p-0" align="start">
+      <PopoverContent className="w-[270px] p-0 overflow-visible" align="start">
         <div className="flex items-center border-b px-3">
           <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
           <Input
@@ -189,7 +164,7 @@ export function AgentDropdown({
             className="flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 border-none focus-visible:ring-0 px-0"
           />
         </div>
-        <ScrollArea className="h-[300px] p-1">
+        <ScrollArea className="h-[300px] p-1 pl-2.5">
           {/* Pinned main agents — always first */}
           {PINNED_AGENTS.map((pinnedAgent) => {
             const matchesSearch = !searchQuery || pinnedAgent.name.toLowerCase().includes(searchQuery.toLowerCase()) || (pinnedAgent.slug ?? '').toLowerCase().includes(searchQuery.toLowerCase())
@@ -215,6 +190,9 @@ export function AgentDropdown({
                   <div className="relative w-8 h-8">
                     <div className="w-8 h-8 rounded-xl overflow-hidden">
                       <AgentIcon agent={pinnedAgent} size={32} />
+                    </div>
+                    <div className="absolute -top-1 -left-1 bg-white border border-blue-200 rounded-md p-px shadow-sm z-20" title="Claude Code">
+                      <img src="/icons/claudecode-color.svg" alt="" className="w-3 h-3 object-contain" />
                     </div>
                     {getModelIcon(pinnedAgent.model) && (
                       <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-sm" title={pinnedAgent.model}>
@@ -270,6 +248,9 @@ export function AgentDropdown({
                     <div className="relative w-8 h-8">
                       <div className="w-8 h-8 rounded-xl overflow-hidden">
                         <AgentIcon agent={agent} size={32} />
+                      </div>
+                      <div className="absolute -top-1 -left-1 bg-white border border-blue-200 rounded-md p-px shadow-sm z-20" title="Claude Code">
+                        <img src="/icons/claudecode-color.svg" alt="" className="w-3 h-3 object-contain" />
                       </div>
                       {getModelIcon(agent.model) && (
                         <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-sm" title={agent.model}>

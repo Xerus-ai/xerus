@@ -4,6 +4,8 @@ import { X, MessageSquare, Settings, Puzzle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import type { Assistant, Skill } from '@/lib/api/types'
+import { ModelIcon, AdapterIcon } from '@/components/agents/AgentAvatar'
+import { formatModelName } from '@/utils/models'
 
 export type SelectedItem =
   | { type: 'agent'; data: Assistant }
@@ -46,8 +48,9 @@ function AgentDetail({ agent, onClose, router }: { agent: Assistant; onClose: ()
           <div className="flex-1 min-w-0">
             <h3 className="text-base font-medium text-text truncate">{agent.name}</h3>
             {agent.model && (
-              <span className="text-[11px] text-text-secondary bg-surface-hover px-2 py-0.5 rounded-md mt-1 inline-block">
-                {agent.model}
+              <span className="text-[11px] text-text-secondary bg-surface-hover px-2 py-0.5 rounded-md mt-1 inline-flex items-center gap-1">
+                <ModelIcon model={agent.model} size="sm" />
+                {formatModelName(agent.model)}
               </span>
             )}
           </div>

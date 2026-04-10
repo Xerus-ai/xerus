@@ -124,13 +124,15 @@ export function CLIAuthStatusPanel({ cliAuthStatus, onStatusChange }: CLIAuthSta
           {claudeConnected ? (
             <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 rounded-lg border border-emerald-100">
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span className="text-xs font-medium text-emerald-700">Connected</span>
-              {claudeAuth?.method === 'subscription' && (
-                <span className="ml-auto text-[10px] text-emerald-600">Subscription</span>
-              )}
-              {claudeAuth?.method === 'api' && (
-                <span className="ml-auto text-[10px] text-emerald-600">API Key</span>
-              )}
+              <span className="text-xs font-medium text-emerald-700">
+                {claudeAuth?.method === 'subscription' ? 'Subscription' : 'API Key'}
+              </span>
+              <button
+                onClick={() => handleLogin('claudecode')}
+                className="ml-auto text-[10px] font-medium text-text bg-white border border-surface-active rounded-md px-2 py-0.5 hover:bg-surface-hover transition-colors"
+              >
+                Disconnect
+              </button>
             </div>
           ) : (
             <button
@@ -153,8 +155,8 @@ export function CLIAuthStatusPanel({ cliAuthStatus, onStatusChange }: CLIAuthSta
           )}
         </div>
 
-        {/* Codex login card */}
-        <div className="p-4 bg-white rounded-xl border border-surface-active/50">
+        {/* Codex login card - Coming Soon */}
+        <div className="p-4 bg-white rounded-xl border border-surface-active/50 opacity-60">
           <div className="flex items-center gap-2.5 mb-3">
             <div className="w-8 h-8 bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg flex items-center justify-center border border-green-100">
               <Cpu className="w-4 h-4 text-green-600" />
@@ -165,36 +167,9 @@ export function CLIAuthStatusPanel({ cliAuthStatus, onStatusChange }: CLIAuthSta
             </div>
           </div>
 
-          {codexConnected ? (
-            <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 rounded-lg border border-emerald-100">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span className="text-xs font-medium text-emerald-700">Connected</span>
-              {codexAuth?.method === 'subscription' && (
-                <span className="ml-auto text-[10px] text-emerald-600">Subscription</span>
-              )}
-              {codexAuth?.method === 'api' && (
-                <span className="ml-auto text-[10px] text-emerald-600">API Key</span>
-              )}
-            </div>
-          ) : (
-            <button
-              onClick={() => handleLogin('codex')}
-              disabled={isLoggingIn !== null}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-text text-white rounded-lg hover:bg-text/90 disabled:opacity-50 transition-colors text-xs font-medium"
-            >
-              {isLoggingIn === 'codex' ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  Connecting...
-                </>
-              ) : (
-                <>
-                  Login with Codex
-                  <ExternalLink className="w-3 h-3 opacity-60" />
-                </>
-              )}
-            </button>
-          )}
+          <div className="flex items-center justify-center gap-2 px-3 py-2.5 bg-gray-50 rounded-lg border border-gray-200">
+            <span className="text-xs font-medium text-gray-400 italic">Coming Soon</span>
+          </div>
         </div>
       </div>
 
