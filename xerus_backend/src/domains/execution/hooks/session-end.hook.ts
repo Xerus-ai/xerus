@@ -33,7 +33,7 @@ import type {
  * 6. Emit SSE session_ended - Notify frontend
  * 7. Sandbox Lifecycle Decision - Pause sandbox if appropriate
  * 8. Check Skill Creation - Suggest skill if novel problem solved
- * 9. Append Activity Log - Write to shared/activity.jsonl (last, least critical)
+ * 9. Append Activity Log - Write to data/activity.jsonl (last, least critical)
  *
  * ARCHITECTURE (Feb 2025): Git-based memory
  * - .memory/ Git repo is source of truth
@@ -83,7 +83,7 @@ export class SessionEndHandler {
             result.channel_notified = true;
         }
 
-        // 9. Append to shared/activity.jsonl (agent-visible execution trace)
+        // 9. Append to data/activity.jsonl (agent-visible execution trace)
         // Runs last: all critical work above is already complete.
         await this.appendActivityEntry(input);
 
@@ -193,7 +193,7 @@ export class SessionEndHandler {
     }
 
     /**
-     * Append execution summary to shared/activity.jsonl.
+     * Append execution summary to data/activity.jsonl.
      * Gives Xerus master and other agents visibility into what ran.
      * ~150-200 bytes per entry. Runs after all critical steps in handle().
      */

@@ -157,7 +157,7 @@ const EDITABLE_PATTERNS: RegExp[] = [
   /^agents\/[^/]+\/config\.json$/,
   /^agents\/[^/]+\/HEARTBEAT\.md$/,
   /^agents\/[^/]+\/knowledge\/.+/,
-  /^shared\/knowledge\/.+/,
+  /^drive\/.+/,
   /^projects\/[^/]+\/knowledge\/.+/,
 ]
 

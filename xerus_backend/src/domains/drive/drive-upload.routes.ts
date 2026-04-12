@@ -71,7 +71,7 @@ export function createUploadRouter(deps: UploadRouteDeps): Router {
     const router = Router();
     const auth = authenticateFirebaseToken;
 
-    // POST /upload?path=shared/knowledge/
+    // POST /upload?path=drive/
     router.post(
         '/upload',
         auth,
@@ -89,20 +89,20 @@ export function createUploadRouter(deps: UploadRouteDeps): Router {
 
                 const targetPath = String(req.query.path || '');
                 if (!targetPath) {
-                    throw new BadRequestError('path query parameter is required (e.g., shared/knowledge/)');
+                    throw new BadRequestError('path query parameter is required (e.g., drive/)');
                 }
 
                 const normalized = validateDrivePath(targetPath.endsWith('/') ? `${targetPath}placeholder` : targetPath);
                 const targetDir = normalized.replace(/\/placeholder$/, '').replace(/[^/]+$/, '');
 
-                const isKnowledgePath =
-                    targetDir.startsWith('shared/knowledge') ||
+                const isUploadablePath =
+                    targetDir.startsWith('drive') ||
                     /^agents\/[^/]+\/knowledge/.test(targetDir) ||
                     /^projects\/[^/]+\/knowledge/.test(targetDir);
 
-                if (!isKnowledgePath) {
+                if (!isUploadablePath) {
                     throw new BadRequestError(
-                        'Uploads are only allowed to knowledge directories (shared/knowledge/, agents/*/knowledge/, projects/*/knowledge/)',
+                        'Uploads are only allowed to drive/ or knowledge directories (drive/, agents/*/knowledge/, projects/*/knowledge/)',
                     );
                 }
 

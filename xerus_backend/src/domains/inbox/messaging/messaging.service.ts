@@ -156,11 +156,11 @@ export class MessageRouter {
     // -------------------------------------------------------------------------
 
     private generateInboxPath(workspacePath: string, targetSlug: string): string {
-        return `${workspacePath}/shared/inbox/${targetSlug}/inbox.md`;
+        return `${workspacePath}/agents/${targetSlug}/inbox/inbox.md`;
     }
 
     private getInboxDirectory(workspacePath: string, targetSlug: string): string {
-        return `${workspacePath}/shared/inbox/${targetSlug}`;
+        return `${workspacePath}/agents/${targetSlug}/inbox`;
     }
 
     private formatInboxMessage(message: InboxMessage): string {

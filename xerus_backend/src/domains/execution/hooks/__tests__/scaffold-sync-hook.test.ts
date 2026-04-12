@@ -51,7 +51,6 @@ async function createWorkspaceStructure(root: string): Promise<void> {
     await fs.mkdir(path.join(root, 'agents'), { recursive: true });
     await fs.mkdir(path.join(root, '.memory', 'agents'), { recursive: true });
     await fs.mkdir(path.join(root, '.xerus'), { recursive: true });
-    await fs.mkdir(path.join(root, 'shared'), { recursive: true });
     await fs.mkdir(path.join(root, 'data'), { recursive: true });
     await fs.mkdir(path.join(root, 'projects'), { recursive: true });
 
@@ -76,8 +75,8 @@ async function createWorkspaceStructure(root: string): Promise<void> {
         execSync(`sqlite3 "${dbPath}" < "${SCHEMA_FILE}"`, { stdio: 'pipe' });
     }
 
-    // Initialize shared/activity.jsonl
-    await fs.writeFile(path.join(root, 'shared', 'activity.jsonl'), '');
+    // Initialize data/activity.jsonl
+    await fs.writeFile(path.join(root, 'data', 'activity.jsonl'), '');
 }
 
 function runHook(root: string, toolName: string, filePath: string): { stdout: string; stderr: string; exitCode: number } {
@@ -350,7 +349,7 @@ describeIfBash('scaffold-sync-hook.sh', () => {
 
     describe('non-matching paths', () => {
         it('does nothing for unrelated file writes', async () => {
-            const result = runHook(tmpDir, 'Write', path.join(tmpDir, 'shared', 'knowledge', 'company.md'));
+            const result = runHook(tmpDir, 'Write', path.join(tmpDir, 'drive', 'company.md'));
             expect(result.exitCode).toBe(0);
             expect(result.stdout).toBe('');
         });

@@ -192,7 +192,7 @@ export class WorkspaceManager extends WorkspacePaths {
                 agents: agentsPath,
                 projects: this.getProjectsPath(),
                 memory: this.getMemoryPath(),
-                shared: this.getSharedPath(),
+                drive: this.getDrivePath(),
                 marketplace: this.getMarketplacePath(),
                 data: this.getDataPath(),
                 claude: this.getClaudePath(),

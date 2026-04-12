@@ -268,7 +268,7 @@ async function startServer(): Promise<void> {
         setOnboardingDeps({ sandboxService });
         setUserRoutesDeps({ sandboxService });
 
-        setDriveDeps(new DriveService(sandboxService, backupService));
+        setDriveDeps(new DriveService(sandboxService, backupService), sandboxService);
 
         setSkillRoutesDeps({ sandboxService });
 

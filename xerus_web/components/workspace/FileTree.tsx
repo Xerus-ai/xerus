@@ -17,7 +17,7 @@ import type { FileNode } from '@/lib/api/workspace'
 const READ_ONLY_DIRS = ['.memory', '.claude', 'marketplace', '.beads', 'context']
 
 // Directories that support uploading (shown with + button)
-const UPLOAD_DIRS = ['shared/knowledge', /^agents\/[^/]+\/knowledge$/, /^projects\/[^/]+\/knowledge$/]
+const UPLOAD_DIRS = ['drive', /^agents\/[^/]+\/knowledge$/, /^projects\/[^/]+\/knowledge$/]
 
 function isUploadableDir(path: string): boolean {
   return UPLOAD_DIRS.some((pattern) =>
@@ -179,7 +179,7 @@ export function FileTree({
   className,
 }: FileTreeProps) {
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(
-    () => new Set(['agents', 'projects', 'shared']),
+    () => new Set(['agents', 'projects', 'drive']),
   )
 
   const handleToggle = useCallback((path: string) => {

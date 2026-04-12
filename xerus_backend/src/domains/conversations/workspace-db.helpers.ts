@@ -15,6 +15,10 @@ export const WORKSPACE_DB_PATH = `${SANDBOX_CONFIG.workspacePath}/data/workspace
 const ESCAPED_DB_PATH = shellEscapePath(WORKSPACE_DB_PATH);
 
 export function escapeSQL(value: string): string {
+    // Reject newlines to prevent heredoc termination injection
+    if (/[\n\r]/.test(value)) {
+        throw new Error('SQL value must not contain newlines');
+    }
     // Strip null bytes (prevents SQLite string literal termination), then escape single quotes
     return value.replace(/\0/g, '').replace(/'/g, "''");
 }

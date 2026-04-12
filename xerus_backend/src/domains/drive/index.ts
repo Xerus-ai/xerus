@@ -1,5 +1,5 @@
 // Drive - Barrel Export
-// Workspace Drive feature: file browser, editor, upload, status
+// Workspace Drive feature: file browser, editor, upload, status, connections, tags
 
 export { DriveService } from './drive.service';
 export { setDriveDeps, workspaceSSEBroadcaster } from './drive.routes';
@@ -19,3 +19,5 @@ export type {
     ChannelOverview,
     DocumentOverview,
 } from './types';
+export type { FileConnectionRow } from './connections.service';
+export type { FileTagRow, TagCount } from './tags.service';

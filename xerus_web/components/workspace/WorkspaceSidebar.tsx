@@ -3,7 +3,7 @@
 import { cn } from '@/lib/utils'
 import { Bot, Puzzle, BookOpen, Brain, FolderKanban, Files } from 'lucide-react'
 
-export type WorkspaceSection = 'agents' | 'skills' | 'knowledge' | 'memory' | 'projects' | 'files'
+import type { WorkspaceSection } from '@/components/layout/WorkspaceSectionContext'
 
 const SECTIONS: { id: WorkspaceSection; label: string; icon: React.ElementType; dividerAfter?: boolean }[] = [
   { id: 'agents', label: 'Agents', icon: Bot },

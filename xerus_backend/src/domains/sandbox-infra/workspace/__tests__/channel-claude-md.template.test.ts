@@ -52,14 +52,14 @@ describe('generateChannelClaudeMd', () => {
         const params: ChannelClaudeMdParams = {
             ...DEFAULT_PARAMS,
             sharedResources: [
-                'shared/knowledge/brand-guide.md',
-                'shared/knowledge/seo-playbook.md',
+                'drive/brand-guide.md',
+                'drive/seo-playbook.md',
             ],
         };
         const result = generateChannelClaudeMd(params);
         expect(result).toContain('## Resources');
-        expect(result).toContain('shared/knowledge/brand-guide.md');
-        expect(result).toContain('shared/knowledge/seo-playbook.md');
+        expect(result).toContain('drive/brand-guide.md');
+        expect(result).toContain('drive/seo-playbook.md');
     });
 
     it('should omit resources section when no shared resources', () => {

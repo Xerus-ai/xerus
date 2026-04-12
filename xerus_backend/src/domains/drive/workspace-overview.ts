@@ -74,11 +74,10 @@ async function extractAgentsFromChannel(channel: FileNode, readFile?: FileReader
 }
 
 function extractDocuments(root: FileNode): DocumentOverview[] {
-    const sharedDir = root.children?.find(c => c.name === 'shared' && c.type === 'directory');
-    const knowledgeDir = sharedDir?.children?.find(c => c.name === 'knowledge' && c.type === 'directory');
-    if (!knowledgeDir?.children) return [];
+    const driveDir = root.children?.find(c => c.name === 'drive' && c.type === 'directory');
+    if (!driveDir?.children) return [];
 
-    return knowledgeDir.children
+    return driveDir.children
         .filter(c => c.type === 'file' && c.name !== '.gitkeep')
         .map(f => ({ name: f.name, path: f.path }));
 }

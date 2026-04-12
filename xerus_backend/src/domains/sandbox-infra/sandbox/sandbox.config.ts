@@ -85,7 +85,7 @@ export const BACKUP_TAR_EXCLUDES = [
     '.xerus/manifest.yaml',
     'data/schema.sql',
     'data/workspace-schema.sql',
-    'shared/knowledge/TOOL_GUIDE.md',
+    '.claude/rules/TOOL_GUIDE.md',
 ] as const;
 
 // Pre-built tar exclude flags for shell commands

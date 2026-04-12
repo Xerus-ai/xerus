@@ -24,6 +24,9 @@ import { InMemoryWorkspaceSSEBroadcaster } from './workspace-sse.broadcaster';
 import type { FileChangeAction } from './workspace-sse.broadcaster';
 import { createUploadRouter } from './drive-upload.routes';
 import { createLifecycleRouter } from './drive-lifecycle.routes';
+import { createConnectionsRouter } from './connections.routes';
+import { createTagsRouter } from './tags.routes';
+import type { SandboxService } from '../sandbox-infra/sandbox/sandbox.service';
 
 function getContentType(filePath: string): string {
     const ext = path.extname(filePath).toLowerCase();
@@ -86,8 +89,10 @@ function getContentType(filePath: string): string {
 
 let driveServiceInstance: DriveService | null = null;
 
-export function setDriveDeps(service: DriveService): void {
+export function setDriveDeps(service: DriveService, sandboxService: SandboxService): void {
     driveServiceInstance = service;
+    router.use(createConnectionsRouter({ sandboxService }));
+    router.use(createTagsRouter({ sandboxService }));
 }
 
 function getDriveService(): DriveService {

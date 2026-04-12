@@ -12,14 +12,14 @@ interface WorkspaceSectionContextType {
 }
 
 const Context = createContext<WorkspaceSectionContextType>({
-  activeSection: 'agents',
+  activeSection: 'browse',
   setActiveSection: () => {},
   navigateToPath: () => {},
   consumePendingPath: () => null,
 })
 
 export function WorkspaceSectionProvider({ children }: { children: ReactNode }) {
-  const [activeSection, setActiveSection] = useState<WorkspaceSection>('agents')
+  const [activeSection, setActiveSection] = useState<WorkspaceSection>('browse')
   // Ref, not state — transient signal data, consumed once (rule: rerender-use-ref-transient-values)
   const pendingPathRef = useRef<string | null>(null)
 
