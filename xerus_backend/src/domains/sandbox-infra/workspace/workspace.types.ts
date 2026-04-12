@@ -45,13 +45,15 @@ export const WORKSPACE_DIRECTORIES = {
     beads: '.beads',
     beadsIssues: '.beads/issues.jsonl',
 
-    // Shared resources
-    shared: 'shared',
-    sharedKnowledge: 'shared/knowledge',
-    sharedInbox: 'shared/inbox',
-    sharedOffice: 'shared/office',
-    sharedStandup: 'shared/standup',
-    sharedActivity: 'shared/activity.jsonl',
+    // User content
+    drive: 'drive',
+
+    // Operational data
+    dataActivity: 'data/activity.jsonl',
+    dataDashboard: 'data/dashboard',
+
+    // Agent governance rules
+    claudeRules: '.claude/rules',
 } as const;
 
 // Agent subdirectory structure (under agents/{slug}/)
@@ -129,7 +131,7 @@ export interface WorkspaceInfo {
         agents: string;
         projects: string;
         memory: string;
-        shared: string;
+        drive: string;
         marketplace: string;
         data: string;
         claude: string;

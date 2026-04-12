@@ -30,7 +30,7 @@ describe('hook-health', () => {
             expect(cmd).toContain("echo '---HOOKS---'");
             expect(cmd).toContain('.xerus/hook-audit.jsonl');
             expect(cmd).toContain("echo '---ACTIVITY---'");
-            expect(cmd).toContain('shared/activity.jsonl');
+            expect(cmd).toContain('data/activity.jsonl');
             expect(cmd).toContain("echo '---DBTABLES---'");
             expect(cmd).toContain('data/company.db');
             // shellEscape wraps path in single quotes

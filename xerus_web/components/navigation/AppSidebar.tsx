@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
@@ -9,7 +9,7 @@ import {
   MessageSquare, Inbox, Home,
   Bot, Puzzle, Unplug, FileText, Files, Settings,
   PanelLeftClose, PanelLeftOpen,
-  Plus, Hash, ChevronDown, ChevronRight, FolderOpen, Folder,
+  Plus,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { apiCall } from '@/lib/api/client'
@@ -17,8 +17,6 @@ import { UserMenu } from '@/components/UserMenu'
 import { useUnreadCounts } from '@/hooks/useUnreadCounts'
 import { useWorkspaceSection, type WorkspaceSection } from '@/components/layout/WorkspaceSectionContext'
 import { useSidebarSlotContent } from '@/components/layout/SidebarSlotContext'
-import { useDomains } from '@/hooks/useDomains'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { InboxSidebarBody } from './InboxSidebarBody'
 import { getWorkspaceOverview, type WorkspaceOverview } from '@/lib/api/workspace'
@@ -200,66 +198,14 @@ function HomeSidebarBody({ activeSection, isOnWorkspace, onSectionClick, onPathC
     dedupingInterval: 30000,
   })
 
-  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set())
-
-  // Auto-expand all projects on first load
-  useEffect(() => {
-    if (overview?.projects && expandedProjects.size === 0) {
-      setExpandedProjects(new Set(overview.projects.map(p => p.slug)))
-    }
-  }, [overview?.projects, expandedProjects.size])
-
-  const toggleProject = (slug: string) => {
-    setExpandedProjects(prev => {
-      const next = new Set(prev)
-      next.has(slug) ? next.delete(slug) : next.add(slug)
-      return next
-    })
-  }
-
   return (
     <nav className="px-4 py-2 space-y-5">
-      {/* Projects — dynamic from overview */}
-      {overview?.projects && overview.projects.length > 0 ? overview.projects.map(project => {
-        const isExpanded = expandedProjects.has(project.slug)
-        return (
-          <div key={project.slug}>
-            <button
-              onClick={() => toggleProject(project.slug)}
-              className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-[15px] font-medium text-text hover:bg-surface-hover transition-colors group"
-            >
-              {isExpanded ? <ChevronDown className="w-4 h-4 text-text-secondary shrink-0" /> : <ChevronRight className="w-4 h-4 text-text-secondary shrink-0" />}
-              {isExpanded ? <FolderOpen className="w-5 h-5 text-primary shrink-0" /> : <Folder className="w-5 h-5 text-text-secondary shrink-0" />}
-              <span className="flex-1 text-left truncate">{project.name}</span>
-              <span className="text-[11px] font-medium text-text-secondary bg-surface-hover rounded-full px-2 py-0.5">{project.channels.length}</span>
-            </button>
-            {isExpanded && (
-              <div className="pl-7 pr-2 py-0.5 space-y-0.5">
-                {project.channels.map(channel => (
-                  <button
-                    key={channel.name}
-                    onClick={() => onPathClick(channel.path)}
-                    className="flex items-center gap-2 w-full px-3 py-1.5 rounded-xl text-[14px] text-text-secondary hover:bg-surface-hover/60 hover:text-text transition-colors"
-                  >
-                    <Hash className="w-4 h-4 shrink-0" />
-                    <span className="flex-1 text-left truncate">{channel.name}</span>
-                    {channel.deliverables.length > 0 ? (
-                      <span className="text-[10px] font-medium text-text-secondary">{channel.deliverables.length}</span>
-                    ) : null}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )
-      }) : null}
-
-      {/* Workspace — documents from shared/knowledge */}
-      {overview?.documents && overview.documents.length > 0 ? (
-        <div>
-          <p className="text-xs font-semibold text-text-secondary/60 mb-1.5 px-3 tracking-wide">Workspace</p>
-          <div className="space-y-0.5">
-            {overview.documents.map(doc => (
+      {/* Workspace — drive content */}
+      <div>
+        <p className="text-xs font-semibold text-text-secondary/60 mb-1.5 px-3 tracking-wide">Workspace</p>
+        <div className="space-y-0.5">
+          {overview?.documents && overview.documents.length > 0 ? (
+            overview.documents.map(doc => (
               <button
                 key={doc.path}
                 onClick={() => onPathClick(doc.path)}
@@ -268,10 +214,12 @@ function HomeSidebarBody({ activeSection, isOnWorkspace, onSectionClick, onPathC
                 <FileText className="w-4 h-4 shrink-0" />
                 <span className="flex-1 text-left truncate">{doc.name.replace(/\.md$/, '')}</span>
               </button>
-            ))}
-          </div>
+            ))
+          ) : (
+            <p className="px-3 py-2 text-[13px] text-text-muted">No files yet</p>
+          )}
         </div>
-      ) : null}
+      </div>
 
       {/* Marketplace */}
       <div>

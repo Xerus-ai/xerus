@@ -38,24 +38,20 @@ export class WorkspacePaths {
         return this.resolve(WORKSPACE_DIRECTORIES.memory);
     }
 
-    getSharedPath(): string {
-        return this.resolve(WORKSPACE_DIRECTORIES.shared);
+    getDrivePath(): string {
+        return this.resolve(WORKSPACE_DIRECTORIES.drive);
     }
 
-    getSharedKnowledgePath(): string {
-        return this.resolve(WORKSPACE_DIRECTORIES.sharedKnowledge);
+    getDataActivityPath(): string {
+        return this.resolve(WORKSPACE_DIRECTORIES.dataActivity);
     }
 
-    getSharedInboxPath(): string {
-        return this.resolve(WORKSPACE_DIRECTORIES.sharedInbox);
+    getDataDashboardPath(): string {
+        return this.resolve(WORKSPACE_DIRECTORIES.dataDashboard);
     }
 
-    getSharedOfficePath(): string {
-        return this.resolve(WORKSPACE_DIRECTORIES.sharedOffice);
-    }
-
-    getSharedStandupPath(): string {
-        return this.resolve(WORKSPACE_DIRECTORIES.sharedStandup);
+    getClaudeRulesPath(): string {
+        return this.resolve(WORKSPACE_DIRECTORIES.claudeRules);
     }
 
     getMarketplacePath(): string {

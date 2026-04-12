@@ -197,7 +197,7 @@ export function buildSessionEndHandlers(
             drmCompressor: createSandboxDRMCompressor(gitRepo, executor, emitter, ctx.agentSlug),
             activityWriter: {
                 appendEntry: async (entry) => {
-                    const activityPath = path.join(ctx.workspacePath, 'shared', 'activity.jsonl');
+                    const activityPath = path.join(ctx.workspacePath, 'data', 'activity.jsonl');
                     const dir = path.dirname(activityPath);
                     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
                     fs.appendFileSync(activityPath, JSON.stringify(entry) + '\n', 'utf-8');

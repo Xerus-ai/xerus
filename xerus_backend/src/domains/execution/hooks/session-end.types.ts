@@ -199,7 +199,7 @@ export interface DRMCompressor {
 }
 
 /**
- * Interface for appending execution traces to shared/activity.jsonl.
+ * Interface for appending execution traces to data/activity.jsonl.
  * Gives agents (especially Xerus master) visibility into what ran.
  */
 export interface ActivityWriter {
@@ -207,7 +207,7 @@ export interface ActivityWriter {
 }
 
 /**
- * Single entry in shared/activity.jsonl.
+ * Single entry in data/activity.jsonl.
  * ~150-200 bytes per line. Rolling 7-day window (trimmed by daily digest).
  */
 export interface ActivityEntry {

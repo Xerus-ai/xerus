@@ -54,9 +54,7 @@ async function createTestWorkspace(): Promise<AgentWorkspace> {
         'agents',
         '.memory/agents/xerus-master',
         '.memory/agents/xerus-cto',
-        'shared/knowledge',
-        'shared/office',
-        'shared/standup',
+        'drive',
         'data',
         'projects',
     ];
@@ -85,11 +83,11 @@ async function createTestWorkspace(): Promise<AgentWorkspace> {
     // Copy company.md template
     try {
         await fs.copyFile(
-            path.join(WORKSPACE_TEMPLATE, 'shared', 'knowledge', 'company.md'),
-            path.join(root, 'shared', 'knowledge', 'company.md'),
+            path.join(WORKSPACE_TEMPLATE, 'drive', 'company.md'),
+            path.join(root, 'drive', 'company.md'),
         );
     } catch {
-        await fs.writeFile(path.join(root, 'shared', 'knowledge', 'company.md'), '# Company\n\n## Vision\n{TODO}\n');
+        await fs.writeFile(path.join(root, 'drive', 'company.md'), '# Company\n\n## Vision\n{TODO}\n');
     }
 
     // Initialize memory
@@ -99,7 +97,7 @@ async function createTestWorkspace(): Promise<AgentWorkspace> {
     );
 
     // Initialize activity log
-    await fs.writeFile(path.join(root, 'shared', 'activity.jsonl'), '');
+    await fs.writeFile(path.join(root, 'data', 'activity.jsonl'), '');
 
     // Copy hook scripts so tests can execute them
     const hookScripts = ['scaffold-sync-hook.sh', '_lib.sh'];
@@ -209,7 +207,7 @@ describe('Agent Behavior Specifications', () => {
 
             // Expected outputs after bootstrap completes:
             const expectedOutputs = {
-                'company.md populated': 'shared/knowledge/company.md should NOT contain {TODO}',
+                'company.md populated': 'drive/company.md should NOT contain {TODO}',
                 'project created': 'at least one directory under projects/',
                 'channel created': 'at least one CLAUDE.md under projects/*/channels/*/',
                 'STATUS.md updated': '.claude/agents/xerus-master/STATUS.md should not contain "Bootstrap"',
@@ -268,7 +266,7 @@ Generated: 2026-04-07T10:00:00Z
 ## Current Task
 - **ID**: task-001
 - **Title**: Write a company overview document
-- **Description**: Create shared/knowledge/company-overview.md with a brief description of the workspace
+- **Description**: Create drive/company-overview.md with a brief description of the workspace
 - **Priority**: 1 (high)
 - **Channel**: projects/default/channels/general
 `);
@@ -281,7 +279,7 @@ Generated: 2026-04-07T10:00:00Z
             // 5. Updates working.md
 
             const expectedOutputs = {
-                'task_output_created': 'shared/knowledge/company-overview.md should exist',
+                'task_output_created': 'drive/company-overview.md should exist',
                 'task_closed': '.beads/issues.jsonl should have a closed entry',
                 'completion_posted': 'output/posts.jsonl should have a post from xerus-master',
                 'working_updated': '.memory/agents/xerus-master/working.md should reflect task completion',

@@ -26,8 +26,8 @@ import { cn } from '@/lib/utils'
 const SECTION_PATHS: Partial<Record<WorkspaceSection, string>> = {
   agents: 'agents',
   skills: 'marketplace',
-  connectors: 'shared',
-  knowledge: 'shared/knowledge',
+  connectors: 'connectors',
+  knowledge: 'drive',
   memory: '.memory',
   projects: 'projects',
 }
@@ -43,7 +43,7 @@ export default function WorkspacePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedPath, setSelectedPath] = useState<string | null>(null)
-  const [currentDirPath, setCurrentDirPath] = useState<string | null>(null)
+  const [currentDirPath, setCurrentDirPath] = useState<string | null>('drive')
   const [searchQuery, setSearchQuery] = useState('')
   const [activeFilter, setActiveFilter] = useState<FileFilter>('all')
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
@@ -128,7 +128,7 @@ export default function WorkspacePage() {
 
   const handleTreeSelect = useCallback((node: FileNode) => {
     if (node.type === 'directory') { setCurrentDirPath(node.path); setSelectedPath(node.path) }
-    else { openFileInEditor(node); setCurrentDirPath(node.path.includes('/') ? node.path.split('/').slice(0, -1).join('/') : null) }
+    else { openFileInEditor(node); setCurrentDirPath(node.path.includes('/') ? node.path.split('/').slice(0, -1).join('/') : 'drive') }
   }, [openFileInEditor])
 
   const handleDirClick = useCallback((node: FileNode) => { setCurrentDirPath(node.path); setSelectedPath(node.path) }, [])
@@ -153,7 +153,7 @@ export default function WorkspacePage() {
       prevSectionRef.current = activeSection
       setDetailView(null)
       if (activeSection === 'files' || activeSection === 'browse') {
-        if (activeSection === 'files') setCurrentDirPath(null)
+        if (activeSection === 'files') setCurrentDirPath('drive')
         setContentViewMode('browse')
       } else {
         const sectionPath = SECTION_PATHS[activeSection]
@@ -176,7 +176,7 @@ export default function WorkspacePage() {
           const fileName = parts[parts.length - 1]
           setOpenTabs(prev => prev.find(t => t.path === path) ? prev : [...prev, { path, name: fileName, isDirty: false }])
           setActiveTab(path)
-          setCurrentDirPath(parts.slice(0, -1).join('/') || null)
+          setCurrentDirPath(parts.slice(0, -1).join('/') || 'drive')
         } else {
           setCurrentDirPath(path)
         }
@@ -191,7 +191,7 @@ export default function WorkspacePage() {
     setContentViewMode(mode)
     setDetailView(null)
     if (mode === 'browse') {
-      setCurrentDirPath(SECTION_PATHS[activeSectionRef.current] || null)
+      setCurrentDirPath(SECTION_PATHS[activeSectionRef.current] || 'drive')
     }
   }, [])
 
@@ -263,7 +263,7 @@ export default function WorkspacePage() {
             </div>
             {showFileBrowser && (
               <button
-                onClick={() => { setUploadTargetPath('shared/knowledge'); setUploadPanelOpen(true) }}
+                onClick={() => { setUploadTargetPath('drive'); setUploadPanelOpen(true) }}
                 className="p-1.5 rounded-lg hover:bg-surface-hover text-text-secondary hover:text-text transition-colors"
                 title="Upload file"
               >
@@ -326,9 +326,15 @@ export default function WorkspacePage() {
                         onSortChange={setSortMode}
                         onDirClick={handleDirClick}
                         onFileClick={openFileInEditor}
-                        onNavigateBack={(path) => { setCurrentDirPath(path); setSelectedPath(path) }}
+                        onNavigateBack={(path) => {
+                          // Never navigate above drive/ — that's the user's root
+                          const safePath = (!path || path === '') ? 'drive' : path
+                          setCurrentDirPath(safePath)
+                          setSelectedPath(safePath)
+                        }}
                         onUploadClick={(path) => { setUploadTargetPath(path); setUploadPanelOpen(true) }}
                         onNewFolder={confirmNewFolder}
+                        showPropertyBar={isBrowseMode && currentDirPath?.startsWith('drive')}
                       />
                     </div>
                   </Panel>

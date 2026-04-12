@@ -309,7 +309,7 @@ describe('MessageRouter', () => {
 
             await router.routeMessage(message);
 
-            const inboxPath = `/workspace/shared/inbox/${RESEARCHER}/inbox.md`;
+            const inboxPath = `/workspace/agents/${RESEARCHER}/inbox/inbox.md`;
             const content = workspaceWriter.getContent(inboxPath);
 
             expect(content).toContain(`**From**: ${ANALYST}`);
@@ -336,7 +336,7 @@ describe('MessageRouter', () => {
             await router.routeMessage(message1);
             await router.routeMessage(message2);
 
-            const inboxPath = `/workspace/shared/inbox/${RESEARCHER}/inbox.md`;
+            const inboxPath = `/workspace/agents/${RESEARCHER}/inbox/inbox.md`;
             const content = workspaceWriter.getContent(inboxPath);
 
             expect(content).toContain('First message');
@@ -384,7 +384,7 @@ describe('MessageRouter', () => {
 
             const result = await router.routeMessage(message);
 
-            expect(result.inbox_path).toBe(`/my/workspace/shared/inbox/${RESEARCHER}/inbox.md`);
+            expect(result.inbox_path).toBe(`/my/workspace/agents/${RESEARCHER}/inbox/inbox.md`);
         });
     });
 });

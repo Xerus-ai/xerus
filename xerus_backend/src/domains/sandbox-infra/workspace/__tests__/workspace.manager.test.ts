@@ -433,16 +433,8 @@ describe('WorkspaceManager', () => {
             expect(manager.getMemoryPath()).toBe(`${basePath}/.memory`);
         });
 
-        it('getSharedPath returns shared directory', () => {
-            expect(manager.getSharedPath()).toBe(`${basePath}/shared`);
-        });
-
-        it('getSharedKnowledgePath returns shared/knowledge', () => {
-            expect(manager.getSharedKnowledgePath()).toBe(`${basePath}/shared/knowledge`);
-        });
-
-        it('getSharedInboxPath returns shared/inbox', () => {
-            expect(manager.getSharedInboxPath()).toBe(`${basePath}/shared/inbox`);
+        it('getDrivePath returns drive directory', () => {
+            expect(manager.getDrivePath()).toBe(`${basePath}/drive`);
         });
 
         it('getMarketplacePath returns marketplace directory', () => {
@@ -537,7 +529,7 @@ describe('WorkspaceManager', () => {
             expect(info.paths.agents).toBe(`${basePath}/agents`);
             expect(info.paths.projects).toBe(`${basePath}/projects`);
             expect(info.paths.memory).toBe(`${basePath}/.memory`);
-            expect(info.paths.shared).toBe(`${basePath}/shared`);
+            expect(info.paths.drive).toBe(`${basePath}/drive`);
             expect(info.paths.marketplace).toBe(`${basePath}/marketplace`);
             expect(info.paths.data).toBe(`${basePath}/data`);
             expect(info.paths.claude).toBe(`${basePath}/.claude`);
@@ -605,9 +597,9 @@ describe('Workspace Types', () => {
             expect(WORKSPACE_DIRECTORIES.memory).toBe('.memory');
             expect(WORKSPACE_DIRECTORIES.marketplace).toBe('marketplace');
             expect(WORKSPACE_DIRECTORIES.data).toBe('data');
-            expect(WORKSPACE_DIRECTORIES.shared).toBe('shared');
-            expect(WORKSPACE_DIRECTORIES.sharedKnowledge).toBe('shared/knowledge');
-            expect(WORKSPACE_DIRECTORIES.sharedInbox).toBe('shared/inbox');
+            expect(WORKSPACE_DIRECTORIES.drive).toBe('drive');
+            expect(WORKSPACE_DIRECTORIES.dataActivity).toBe('data/activity.jsonl');
+            expect(WORKSPACE_DIRECTORIES.claudeRules).toBe('.claude/rules');
         });
 
         it('should have claude subdirectory constants', () => {

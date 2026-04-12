@@ -1,6 +1,6 @@
 // Hook Health Check
 // Post-execution verification of shell hook side effects.
-// Reads .xerus/hook-audit.jsonl, shared/activity.jsonl, and company.db status
+// Reads .xerus/hook-audit.jsonl, data/activity.jsonl, and company.db status
 // from the sandbox via a single compound shell command.
 // See: docs/planning/execution/ (Shell Hook Observability)
 
@@ -31,7 +31,7 @@ const SENTINEL_DBTABLES = '---DBTABLES---';
 export function buildHealthCheckCommand(workspacePath: string): string {
     const base = shellEscape(workspacePath);
     const auditFile = `${base}/.xerus/hook-audit.jsonl`;
-    const activityFile = `${base}/shared/activity.jsonl`;
+    const activityFile = `${base}/data/activity.jsonl`;
     const dbFile = `${base}/data/company.db`;
 
     return [

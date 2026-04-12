@@ -13,6 +13,7 @@ import type { FileNode } from '@/lib/api/workspace'
 import * as workspaceApi from '@/lib/api/workspace'
 import { countFiles } from './file-utils'
 import type { FileFilter, SortMode } from './file-utils'
+import { PropertyBar } from './PropertyBar'
 
 export type ViewMode = 'grid' | 'list'
 
@@ -35,6 +36,7 @@ interface BrowseViewProps {
   onUploadClick: (targetPath: string) => void
   onNewFolder: (name: string) => Promise<void>
   previews?: Record<string, string>
+  showPropertyBar?: boolean
 }
 
 export function BrowseView({
@@ -56,6 +58,7 @@ export function BrowseView({
   onUploadClick,
   onNewFolder,
   previews,
+  showPropertyBar = false,
 }: BrowseViewProps) {
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
@@ -209,10 +212,10 @@ export function BrowseView({
         {/* Section header: current folder title + actions */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            {currentDirPath && (
+            {currentDirPath && currentDirPath !== 'drive' && (
               <button
                 onClick={() => onNavigateBack(
-                  currentDirPath.includes('/') ? currentDirPath.split('/').slice(0, -1).join('/') : null
+                  currentDirPath.includes('/') ? currentDirPath.split('/').slice(0, -1).join('/') : 'drive'
                 )}
                 className="p-1.5 rounded-lg hover:bg-surface-hover text-text-secondary hover:text-text transition-colors"
               >
@@ -220,7 +223,7 @@ export function BrowseView({
               </button>
             )}
             <h2 className="font-serif text-2xl text-text">
-              {currentDirPath ? currentDirPath.split('/').pop() : 'Workspace'}
+              {!currentDirPath || currentDirPath === 'drive' ? 'Workspace' : currentDirPath.split('/').pop()}
             </h2>
             <button
               onClick={startNewFolder}
@@ -243,7 +246,7 @@ export function BrowseView({
               <ArrowUpDown className="w-3.5 h-3.5" />
             </button>
             <button
-              onClick={() => onUploadClick(currentDirPath || 'shared/knowledge')}
+              onClick={() => onUploadClick(currentDirPath || 'drive')}
               className="px-5 py-2 rounded-full bg-text text-white hover:bg-[#1a1a1a] transition-colors text-sm font-medium flex items-center gap-2 shadow-sm"
             >
               <Upload className="w-4 h-4" />
@@ -251,6 +254,13 @@ export function BrowseView({
             </button>
           </div>
         </div>
+
+        {/* Property bar — connections + tags (Eden-style, workspace only) */}
+        {showPropertyBar && currentDirPath && (
+          <div className="mb-5">
+            <PropertyBar filePath={currentDirPath} />
+          </div>
+        )}
 
         {/* Folders — responsive grid with FolderCard */}
         {(visibleDirs.length > 0 || isCreatingFolder) && (
@@ -373,7 +383,7 @@ export function BrowseView({
                 New Folder
               </button>
               <button
-                onClick={() => onUploadClick(currentDirPath || 'shared/knowledge')}
+                onClick={() => onUploadClick(currentDirPath || 'drive')}
                 className="px-6 py-2.5 rounded-full bg-text text-white hover:bg-[#1a1a1a] transition-colors text-sm font-medium inline-flex items-center gap-2"
               >
                 <Upload className="w-4 h-4" />
