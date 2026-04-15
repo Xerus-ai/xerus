@@ -70,7 +70,7 @@ export function AutonomyLevelSelector({ value, onChange }: AutonomyLevelSelector
                                         <Check className="w-3 h-3 text-white" strokeWidth={3} />
                                     </div>
                                 ) : (
-                                    <Icon className="w-5 h-5 text-text-muted/40 shrink-0" />
+                                    <Icon className="w-5 h-5 text-text/[0.16] shrink-0" />
                                 )}
                             </div>
 
@@ -82,7 +82,7 @@ export function AutonomyLevelSelector({ value, onChange }: AutonomyLevelSelector
                             {/* Tag */}
                             <span className={`inline-block ml-0 text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full ${
                                 isSelected
-                                    ? 'text-primary bg-primary/10'
+                                    ? 'text-secondary bg-secondary/10'
                                     : 'text-text bg-surface border border-surface-active'
                             }`}>
                                 {option.tag}

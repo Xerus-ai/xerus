@@ -82,7 +82,7 @@ export function ThinkingLevelSelector({ value, onChange }: ThinkingLevelSelector
                             {/* Tag */}
                             <span className={`inline-block ml-0 text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full ${
                                 isSelected
-                                    ? 'text-primary bg-primary/10'
+                                    ? 'text-secondary bg-secondary/10'
                                     : 'text-text bg-surface border border-surface-active'
                             }`}>
                                 {option.tag}

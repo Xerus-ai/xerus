@@ -59,7 +59,7 @@ export function TaskCard({
         'bg-surface hover:bg-surface-hover rounded-2xl p-4 shadow-sm',
         'transition-all duration-200',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-        isDragging && 'opacity-40 shadow-lg scale-[1.02]',
+        isDragging && 'opacity-50 shadow-lg scale-[1.02]',
         onClick && 'cursor-pointer hover:shadow-md',
         className
       )}

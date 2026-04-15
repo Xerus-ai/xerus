@@ -120,7 +120,7 @@ export function FileEditor({ path, name, size, onDirtyChange, className }: FileE
               setLoading(false)
             })
           }}
-          className="text-sm text-primary font-medium hover:underline"
+          className="text-sm text-secondary font-medium hover:underline"
         >
           Retry
         </button>
@@ -142,9 +142,9 @@ export function FileEditor({ path, name, size, onDirtyChange, className }: FileE
 
       {/* Read-only notice — matching agent IDE pattern */}
       {!isEditable && (
-        <div className="mx-8 mt-6 mb-4 flex items-center gap-3 p-4 bg-primary/5 border border-primary/20 rounded-2xl shrink-0">
-          <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-            <Lock className="w-4 h-4 text-primary" />
+        <div className="mx-8 mt-6 mb-4 flex items-center gap-3 p-4 bg-secondary/5 border border-secondary/20 rounded-2xl shrink-0">
+          <div className="w-8 h-8 rounded-xl bg-secondary/10 flex items-center justify-center shrink-0">
+            <Lock className="w-4 h-4 text-secondary" />
           </div>
           <span className="text-sm text-text">This file is read-only</span>
         </div>
@@ -176,12 +176,12 @@ export function FileEditor({ path, name, size, onDirtyChange, className }: FileE
       </div>
 
       {/* Footer Toolbar — matching skill editor pattern */}
-      <div className="mx-4 mb-4 mt-2 p-1.5 rounded-[20px] border border-surface-active bg-white flex items-center justify-between shadow-sm shrink-0">
+      <div className="mx-4 mb-4 mt-2 p-1.5 rounded-2xl border border-surface-active bg-card flex items-center justify-between shadow-sm shrink-0">
         {/* Left: Write with AI */}
         <div className="flex items-center gap-2">
           <button
             disabled
-            className="h-9 px-3 rounded-[12px] flex items-center gap-2 text-text-secondary font-medium text-sm opacity-50 cursor-not-allowed"
+            className="h-9 px-3 rounded-xl flex items-center gap-2 text-text-secondary font-medium text-sm opacity-50 cursor-not-allowed"
           >
             <Sparkles className="w-4 h-4" />
             Write with AI
@@ -194,7 +194,7 @@ export function FileEditor({ path, name, size, onDirtyChange, className }: FileE
             onClick={() => setMode('view')}
             className={cn(
               'flex items-center gap-2 px-3 py-1.5 rounded-[10px] text-xs font-semibold transition-all',
-              mode === 'view' ? 'bg-white shadow-sm text-text' : 'text-text-secondary hover:text-text',
+              mode === 'view' ? 'bg-card shadow-sm text-text' : 'text-text-secondary hover:text-text',
             )}
           >
             <Eye className="w-3.5 h-3.5" />
@@ -205,7 +205,7 @@ export function FileEditor({ path, name, size, onDirtyChange, className }: FileE
               onClick={() => setMode('edit')}
               className={cn(
                 'flex items-center gap-2 px-3 py-1.5 rounded-[10px] text-xs font-semibold transition-all',
-                mode === 'edit' ? 'bg-white shadow-sm text-text' : 'text-text-secondary hover:text-text',
+                mode === 'edit' ? 'bg-card shadow-sm text-text' : 'text-text-secondary hover:text-text',
               )}
             >
               <Pencil className="w-3.5 h-3.5" />
@@ -224,7 +224,7 @@ export function FileEditor({ path, name, size, onDirtyChange, className }: FileE
               onClick={handleSave}
               disabled={saving || !isDirty}
               className={cn(
-                'w-9 h-9 rounded-[12px] flex items-center justify-center shadow-md transition-colors',
+                'w-9 h-9 rounded-xl flex items-center justify-center shadow-md transition-colors',
                 mode === 'edit' && isDirty
                   ? 'bg-text text-white hover:bg-primary'
                   : 'bg-surface text-text-secondary cursor-not-allowed',

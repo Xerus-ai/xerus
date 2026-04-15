@@ -201,14 +201,14 @@ function StepItem({ step, index }: { step: ExecutionStep; index: number }) {
         <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center shrink-0', colorClass)}>
           <Icon className="w-3.5 h-3.5" />
         </div>
-        <div className="w-px flex-1 bg-surface-active group-last:bg-transparent" />
+        <div className="w-px flex-1 bg-border group-last:bg-transparent" />
       </div>
 
       {/* Content */}
       <div className="pb-5 min-w-0 flex-1">
         <div className="flex items-baseline gap-2 mb-0.5">
           <span className="text-sm font-medium text-text">{step.title}</span>
-          <span className="text-[11px] text-text-muted tabular-nums">
+          <span className="text-[11px] text-text-muted tabular-nums font-mono">
             {formatDuration(step.duration_ms)}
           </span>
           {step.status === 'error' && (
@@ -220,13 +220,13 @@ function StepItem({ step, index }: { step: ExecutionStep; index: number }) {
         )}
         {step.output && (
           <div className="relative group/output">
-            <pre className="text-[11px] leading-relaxed text-text-secondary bg-surface/80 rounded-xl px-3 py-2 overflow-x-auto whitespace-pre-wrap font-mono border border-surface-active">
+            <pre className="text-[11px] leading-relaxed text-text-secondary bg-surface/80 rounded-xl px-3 py-2 overflow-x-auto whitespace-pre-wrap font-mono border border-border">
               {step.output}
             </pre>
             <button
               type="button"
               aria-label="Copy output"
-              className="absolute top-1.5 right-1.5 p-1 rounded-md bg-white/80 text-text-muted hover:text-text opacity-0 group-hover/output:opacity-100 transition-opacity"
+              className="absolute top-1.5 right-1.5 p-1 rounded-md bg-card/80 text-text-muted hover:text-text opacity-0 group-hover/output:opacity-100 transition-opacity"
               onClick={() => navigator.clipboard.writeText(step.output ?? '')}
             >
               <Copy className="w-3 h-3" />
@@ -282,7 +282,7 @@ export function ExecutionDetail({ executionId, open, onClose }: ExecutionDetailP
   if (isLoading) {
     return (
       <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-        <SheetContent side="right" className="w-full sm:max-w-[480px] p-0 bg-white flex flex-col items-center justify-center">
+        <SheetContent side="right" className="w-full sm:max-w-[480px] p-0 bg-card flex flex-col items-center justify-center">
           <Loader2 className="w-6 h-6 animate-spin text-text-muted" />
           <p className="text-sm text-text-muted mt-2">Loading execution...</p>
         </SheetContent>
@@ -293,7 +293,7 @@ export function ExecutionDetail({ executionId, open, onClose }: ExecutionDetailP
   if (error || !execution) {
     return (
       <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-        <SheetContent side="right" className="w-full sm:max-w-[480px] p-0 bg-white flex flex-col items-center justify-center">
+        <SheetContent side="right" className="w-full sm:max-w-[480px] p-0 bg-card flex flex-col items-center justify-center">
           <XCircle className="w-6 h-6 text-red-500" />
           <p className="text-sm text-text-secondary mt-2">{error ?? 'Execution not found'}</p>
         </SheetContent>
@@ -305,11 +305,11 @@ export function ExecutionDetail({ executionId, open, onClose }: ExecutionDetailP
     <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <SheetContent
         side="right"
-        className="w-full sm:max-w-[480px] p-0 bg-white flex flex-col"
+        className="w-full sm:max-w-[480px] p-0 bg-card flex flex-col"
       >
         <SheetHeader className="px-5 pt-5 pb-0 space-y-0">
           <div className="flex items-center gap-3 mb-3">
-            <Avatar className="w-9 h-9 ring-2 ring-surface-active">
+            <Avatar className="w-9 h-9 ring-2 ring-border">
               <AvatarFallback className="text-xs font-medium bg-surface-hover text-text-secondary">
                 {execution.agent_name.charAt(0)}
               </AvatarFallback>
@@ -342,7 +342,7 @@ export function ExecutionDetail({ executionId, open, onClose }: ExecutionDetailP
         </SheetHeader>
 
         {/* Divider */}
-        <div className="h-px bg-surface-active" />
+        <div className="h-px bg-border" />
 
         {/* Execution timeline */}
         <ScrollArea className="flex-1">
@@ -352,7 +352,7 @@ export function ExecutionDetail({ executionId, open, onClose }: ExecutionDetailP
             </h3>
             <div>
               {execution.steps.length === 0 ? (
-                <p className="text-xs text-stone-400 text-center py-6">
+                <p className="text-xs text-text-muted text-center py-6">
                   Step-level timeline not available for this execution.
                 </p>
               ) : (
@@ -372,7 +372,7 @@ export function ExecutionDetail({ executionId, open, onClose }: ExecutionDetailP
                   {execution.files_changed.map((file) => (
                     <div
                       key={file}
-                      className="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface/60 border border-surface-active text-sm group/file hover:bg-surface-hover transition-colors"
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface/60 border border-border text-sm group/file hover:bg-surface-hover transition-colors"
                     >
                       <FileText className="w-3.5 h-3.5 text-text-muted shrink-0" />
                       <span className="text-text-secondary font-mono text-xs flex-1 truncate">{file}</span>

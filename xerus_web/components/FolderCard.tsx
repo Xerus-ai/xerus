@@ -30,7 +30,7 @@ export const AccessAvatars = ({ users = [], max = 4 }: { users?: string[], max?:
             ))}
             {hiddenCount > 0 && (
                 <div
-                    className="w-5 h-5 rounded-full ring-2 ring-primary bg-text-secondary text-[10px] font-medium text-white flex items-center justify-center border border-white/10"
+                    className="w-5 h-5 rounded-full ring-2 ring-primary bg-text/55 text-[10px] font-medium text-white flex items-center justify-center border border-white/10"
                     style={{ zIndex: 0 }}
                 >
                     +{hiddenCount}
@@ -114,12 +114,12 @@ export const FolderCard = ({
                 {/* B. STACKED PAPERS — scaled for h-36 */}
                 <div className="absolute top-[10%] left-0 w-full h-full pointer-events-none px-3 z-10">
                     <div className="relative w-full h-full perspective-1000">
-                        <div className="absolute top-0 right-4 w-16 h-20 bg-white/40 rounded transform rotate-12 shadow-sm backdrop-blur-[2px] border border-white/20 transition-all duration-500 ease-out group-hover:rotate-[15deg] group-hover:-translate-y-2 group-hover:translate-x-1 origin-bottom-left" />
-                        <div className="absolute top-1 right-6 w-16 h-20 bg-white/70 rounded transform rotate-6 shadow-md backdrop-blur-[1px] border border-white/30 flex flex-col p-2 gap-1 transition-all duration-500 ease-out group-hover:rotate-[8deg] group-hover:-translate-y-3 group-hover:translate-x-1 origin-bottom-left">
+                        <div className="absolute top-0 right-4 w-16 h-20 bg-card/40 rounded transform rotate-12 shadow-sm backdrop-blur-[2px] border border-card/20 transition-all duration-500 ease-out group-hover:rotate-[15deg] group-hover:-translate-y-2 group-hover:translate-x-1 origin-bottom-left" />
+                        <div className="absolute top-1 right-6 w-16 h-20 bg-card/70 rounded transform rotate-6 shadow-md backdrop-blur-[1px] border border-card/30 flex flex-col p-2 gap-1 transition-all duration-500 ease-out group-hover:rotate-[8deg] group-hover:-translate-y-3 group-hover:translate-x-1 origin-bottom-left">
                             <div className="w-full h-0.5 bg-surface-active/50 rounded-full" />
                             <div className="w-2/3 h-0.5 bg-surface-active/50 rounded-full" />
                         </div>
-                        <div className="absolute top-2 right-8 w-16 h-20 bg-white rounded transform -rotate-3 shadow-lg border border-white/60 flex flex-col p-2 gap-1 transition-all duration-500 ease-out group-hover:-rotate-2 group-hover:-translate-y-4 group-hover:scale-[1.01] origin-bottom-left">
+                        <div className="absolute top-2 right-8 w-16 h-20 bg-card rounded transform -rotate-3 shadow-lg border border-card/60 flex flex-col p-2 gap-1 transition-all duration-500 ease-out group-hover:-rotate-2 group-hover:-translate-y-4 group-hover:scale-[1.01] origin-bottom-left">
                             <div className="w-5 h-5 rounded-full bg-surface mb-0.5 flex items-center justify-center text-surface-active">
                                 <FileText size={10} strokeWidth={2} />
                             </div>

@@ -73,8 +73,8 @@ function FilterBar({
             className={cn(
               'px-5 py-2 rounded-full text-sm font-medium transition-all border',
               isActive
-                ? 'bg-[#1C1917] text-white border-[#1C1917]'
-                : 'bg-transparent hover:bg-surface-hover text-text-secondary border-surface-active/50',
+                ? 'bg-secondary/10 text-secondary border-secondary/20'
+                : 'bg-transparent hover:bg-surface-hover text-text-secondary border-border',
             )}
             style={isActive && pf.color ? { backgroundColor: pf.color, borderColor: pf.color } : undefined}
           >
@@ -84,7 +84,7 @@ function FilterBar({
       })}
 
       <Select value={agentFilter} onValueChange={onAgentChange}>
-        <SelectTrigger className="h-[38px] px-5 rounded-full border-surface-active/50 bg-transparent text-sm font-medium text-text-secondary gap-1.5 w-auto">
+        <SelectTrigger className="h-[38px] px-5 rounded-full border-border bg-transparent text-sm font-medium text-text-secondary gap-1.5 w-auto">
           <SelectValue placeholder="Agent" />
         </SelectTrigger>
         <SelectContent>

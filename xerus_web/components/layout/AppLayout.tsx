@@ -28,22 +28,22 @@ function LoadingScreen({ title, subtitle }: { title?: string; subtitle?: string 
     <div className="flex h-screen items-center justify-center relative">
       <GradientBackground />
       <div className="flex flex-col items-center gap-8 animate-tab-in relative z-10">
-        <img src="/logo/xerus.svg" alt="Xerus" className="w-20 h-20 animate-pulse" />
+        <img src="/logo/xerus.svg" alt="Xerus" className="w-16 h-16 animate-[breathing_2s_ease-in-out_infinite]" />
 
         {title ? (
           <div className="flex flex-col items-center gap-3">
-            <p className="text-lg font-semibold text-text">{title}</p>
+            <p className="text-base font-medium text-text">{title}</p>
             {subtitle && (
               <p className="text-sm text-text-secondary">{subtitle}</p>
             )}
-            <div className="w-56 h-1.5 bg-surface-active rounded-full overflow-hidden mt-1">
-              <div className="h-full bg-primary rounded-full animate-[loading_1.5s_ease-in-out_infinite]" />
+            <div className="w-48 h-1 bg-surface-active rounded-full overflow-hidden mt-1">
+              <div className="h-full bg-foreground/30 rounded-full animate-[loading_1.5s_cubic-bezier(0.23,1,0.32,1)_infinite]" />
             </div>
           </div>
         ) : (
           /* Minimal: no text — used during hydration & login auth check */
-          <div className="w-40 h-1 bg-surface-active rounded-full overflow-hidden">
-            <div className="h-full bg-primary/70 rounded-full animate-[loading_1.5s_ease-in-out_infinite]" />
+          <div className="w-40 h-0.5 bg-surface-active rounded-full overflow-hidden">
+            <div className="h-full bg-foreground/20 rounded-full animate-[loading_1.5s_cubic-bezier(0.23,1,0.32,1)_infinite]" />
           </div>
         )}
       </div>
@@ -185,7 +185,7 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
         {/* Right Panel */}
         {isRightPanelOpen && rightPanelContent && (
           <aside
-            className="shrink-0 w-[var(--right-panel-width)] h-screen border-l border-surface-active overflow-y-auto"
+            className="shrink-0 w-[var(--right-panel-width)] h-screen border-l border-border overflow-y-auto"
             role="complementary"
             aria-label="Detail panel"
           >

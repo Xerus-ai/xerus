@@ -63,7 +63,7 @@ export function ToolSelectorPanel({
       variant="clean"
     >
       {({ close, minimize }) => (
-        <div className="bg-white rounded-[32px] h-full w-full flex flex-col p-6 overflow-hidden">
+        <div className="bg-card rounded-2xl h-full w-full flex flex-col p-6 overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between mb-4 shrink-0">
             <div className="flex items-center gap-2">
@@ -72,7 +72,7 @@ export function ToolSelectorPanel({
                   close()
                   onSearchChange('')
                 }}
-                className="p-1.5 bg-[#F5F5F5] hover:bg-[#E5E5E5] rounded-full transition-colors"
+                className="p-1.5 bg-surface-hover hover:bg-surface-pressed rounded-full transition-colors"
                 aria-label="Close"
               >
                 <X className="w-4 h-4 text-text" />
@@ -84,7 +84,7 @@ export function ToolSelectorPanel({
                   e.stopPropagation()
                   minimize()
                 }}
-                className="p-1.5 bg-[#F5F5F5] hover:bg-[#E5E5E5] rounded-full transition-colors"
+                className="p-1.5 bg-surface-hover hover:bg-surface-pressed rounded-full transition-colors"
                 aria-label="Minimize"
               >
                 <Minus className="w-4 h-4 text-text" />
@@ -116,10 +116,10 @@ export function ToolSelectorPanel({
 
           {/* Read-only notice for system templates */}
           {!isEditable && (
-            <div className="flex items-center justify-between gap-3 p-4 mb-4 bg-primary/5 border border-primary/20 rounded-2xl shrink-0">
+            <div className="flex items-center justify-between gap-3 p-4 mb-4 bg-secondary/5 border border-secondary/20 rounded-2xl shrink-0">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
-                  <Lock className="w-4 h-4 text-primary" />
+                <div className="w-8 h-8 rounded-xl bg-secondary/10 flex items-center justify-center">
+                  <Lock className="w-4 h-4 text-secondary" />
                 </div>
                 <span className="text-sm text-text">To add tools, clone this agent first.</span>
               </div>
@@ -157,7 +157,7 @@ export function ToolSelectorPanel({
                       key={tool.id || tool.tool_name}
                       className="py-3 first:pt-0 last:pb-0 flex items-center gap-4 group hover:bg-surface-alt/50 -mx-2 px-2 rounded-lg transition-colors"
                     >
-                      <div className="w-11 h-11 rounded-xl overflow-hidden border border-surface-active bg-white flex items-center justify-center shrink-0">
+                      <div className="w-11 h-11 rounded-xl overflow-hidden border border-surface-active bg-card flex items-center justify-center shrink-0">
                         {tool.icon ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
@@ -196,7 +196,7 @@ export function ToolSelectorPanel({
                                 }
                               }}
                               disabled={isConfiguring || !isEditable}
-                              className="flex items-center justify-center gap-1.5 bg-black hover:bg-[#1a1a1a] text-white font-medium px-4 py-2 rounded-xl text-sm transition-colors disabled:opacity-50"
+                              className="flex items-center justify-center gap-1.5 bg-black hover:bg-text/90 text-white font-medium px-4 py-2 rounded-xl text-sm transition-colors disabled:opacity-50"
                             >
                               {isConfiguring ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -225,7 +225,7 @@ export function ToolSelectorPanel({
                               className={`flex items-center justify-center gap-1.5 font-medium px-4 py-2 rounded-xl text-sm transition-colors disabled:opacity-50 ${
                                 isConnected
                                   ? 'bg-primary text-white cursor-default'
-                                  : 'bg-black hover:bg-[#1a1a1a] text-white'
+                                  : 'bg-black hover:bg-text/90 text-white'
                               }`}
                             >
                               {isConfiguring ? (

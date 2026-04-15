@@ -153,7 +153,7 @@ export function ExecutionDetail({
   return (
     <div
       className={cn(
-        'border border-surface-active rounded-[24px] bg-white overflow-hidden',
+        'border border-surface-active rounded-xl bg-card overflow-hidden',
         className
       )}
     >

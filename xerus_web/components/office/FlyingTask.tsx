@@ -75,7 +75,7 @@ export function FlyingTask({ data, onComplete }: FlyingTaskProps) {
         onAnimationComplete={() => onComplete(data.id)}
       >
         <div
-          className="bg-white shadow-md rounded-xl px-2 py-1 whitespace-nowrap"
+          className="bg-card shadow-md rounded-xl px-2 py-1 whitespace-nowrap"
           style={{
             borderWidth: 1,
             borderColor: `${accentColor}40`,

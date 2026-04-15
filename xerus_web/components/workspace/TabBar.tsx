@@ -39,7 +39,7 @@ export function TabBar({ tabs, activeTab, onSelectTab, onCloseTab, onCloseAll, c
               className={cn(
                 'group flex items-center gap-1.5 pl-2.5 pr-1.5 py-1.5 rounded-[8px] text-xs cursor-pointer transition-all min-w-0 max-w-[180px]',
                 isActive
-                  ? 'bg-white text-text shadow-sm font-medium'
+                  ? 'bg-card text-text shadow-sm font-medium'
                   : 'text-text-secondary hover:text-text',
               )}
               onClick={() => onSelectTab(tab.path)}

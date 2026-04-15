@@ -63,7 +63,7 @@ export function ChannelDeliverables({ channelId, className }: ChannelDeliverable
         {deliverables.map((d) => (
           <div
             key={d.id}
-            className="flex items-start gap-3 py-3 px-3 rounded-xl hover:bg-surface-hover transition-colors group"
+            className="flex items-start gap-3 py-3 px-3 rounded-xl hover:bg-surface-hover transition-colors duration-150 group cursor-pointer"
           >
             <div className="flex-shrink-0 mt-0.5">
               {fileIcon(d.file_type)}
@@ -74,7 +74,7 @@ export function ChannelDeliverables({ channelId, className }: ChannelDeliverable
                   {d.filename}
                 </span>
                 {d.file_size_bytes > 0 && (
-                  <span className="text-xs text-text-muted flex-shrink-0">
+                  <span className="text-xs text-text-muted tabular-nums flex-shrink-0">
                     {formatBytes(d.file_size_bytes)}
                   </span>
                 )}

@@ -249,11 +249,11 @@ export function ChannelActivity({ channelId, className }: ChannelActivityProps) 
                     role="separator"
                     aria-label={formatDateSeparator(group.date)}
                   >
-                    <div className="flex-1 h-px bg-surface-active" />
-                    <span className="text-xs font-medium text-text-muted">
+                    <div className="flex-1 h-px bg-border" />
+                    <span className="text-xs font-medium text-text-muted tabular-nums">
                       {formatDateSeparator(group.date)}
                     </span>
-                    <div className="flex-1 h-px bg-surface-active" />
+                    <div className="flex-1 h-px bg-border" />
                   </div>
                 )
 
@@ -319,7 +319,7 @@ export function ChannelActivity({ channelId, className }: ChannelActivityProps) 
       <MentionInput
         agents={channelAgents}
         onSend={handleSend}
-        placeholder="Message this channel..."
+        placeholder="Message your agents..."
         insertRef={insertRef}
       />
 

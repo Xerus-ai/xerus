@@ -73,18 +73,21 @@ export function InviteCodeGate({ email }: InviteCodeGateProps) {
       <div className="relative z-10 w-full max-w-md px-4 flex flex-col items-center">
         {/* Logo */}
         <div className="text-center mb-10">
-          <div className="flex items-center justify-center gap-3 mb-6">
+          <div className="flex items-center justify-center gap-3 mb-6 animate-[fadeInScale_600ms_cubic-bezier(0.23,1,0.32,1)_forwards]" style={{ opacity: 0 }}>
             <img src="/logo/xerus.svg" alt="Xerus" className="w-16 h-16" />
             <img src="/logo/logo-svg.svg" alt="Xerus Logo" className="h-10 mt-3" />
           </div>
 
+          <h1 className="text-2xl font-serif font-medium text-text mb-3 tracking-tight">
+            You're almost in
+          </h1>
           <p className="text-text-secondary text-lg font-sans max-w-sm mx-auto">
-            Xerus is currently invite-only. Enter your code below to get started, or join the waitlist.
+            Enter your invite code to get started, or join the waitlist for early access.
           </p>
         </div>
 
         {/* Card */}
-        <div className="w-full bg-surface p-8 rounded-[32px] shadow-sm border border-[#FFE4D6]">
+        <div className="w-full bg-card p-8 rounded-[32px] shadow-md border border-secondary/15 ring-1 ring-secondary/5">
           {showRequestAccess ? (
             // Request access form
             <div>
@@ -110,7 +113,7 @@ export function InviteCodeGate({ email }: InviteCodeGateProps) {
 
                   <button
                     type="submit"
-                    className="w-full flex items-center justify-center py-3.5 px-6 mt-4 bg-[#18181B] text-white rounded-xl font-medium text-[15px] hover:bg-[#27272A] transition-all duration-300 transform hover:-translate-y-0.5"
+                    className="w-full flex items-center justify-center py-3.5 px-6 mt-4 bg-text text-white rounded-xl font-medium text-[15px] hover:bg-text/90 transition-all duration-300 transform hover:-translate-y-0.5"
                   >
                     Join waitlist
                   </button>
@@ -137,12 +140,12 @@ export function InviteCodeGate({ email }: InviteCodeGateProps) {
               <p className="text-text-secondary text-[15px] leading-relaxed mb-1 text-center">
                 Signed in as <span className="font-medium text-text">{email}</span>
               </p>
-              <p className="text-text-secondary/60 text-[13px] mb-6 text-center">
+              <p className="text-text/[0.33] text-[13px] mb-6 text-center">
                 Invite codes are shared on our Discord and social channels.
               </p>
 
               <label htmlFor="inviteCode" className="block text-[13px] font-medium text-text-secondary mb-2 ml-1">
-                Invite code
+                Your invite code
               </label>
               <input
                 id="inviteCode"
@@ -172,7 +175,7 @@ export function InviteCodeGate({ email }: InviteCodeGateProps) {
               <button
                 type="submit"
                 disabled={code.length < 8 || isSubmitting}
-                className="w-full flex items-center justify-center gap-2.5 py-3.5 px-6 mt-4 bg-[#18181B] text-white rounded-xl font-medium text-[15px] hover:bg-[#27272A] transition-all duration-300 transform hover:-translate-y-0.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none"
+                className="w-full flex items-center justify-center gap-2.5 py-3.5 px-6 mt-4 bg-text text-white rounded-xl font-medium text-[15px] hover:bg-text/90 transition-all duration-300 transform hover:-translate-y-0.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none"
               >
                 {isSubmitting ? (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -198,11 +201,11 @@ export function InviteCodeGate({ email }: InviteCodeGateProps) {
 
         {/* Footer */}
         <div className="mt-8 text-center">
-          <p className="text-xs text-[#9CA3AF] font-sans">
+          <p className="text-xs text-text-muted font-sans">
             Not you?{' '}
             <button
               onClick={handleLogout}
-              className="text-primary hover:text-primary/90 transition-colors hover:underline"
+              className="text-secondary hover:text-secondary/90 transition-colors hover:underline"
             >
               Sign out
             </button>

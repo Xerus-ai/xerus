@@ -42,7 +42,7 @@ export function OfficeHUD({ agents }: OfficeHUDProps) {
           {activeAgents.slice(0, 4).map(agent => (
             <div
               key={agent.id}
-              className="flex items-center gap-1.5 bg-white/80 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-sm whitespace-nowrap flex-shrink-0"
+              className="flex items-center gap-1.5 bg-card/80 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-sm whitespace-nowrap flex-shrink-0"
             >
               <Zap className="w-3 h-3 text-primary" />
               <span className="text-[10px] font-medium text-text">{agent.name}</span>

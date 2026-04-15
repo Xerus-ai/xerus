@@ -36,7 +36,7 @@ const AgentCardComponent = ({ agent, onClone, onChat, onClick, isCloning, isOwne
     return (
         <div
             data-testid="agent-card"
-            className="bg-surface hover:bg-surface-hover rounded-[32px] p-6 shadow-sm relative group h-full transition-all duration-300 cursor-pointer flex flex-col"
+            className="bg-surface hover:bg-surface-hover rounded-2xl p-6 shadow-sm relative group h-full transition-all duration-200 cursor-pointer flex flex-col hover:-translate-y-0.5 hover:shadow-md"
             onClick={onClick}
         >
             {/* Header */}
@@ -47,12 +47,12 @@ const AgentCardComponent = ({ agent, onClone, onChat, onClick, isCloning, isOwne
                         <AgentAvatarWithModel agent={agent} hideBadge className="w-full h-full" />
                     </div>
                     {/* Claude Code adapter badge */}
-                    <div className="absolute -top-1.5 -left-1.5 bg-white border border-blue-200 rounded-md p-0.5 shadow-sm z-20" title="Claude Code">
+                    <div className="absolute -top-1.5 -left-1.5 bg-card border border-secondary/20 rounded-md p-0.5 shadow-sm z-20" title="Claude Code">
                         <img src="/icons/claudecode-color.svg" alt="Claude Code" className="w-4 h-4 object-contain" />
                     </div>
                     {/* Model Badge */}
                     {agent.model && (
-                        <div className="absolute -bottom-1 left-[calc(50%+4px)] -translate-x-1/2 bg-white border border-surface-active rounded-md px-2 py-0.5 shadow-sm flex items-center gap-0.5 z-10 whitespace-nowrap">
+                        <div className="absolute -bottom-1 left-[calc(50%+4px)] -translate-x-1/2 bg-card border border-surface-active rounded-md px-2 py-0.5 shadow-sm flex items-center gap-0.5 z-10 whitespace-nowrap">
                             <ModelIcon model={agent.model} size="sm" />
                             <span className="text-[10px] font-bold text-text-secondary whitespace-nowrap">{formatModelName(agent.model)}</span>
                         </div>
@@ -69,7 +69,7 @@ const AgentCardComponent = ({ agent, onClone, onChat, onClick, isCloning, isOwne
                                     <Tooltip key={tool.name_slug || idx}>
                                         <TooltipTrigger asChild>
                                             <div
-                                                className="w-8 h-8 rounded-lg bg-white border border-surface-active flex items-center justify-center overflow-hidden shadow-sm hover:scale-125 hover:z-10 transition-transform duration-200 cursor-default"
+                                                className="w-8 h-8 rounded-lg bg-card border border-surface-active flex items-center justify-center overflow-hidden shadow-sm hover:scale-125 hover:z-10 transition-transform duration-200 cursor-default"
                                                 style={{ zIndex: 4 - idx }}
                                             >
                                                 {tool.img_src ? (
@@ -113,7 +113,7 @@ const AgentCardComponent = ({ agent, onClone, onChat, onClick, isCloning, isOwne
                         <div className={`flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${
                             agent.adapter_type === 'codex'
                                 ? 'text-gray-400 bg-gray-50 border-gray-200'
-                                : 'text-blue-700 bg-blue-50 border-blue-200'
+                                : 'text-secondary bg-secondary/10 border-secondary/20'
                         }`}>
                             {getAdapterIconPath(agent.adapter_type) && (
                                 // eslint-disable-next-line @next/next/no-img-element
@@ -139,11 +139,11 @@ const AgentCardComponent = ({ agent, onClone, onChat, onClick, isCloning, isOwne
             {/* Body */}
             <div className="mb-4">
                 <div className="flex items-start gap-0.5 overflow-visible">
-                    <h3 className="font-serif text-xl text-text group-hover:text-primary transition-colors line-clamp-1" title={agent.name}>
+                    <h3 className="text-base font-medium tracking-tight text-text group-hover:text-secondary transition-colors line-clamp-1" title={agent.name}>
                         {agent.name}
                     </h3>
                     {agent.isVerified && (
-                        <span className="shrink-0 w-3 h-3 bg-primary rounded-full flex items-center justify-center -mt-0.5" title="Verified">
+                        <span className="shrink-0 w-3 h-3 bg-secondary rounded-full flex items-center justify-center -mt-0.5" title="Verified">
                             <svg className="w-2 h-2 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
                                 <polyline points="20 6 9 17 4 12" />
                             </svg>
@@ -162,9 +162,9 @@ const AgentCardComponent = ({ agent, onClone, onChat, onClick, isCloning, isOwne
                         e.stopPropagation();
                         onClick?.();
                     }}
-                    className="flex items-center justify-center gap-2 bg-surface-hover hover:bg-surface-pressed text-text font-medium py-2.5 rounded-xl text-sm transition-colors"
+                    className="flex items-center justify-center gap-2 bg-surface-hover hover:bg-surface-pressed text-text-secondary font-medium py-2.5 rounded-xl text-sm transition-colors border border-surface-active"
                 >
-                    <Settings className="w-4 h-4 text-text-secondary" />
+                    <Settings className="w-4 h-4" />
                     Manage
                 </button>
                 {isOwner && onChat ? (
@@ -173,10 +173,10 @@ const AgentCardComponent = ({ agent, onClone, onChat, onClick, isCloning, isOwne
                             e.stopPropagation();
                             onChat(e);
                         }}
-                        className="flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white font-medium py-2.5 rounded-xl text-sm shadow-sm transition-all"
+                        className="flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white font-semibold py-2.5 rounded-xl text-sm shadow-sm hover:shadow-md transition-all"
                     >
                         Chat
-                        <ArrowRight className="w-4 h-4" />
+                        <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform duration-200" />
                     </button>
                 ) : canCloneAgent(agent.agentType) && onClone ? (
                     <button
@@ -186,7 +186,7 @@ const AgentCardComponent = ({ agent, onClone, onChat, onClick, isCloning, isOwne
                         }}
                         disabled={isCloning}
                         data-testid="agent-clone-button"
-                        className="flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white font-medium py-2.5 rounded-xl text-sm shadow-sm transition-all disabled:opacity-50"
+                        className="flex items-center justify-center gap-2 bg-secondary hover:bg-secondary/90 text-white font-medium py-2.5 rounded-xl text-sm shadow-sm transition-all disabled:opacity-50"
                     >
                         {isCloning ? (
                             <span className="flex items-center justify-center gap-2">
@@ -231,12 +231,12 @@ export function CreateAgentCard({ onClick }: CreateAgentCardProps) {
         <div
             onClick={onClick}
             data-testid="create-agent-card"
-            className="rounded-[32px] border-2 border-dashed border-surface-active hover:border-primary p-6 flex flex-col items-center justify-center text-center h-full min-h-[280px] hover:bg-surface-hover/50 transition-all duration-300 cursor-pointer group"
+            className="rounded-2xl border-2 border-dashed border-surface-active hover:border-secondary/40 p-6 flex flex-col items-center justify-center text-center h-full min-h-[280px] hover:bg-surface-hover/50 transition-all duration-200 cursor-pointer group"
         >
             <div className="w-16 h-16 bg-surface rounded-full flex items-center justify-center shadow-sm mb-4 group-hover:scale-110 transition-transform duration-300">
-                <Upload className="w-7 h-7 text-primary" />
+                <Upload className="w-7 h-7 text-secondary" />
             </div>
-            <h3 className="font-serif text-xl text-text group-hover:text-primary transition-colors">
+            <h3 className="text-base font-medium tracking-tight text-text group-hover:text-secondary transition-colors">
                 Import Agent
             </h3>
             <p className="text-sm text-text-secondary mt-2 max-w-[200px]">

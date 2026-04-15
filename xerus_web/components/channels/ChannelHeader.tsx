@@ -39,12 +39,12 @@ interface ChannelHeaderProps {
 // ---------------------------------------------------------------------------
 
 const TAB_LIST_CLASSES =
-  'mb-8 bg-surface p-[0.325rem] rounded-full inline-flex h-auto w-auto border-none'
+  'mt-4 mb-6 bg-surface p-1 rounded-full inline-flex h-auto w-auto border-none'
 
 const TAB_TRIGGER_CLASSES = cn(
-  'rounded-full px-6 py-2.5 text-sm font-medium transition-all',
-  'data-[state=active]:bg-text data-[state=active]:text-white data-[state=active]:shadow-sm',
-  'text-text-secondary hover:text-text'
+  'rounded-full px-5 py-2 text-sm font-medium transition-all duration-150',
+  'data-[state=active]:bg-secondary/10 data-[state=active]:text-secondary data-[state=active]:shadow-sm',
+  'text-text-muted hover:text-text-secondary'
 )
 
 // ---------------------------------------------------------------------------
@@ -125,7 +125,7 @@ export function ChannelHeader({
   return (
     <div className={cn('flex flex-col h-full', className)}>
       {/* Header section */}
-      <div className="flex-shrink-0 pb-4">
+      <div className="flex-shrink-0 pb-4 border-b border-border">
         <div className="flex items-start justify-between gap-4 mb-2">
           {/* Left: channel name + description (click-to-edit) */}
           <div className="min-w-0 flex-1">
@@ -138,14 +138,14 @@ export function ChannelHeader({
                   onChange={(e) => setEditName(e.target.value)}
                   onBlur={handleNameBlur}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleNameBlur(); if (e.key === 'Escape') { setEditName(channelName); setIsEditingName(false) } }}
-                  className="font-serif !text-2xl text-text bg-transparent border-none shadow-none !h-auto focus-visible:ring-2 focus-visible:ring-primary p-0 min-w-[200px]"
+                  className="font-serif !text-lg font-medium tracking-tight text-text bg-transparent border-none shadow-none !h-auto focus-visible:ring-2 focus-visible:ring-primary p-0 min-w-[200px]"
                   placeholder="Channel name"
                 />
               ) : (
                 <>
                   <h1
                     onClick={() => setIsEditingName(true)}
-                    className="font-serif text-2xl font-semibold text-text truncate cursor-text hover:text-text/80 transition-colors"
+                    className="font-serif text-lg font-medium tracking-tight text-text truncate cursor-text hover:text-text/80 transition-colors"
                   >
                     # {channelName}
                   </h1>
@@ -203,18 +203,18 @@ export function ChannelHeader({
               <div className="flex items-center">
                 {channelAgents.slice(0, 5).map((agent, index) => (
                   <div key={agent.id} className="relative pb-1" style={{ marginLeft: index === 0 ? 0 : -6, zIndex: 5 - index }}>
-                    <div className="w-9 h-9 rounded-xl overflow-hidden border border-surface-active bg-surface-hover ring-2 ring-white">
+                    <div className="w-9 h-9 rounded-xl overflow-hidden border border-surface-active bg-surface-hover ring-2 ring-card">
                       <AgentAvatarWithModel name={agent.name} avatarUrl={agent.avatar_url} model={agent.ai_model} hideBadge className="w-full h-full" />
                     </div>
                     {agent.ai_model && (
-                      <div className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 bg-white border border-surface-active rounded-md px-1 py-px shadow-sm flex items-center gap-0.5 z-10">
+                      <div className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 bg-card border border-surface-active rounded-md px-1 py-px shadow-sm flex items-center gap-0.5 z-10">
                         <ModelIcon model={agent.ai_model} size="xs" />
                       </div>
                     )}
                   </div>
                 ))}
                 {channelAgents.length > 5 && (
-                  <div className="w-9 h-9 rounded-xl bg-surface-hover text-text-secondary ring-2 ring-white flex items-center justify-center text-xs font-medium" style={{ marginLeft: -6, zIndex: 0 }}>
+                  <div className="w-9 h-9 rounded-xl bg-surface-hover text-text-secondary ring-2 ring-card flex items-center justify-center text-xs font-medium" style={{ marginLeft: -6, zIndex: 0 }}>
                     +{channelAgents.length - 5}
                   </div>
                 )}
@@ -226,7 +226,7 @@ export function ChannelHeader({
             <Popover open={agentPopoverOpen} onOpenChange={setAgentPopoverOpen}>
               <PopoverTrigger asChild>
                 <button
-                  className="p-2 hover:bg-[#FFF5EB] text-[#FF6600] rounded-full transition-colors"
+                  className="p-2 hover:bg-secondary/8 text-secondary rounded-full transition-colors"
                   aria-label="Manage channel agents"
                 >
                   {agentPopoverOpen ? <X className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
@@ -235,14 +235,14 @@ export function ChannelHeader({
               <PopoverContent
                 align="end"
                 sideOffset={8}
-                className="w-80 p-0 rounded-[24px] bg-surface border border-surface-active shadow-sm"
+                className="w-80 p-0 rounded-[24px] bg-surface border border-border shadow-sm"
               >
                 <div className="px-5 pt-5 pb-3">
                   <h3 className="text-lg font-serif text-text">Channel Agents</h3>
                   <p className="text-xs text-text-muted mt-0.5">{channelAgents.length} assigned</p>
                 </div>
                 <div className="px-5 pb-4">
-                  <div className="bg-surface rounded-[20px] border border-surface-active shadow-sm p-4">
+                  <div className="bg-surface rounded-2xl border border-border shadow-sm p-4">
                     {channelAgents.length > 0 ? (
                       <div className="space-y-1">
                         {channelAgents.map((agent) => {
@@ -253,11 +253,11 @@ export function ChannelHeader({
                                 <div className="w-10 h-10 rounded-xl overflow-hidden border border-surface-active bg-surface-hover">
                                   <AgentAvatarWithModel name={agent.name} avatarUrl={agent.avatar_url} model={agent.ai_model} hideBadge className="w-full h-full" />
                                 </div>
-                                <div className="absolute -top-1.5 -left-1.5 bg-white border border-blue-200 rounded-md p-0.5 shadow-sm z-20" title="Claude Code">
+                                <div className="absolute -top-1.5 -left-1.5 bg-card border border-secondary/20 rounded-md p-0.5 shadow-sm z-20" title="Claude Code">
                                   <img src="/icons/claudecode-color.svg" alt="" className="w-3.5 h-3.5 object-contain" />
                                 </div>
                                 {agent.ai_model && (
-                                  <div className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 bg-white border border-surface-active rounded-md px-1 py-px shadow-sm flex items-center gap-0.5 z-10 whitespace-nowrap">
+                                  <div className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 bg-card border border-surface-active rounded-md px-1 py-px shadow-sm flex items-center gap-0.5 z-10 whitespace-nowrap">
                                     <ModelIcon model={agent.ai_model} size="xs" />
                                     <span className="text-[8px] font-bold text-text-secondary">{formatModelName(agent.ai_model)}</span>
                                   </div>
@@ -283,14 +283,14 @@ export function ChannelHeader({
                         })}
                       </div>
                     ) : (
-                      <div className="text-center py-6 border-2 border-dashed border-surface-active rounded-xl">
+                      <div className="text-center py-6 border-2 border-dashed border-border rounded-xl">
                         <p className="text-xs text-text-secondary italic">No agents assigned yet</p>
                       </div>
                     )}
 
                     {/* Available agents picker */}
                     {allAgents.filter(a => !assignedIds.has(a.id)).length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-surface-active">
+                      <div className="mt-3 pt-3 border-t border-border">
                         <p className="text-[10px] font-medium text-text-secondary mb-1.5">Add agent</p>
                         <div className="space-y-0.5 max-h-48 overflow-y-auto">
                           {allAgents.filter(a => !assignedIds.has(a.id)).map((agent) => {
@@ -307,7 +307,7 @@ export function ChannelHeader({
                                     <AgentAvatarWithModel name={agent.name} avatarUrl={agent.avatar_url} model={agent.ai_model} hideBadge className="w-full h-full" />
                                   </div>
                                   {agent.ai_model && (
-                                    <div className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 bg-white border border-surface-active rounded-md px-0.5 py-px shadow-sm flex items-center z-10">
+                                    <div className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 bg-card border border-surface-active rounded-md px-0.5 py-px shadow-sm flex items-center z-10">
                                       <ModelIcon model={agent.ai_model} size="xs" />
                                     </div>
                                   )}

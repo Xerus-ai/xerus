@@ -106,7 +106,7 @@ export function PageHeader({
                                 value={inputValue}
                                 onChange={(e) => setInputValue(e.target.value)}
                                 data-testid="agent-search"
-                                className="w-full pl-10 pr-4 py-3 bg-white/60 border border-surface-active rounded-full text-sm focus:outline-none focus:border-primary transition-colors placeholder:text-text-secondary/60"
+                                className="w-full pl-10 pr-4 py-3 bg-card/60 border border-surface-active rounded-full text-sm focus:outline-none focus:border-primary transition-colors placeholder:text-text/40"
                             />
                         </div>
                     )}
@@ -167,7 +167,7 @@ export function PageHeader({
                                         </button>
                                     </PopoverTrigger>
                                     <PopoverContent
-                                        className="w-64 p-2 bg-white border border-surface-active rounded-xl shadow-lg"
+                                        className="w-64 p-2 bg-card border border-surface-active rounded-xl shadow-lg"
                                         align="start"
                                     >
                                         <div className="max-h-[300px] overflow-y-auto">

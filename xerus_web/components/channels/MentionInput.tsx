@@ -23,7 +23,7 @@ const STATUS_DOT: Record<string, string> = {
 export function MentionInput({
   agents,
   onSend,
-  placeholder = 'Message this channel...',
+  placeholder = 'Message your agents...',
   className,
   insertRef,
 }: MentionInputProps) {
@@ -191,49 +191,51 @@ export function MentionInput({
         {showPicker && filtered.length > 0 && (
           <div
             ref={pickerRef}
-            className="absolute bottom-full left-0 right-0 mb-2 bg-white border border-surface-active rounded-2xl shadow-lg overflow-hidden max-h-[200px] overflow-y-auto z-10"
+            className="absolute bottom-full left-0 w-[280px] mb-2 bg-card border border-border rounded-xl shadow-lg backdrop-blur-sm overflow-hidden max-h-[200px] overflow-y-auto z-10"
             role="listbox"
             aria-label="Mention an agent"
           >
-            <div className="px-3 py-2 border-b border-surface-active">
+            <div className="px-3 py-1.5 border-b border-border">
               <span className="text-[11px] font-medium text-text-muted uppercase tracking-wide">Agents</span>
             </div>
-            {filtered.map((agent, idx) => (
-              <button
-                key={agent.id}
-                type="button"
-                role="option"
-                aria-selected={idx === selectedIdx}
-                className={cn(
-                  'flex items-center gap-3 w-full px-3 py-2 text-left text-sm transition-colors',
-                  idx === selectedIdx
-                    ? 'bg-primary/8 text-primary'
-                    : 'text-text hover:bg-surface-hover'
-                )}
-                onMouseDown={(e) => {
-                  e.preventDefault()
-                  insertMention(agent)
-                }}
-                onMouseEnter={() => setSelectedIdx(idx)}
-              >
-                <span
-                  className={cn('w-2 h-2 rounded-full shrink-0', STATUS_DOT[agent.status] ?? 'bg-slate-400')}
-                  aria-hidden="true"
-                />
-                <span className="font-medium flex-1">{agent.name}</span>
-                <span className="text-text-muted text-xs">@{agent.slug}</span>
-              </button>
-            ))}
+            <div className="p-1">
+              {filtered.map((agent, idx) => (
+                <button
+                  key={agent.id}
+                  type="button"
+                  role="option"
+                  aria-selected={idx === selectedIdx}
+                  className={cn(
+                    'flex items-center gap-2.5 w-full px-2 py-1.5 text-left text-sm rounded-md transition-colors duration-100',
+                    idx === selectedIdx
+                      ? 'bg-surface-hover text-text'
+                      : 'text-text hover:bg-surface-hover'
+                  )}
+                  onMouseDown={(e) => {
+                    e.preventDefault()
+                    insertMention(agent)
+                  }}
+                  onMouseEnter={() => setSelectedIdx(idx)}
+                >
+                  <span
+                    className={cn('w-1.5 h-1.5 rounded-full shrink-0', STATUS_DOT[agent.status] ?? 'bg-slate-400')}
+                    aria-hidden="true"
+                  />
+                  <span className="font-medium truncate flex-1">{agent.name}</span>
+                  <span className="text-text-muted text-xs truncate">@{agent.slug}</span>
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
         {/* Composer card */}
         <div
           className={cn(
-            'rounded-2xl border bg-white transition-all duration-200',
+            'rounded-2xl border bg-card transition-all duration-150',
             focused
-              ? 'border-primary/40 shadow-[0_2px_12px_rgba(255,102,0,0.08)]'
-              : 'border-surface-active shadow-sm hover:shadow-md hover:border-surface-hover'
+              ? 'border-primary/30 shadow-sm'
+              : 'border-border shadow-sm hover:border-border/80'
           )}
         >
           {/* Textarea */}

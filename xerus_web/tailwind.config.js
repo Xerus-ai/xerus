@@ -10,13 +10,15 @@ module.exports = {
 			fontFamily: {
 				'sans': ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Helvetica', 'sans-serif'],
 				'serif': ['Lora', 'Georgia', 'Times New Roman', 'serif'],
+				'mono': ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', 'monospace'],
 			},
 			colors: {
-				// Brand colors
+				// Primary = Dark (buttons, strong actions)
 				primary: {
 					DEFAULT: 'hsl(var(--primary))',
 					foreground: 'hsl(var(--primary-foreground))'
 				},
+				// Secondary = Orange (accent buttons, highlights)
 				secondary: {
 					DEFAULT: 'hsl(var(--secondary))',
 					foreground: 'hsl(var(--secondary-foreground))'
@@ -26,20 +28,21 @@ module.exports = {
 					foreground: 'hsl(var(--accent-foreground))'
 				},
 
-				// Surface colors (cards, panels, containers)
+				// Surface colors — RGB channels for Tailwind alpha + dark mode
 				surface: {
-					DEFAULT: '#F5F0EB',
-					alt: '#FBF7F1',
-					hover: '#EAE4DC',
-					active: '#E5E0DA',
-					pressed: '#E0D8CE',
+					DEFAULT: 'rgb(var(--clr-surface) / <alpha-value>)',
+					alt: 'rgb(var(--clr-surface-alt) / <alpha-value>)',
+					hover: 'rgb(var(--clr-surface-hover) / <alpha-value>)',
+					active: 'rgb(var(--clr-surface-active) / <alpha-value>)',
+					pressed: 'rgb(var(--clr-surface-pressed) / <alpha-value>)',
 				},
 
-				// Text colors
+				// Text — warm brown base with alpha support
+				// text-text = #26251e, text-text/55 = Cursor's secondary text
 				text: {
-					DEFAULT: '#2D2D2D',
-					secondary: '#6E6E6E',
-					muted: '#999999',
+					DEFAULT: 'rgb(var(--clr-text) / <alpha-value>)',
+					secondary: 'var(--clr-text-secondary)',
+					muted: 'var(--clr-text-muted)',
 				},
 
 				// Base UI colors
@@ -75,14 +78,16 @@ module.exports = {
 			borderRadius: {
 				'sm': '4px',
 				'md': '8px',
-				'lg': '12px',
-				'xl': '16px',
-				'2xl': '24px',
+				'lg': '10px',
+				'xl': '12px',
+				'2xl': '16px',
+				'pill': '9999px',
 			},
 			boxShadow: {
-				'sm': '0 1px 3px rgba(0,0,0,0.1)',
-				'md': '0 4px 6px rgba(0,0,0,0.1)',
-				'lg': '0 8px 20px rgba(0,0,0,0.1)',
+				'sm': '0 1px 2px rgba(0,0,0,0.04)',
+				'md': '0 2px 8px rgba(0,0,0,0.06)',
+				'lg': '0 8px 24px rgba(0,0,0,0.08)',
+				'elevated': '0 14px 32px rgba(0,0,0,0.1), 0 28px 70px rgba(0,0,0,0.06)',
 			}
 		}
 	},

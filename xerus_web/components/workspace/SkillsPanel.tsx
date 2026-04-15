@@ -99,8 +99,8 @@ export function SkillsPanel({ onSelect, onCountChange }: SkillsPanelProps) {
         {/* My Skills (user-created + installed) */}
         <div className="w-full mb-12">
           <div className="flex items-center gap-3 mb-6">
-            <h2 className="font-serif text-2xl text-text">My Skills</h2>
-            <span className="bg-primary/10 text-primary text-xs font-bold px-2 py-1 rounded-md">
+            <h2 className="font-serif text-2xl text-text tracking-tight">My Skills</h2>
+            <span className="bg-secondary/10 text-secondary text-xs font-bold px-2 py-1 rounded-md tabular-nums">
               {filteredMySkills.length + filteredInstalled.length} Skills
             </span>
           </div>
@@ -131,8 +131,8 @@ export function SkillsPanel({ onSelect, onCountChange }: SkillsPanelProps) {
         {/* Marketplace */}
         <div className="w-full">
           <div className="flex items-center gap-3 mb-6">
-            <h2 className="font-serif text-2xl text-text">Marketplace</h2>
-            <span className="bg-text-secondary/10 text-text-secondary text-xs font-bold px-2 py-1 rounded-md">
+            <h2 className="font-serif text-2xl text-text tracking-tight">Marketplace</h2>
+            <span className="bg-surface-active text-text-secondary text-xs font-bold px-2 py-1 rounded-md tabular-nums">
               {filteredMarketplace.length} Available
             </span>
           </div>

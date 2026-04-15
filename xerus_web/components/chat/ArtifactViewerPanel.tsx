@@ -153,16 +153,16 @@ function MarkdownRenderer({ content }: { content: string }) {
       'prose-headings:font-semibold prose-headings:text-text prose-headings:mt-4 prose-headings:mb-2',
       'prose-h1:text-xl prose-h2:text-lg prose-h3:text-base',
       'prose-strong:text-text prose-strong:font-semibold',
-      'prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-lg prose-code:bg-surface prose-code:text-primary prose-code:font-mono prose-code:text-sm',
+      'prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:bg-surface-hover prose-code:text-text prose-code:font-mono prose-code:text-[13px]',
       'prose-code:before:content-none prose-code:after:content-none',
       'prose-pre:bg-[#1E1E1E] prose-pre:rounded-xl prose-pre:border prose-pre:border-gray-800',
       'prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-li:text-text-secondary prose-li:text-[14px]',
-      'prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-a:font-medium',
+      'prose-a:text-secondary prose-a:no-underline hover:prose-a:underline prose-a:font-medium',
       'prose-table:text-xs prose-th:text-left prose-th:text-text prose-th:font-semibold prose-th:pb-2',
       'prose-td:text-text-secondary prose-td:py-1',
       'prose-tr:border-b prose-tr:border-surface-active',
       'prose-em:text-text-secondary',
-      'prose-blockquote:border-l-primary prose-blockquote:text-text-secondary',
+      'prose-blockquote:border-l-0 prose-blockquote:not-italic prose-blockquote:bg-surface-hover/60 prose-blockquote:rounded-lg prose-blockquote:px-4 prose-blockquote:py-3 prose-blockquote:text-text-secondary prose-blockquote:italic prose-blockquote:font-serif',
     )}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
@@ -322,13 +322,13 @@ export function ArtifactViewerPanel({
       className={cn(
         'hidden md:flex flex-col shrink-0 overflow-hidden',
         'h-full',
-        'w-[50%] bg-white border-l border-surface-active/40',
+        'w-[50%] bg-card border-l border-surface-active/40',
         'transition-all duration-200 ease-in-out',
         className,
       )}
     >
       {/* Header */}
-      <div className="flex items-center gap-2.5 px-4 py-3 border-b border-gray-200 shrink-0 bg-white">
+      <div className="flex items-center gap-2.5 px-4 py-3 border-b border-border shrink-0 bg-card">
         {/* Type icon */}
         <div className={cn('w-7 h-7 rounded-xl flex items-center justify-center shrink-0', iconColor)}>
           <Icon className="w-3.5 h-3.5" />

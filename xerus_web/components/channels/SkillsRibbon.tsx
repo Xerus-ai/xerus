@@ -58,7 +58,7 @@ export function SkillsRibbon({ channelSlug, onSkillClick }: SkillsRibbonProps) {
       <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
         <PopoverTrigger asChild>
           <button
-            className="p-1 hover:bg-[#FFF5EB] text-[#FF6600] rounded-full transition-colors shrink-0"
+            className="p-1 hover:bg-primary/5 text-primary rounded-full transition-colors shrink-0"
             aria-label="Manage skills"
           >
             {popoverOpen ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
@@ -68,11 +68,11 @@ export function SkillsRibbon({ channelSlug, onSkillClick }: SkillsRibbonProps) {
           align="start"
           side="top"
           sideOffset={8}
-          className="w-72 p-0 rounded-[20px] bg-surface border border-surface-active shadow-sm max-h-[320px] flex flex-col"
+          className="w-72 p-0 rounded-2xl bg-surface border border-surface-active shadow-sm max-h-[320px] flex flex-col"
         >
           <div className="px-4 pt-4 pb-2 shrink-0">
             <div className="flex items-center gap-2">
-              <Puzzle className="w-4 h-4 text-[#FF6600]" />
+              <Puzzle className="w-4 h-4 text-primary" />
               <h3 className="text-sm font-semibold text-text">Channel Skills</h3>
             </div>
             <p className="text-[11px] text-text-muted mt-0.5">{installedSkills.length} installed</p>
@@ -86,8 +86,8 @@ export function SkillsRibbon({ channelSlug, onSkillClick }: SkillsRibbonProps) {
                   const isProcessing = processing === skill.slug
                   return (
                     <div key={skill.slug} className="flex items-center gap-2 py-1.5 px-2 rounded-xl hover:bg-surface-hover group transition-colors">
-                      <div className="w-6 h-6 rounded-lg bg-[#FF6600]/10 flex items-center justify-center shrink-0">
-                        <Puzzle className="w-3 h-3 text-[#FF6600]" />
+                      <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                        <Puzzle className="w-3 h-3 text-primary" />
                       </div>
                       <span className="text-sm text-text truncate flex-1">{skill.name}</span>
                       {isProcessing ? (

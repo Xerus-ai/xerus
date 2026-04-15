@@ -54,7 +54,7 @@ export function SkillPreviewCard({ frontmatter, xerushub, markdownBody, files }:
               {tags.map(tag => (
                 <span
                   key={tag}
-                  className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-primary/10 text-primary"
+                  className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-secondary/10 text-secondary"
                 >
                   {tag}
                 </span>
@@ -71,7 +71,7 @@ export function SkillPreviewCard({ frontmatter, xerushub, markdownBody, files }:
         )}
 
         {/* Markdown preview */}
-        <div className="rounded-xl overflow-hidden border border-surface-active bg-white" style={{ maxHeight: '160px' }}>
+        <div className="rounded-xl overflow-hidden border border-surface-active bg-card" style={{ maxHeight: '160px' }}>
           <div className="overflow-hidden" style={{ maxHeight: '160px' }}>
             <div
               className="prose prose-sm max-w-none text-text prose-headings:text-text prose-headings:font-normal prose-headings:leading-[1.3] prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-h1:text-[36px] prose-h1:font-normal prose-h1:mb-3 prose-h2:text-[30px] prose-h2:font-normal prose-h2:mb-2 prose-h3:text-[24px] prose-h3:font-normal prose-h3:mb-2"

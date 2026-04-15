@@ -137,7 +137,7 @@ export function FileCard({ node, isSelected, onClick, onContextMenu, preview }: 
       <button
         onClick={onClick}
         className={cn(
-          'rounded-2xl overflow-hidden text-left transition-all duration-300 bg-white border',
+          'rounded-2xl overflow-hidden text-left transition-all duration-300 bg-card border',
           isSelected
             ? 'border-surface-active shadow-lg'
             : 'border-[#E5E5E5]/80 shadow-[0_2px_12px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:translate-y-[-2px]',
@@ -153,7 +153,7 @@ export function FileCard({ node, isSelected, onClick, onContextMenu, preview }: 
             /* Eden layout: centered portrait card inside the preview area */
             <div className="h-full flex items-center justify-center" style={{ padding: '4px' }}>
               <div
-                className="relative rounded-xl overflow-hidden shadow-[0_0_12px_rgba(0,0,0,0.05)] bg-white"
+                className="relative rounded-xl overflow-hidden shadow-[0_0_12px_rgba(0,0,0,0.05)] bg-card"
                 style={{ aspectRatio: '0.71 / 1', width: 'auto', height: '100%', maxWidth: 'calc(100% - 8px)', maxHeight: 'calc(100% - 8px)' }}
               >
                 <div className="absolute inset-0 w-full h-full overflow-hidden">
@@ -164,7 +164,7 @@ export function FileCard({ node, isSelected, onClick, onContextMenu, preview }: 
                   )}
                 </div>
                 <div
-                  className="absolute inset-x-0 bottom-0 h-6 pointer-events-none bg-white"
+                  className="absolute inset-x-0 bottom-0 h-6 pointer-events-none bg-card"
                   style={{ maskImage: 'linear-gradient(to top, black 0%, black 30%, transparent 100%)' }}
                 />
               </div>

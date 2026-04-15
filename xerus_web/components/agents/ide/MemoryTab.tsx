@@ -108,14 +108,14 @@ export function MemoryTab({ agent }: MemoryTabProps) {
                 </div>
 
                 {/* Filter Pills */}
-                <div className="flex items-center bg-surface rounded-[12px] p-1 border border-surface-active">
+                <div className="flex items-center bg-surface rounded-xl p-1 border border-surface-active">
                     {MEMORY_FILTERS.map(f => (
                         <button
                             key={f.value}
                             onClick={() => setActiveFilter(f.value)}
                             className={`px-4 py-1.5 rounded-[8px] text-sm font-medium transition-all ${
                                 activeFilter === f.value
-                                    ? 'bg-white text-text shadow-sm'
+                                    ? 'bg-card text-text shadow-sm'
                                     : 'text-text-secondary hover:text-text'
                             }`}
                         >
@@ -138,7 +138,7 @@ export function MemoryTab({ agent }: MemoryTabProps) {
                                     {entries.map(entry => (
                                         <div
                                             key={entry.id}
-                                            className="p-3 bg-white rounded-xl border border-surface-active/60"
+                                            className="p-3 bg-card rounded-xl border border-surface-active/60"
                                         >
                                             {entry.filePath && (
                                                 <p className="text-xs text-text-muted font-mono mb-1 truncate">

@@ -54,7 +54,7 @@ export function AgentFilesSection({
       {/* Agent Files - Unified Section */}
       <div className="space-y-4">
         <div className="flex items-center gap-2 px-1">
-          <FileText className="w-6 h-6 text-primary" />
+          <FileText className="w-6 h-6 text-secondary" />
           <h3 className="text-2xl font-serif text-text">Agent Files</h3>
         </div>
 

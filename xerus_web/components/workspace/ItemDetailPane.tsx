@@ -78,7 +78,7 @@ function AgentDetail({ agent, onClose, router }: { agent: Assistant; onClose: ()
             <span className="text-xs text-text-secondary">Type</span>
             <span className={cn(
               'text-[10px] font-medium px-2 py-0.5 rounded-full',
-              isMarketplace ? 'bg-primary/10 text-primary' : 'bg-surface-hover text-text-secondary'
+              isMarketplace ? 'bg-secondary/10 text-secondary' : 'bg-surface-hover text-text-secondary'
             )}>
               {isMarketplace ? 'Marketplace' : 'Private'}
             </span>

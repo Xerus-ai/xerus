@@ -168,7 +168,7 @@ export function ProactivitySection({
     : null
 
   return (
-    <div className="bg-surface rounded-[24px] border border-surface-active p-6 shadow-sm">
+    <div className="bg-surface rounded-xl border border-surface-active p-6 shadow-sm">
       <h3 className="text-sm font-semibold text-text mb-4">Proactivity</h3>
 
       {/* Reactive / Proactive Cards */}
@@ -209,7 +209,7 @@ export function ProactivitySection({
 
           <span className={`inline-block ml-0 text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full ${
             !isProactive
-              ? 'text-primary bg-primary/10'
+              ? 'text-secondary bg-secondary/10'
               : 'text-text bg-surface border border-surface-active'
           }`}>
             ON DEMAND
@@ -252,7 +252,7 @@ export function ProactivitySection({
 
           <span className={`inline-block ml-0 text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full ${
             isProactive
-              ? 'text-primary bg-primary/10'
+              ? 'text-secondary bg-secondary/10'
               : 'text-text bg-surface border border-surface-active'
           }`}>
             SCHEDULED
@@ -281,7 +281,7 @@ export function ProactivitySection({
           </div>
           <button
             onClick={() => setConfigOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-text bg-surface-hover hover:bg-surface-pressed rounded-[12px] transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-text bg-surface-hover hover:bg-surface-pressed rounded-xl transition-colors"
           >
             <Settings className="w-3.5 h-3.5" />
             Configure
@@ -300,13 +300,13 @@ export function ProactivitySection({
         variant="clean"
       >
         {({ close, minimize }) => (
-          <div className="bg-white rounded-[32px] h-full w-full flex flex-col p-6 overflow-hidden">
+          <div className="bg-card rounded-2xl h-full w-full flex flex-col p-6 overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between mb-4 shrink-0">
               <div className="flex items-center gap-2">
                 <button
                   onClick={close}
-                  className="p-1.5 bg-[#F5F5F5] hover:bg-[#E5E5E5] rounded-full transition-colors"
+                  className="p-1.5 bg-surface-hover hover:bg-surface-pressed rounded-full transition-colors"
                   aria-label="Close"
                 >
                   <X className="w-4 h-4 text-text" />
@@ -314,7 +314,7 @@ export function ProactivitySection({
                 <button
                   type="button"
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); minimize() }}
-                  className="p-1.5 bg-[#F5F5F5] hover:bg-[#E5E5E5] rounded-full transition-colors"
+                  className="p-1.5 bg-surface-hover hover:bg-surface-pressed rounded-full transition-colors"
                   aria-label="Minimize"
                 >
                   <Minus className="w-4 h-4 text-text" />
@@ -344,12 +344,12 @@ export function ProactivitySection({
                       onClick={() => handlePresetChange(preset.cron)}
                       className={`p-3 rounded-xl border text-left transition-all ${
                         selectedPreset === preset.cron
-                          ? 'border-primary bg-[#FFF5EB]'
-                          : 'border-surface-active bg-white hover:border-primary/50'
+                          ? 'border-primary bg-primary/5'
+                          : 'border-surface-active bg-card hover:border-primary/50'
                       }`}
                     >
                       <div className={`font-medium text-sm ${
-                        selectedPreset === preset.cron ? 'text-primary' : 'text-text'
+                        selectedPreset === preset.cron ? 'text-secondary' : 'text-text'
                       }`}>
                         {preset.label}
                       </div>
@@ -372,7 +372,7 @@ export function ProactivitySection({
                         markDirty()
                       }}
                       placeholder="*/30 * * * *"
-                      className="w-full px-3 py-2 rounded-lg border border-surface-active text-sm focus:outline-none focus:border-primary transition-colors bg-white text-text font-mono placeholder:text-[#9CA3AF]"
+                      className="w-full px-3 py-2 rounded-lg border border-surface-active text-sm focus:outline-none focus:border-primary transition-colors bg-card text-text font-mono placeholder:text-text-muted"
                     />
                     <p className="text-xs text-text-secondary mt-1">
                       Format: minute hour day month weekday (e.g., "0 9 * * *" = 9:00 AM daily)
@@ -412,7 +412,7 @@ export function ProactivitySection({
                             setActiveHoursStart(e.target.value)
                             markDirty()
                           }}
-                          className="w-full px-3 py-2 rounded-lg border border-surface-active text-sm focus:outline-none focus:border-primary transition-colors bg-white text-text"
+                          className="w-full px-3 py-2 rounded-lg border border-surface-active text-sm focus:outline-none focus:border-primary transition-colors bg-card text-text"
                         />
                       </div>
                       <div>
@@ -427,7 +427,7 @@ export function ProactivitySection({
                             setActiveHoursEnd(e.target.value)
                             markDirty()
                           }}
-                          className="w-full px-3 py-2 rounded-lg border border-surface-active text-sm focus:outline-none focus:border-primary transition-colors bg-white text-text"
+                          className="w-full px-3 py-2 rounded-lg border border-surface-active text-sm focus:outline-none focus:border-primary transition-colors bg-card text-text"
                         />
                       </div>
                     </div>
@@ -443,7 +443,7 @@ export function ProactivitySection({
                           setTimezone(e.target.value)
                           markDirty()
                         }}
-                        className="w-full px-3 py-2 rounded-lg border border-surface-active text-sm focus:outline-none focus:border-primary transition-colors bg-white text-text"
+                        className="w-full px-3 py-2 rounded-lg border border-surface-active text-sm focus:outline-none focus:border-primary transition-colors bg-card text-text"
                       >
                         {TIMEZONES.map((tz) => (
                           <option key={tz.id} value={tz.id}>
@@ -472,9 +472,9 @@ export function ProactivitySection({
               </div>
 
               {/* Preview */}
-              <div className="flex items-center gap-3 p-4 bg-primary/5 border border-primary/20 rounded-2xl">
-                <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                  <Info className="w-4 h-4 text-primary" />
+              <div className="flex items-center gap-3 p-4 bg-secondary/5 border border-secondary/20 rounded-2xl">
+                <div className="w-8 h-8 rounded-xl bg-secondary/10 flex items-center justify-center shrink-0">
+                  <Info className="w-4 h-4 text-secondary" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm text-text">{previewText}</div>
@@ -486,13 +486,13 @@ export function ProactivitySection({
               <div className="flex items-center justify-end gap-3 pt-4">
                 <button
                   onClick={close}
-                  className="px-6 py-2.5 rounded-[12px] border border-surface-active text-text hover:bg-surface font-medium text-sm transition-colors"
+                  className="px-6 py-2.5 rounded-xl border border-surface-active text-text hover:bg-surface font-medium text-sm transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSave}
-                  className="px-6 py-2.5 rounded-[12px] bg-text hover:bg-[#1a1a1a] text-white font-medium text-sm shadow-sm transition-colors"
+                  className="px-6 py-2.5 rounded-xl bg-text hover:bg-text/90 text-white font-medium text-sm shadow-sm transition-colors"
                 >
                   Save
                 </button>

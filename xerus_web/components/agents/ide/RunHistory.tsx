@@ -211,12 +211,12 @@ export function RunHistory({ agent }: RunHistoryProps) {
                 {/* Right: Tab Switcher + Pagination */}
                 <div className="flex items-center gap-3">
                     {/* Tab Switcher */}
-                    <div className="flex items-center bg-surface rounded-[12px] p-1 border border-surface-active">
+                    <div className="flex items-center bg-surface rounded-xl p-1 border border-surface-active">
                         <button
                             onClick={() => handleTabChange('all')}
                             className={`px-4 py-1.5 rounded-[8px] text-sm font-medium transition-all ${
                                 activeTab === 'all'
-                                    ? 'bg-white text-text shadow-sm'
+                                    ? 'bg-card text-text shadow-sm'
                                     : 'text-text-secondary hover:text-text'
                             }`}
                         >
@@ -226,7 +226,7 @@ export function RunHistory({ agent }: RunHistoryProps) {
                             onClick={() => handleTabChange('success')}
                             className={`px-4 py-1.5 rounded-[8px] text-sm font-medium transition-all ${
                                 activeTab === 'success'
-                                    ? 'bg-white text-text shadow-sm'
+                                    ? 'bg-card text-text shadow-sm'
                                     : 'text-text-secondary hover:text-text'
                             }`}
                         >
@@ -236,7 +236,7 @@ export function RunHistory({ agent }: RunHistoryProps) {
                             onClick={() => handleTabChange('failed')}
                             className={`px-4 py-1.5 rounded-[8px] text-sm font-medium transition-all ${
                                 activeTab === 'failed'
-                                    ? 'bg-white text-text shadow-sm'
+                                    ? 'bg-card text-text shadow-sm'
                                     : 'text-text-secondary hover:text-text'
                             }`}
                         >
@@ -246,7 +246,7 @@ export function RunHistory({ agent }: RunHistoryProps) {
 
                     {/* Pagination */}
                     {totalPages > 1 && (
-                        <div className="flex items-center gap-2 bg-white rounded-[12px] px-3 py-1.5 border border-surface-active">
+                        <div className="flex items-center gap-2 bg-card rounded-xl px-3 py-1.5 border border-surface-active">
                             <button
                                 onClick={() => setPage(p => Math.max(1, p - 1))}
                                 disabled={page === 1}

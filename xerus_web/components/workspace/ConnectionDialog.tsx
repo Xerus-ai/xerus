@@ -120,7 +120,7 @@ export function ConnectionDialog({ filePath, open, onClose, onCreated }: Connect
   return (
     <div
       ref={dialogRef}
-      className="absolute z-50 mt-1 w-72 bg-white rounded-2xl shadow-lg border border-surface-active overflow-hidden"
+      className="absolute z-50 mt-1 w-72 bg-card rounded-2xl shadow-lg border border-surface-active overflow-hidden"
     >
       {/* Search input */}
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-surface-active/40">

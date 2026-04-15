@@ -134,7 +134,7 @@ function MobileWorkspaceNav({ onClose }: { onClose: () => void }) {
                   className="flex items-center gap-2 w-full px-2 py-1.5 rounded-xl text-sm font-medium text-text hover:bg-surface-hover transition-colors"
                 >
                   {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-text-secondary shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-text-secondary shrink-0" />}
-                  {isExpanded ? <FolderOpen className="w-4 h-4 text-primary shrink-0" /> : <Folder className="w-4 h-4 text-text-secondary shrink-0" />}
+                  {isExpanded ? <FolderOpen className="w-4 h-4 text-secondary shrink-0" /> : <Folder className="w-4 h-4 text-text-secondary shrink-0" />}
                   <span className="flex-1 text-left truncate">{project.name}</span>
                   <span className="text-[10px] text-text-muted">{project.channels.length}</span>
                 </button>
@@ -238,10 +238,10 @@ function MobileInboxNav({ onClose }: { onClose: () => void }) {
               className="flex items-center gap-2 w-full px-2 py-1.5 rounded-xl text-sm font-medium text-text hover:bg-surface-hover transition-colors"
             >
               {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-text-secondary shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-text-secondary shrink-0" />}
-              {isExpanded ? <FolderOpen className="w-4 h-4 text-primary shrink-0" /> : <Folder className="w-4 h-4 text-text-secondary shrink-0" />}
+              {isExpanded ? <FolderOpen className="w-4 h-4 text-secondary shrink-0" /> : <Folder className="w-4 h-4 text-text-secondary shrink-0" />}
               <span className="flex-1 text-left truncate">{domain.name}</span>
               {domainUnread > 0 ? (
-                <span className="min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-primary text-white text-[10px] font-semibold">{domainUnread > 99 ? '99+' : domainUnread}</span>
+                <span className="min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-secondary text-white text-[10px] font-semibold">{domainUnread > 99 ? '99+' : domainUnread}</span>
               ) : (
                 <span className="text-[10px] text-text-muted">{domain.channels.length}</span>
               )}
@@ -261,13 +261,13 @@ function MobileInboxNav({ onClose }: { onClose: () => void }) {
                       }}
                       className={cn(
                         'flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-[13px] transition-colors',
-                        isActive ? 'bg-primary/8 text-primary font-medium' : unread > 0 ? 'text-text font-semibold hover:bg-surface-hover' : 'text-text-secondary hover:bg-surface-hover hover:text-text'
+                        isActive ? 'bg-surface-hover text-text font-medium' : unread > 0 ? 'text-text font-semibold hover:bg-surface-hover' : 'text-text-secondary hover:bg-surface-hover hover:text-text'
                       )}
                     >
                       <Hash className="w-3.5 h-3.5 shrink-0" />
                       <span className="flex-1 text-left truncate">{channel.name}</span>
                       {unread > 0 && !isActive ? (
-                        <span className="min-w-[14px] h-3.5 px-1 flex items-center justify-center rounded-full bg-primary text-white text-[9px] font-semibold">{unread}</span>
+                        <span className="min-w-[14px] h-3.5 px-1 flex items-center justify-center rounded-full bg-secondary text-white text-[9px] font-semibold tabular-nums">{unread}</span>
                       ) : null}
                     </button>
                   )

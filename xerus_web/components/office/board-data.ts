@@ -3,10 +3,10 @@ import type { KanbanTask } from '@/components/common/KanbanBoard'
 export const PRIORITIES = ['all', 'critical', 'high', 'medium', 'low'] as const
 
 export const PRIORITY_STYLES: Record<string, string> = {
-  critical: 'bg-red-100 text-red-700',
-  high: 'bg-orange-100 text-orange-700',
-  medium: 'bg-yellow-100 text-yellow-700',
-  low: 'bg-gray-100 text-gray-600',
+  critical: 'bg-destructive/10 text-destructive font-medium',
+  high: 'bg-secondary/10 text-secondary font-medium',
+  medium: 'bg-amber-100/60 text-amber-700',
+  low: 'bg-surface-active text-text-muted',
 }
 
 // Dummy data (DUMMY_SUBTASK_NAMES, DUMMY_SUBTASK_NOTES, DUMMY_FILES)

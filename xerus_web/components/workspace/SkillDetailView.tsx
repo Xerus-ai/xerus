@@ -214,7 +214,7 @@ export function SkillDetailView({ skillSlug, onBack }: SkillDetailViewProps) {
           </div>
           <div className="shrink-0">
             {isInstalled ? (
-              <button onClick={async () => { await handleUninstall(0); mutateSkill() }} className="flex items-center gap-2 bg-black hover:bg-[#1a1a1a] text-white font-medium px-5 py-2.5 rounded-xl text-sm shadow-sm transition-all">
+              <button onClick={async () => { await handleUninstall(0); mutateSkill() }} className="flex items-center gap-2 bg-black hover:bg-text/90 text-white font-medium px-5 py-2.5 rounded-xl text-sm shadow-sm transition-all">
                 Uninstall
               </button>
             ) : (
@@ -276,11 +276,11 @@ export function SkillDetailView({ skillSlug, onBack }: SkillDetailViewProps) {
           <FloatingPanelProvider>
             <FloatingPanel isOpen={!!activeFile} onClose={() => setActiveFile(null)} title={activeFile || ''} minimizedTitle={activeFile || ''} icon={<FileText className="w-4 h-4" />} className="w-[600px] h-[600px] rounded-[40px] shadow-sm bg-surface p-2" variant="clean">
               {({ close, minimize }) => (
-                <div className="bg-white rounded-[32px] h-full w-full flex flex-col p-6 overflow-hidden">
+                <div className="bg-card rounded-2xl h-full w-full flex flex-col p-6 overflow-hidden">
                   <div className="flex items-center justify-between mb-4 shrink-0">
                     <div className="flex items-center gap-2">
-                      <button onClick={close} className="p-1.5 bg-[#F5F5F5] hover:bg-[#E5E5E5] rounded-full transition-colors"><X className="w-4 h-4 text-text" /></button>
-                      <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); minimize() }} className="p-1.5 bg-[#F5F5F5] hover:bg-[#E5E5E5] rounded-full transition-colors"><Minus className="w-4 h-4 text-text" /></button>
+                      <button onClick={close} className="p-1.5 bg-surface-hover hover:bg-surface-pressed rounded-full transition-colors"><X className="w-4 h-4 text-text" /></button>
+                      <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); minimize() }} className="p-1.5 bg-surface-hover hover:bg-surface-pressed rounded-full transition-colors"><Minus className="w-4 h-4 text-text" /></button>
                     </div>
                     <span className="text-sm font-bold text-text">{activeFile}</span>
                   </div>
@@ -291,19 +291,19 @@ export function SkillDetailView({ skillSlug, onBack }: SkillDetailViewProps) {
                       activeFile && <SkillFileViewer slug={skillSlug} filePath={activeFile} onContentLoaded={setEditContent} />
                     )}
                   </div>
-                  <div className="mt-4 p-1.5 rounded-[20px] border border-surface-active bg-white flex items-center justify-between shadow-sm shrink-0">
-                    <button disabled className="h-9 px-3 rounded-[12px] flex items-center gap-2 text-text-secondary font-medium text-sm opacity-50 cursor-not-allowed"><Sparkles className="w-4 h-4" /> Write with AI</button>
+                  <div className="mt-4 p-1.5 rounded-2xl border border-surface-active bg-card flex items-center justify-between shadow-sm shrink-0">
+                    <button disabled className="h-9 px-3 rounded-xl flex items-center gap-2 text-text-secondary font-medium text-sm opacity-50 cursor-not-allowed"><Sparkles className="w-4 h-4" /> Write with AI</button>
                     <div className="flex items-center bg-surface rounded-[14px] p-1">
-                      <button onClick={() => setEditorMode('view')} className={`flex items-center gap-2 px-3 py-1.5 rounded-[10px] text-xs font-semibold transition-all ${editorMode === 'view' ? 'bg-white shadow-sm text-text' : 'text-text-secondary hover:text-text'}`}><Eye className="w-3.5 h-3.5" /> View</button>
-                      {(isInstalled || isOwner) && <button onClick={() => setEditorMode('edit')} className={`flex items-center gap-2 px-3 py-1.5 rounded-[10px] text-xs font-semibold transition-all ${editorMode === 'edit' ? 'bg-white shadow-sm text-text' : 'text-text-secondary hover:text-text'}`}><Pencil className="w-3.5 h-3.5" /> Edit</button>}
+                      <button onClick={() => setEditorMode('view')} className={`flex items-center gap-2 px-3 py-1.5 rounded-[10px] text-xs font-semibold transition-all ${editorMode === 'view' ? 'bg-card shadow-sm text-text' : 'text-text-secondary hover:text-text'}`}><Eye className="w-3.5 h-3.5" /> View</button>
+                      {(isInstalled || isOwner) && <button onClick={() => setEditorMode('edit')} className={`flex items-center gap-2 px-3 py-1.5 rounded-[10px] text-xs font-semibold transition-all ${editorMode === 'edit' ? 'bg-card shadow-sm text-text' : 'text-text-secondary hover:text-text'}`}><Pencil className="w-3.5 h-3.5" /> Edit</button>}
                     </div>
                     <div className="flex items-center gap-2">
                       {(isInstalled || isOwner) ? (
-                        <button onClick={async () => { if (!activeFile) return; setSaving(true); try { const { writeSkillFile } = await import('@/lib/api/skills'); await writeSkillFile(skillSlug, activeFile, editContent); mutateSkill() } finally { setSaving(false) } }} disabled={saving || editorMode === 'view'} className={`w-9 h-9 rounded-[12px] flex items-center justify-center shadow-md transition-colors ${editorMode === 'edit' ? 'bg-text text-white hover:bg-primary' : 'bg-surface text-text-secondary cursor-not-allowed'}`}>
+                        <button onClick={async () => { if (!activeFile) return; setSaving(true); try { const { writeSkillFile } = await import('@/lib/api/skills'); await writeSkillFile(skillSlug, activeFile, editContent); mutateSkill() } finally { setSaving(false) } }} disabled={saving || editorMode === 'view'} className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-md transition-colors ${editorMode === 'edit' ? 'bg-text text-white hover:bg-primary' : 'bg-surface text-text-secondary cursor-not-allowed'}`}>
                           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowUp className="w-4 h-4" />}
                         </button>
                       ) : (
-                        <button onClick={close} className="h-9 px-4 bg-surface hover:bg-surface-active rounded-[12px] text-text text-sm font-medium transition-colors">Close</button>
+                        <button onClick={close} className="h-9 px-4 bg-surface hover:bg-surface-active rounded-xl text-text text-sm font-medium transition-colors">Close</button>
                       )}
                     </div>
                   </div>

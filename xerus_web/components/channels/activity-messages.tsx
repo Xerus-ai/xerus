@@ -59,7 +59,7 @@ export function PostMessage({
 
   return (
     <div className="flex gap-3 py-3 px-2 group" role="article" aria-label={`Message from ${name}`}>
-      <Avatar className="w-8 h-8 flex-shrink-0 ring-2 ring-white">
+      <Avatar className="w-8 h-8 flex-shrink-0 ring-2 ring-card">
         {avatarUrl ? <AvatarImage src={avatarUrl} alt={name} /> : null}
         <AvatarFallback className="text-xs text-text-secondary bg-surface-hover">
           {getInitials(name)}
@@ -71,18 +71,18 @@ export function PostMessage({
           <span className="text-sm font-medium text-text">
             {name}
           </span>
-          <span className="text-xs text-text-muted">
+          <span className="text-xs text-text-muted tabular-nums">
             {formatRelativeTime(message.created_at)}
           </span>
         </div>
 
-        <div className="prose prose-sm max-w-none text-sm text-text leading-relaxed [&_p]:mb-2 [&_ul]:mb-2 [&_ol]:mb-2 [&_li]:text-sm [&_strong]:text-text">
+        <div className="prose prose-sm max-w-none text-sm text-text leading-relaxed max-w-[65ch] [&_p]:mb-2 [&_ul]:mb-2 [&_ol]:mb-2 [&_li]:text-sm [&_strong]:text-text">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>
             {message.content}
           </ReactMarkdown>
         </div>
 
-        <div className="flex items-center gap-3 mt-2 opacity-0 group-hover:opacity-100 transition-all duration-200">
+        <div className="flex items-center gap-3 mt-1.5 opacity-0 group-hover:opacity-100 transition-all duration-200">
           {executionId && (
             <button
               type="button"
@@ -186,11 +186,11 @@ export function EscalationMessage({
 
   return (
     <div
-      className="flex gap-3 py-3 px-2 border-l-4 border-l-orange-400 bg-orange-50/50 rounded-r-2xl"
+      className="flex gap-3 py-3 px-3 bg-primary/5 rounded-2xl"
       role="article"
       aria-label={`Escalation from ${displayName(message)}`}
     >
-      <Avatar className="w-8 h-8 flex-shrink-0 ring-2 ring-white">
+      <Avatar className="w-8 h-8 flex-shrink-0 ring-2 ring-card">
         {avatarUrl ? <AvatarImage src={avatarUrl} alt={displayName(message)} /> : null}
         <AvatarFallback className="text-xs text-text-secondary bg-surface-hover">
           {getInitials(displayName(message))}
@@ -200,15 +200,15 @@ export function EscalationMessage({
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2 mb-1">
           <span className="text-sm font-medium text-text">{displayName(message)}</span>
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-orange-600">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-primary">
             Needs Approval
           </span>
-          <span className="text-xs text-text-muted">
+          <span className="text-xs text-text-muted tabular-nums">
             {formatRelativeTime(message.created_at)}
           </span>
         </div>
 
-        <div className="prose prose-sm max-w-none text-sm text-text leading-relaxed [&_p]:mb-2 [&_strong]:text-text">
+        <div className="prose prose-sm max-w-none text-sm text-text leading-relaxed max-w-[65ch] [&_p]:mb-2 [&_strong]:text-text">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>
             {message.content}
           </ReactMarkdown>
@@ -246,7 +246,7 @@ export function EscalationMessage({
             <MessageSquare className="w-3.5 h-3.5" />,
             onDiscuss,
             cn(
-              'text-primary hover:bg-[#FFF4E6]',
+              'text-primary hover:bg-primary/8',
               'active:scale-95',
             ),
             'bg-blue-500/10 text-blue-700 cursor-default',
@@ -278,7 +278,7 @@ export function CoordinationMessage({ message }: { message: ChannelMessage }) {
       <span className="text-[13px] text-text-muted flex-1 truncate">
         {message.content}
       </span>
-      <span className="text-xs text-text-muted flex-shrink-0">
+      <span className="text-xs text-text-muted tabular-nums flex-shrink-0">
         {formatRelativeTime(message.created_at)}
       </span>
     </div>

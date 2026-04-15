@@ -22,8 +22,8 @@ export function AgentPreviewCard({ frontmatter, markdownBody, files, warning }: 
     <div className="flex flex-col gap-4">
       {/* Detection badge */}
       <div className="flex items-center gap-2">
-        <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
-          <Bot className="w-3.5 h-3.5 text-primary" />
+        <div className="w-6 h-6 rounded-full bg-secondary/10 flex items-center justify-center">
+          <Bot className="w-3.5 h-3.5 text-secondary" />
         </div>
         <span className="text-sm font-semibold text-text">Agent Detected</span>
       </div>
@@ -39,7 +39,7 @@ export function AgentPreviewCard({ frontmatter, markdownBody, files, warning }: 
             )}
           </div>
           {ai_model && (
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-white border border-surface-active rounded-lg shrink-0 ml-3">
+            <div className="flex items-center gap-1.5 px-2 py-1 bg-card border border-surface-active rounded-lg shrink-0 ml-3">
               <ModelIcon model={ai_model} size="sm" />
               <span className="text-[10px] font-bold text-text-secondary max-w-[80px] truncate">
                 {formatModelName(ai_model)}
@@ -51,7 +51,7 @@ export function AgentPreviewCard({ frontmatter, markdownBody, files, warning }: 
         {/* Meta row */}
         <div className="flex flex-wrap gap-2 mb-4">
           {category && (
-            <span className="text-[10px] font-medium px-2 py-1 rounded-md bg-primary/10 text-primary capitalize">
+            <span className="text-[10px] font-medium px-2 py-1 rounded-md bg-secondary/10 text-secondary capitalize">
               {category}
             </span>
           )}
@@ -76,7 +76,7 @@ export function AgentPreviewCard({ frontmatter, markdownBody, files, warning }: 
               {tools.map(tool => (
                 <span
                   key={tool}
-                  className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-white border border-surface-active text-text-secondary"
+                  className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-card border border-surface-active text-text-secondary"
                 >
                   {tool}
                 </span>
@@ -86,7 +86,7 @@ export function AgentPreviewCard({ frontmatter, markdownBody, files, warning }: 
         )}
 
         {/* Markdown preview — Eden zoom technique */}
-        <div className="rounded-xl overflow-hidden border border-surface-active bg-white" style={{ maxHeight: '160px' }}>
+        <div className="rounded-xl overflow-hidden border border-surface-active bg-card" style={{ maxHeight: '160px' }}>
           <div className="overflow-hidden" style={{ maxHeight: '160px' }}>
             <div
               className="prose prose-sm max-w-none text-text prose-headings:text-text prose-headings:font-normal prose-headings:leading-[1.3] prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-h1:text-[36px] prose-h1:font-normal prose-h1:mb-3 prose-h2:text-[30px] prose-h2:font-normal prose-h2:mb-2 prose-h3:text-[24px] prose-h3:font-normal prose-h3:mb-2"

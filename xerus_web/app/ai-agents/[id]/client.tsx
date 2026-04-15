@@ -266,19 +266,19 @@ export default function AgentDetailsClient({ agentId }: AgentDetailsClientProps)
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="mb-8 bg-surface p-[0.325rem] rounded-full inline-flex h-auto w-auto border-none">
-            <TabsTrigger value="identity" className="rounded-full px-6 py-2.5 text-sm font-medium transition-all data-[state=active]:bg-text data-[state=active]:text-white data-[state=active]:shadow-sm text-text-secondary hover:text-text">
+            <TabsTrigger value="identity" className="rounded-full px-6 py-2.5 text-sm font-medium transition-all data-[state=active]:bg-secondary/10 data-[state=active]:text-secondary data-[state=active]:shadow-sm text-text-secondary hover:text-text">
               Identity
             </TabsTrigger>
-            <TabsTrigger value="behaviour" className="rounded-full px-6 py-2.5 text-sm font-medium transition-all data-[state=active]:bg-text data-[state=active]:text-white data-[state=active]:shadow-sm text-text-secondary hover:text-text">
+            <TabsTrigger value="behaviour" className="rounded-full px-6 py-2.5 text-sm font-medium transition-all data-[state=active]:bg-secondary/10 data-[state=active]:text-secondary data-[state=active]:shadow-sm text-text-secondary hover:text-text">
               Behaviour
             </TabsTrigger>
-            <TabsTrigger value="schedules" className="rounded-full px-6 py-2.5 text-sm font-medium transition-all data-[state=active]:bg-text data-[state=active]:text-white data-[state=active]:shadow-sm text-text-secondary hover:text-text">
+            <TabsTrigger value="schedules" className="rounded-full px-6 py-2.5 text-sm font-medium transition-all data-[state=active]:bg-secondary/10 data-[state=active]:text-secondary data-[state=active]:shadow-sm text-text-secondary hover:text-text">
               Schedules
             </TabsTrigger>
-            <TabsTrigger value="history" className="rounded-full px-6 py-2.5 text-sm font-medium transition-all data-[state=active]:bg-text data-[state=active]:text-white data-[state=active]:shadow-sm text-text-secondary hover:text-text">
+            <TabsTrigger value="history" className="rounded-full px-6 py-2.5 text-sm font-medium transition-all data-[state=active]:bg-secondary/10 data-[state=active]:text-secondary data-[state=active]:shadow-sm text-text-secondary hover:text-text">
               History
             </TabsTrigger>
-            <TabsTrigger value="memory" className="rounded-full px-6 py-2.5 text-sm font-medium transition-all data-[state=active]:bg-text data-[state=active]:text-white data-[state=active]:shadow-sm text-text-secondary hover:text-text">
+            <TabsTrigger value="memory" className="rounded-full px-6 py-2.5 text-sm font-medium transition-all data-[state=active]:bg-secondary/10 data-[state=active]:text-secondary data-[state=active]:shadow-sm text-text-secondary hover:text-text">
               Memory
             </TabsTrigger>
           </TabsList>

@@ -38,7 +38,7 @@ function AgentAvatarIcon({ agent, size = 28 }: { agent: Agent; size?: number }) 
     return <img src={avatarUrl} alt={agent.name} className="w-full h-full object-cover rounded-full" loading="lazy" />
   }
   return (
-    <span className="w-full h-full flex items-center justify-center bg-primary/10 text-primary text-[10px] font-semibold rounded-full">
+    <span className="w-full h-full flex items-center justify-center bg-secondary/10 text-secondary text-[10px] font-semibold rounded-full">
       {agent.name.substring(0, 2).toUpperCase()}
     </span>
   )
@@ -124,14 +124,14 @@ export function MessageList({
                 {currentAgent ? (
                   <AgentAvatarIcon agent={currentAgent} size={36} />
                 ) : (
-                  <span className="w-full h-full flex items-center justify-center bg-primary/10 text-primary">
+                  <span className="w-full h-full flex items-center justify-center bg-secondary/10 text-secondary">
                     <Bot className="h-4.5 w-4.5" />
                   </span>
                 )}
               </div>
 
               <div className="flex-1 min-w-0">
-                <span className="text-base font-semibold text-primary block">
+                <span className="text-base font-semibold text-secondary block">
                   {currentAgent?.name || 'Xerus'}
                 </span>
                 <ThinkingIndicator executionState={executionState} />

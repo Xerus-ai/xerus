@@ -198,7 +198,7 @@ export function AgentDetailView({ agentId, onBack }: AgentDetailViewProps) {
               <TabsTrigger
                 key={tab}
                 value={tab}
-                className="rounded-full px-6 py-2.5 text-sm font-medium transition-all data-[state=active]:bg-text data-[state=active]:text-white data-[state=active]:shadow-sm text-text-secondary hover:text-text capitalize"
+                className="rounded-full px-6 py-2.5 text-sm font-medium transition-all data-[state=active]:bg-secondary/10 data-[state=active]:text-secondary data-[state=active]:shadow-sm text-text-secondary hover:text-text capitalize"
               >
                 {tab}
               </TabsTrigger>

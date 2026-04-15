@@ -139,14 +139,14 @@ export function TaskPanel({
       variant="clean"
     >
       {({ close, minimize }) => (
-        <div className="bg-white rounded-[32px] h-full w-full flex flex-col overflow-hidden">
+        <div className="bg-card rounded-2xl h-full w-full flex flex-col overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-6 pt-5 pb-3 shrink-0">
             <div className="flex items-center gap-2">
-              <button onClick={close} className="p-1.5 bg-[#F5F5F5] hover:bg-[#E5E5E5] rounded-full transition-colors" aria-label="Close">
+              <button onClick={close} className="p-1.5 bg-surface-hover hover:bg-surface-pressed rounded-full transition-colors" aria-label="Close">
                 <X className="w-4 h-4 text-text" />
               </button>
-              <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); minimize() }} className="p-1.5 bg-[#F5F5F5] hover:bg-[#E5E5E5] rounded-full transition-colors" aria-label="Minimize">
+              <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); minimize() }} className="p-1.5 bg-surface-hover hover:bg-surface-pressed rounded-full transition-colors" aria-label="Minimize">
                 <Minus className="w-4 h-4 text-text" />
               </button>
             </div>
@@ -156,7 +156,7 @@ export function TaskPanel({
               {(channelTag || task?.channelTag) && (
                 <>
                   <span className="font-medium"># {channelTag || task?.channelTag}</span>
-                  <span className="text-surface-active">|</span>
+                  <span className="text-text-muted">|</span>
                 </>
               )}
               <span style={{ color: statusInfo.color }}>{statusInfo.label}</span>
@@ -169,7 +169,7 @@ export function TaskPanel({
                   onClick={() => setMode('view')}
                   className={cn(
                     'flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-xs font-semibold transition-all',
-                    mode === 'view' ? 'bg-white shadow-sm text-text' : 'text-text-secondary hover:text-text',
+                    mode === 'view' ? 'bg-card shadow-sm text-text' : 'text-text-secondary hover:text-text',
                   )}
                 >
                   <Eye className="w-3.5 h-3.5" />
@@ -179,7 +179,7 @@ export function TaskPanel({
                   onClick={() => setMode('edit')}
                   className={cn(
                     'flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-xs font-semibold transition-all',
-                    mode === 'edit' ? 'bg-white shadow-sm text-text' : 'text-text-secondary hover:text-text',
+                    mode === 'edit' ? 'bg-card shadow-sm text-text' : 'text-text-secondary hover:text-text',
                   )}
                 >
                   <Pencil className="w-3.5 h-3.5" />
@@ -220,7 +220,7 @@ export function TaskPanel({
                   <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
                     <PopoverTrigger asChild>
                       <button className={cn(
-                        'flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#FDF8F3] border border-surface-active/20 text-sm transition-colors hover:border-primary/40',
+                        'flex items-center gap-2 px-3 py-1.5 rounded-xl bg-surface border border-border/20 text-sm transition-colors hover:border-primary/40',
                         dueDate ? 'text-text' : 'text-text-muted',
                       )}>
                         <CalendarIcon className="w-3.5 h-3.5" />
@@ -240,7 +240,7 @@ export function TaskPanel({
                 {isEditable ? (
                   agents.length > 0 ? (
                     <Select value={assignee || '__none'} onValueChange={(v) => setAssignee(v === '__none' ? '' : v)}>
-                      <SelectTrigger className="rounded-xl bg-[#FDF8F3] border-surface-active/20 h-9 text-sm w-52">
+                      <SelectTrigger className="rounded-xl bg-surface border-border/20 h-9 text-sm w-52">
                         <SelectValue placeholder="Select agent" />
                       </SelectTrigger>
                       <SelectContent>
@@ -305,10 +305,10 @@ export function TaskPanel({
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Add more details..."
                   rows={4}
-                  className="w-full px-4 py-3 rounded-[20px] bg-[#FDF8F3] border border-surface-active/20 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary/40 resize-none"
+                  className="w-full px-4 py-3 rounded-2xl bg-surface border border-border/20 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary/40 resize-none"
                 />
               ) : (
-                <div className="px-4 py-3 rounded-[20px] bg-[#FDF8F3] border border-surface-active/10">
+                <div className="px-4 py-3 rounded-2xl bg-surface border border-border/10">
                   <p className="text-sm text-text-secondary leading-relaxed whitespace-pre-wrap">
                     {task?.description || 'No description provided.'}
                   </p>
@@ -327,10 +327,10 @@ export function TaskPanel({
 
           {/* Footer toolbar */}
           {isEditable && (
-            <div className="mx-6 mb-5 p-1.5 rounded-[20px] border border-surface-active bg-white flex items-center justify-between shadow-sm shrink-0">
+            <div className="mx-6 mb-5 p-1.5 rounded-2xl border border-border bg-card flex items-center justify-between shadow-sm shrink-0">
               <div className="flex items-center gap-2">
                 <Select value={priority} onValueChange={setPriority}>
-                  <SelectTrigger className="h-9 px-3 rounded-[12px] bg-transparent border-none text-sm font-medium text-text gap-1.5 hover:bg-surface transition-colors w-auto">
+                  <SelectTrigger className="h-9 px-3 rounded-xl bg-transparent border-none text-sm font-medium text-text gap-1.5 hover:bg-surface transition-colors w-auto">
                     <div className="flex items-center gap-1.5">
                       <svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill={PRIORITY_CFG[priority]?.color || '#F59E0B'} /></svg>
                       <span>{PRIORITY_CFG[priority]?.label || 'Medium'}</span>
@@ -351,7 +351,7 @@ export function TaskPanel({
               <button
                 onClick={handleSave}
                 disabled={isSubmitting || (mode === 'create' && !title.trim())}
-                className="w-9 h-9 bg-text text-white rounded-[12px] flex items-center justify-center hover:bg-primary transition-colors shadow-md disabled:opacity-50"
+                className="w-9 h-9 bg-text text-white rounded-xl flex items-center justify-center hover:bg-primary transition-colors shadow-md disabled:opacity-50"
                 aria-label={mode === 'create' ? 'Create task' : 'Save changes'}
               >
                 {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowUp className="w-4 h-4" />}

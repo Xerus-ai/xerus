@@ -138,10 +138,10 @@ export function BrowseView({
     <>
       {/* Search bar — Eden-style: dominant, full-width with scope chip */}
       <div className="shrink-0 px-3 sm:px-6 pt-3 sm:pt-6 pb-4">
-        <div className="relative flex items-center bg-surface-hover rounded-[24px] overflow-hidden transition-all focus-within:ring-2 focus-within:ring-[#E5E5E5] px-1 py-1">
+        <div className="relative flex items-center bg-surface-hover rounded-xl overflow-hidden transition-all focus-within:ring-2 focus-within:ring-[#E5E5E5] px-1 py-1">
           <Search className="ml-3 w-4 h-4 text-text-muted shrink-0" />
           {currentDirPath && (
-            <span className="ml-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white text-xs font-medium text-text shadow-sm shrink-0 border border-surface-active">
+            <span className="ml-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-card text-xs font-medium text-text shadow-sm shrink-0 border border-surface-active">
               <FolderOpen className="w-3.5 h-3.5 text-blue-500" />
               {currentDirPath.split('/').pop()}
               <button onClick={() => onNavigateBack(null)} className="ml-1 text-text-muted hover:text-text">×</button>
@@ -155,7 +155,7 @@ export function BrowseView({
             className="flex-1 min-w-0 pl-3 pr-2 py-2.5 bg-transparent text-sm text-text focus:outline-none placeholder:text-text-muted"
           />
           {/* View toggle — right side of search */}
-          <div className="mr-1 flex items-center gap-1 bg-white rounded-full p-0.5 border border-surface-active shrink-0">
+          <div className="mr-1 flex items-center gap-1 bg-card rounded-full p-0.5 border border-surface-active shrink-0">
             <button
               onClick={() => onViewModeChange('grid')}
               className={cn(
@@ -179,7 +179,7 @@ export function BrowseView({
 
         {/* Filter segmented control — matching tools/id page */}
         <div className="mt-4">
-          <div className="inline-flex items-center bg-surface rounded-[12px] p-1 border border-surface-active">
+          <div className="inline-flex items-center bg-surface rounded-xl p-1 border border-surface-active">
             {(['all', 'markdown', 'json', 'config', 'media'] as FileFilter[]).map((filter) => {
               const labels: Record<string, string> = {
                 all: 'All results',
@@ -195,7 +195,7 @@ export function BrowseView({
                   className={cn(
                     'px-4 py-1.5 rounded-[8px] text-sm font-medium transition-all whitespace-nowrap',
                     activeFilter === filter
-                      ? 'bg-white text-text shadow-sm'
+                      ? 'bg-card text-text shadow-sm'
                       : 'text-text-secondary hover:text-text',
                   )}
                 >
@@ -222,7 +222,7 @@ export function BrowseView({
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
               </button>
             )}
-            <h2 className="font-serif text-2xl text-text">
+            <h2 className="font-serif text-2xl text-text tracking-tight">
               {!currentDirPath || currentDirPath === 'drive' ? 'Workspace' : currentDirPath.split('/').pop()}
             </h2>
             <button
@@ -247,7 +247,7 @@ export function BrowseView({
             </button>
             <button
               onClick={() => onUploadClick(currentDirPath || 'drive')}
-              className="px-5 py-2 rounded-full bg-text text-white hover:bg-[#1a1a1a] transition-colors text-sm font-medium flex items-center gap-2 shadow-sm"
+              className="px-5 py-2 rounded-full bg-text text-white hover:bg-text/90 transition-colors text-sm font-medium flex items-center gap-2 shadow-sm"
             >
               <Upload className="w-4 h-4" />
               Upload
@@ -284,7 +284,7 @@ export function BrowseView({
                       }}
                       placeholder="New folder"
                       className={cn(
-                        'w-full text-center text-sm px-3 py-2 rounded-lg border bg-white focus:outline-none focus:border-primary transition-colors',
+                        'w-full text-center text-sm px-3 py-2 rounded-lg border bg-card focus:outline-none focus:border-primary transition-colors',
                         folderError ? 'border-red-500' : 'border-surface-active',
                       )}
                     />
@@ -360,7 +360,7 @@ export function BrowseView({
           </div>
         ) : visibleDirs.length === 0 ? (
           /* Empty state — matching old KB page style */
-          <div className="text-center py-20 bg-surface rounded-[24px] border border-surface-active">
+          <div className="text-center py-20 bg-surface rounded-xl border border-surface-active">
             <div className="w-16 h-16 bg-surface-hover rounded-full flex items-center justify-center mx-auto mb-4">
               <FolderInput className="w-8 h-8 text-text-secondary" />
             </div>
@@ -384,7 +384,7 @@ export function BrowseView({
               </button>
               <button
                 onClick={() => onUploadClick(currentDirPath || 'drive')}
-                className="px-6 py-2.5 rounded-full bg-text text-white hover:bg-[#1a1a1a] transition-colors text-sm font-medium inline-flex items-center gap-2"
+                className="px-6 py-2.5 rounded-full bg-text text-white hover:bg-text/90 transition-colors text-sm font-medium inline-flex items-center gap-2"
               >
                 <Upload className="w-4 h-4" />
                 Upload

@@ -85,7 +85,7 @@ export function SchedulesTab({
                 </div>
                 <Button
                     onClick={() => setIsCreateOpen(true)}
-                    className="bg-text text-white hover:bg-[#1a1a1a] rounded-xl px-4 py-2 flex items-center gap-2"
+                    className="bg-text text-white hover:bg-text/90 rounded-xl px-4 py-2 flex items-center gap-2"
                 >
                     <Plus className="w-4 h-4" />
                     Create Schedule
@@ -179,7 +179,7 @@ export function SchedulesTab({
                         <p className="text-text-secondary mb-6">Create a schedule to run your agent automatically.</p>
                         <Button
                             onClick={() => setIsCreateOpen(true)}
-                            className="px-6 py-2.5 rounded-full bg-text text-white hover:bg-[#1a1a1a] transition-colors text-sm font-medium inline-flex items-center gap-2 h-auto"
+                            className="px-6 py-2.5 rounded-full bg-text text-white hover:bg-text/90 transition-colors text-sm font-medium inline-flex items-center gap-2 h-auto"
                         >
                             <Plus className="w-4 h-4" />
                             Create Schedule
@@ -199,19 +199,19 @@ export function SchedulesTab({
                 variant="clean"
             >
                 {({ close, minimize }) => (
-                    <div className="bg-white rounded-[32px] h-full w-full flex flex-col p-6 overflow-hidden">
+                    <div className="bg-card rounded-2xl h-full w-full flex flex-col p-6 overflow-hidden">
                         <div className="flex items-center justify-between mb-4 shrink-0">
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={close}
-                                    className="p-1.5 bg-[#F5F5F5] hover:bg-[#E5E5E5] rounded-full transition-colors"
+                                    className="p-1.5 bg-surface-hover hover:bg-surface-pressed rounded-full transition-colors"
                                     aria-label="Close"
                                 >
                                     <X className="w-4 h-4 text-text" />
                                 </button>
                                 <button
                                     onClick={minimize}
-                                    className="p-1.5 bg-[#F5F5F5] hover:bg-[#E5E5E5] rounded-full transition-colors"
+                                    className="p-1.5 bg-surface-hover hover:bg-surface-pressed rounded-full transition-colors"
                                     aria-label="Minimize"
                                 >
                                     <Minus className="w-4 h-4 text-text" />
@@ -246,19 +246,19 @@ export function SchedulesTab({
                 variant="clean"
             >
                 {({ close, minimize }) => (
-                    <div className="bg-white rounded-[32px] h-full w-full flex flex-col p-6 overflow-hidden">
+                    <div className="bg-card rounded-2xl h-full w-full flex flex-col p-6 overflow-hidden">
                         <div className="flex items-center justify-between mb-4 shrink-0">
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={close}
-                                    className="p-1.5 bg-[#F5F5F5] hover:bg-[#E5E5E5] rounded-full transition-colors"
+                                    className="p-1.5 bg-surface-hover hover:bg-surface-pressed rounded-full transition-colors"
                                     aria-label="Close"
                                 >
                                     <X className="w-4 h-4 text-text" />
                                 </button>
                                 <button
                                     onClick={minimize}
-                                    className="p-1.5 bg-[#F5F5F5] hover:bg-[#E5E5E5] rounded-full transition-colors"
+                                    className="p-1.5 bg-surface-hover hover:bg-surface-pressed rounded-full transition-colors"
                                     aria-label="Minimize"
                                 >
                                     <Minus className="w-4 h-4 text-text" />

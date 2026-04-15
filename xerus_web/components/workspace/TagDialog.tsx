@@ -103,7 +103,7 @@ export function TagDialog({ filePath, open, onClose, onCreated }: TagDialogProps
   return (
     <div
       ref={dialogRef}
-      className="absolute z-50 mt-1 w-64 bg-white rounded-2xl shadow-lg border border-surface-active overflow-hidden"
+      className="absolute z-50 mt-1 w-64 bg-card rounded-2xl shadow-lg border border-surface-active overflow-hidden"
     >
       {/* Search / create input */}
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-surface-active/40">

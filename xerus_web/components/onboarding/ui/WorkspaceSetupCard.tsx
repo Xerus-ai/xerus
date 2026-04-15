@@ -43,7 +43,7 @@ export function WorkspaceSetupCard({
   const canSubmit = workspace.trim() && project.trim()
 
   return (
-    <div className="rounded-[24px] bg-surface/80 backdrop-blur-sm border border-surface-active p-5 space-y-4 max-w-[480px]">
+    <div className="rounded-xl bg-surface/80 backdrop-blur-sm border border-surface-active p-5 space-y-4 max-w-[480px]">
       {/* Input fields */}
       <div className="space-y-3">
         <div>
@@ -55,7 +55,7 @@ export function WorkspaceSetupCard({
             value={workspace}
             onChange={(e) => setWorkspace(e.target.value)}
             placeholder="Acme Corp"
-            className="mt-1 w-full bg-white/60 rounded-xl border border-surface-active px-3 py-2.5 text-sm text-text placeholder:text-text-muted outline-none focus:border-primary/40 transition-colors"
+            className="mt-1 w-full bg-card/60 rounded-xl border border-surface-active px-3 py-2.5 text-sm text-text placeholder:text-text-muted outline-none focus:border-primary/40 transition-colors"
           />
         </div>
         <div>
@@ -67,7 +67,7 @@ export function WorkspaceSetupCard({
             value={project}
             onChange={(e) => setProject(e.target.value)}
             placeholder="Content Strategy"
-            className="mt-1 w-full bg-white/60 rounded-xl border border-surface-active px-3 py-2.5 text-sm text-text placeholder:text-text-muted outline-none focus:border-primary/40 transition-colors"
+            className="mt-1 w-full bg-card/60 rounded-xl border border-surface-active px-3 py-2.5 text-sm text-text placeholder:text-text-muted outline-none focus:border-primary/40 transition-colors"
           />
         </div>
       </div>

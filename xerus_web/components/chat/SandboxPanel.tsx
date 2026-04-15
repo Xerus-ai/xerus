@@ -92,9 +92,9 @@ export function SandboxPanel({
   const TabIcon = TAB_META[activeConfig.id].icon
 
   return (
-    <div className={cn('hidden md:flex flex-col h-full overflow-hidden bg-white', className)}>
+    <div className={cn('hidden md:flex flex-col h-full overflow-hidden bg-card', className)}>
       {/* Tab bar — compact 36px */}
-      <div className="flex items-center h-9 border-b border-gray-200 shrink-0 bg-white px-1">
+      <div className="flex items-center h-9 border-b border-border shrink-0 bg-card px-1">
         {/* Tabs */}
         <div className="flex items-center gap-0.5 flex-1 min-w-0">
           {availableTabs.map(tab => {
@@ -168,7 +168,7 @@ export function SandboxPanel({
               {state.loading && isVisible && (
                 <div className={cn(
                   'absolute inset-0 flex flex-col items-center justify-center gap-3 z-20',
-                  isDark ? 'bg-[#1a1a1a]' : 'bg-white',
+                  isDark ? 'bg-[#1a1a1a]' : 'bg-card',
                 )}>
                   <div className="w-6 h-6 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
                   <p className={cn('text-xs', isDark ? 'text-gray-400' : 'text-text-muted')}>
@@ -181,7 +181,7 @@ export function SandboxPanel({
               {state.error && isVisible && (
                 <div className={cn(
                   'absolute inset-0 flex flex-col items-center justify-center gap-3 z-20',
-                  isDark ? 'bg-[#1a1a1a]' : 'bg-white',
+                  isDark ? 'bg-[#1a1a1a]' : 'bg-card',
                 )}>
                   <TabIcon className={cn('w-8 h-8', isDark ? 'text-gray-600' : 'text-text-muted/30')} />
                   <p className={cn('text-sm', isDark ? 'text-gray-400' : 'text-text-muted')}>
@@ -207,7 +207,7 @@ export function SandboxPanel({
                   sandbox="allow-scripts allow-same-origin allow-forms"
                   onLoad={() => handleLoad(tab.id)}
                   onError={() => handleError(tab.id)}
-                  className={cn('w-full h-full border-0', isDark ? 'bg-[#1a1a1a]' : 'bg-white')}
+                  className={cn('w-full h-full border-0', isDark ? 'bg-[#1a1a1a]' : 'bg-card')}
                   allow="clipboard-write; fullscreen"
                   allowFullScreen
                 />

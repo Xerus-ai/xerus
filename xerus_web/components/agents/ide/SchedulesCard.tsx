@@ -47,7 +47,7 @@ export function SchedulesCard({
                 {!isMarketplace && (
                     <button
                         onClick={onNavigateToSchedules}
-                        className="p-2 hover:bg-[#FFF5EB] text-primary rounded-full transition-colors"
+                        className="p-2 hover:bg-primary/5 text-primary rounded-full transition-colors"
                         aria-label="Add schedule"
                     >
                         <Plus className="w-5 h-5" />
@@ -92,7 +92,7 @@ export function SchedulesCard({
                 ) : (
                     <div className="text-center py-8 border-2 border-dashed border-surface-active rounded-xl">
                         <p className="text-xs text-text-secondary italic">
-                            {isMarketplace ? 'Clone this agent to add schedules' : 'No active schedules'}
+                            {isMarketplace ? 'Clone this agent to add schedules' : 'No schedules yet -- your agent is always on standby'}
                         </p>
                     </div>
                 )}
