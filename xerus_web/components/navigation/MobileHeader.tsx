@@ -64,7 +64,7 @@ function MobileDrawer() {
           <Menu className="w-4.5 h-4.5" />
         </button>
       </SheetTrigger>
-      <SheetContent side="right" className="w-[300px] bg-surface p-0 border-l border-surface-active">
+      <SheetContent side="right" className="w-[min(85vw,340px)] bg-surface p-0 border-l border-surface-active">
         <div className="flex flex-col h-full">
           {/* Drawer header */}
           <div className="flex items-center justify-between px-4 h-12 border-b border-surface-active/60 shrink-0">

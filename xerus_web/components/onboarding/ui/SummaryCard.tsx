@@ -23,7 +23,7 @@ export function SummaryCard({
   firstDeliverable,
 }: SummaryCardProps) {
   return (
-    <div className="rounded-[24px] bg-surface/80 backdrop-blur-sm border border-surface-active p-5 max-w-[480px] space-y-3">
+    <div className="rounded-3xl bg-surface/80 backdrop-blur-sm border border-surface-active p-5 max-w-[480px] space-y-3">
       <div className="flex items-center gap-2.5">
         <div className="w-7 h-7 rounded-full bg-green-500/10 flex items-center justify-center">
           <Check className="w-4 h-4 text-green-600" />

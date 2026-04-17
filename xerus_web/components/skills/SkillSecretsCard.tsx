@@ -19,7 +19,7 @@ export function SkillSecretsCard({ skillSlug, envKeys }: SkillSecretsCardProps) 
 
     if (envKeys.length === 0) {
         return (
-            <div className="bg-surface rounded-[24px] border border-surface-active shadow-sm p-6">
+            <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-6">
                 <p className="text-xs text-text-secondary py-2">This skill does not require any API keys.</p>
             </div>
         );
@@ -28,7 +28,7 @@ export function SkillSecretsCard({ skillSlug, envKeys }: SkillSecretsCardProps) 
     const secretMap = new Map((secrets || []).map(s => [s.envKey, s]));
 
     return (
-        <div className="bg-surface rounded-[24px] border border-surface-active shadow-sm p-4 space-y-3">
+        <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-4 space-y-3">
             {envKeys.map(key => (
                 <SecretRow
                     key={key}
@@ -88,7 +88,7 @@ function SecretRow({ skillSlug, envKey, status, onSaved }: {
                         <button
                             onClick={handleDelete}
                             disabled={saving}
-                            className="text-text-muted hover:text-red-500 transition-colors"
+                            className="text-text-muted hover:text-destructive transition-colors"
                         >
                             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                         </button>

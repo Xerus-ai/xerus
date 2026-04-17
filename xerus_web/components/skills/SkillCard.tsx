@@ -25,7 +25,7 @@ export function SkillCard({ skill, onClick, agents = [], onInstall, onUninstall,
 
     return (
         <div
-            className="bg-surface hover:bg-surface-hover rounded-[32px] p-6 shadow-sm relative group h-full min-h-[260px] transition-all duration-200 cursor-pointer flex flex-col overflow-hidden hover:-translate-y-0.5 hover:shadow-md"
+            className="bg-surface hover:bg-surface-hover rounded-4xl p-6 shadow-sm relative group h-full min-h-[260px] transition-all duration-200 cursor-pointer flex flex-col overflow-hidden hover:-translate-y-0.5 hover:shadow-md"
             onClick={onClick}
         >
             {/* Name + Description */}
@@ -108,7 +108,7 @@ export function ImportSkillCard({ onClick }: ImportSkillCardProps) {
     return (
         <div
             onClick={onClick}
-            className="rounded-[32px] border-2 border-dashed border-surface-active hover:border-secondary/40 p-6 flex flex-col items-center justify-center text-center h-full min-h-[260px] hover:bg-surface-hover/50 transition-all duration-300 cursor-pointer group"
+            className="rounded-4xl border-2 border-dashed border-surface-active hover:border-secondary/40 p-6 flex flex-col items-center justify-center text-center h-full min-h-[260px] hover:bg-surface-hover/50 transition-all duration-300 cursor-pointer group"
         >
             <div className="w-16 h-16 bg-surface rounded-full flex items-center justify-center shadow-sm mb-4 group-hover:scale-110 transition-transform duration-300">
                 <Upload className="w-7 h-7 text-secondary" />

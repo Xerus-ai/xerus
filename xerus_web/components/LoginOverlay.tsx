@@ -50,7 +50,7 @@ export function LoginOverlay() {
 
         {/* Card */}
         <div
-          className="w-full bg-card p-8 rounded-[32px] shadow-md border border-secondary/15 ring-1 ring-secondary/5 animate-[fadeInScale_400ms_cubic-bezier(0.23,1,0.32,1)_forwards]"
+          className="w-full bg-card p-8 rounded-4xl shadow-md border border-secondary/15 ring-1 ring-secondary/5 animate-[fadeInScale_400ms_cubic-bezier(0.23,1,0.32,1)_forwards]"
           style={{ opacity: 0, animationDelay: '180ms' }}
         >
           <p className="text-text-secondary text-[15px] leading-relaxed mb-6 text-center">

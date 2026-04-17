@@ -309,6 +309,19 @@ export const MessageBubble = memo(function MessageBubble({
   onOpenWorkspace,
 }: MessageBubbleProps) {
   const isUser = message.role === 'user'
+
+  // Agent identity resolution (consistency principle): if `agent` prop is null,
+  // try to resolve from message.agentSlug/agentName against the agents array.
+  // This prevents the bug where the Xerus logo flashes on a message that was
+  // actually produced by a specific agent.
+  const resolvedAgent: Agent | null = agent ?? (
+    agents && (message.agentSlug || message.agentName)
+      ? agents.find((a) =>
+          (message.agentSlug && a.slug === message.agentSlug) ||
+          (message.agentName && a.name === message.agentName)
+        ) ?? null
+      : null
+  )
   const hasExecution =
     !isUser &&
     !isStreaming &&
@@ -335,15 +348,15 @@ export const MessageBubble = memo(function MessageBubble({
       <div className="flex items-center gap-2 mb-2">
         {!isUser && (
           <div className="w-7 h-7 rounded-lg overflow-hidden shrink-0 flex items-center justify-center">
-            {agent ? (
-              isMascotConfig(agent.avatarUrl) ? (
-                <MascotAvatar config={agent.avatarUrl!} size={28} className="w-full h-full" alt={agent.name} />
-              ) : agent.avatarUrl ? (
+            {resolvedAgent ? (
+              isMascotConfig(resolvedAgent.avatarUrl) ? (
+                <MascotAvatar config={resolvedAgent.avatarUrl!} size={28} className="w-full h-full" alt={resolvedAgent.name} />
+              ) : resolvedAgent.avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={agent.avatarUrl} alt={agent.name} className="w-7 h-7 object-cover" />
+                <img src={resolvedAgent.avatarUrl} alt={resolvedAgent.name} className="w-7 h-7 object-cover" />
               ) : (
                 <span className="w-full h-full flex items-center justify-center bg-secondary/10 text-secondary text-[10px] font-semibold">
-                  {agent.name.substring(0, 2).toUpperCase()}
+                  {resolvedAgent.name.substring(0, 2).toUpperCase()}
                 </span>
               )
             ) : (
@@ -361,7 +374,7 @@ export const MessageBubble = memo(function MessageBubble({
           'text-sm font-medium',
           isUser ? 'text-text' : 'text-secondary'
         )}>
-          {isUser ? 'You' : agent?.name || message.agentName || 'Xerus'}
+          {isUser ? 'You' : resolvedAgent?.name || message.agentName || 'Xerus'}
         </span>
         {!isUser && (
           <span className="text-[10px] font-medium text-text-muted bg-surface-hover rounded-full px-1.5 py-0.5">

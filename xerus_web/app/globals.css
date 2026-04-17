@@ -159,8 +159,16 @@
     /* Semantic colors */
     --clr-success: 31 138 101;
     /* #1f8a65 — warm teal */
+    --clr-warning: 190 130 20;
+    /* #be8214 — warm amber */
     --clr-gold: 192 133 50;
     /* #c08532 — warm gold accent */
+
+    /* Code block theming */
+    --clr-code-bg: 30 30 30;
+    /* #1e1e1e — VS Code dark */
+    --clr-code-border: 50 50 48;
+    /* #323230 — subtle warm border */
 
     /* Border Radius */
     --radius: 0.5rem;
@@ -241,7 +249,13 @@
     --clr-text-muted: rgba(176, 174, 165, 0.40);
 
     --clr-success: 31 138 101;
+    --clr-warning: 230 180 70;
+    /* #e6b446 — warm amber (bright for dark bg) */
     --clr-gold: 192 133 50;
+
+    /* Code block theming — stays dark in both modes */
+    --clr-code-bg: 30 30 30;
+    --clr-code-border: 50 50 48;
   }
 
   * {

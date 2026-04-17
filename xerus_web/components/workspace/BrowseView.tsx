@@ -193,7 +193,7 @@ export function BrowseView({
                   key={filter}
                   onClick={() => onFilterChange(filter)}
                   className={cn(
-                    'px-4 py-1.5 rounded-[8px] text-sm font-medium transition-all whitespace-nowrap',
+                    'px-4 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap',
                     activeFilter === filter
                       ? 'bg-card text-text shadow-sm'
                       : 'text-text-secondary hover:text-text',

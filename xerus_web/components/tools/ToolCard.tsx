@@ -52,10 +52,10 @@ const ToolCardComponent = ({ tool, onClick, onConnect, onDisconnect, onStartStop
                         }`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${
                                 isMcp
-                                    ? (isRunning ? 'bg-green-500' : 'bg-surface-active')
+                                    ? (isRunning ? 'bg-success' : 'bg-surface-active')
                                     : tool.requires_auth
-                                        ? (isConnected ? 'bg-green-500' : 'bg-surface-active')
-                                        : 'bg-green-500'
+                                        ? (isConnected ? 'bg-success' : 'bg-surface-active')
+                                        : 'bg-success'
                             }`}></span>
                             {isMcp
                                 ? (isRunning ? 'Running' : 'Stopped')

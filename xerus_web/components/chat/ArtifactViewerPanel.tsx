@@ -155,7 +155,7 @@ function MarkdownRenderer({ content }: { content: string }) {
       'prose-strong:text-text prose-strong:font-semibold',
       'prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:bg-surface-hover prose-code:text-text prose-code:font-mono prose-code:text-[13px]',
       'prose-code:before:content-none prose-code:after:content-none',
-      'prose-pre:bg-[#1E1E1E] prose-pre:rounded-xl prose-pre:border prose-pre:border-gray-800',
+      'prose-pre:bg-code-bg prose-pre:rounded-xl prose-pre:border prose-pre:border-code-border',
       'prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-li:text-text-secondary prose-li:text-[14px]',
       'prose-a:text-secondary prose-a:no-underline hover:prose-a:underline prose-a:font-medium',
       'prose-table:text-xs prose-th:text-left prose-th:text-text prose-th:font-semibold prose-th:pb-2',

@@ -169,7 +169,7 @@ export function getEditabilityBadge(path: string): { label: string; className: s
   }
   for (const p of EDITABLE_PATTERNS) {
     if (p.test(path)) {
-      return { label: 'Editable', className: 'bg-green-100 text-green-800' }
+      return { label: 'Editable', className: 'bg-success/15 text-success' }
     }
   }
   return { label: 'Read-only', className: 'bg-surface-hover text-text-secondary' }

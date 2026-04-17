@@ -36,7 +36,7 @@ const AUTONOMY_OPTIONS = [
 
 export function AutonomyLevelSelector({ value, onChange }: AutonomyLevelSelectorProps) {
     return (
-        <div className="bg-surface rounded-[24px] border border-surface-active p-6 shadow-sm">
+        <div className="bg-surface rounded-3xl border border-surface-active p-6 shadow-sm">
             <h3 className="text-sm font-semibold text-text mb-4">Autonomy Level</h3>
             <div className="grid grid-cols-3 gap-3">
                 {AUTONOMY_OPTIONS.map((option) => {

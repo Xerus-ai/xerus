@@ -289,16 +289,27 @@ export function KanbanBoard({
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        <div className="grid grid-cols-4 gap-4">
+        <div
+          className={cn(
+            'gap-4',
+            // Mobile/tablet: horizontal scroll with snap, desktop: 4-col grid
+            'flex overflow-x-auto snap-x snap-mandatory scrollbar-none -mx-4 px-4 pb-2',
+            'lg:grid lg:grid-cols-4 lg:overflow-visible lg:snap-none lg:mx-0 lg:px-0 lg:pb-0',
+          )}
+        >
           {columns.map((column) => (
-            <DroppableColumn
+            <div
               key={column.id}
-              column={column}
-              tasks={tasksByColumn[column.id] || []}
-              onTaskClick={onTaskClick}
-              onColumnAdd={onColumnAdd}
-              renderCard={renderCard}
-            />
+              className="snap-start shrink-0 w-[calc(85vw-1rem)] max-w-[320px] lg:w-auto lg:max-w-none"
+            >
+              <DroppableColumn
+                column={column}
+                tasks={tasksByColumn[column.id] || []}
+                onTaskClick={onTaskClick}
+                onColumnAdd={onColumnAdd}
+                renderCard={renderCard}
+              />
+            </div>
           ))}
         </div>
 

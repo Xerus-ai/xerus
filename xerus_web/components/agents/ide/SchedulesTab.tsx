@@ -93,7 +93,7 @@ export function SchedulesTab({
             </div>
 
             {/* Schedules List */}
-            <div className="bg-surface rounded-[24px] border border-surface-active shadow-sm p-6">
+            <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-6">
                 {schedules.length > 0 ? (
                     <div className="space-y-4">
                         {schedules.map((schedule, i) => (
@@ -115,7 +115,7 @@ export function SchedulesTab({
                                                 <h4 className="font-medium text-text">
                                                     {schedule.name || 'Unnamed Schedule'}
                                                 </h4>
-                                                <span className={`text-xs px-2 py-0.5 rounded-full ${schedule.enabled ? 'bg-green-100 text-green-700' : 'bg-surface-hover text-text-secondary'}`}>
+                                                <span className={`text-xs px-2 py-0.5 rounded-full ${schedule.enabled ? 'bg-success/15 text-success' : 'bg-surface-hover text-text-secondary'}`}>
                                                     {schedule.enabled ? 'Active' : 'Paused'}
                                                 </span>
                                             </div>
@@ -159,7 +159,7 @@ export function SchedulesTab({
                                         <Button
                                             variant="ghost"
                                             size="sm"
-                                            className="h-8 w-8 p-0 hover:bg-red-50 rounded-lg"
+                                            className="h-8 w-8 p-0 hover:bg-destructive/10 rounded-lg"
                                             onClick={() => onDelete(schedule.id)}
                                             aria-label="Delete schedule"
                                         >
@@ -277,7 +277,7 @@ export function SchedulesTab({
                                 <div>
                                     <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Status</label>
                                     <p className="mt-1">
-                                        <span className={`inline-flex items-center gap-1.5 text-sm px-3 py-1 rounded-full ${selectedSchedule.enabled ? 'bg-green-100 text-green-700' : 'bg-surface-hover text-text-secondary'}`}>
+                                        <span className={`inline-flex items-center gap-1.5 text-sm px-3 py-1 rounded-full ${selectedSchedule.enabled ? 'bg-success/15 text-success' : 'bg-surface-hover text-text-secondary'}`}>
                                             {selectedSchedule.enabled ? <Check className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
                                             {selectedSchedule.enabled ? 'Active' : 'Paused'}
                                         </span>
@@ -315,7 +315,7 @@ export function SchedulesTab({
                                     </Button>
                                     <Button
                                         variant="ghost"
-                                        className="h-10 px-4 bg-red-50 hover:bg-red-100 rounded-xl text-red-600"
+                                        className="h-10 px-4 bg-destructive/10 hover:bg-destructive/15 rounded-xl text-destructive"
                                         onClick={() => {
                                             onDelete(selectedSchedule.id)
                                             setSelectedSchedule(null)

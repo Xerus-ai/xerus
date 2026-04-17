@@ -70,7 +70,7 @@ export function AgentChannelsCard({ agentId, isEditable, isMarketplace = false }
         )}
       </div>
 
-      <div className="bg-surface rounded-[24px] border border-surface-active shadow-sm p-6">
+      <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-6">
         {assignedChannels.length > 0 ? (
           <div className="space-y-1">
             {assignedChannels.map(ch => (
@@ -103,7 +103,7 @@ export function AgentChannelsCard({ agentId, isEditable, isMarketplace = false }
                     {isEditable && (
                       <button
                         onClick={() => handleRemove(ch.channel_id)}
-                        className="w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-500 text-text-secondary transition-all"
+                        className="w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive text-text-secondary transition-all"
                         title="Remove from channel"
                       >
                         <X className="w-3 h-3" />

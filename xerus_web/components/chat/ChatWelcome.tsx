@@ -135,7 +135,7 @@ function AgentsVisual({ agents }: { agents: Agent[] }) {
               <img src={agent.avatarUrl!} alt={agent.name} className="w-full h-full object-cover" />
             )}
             {/* Status dot */}
-            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-surface bg-[#22C55E]" />
+            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-surface bg-success" />
           </div>
         ))}
         {displayAgents.length === 0 && (
@@ -164,14 +164,14 @@ function DelegateVisual() {
         </div>
         {/* Column 2: Doing */}
         <div className="w-14 flex flex-col gap-1">
-          <div className="h-1 w-6 rounded-full bg-[#22C55E]/30 mb-1" />
-          <div className="h-7 rounded-md bg-[#22C55E]/[0.06] border border-[#22C55E]/10" />
+          <div className="h-1 w-6 rounded-full bg-success/30 mb-1" />
+          <div className="h-7 rounded-md bg-success/[0.06] border border-[#22C55E]/10" />
         </div>
         {/* Column 3: Done */}
         <div className="w-14 flex flex-col gap-1">
-          <div className="h-1 w-7 rounded-full bg-[#3B82F6]/20 mb-1" />
-          <div className="h-5 rounded-md bg-[#3B82F6]/[0.06] border border-[#3B82F6]/10" />
-          <div className="h-5 rounded-md bg-[#3B82F6]/[0.04] border border-[#3B82F6]/8" />
+          <div className="h-1 w-7 rounded-full bg-primary/20 mb-1" />
+          <div className="h-5 rounded-md bg-primary/[0.06] border border-[#3B82F6]/10" />
+          <div className="h-5 rounded-md bg-primary/[0.04] border border-[#3B82F6]/8" />
         </div>
       </div>
     </div>
@@ -399,7 +399,7 @@ export function ChatWelcome({
               type="button"
               onClick={() => onSuggestionClick?.(s.prompt)}
               className={cn(
-                'group flex flex-col rounded-[32px] p-4 overflow-hidden',
+                'group flex flex-col rounded-4xl p-4 overflow-hidden',
                 'bg-surface/60 backdrop-blur-sm shadow-[0_2px_16px_rgba(255,102,0,0.15)]',
                 'hover:-translate-y-0.5 hover:shadow-md',
                 'active:scale-[0.98] transition-all duration-200 cursor-pointer',

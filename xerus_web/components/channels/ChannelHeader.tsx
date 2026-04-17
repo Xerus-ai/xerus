@@ -126,7 +126,7 @@ export function ChannelHeader({
     <div className={cn('flex flex-col h-full', className)}>
       {/* Header section */}
       <div className="flex-shrink-0 pb-4 border-b border-border">
-        <div className="flex items-start justify-between gap-4 mb-2">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4 mb-2">
           {/* Left: channel name + description (click-to-edit) */}
           <div className="min-w-0 flex-1">
             {/* Channel name */}
@@ -151,7 +151,8 @@ export function ChannelHeader({
                   </h1>
                   <button
                     onClick={() => setIsEditingName(true)}
-                    className="p-1 rounded-lg hover:bg-surface-hover text-text-secondary hover:text-primary transition-colors shrink-0"
+                    className="flex items-center justify-center min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 sm:p-1.5 rounded-lg hover:bg-surface-hover text-text-secondary hover:text-primary transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                    aria-label="Edit channel name"
                     title="Edit name"
                   >
                     <Pencil className="w-4 h-4" />
@@ -187,7 +188,8 @@ export function ChannelHeader({
                 </p>
                 <button
                   onClick={() => setIsEditingDesc(true)}
-                  className="p-0.5 rounded-lg hover:bg-surface-hover text-text-muted hover:text-primary transition-colors shrink-0"
+                  className="flex items-center justify-center min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 sm:p-1 rounded-lg hover:bg-surface-hover text-text-muted hover:text-primary transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                  aria-label="Edit channel description"
                   title="Edit description"
                 >
                   <Pencil className="w-3 h-3" />
@@ -197,7 +199,7 @@ export function ChannelHeader({
           </div>
 
           {/* Right: Agent avatars + manage button */}
-          <div className="flex items-center gap-3 flex-shrink-0">
+          <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap flex-shrink-0">
             {/* Agent avatar stack — rounded-xl with model badge at edge */}
             {channelAgents.length > 0 && (
               <div className="flex items-center">
@@ -226,16 +228,26 @@ export function ChannelHeader({
             <Popover open={agentPopoverOpen} onOpenChange={setAgentPopoverOpen}>
               <PopoverTrigger asChild>
                 <button
-                  className="p-2 hover:bg-secondary/8 text-secondary rounded-full transition-colors"
-                  aria-label="Manage channel agents"
+                  className={cn(
+                    'flex items-center gap-1.5 rounded-full transition-colors',
+                    'min-h-[44px] min-w-[44px] justify-center',
+                    'hover:bg-secondary/8 text-secondary',
+                    'sm:min-h-0 sm:min-w-0 sm:px-3 sm:py-1.5 sm:text-xs sm:font-medium sm:border sm:border-secondary/20 sm:hover:border-secondary/40',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary/40',
+                  )}
+                  aria-label={agentPopoverOpen ? 'Close agent manager' : 'Manage channel agents'}
+                  data-testid="channel-manage-agents"
                 >
-                  {agentPopoverOpen ? <X className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+                  {agentPopoverOpen ? <X className="w-5 h-5 sm:w-3.5 sm:h-3.5" /> : <Plus className="w-5 h-5 sm:w-3.5 sm:h-3.5" />}
+                  <span className="hidden sm:inline">
+                    {channelAgents.length > 0 ? 'Manage agents' : 'Add agent'}
+                  </span>
                 </button>
               </PopoverTrigger>
               <PopoverContent
                 align="end"
                 sideOffset={8}
-                className="w-80 p-0 rounded-[24px] bg-surface border border-border shadow-sm"
+                className="w-80 p-0 rounded-3xl bg-surface border border-border shadow-sm"
               >
                 <div className="px-5 pt-5 pb-3">
                   <h3 className="text-lg font-serif text-text">Channel Agents</h3>
@@ -272,7 +284,7 @@ export function ChannelHeader({
                               ) : (
                                 <button
                                   onClick={() => handleToggleAgent(agent)}
-                                  className="w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-500 text-text-secondary transition-all"
+                                  className="w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive text-text-secondary transition-all"
                                   title="Remove from channel"
                                 >
                                   <X className="w-3 h-3" />
@@ -354,7 +366,12 @@ export function ChannelHeader({
         </TabsContent>
 
         <TabsContent value="activity" className="flex-1 min-h-0 mt-0">
-          <ChannelActivity channelId={channelId} className="h-full" />
+          <ChannelActivity
+            channelId={channelId}
+            className="h-full"
+            assignedAgents={channelAgents}
+            onManageAgents={() => setAgentPopoverOpen(true)}
+          />
         </TabsContent>
 
         <TabsContent value="deliverables" className="flex-1 min-h-0 mt-0">

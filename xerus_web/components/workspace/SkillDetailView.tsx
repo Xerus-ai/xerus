@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import useSWR from 'swr'
 import { MarkdownPreview } from '@/components/workspace/MarkdownPreview'
-import { ArrowLeft, FileText, Trash2, Pencil, Loader2, Hash, Bot, X, Minus, Eye, Sparkles, ArrowUp, Shield } from 'lucide-react'
+import { ArrowLeft, FileText, Trash2, Pencil, Loader2, Hash, Bot, X, Minus, Eye, Sparkles, ArrowUp, Shield, Clock } from 'lucide-react'
 import { getSkill, installSkill, uninstallSkill, deleteSkill } from '@/lib/api/skills'
 import { getAssistants } from '@/lib/api/agents'
 import type { SkillDetail, Assistant } from '@/lib/api/types'
@@ -41,7 +41,7 @@ function SkillAgentsCard({ isInstalled, agents, installedByAgents }: { isInstall
   const installedSet = new Set(installedByAgents)
   const assignedAgents = agents.filter((a) => installedSet.has(a.id))
   return (
-    <div className="bg-surface rounded-[24px] border border-surface-active shadow-sm p-6">
+    <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-6">
       {assignedAgents.length > 0 ? (
         <div className="space-y-2">
           {assignedAgents.map((agent) => (
@@ -64,7 +64,7 @@ function SkillAgentsCard({ isInstalled, agents, installedByAgents }: { isInstall
 
 function SkillChannelsCard({ skillSlug }: { skillSlug: string }) {
   return (
-    <div className="bg-surface rounded-[24px] border border-surface-active shadow-sm p-6">
+    <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-6">
       <p className="text-xs text-text-secondary py-2">
         Channel-scoped installs are not wired yet for <span className="font-medium text-text">{skillSlug}</span>. Install this skill once and it becomes available from the shared workspace.
       </p>
@@ -200,7 +200,7 @@ export function SkillDetailView({ skillSlug, onBack }: SkillDetailViewProps) {
             Back to Skills
           </button>
           {isOwner && (
-            <button onClick={handleDelete} disabled={deleting} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm text-text-secondary hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50">
+            <button onClick={handleDelete} disabled={deleting} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm text-text-secondary hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50">
               {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />} Delete
             </button>
           )}
@@ -235,7 +235,7 @@ export function SkillDetailView({ skillSlug, onBack }: SkillDetailViewProps) {
 
             <div className="space-y-2">
               <div className="flex items-center gap-2 px-1"><FileText className="w-5 h-5 text-primary" /><h3 className="text-2xl font-serif text-text">Skill Files</h3></div>
-              <div className="bg-surface rounded-[24px] border border-surface-active shadow-sm p-4 space-y-3">
+              <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-4 space-y-3">
                 <div className="bg-surface-hover rounded-xl px-5 py-4 flex items-center gap-4 cursor-pointer" onClick={() => setActiveFile('SKILL.md')}>
                   <div className="flex-1 min-w-0">
                     <span className="text-sm font-semibold text-text mb-1 block">SKILL.md</span>
@@ -266,7 +266,7 @@ export function SkillDetailView({ skillSlug, onBack }: SkillDetailViewProps) {
             {readmeFile && (
               <div className="space-y-2">
                 <div className="flex items-center gap-2 px-1"><FileText className="w-5 h-5 text-primary" /><h3 className="text-2xl font-serif text-text">README</h3></div>
-                <div className="bg-surface rounded-[24px] border border-surface-active shadow-sm p-6">
+                <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-6">
                   <SkillFileViewer slug={skillSlug} filePath={readmeFile.path} />
                 </div>
               </div>
@@ -320,6 +320,19 @@ export function SkillDetailView({ skillSlug, onBack }: SkillDetailViewProps) {
             <div className="space-y-2">
               <div className="flex items-center gap-2 px-1"><Hash className="w-5 h-5 text-primary" /><h3 className="text-2xl font-serif text-text">Channels</h3></div>
               <SkillChannelsCard skillSlug={skill.slug} />
+            </div>
+            {/* Triggers — parallels the Schedules section on the agent detail page.
+                Skills aren't scheduled directly; agents invoke them on demand.
+                Surfacing this keeps the two detail pages visually balanced. */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 px-1"><Clock className="w-5 h-5 text-primary" /><h3 className="text-2xl font-serif text-text">Triggers</h3></div>
+              <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-6">
+                <p className="text-xs text-text-secondary leading-relaxed">
+                  Skills run on demand — an agent invokes this skill when a message, task, or schedule
+                  calls for it. To run on a timer, add a <span className="font-medium text-text">schedule</span> to an
+                  agent that has this skill installed.
+                </p>
+              </div>
             </div>
           </div>
         </div>

@@ -149,7 +149,11 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
           Skip to main content
         </a>
         <MobileHeader />
-        <main id="main-content" className="flex-1 relative overflow-y-auto pb-14">
+        <main
+          id="main-content"
+          className="flex-1 relative overflow-y-auto pb-14"
+          style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 3rem)' }}
+        >
           {children}
         </main>
         <MobileBottomBar />

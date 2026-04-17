@@ -85,7 +85,7 @@ interface InstallOverlayProps {
 export function InstallOverlay({ skill, agents, onInstall, onUninstall, isOpen, onClose }: InstallOverlayProps) {
     return (
         <div
-            className={`absolute inset-0 z-20 rounded-[32px] overflow-hidden transition-all duration-300 ${
+            className={`absolute inset-0 z-20 rounded-4xl overflow-hidden transition-all duration-300 ${
                 isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
             }`}
             onClick={(e) => e.stopPropagation()}

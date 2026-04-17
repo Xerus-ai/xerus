@@ -131,8 +131,8 @@ export function ConnectorsSection({
                       }`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${
                           tool.requires_auth
-                            ? (isConnected ? 'bg-green-500' : 'bg-surface-active')
-                            : 'bg-green-500'
+                            ? (isConnected ? 'bg-success' : 'bg-surface-active')
+                            : 'bg-success'
                         }`}></span>
                         {tool.requires_auth
                           ? (isConnected ? 'Connected' : 'Disconnected')
@@ -189,7 +189,7 @@ export function ConnectorsSection({
                         <button
                           onClick={() => onRemoveTool(toolSlug)}
                           disabled={toolLoading === toolSlug}
-                          className="p-2 text-text-secondary hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                          className="p-2 text-text-secondary hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors disabled:opacity-50"
                           title="Remove from agent"
                         >
                           {toolLoading === toolSlug ? (

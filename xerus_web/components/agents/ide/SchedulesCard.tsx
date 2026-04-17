@@ -55,7 +55,7 @@ export function SchedulesCard({
                 )}
             </div>
 
-            <div className="bg-surface rounded-[24px] border border-surface-active shadow-sm p-6">
+            <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-6">
                 {schedules.length > 0 ? (
                     <div className="space-y-4">
                         {schedules.slice(0, 5).map((schedule, i) => (

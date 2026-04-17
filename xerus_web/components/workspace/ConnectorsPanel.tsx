@@ -66,7 +66,7 @@ export function ConnectorsPanel() {
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="bg-surface rounded-[32px] p-6 shadow-sm h-[280px] animate-pulse" />
+              <div key={i} className="bg-surface rounded-4xl p-6 shadow-sm h-[280px] animate-pulse" />
             ))}
           </div>
         </div>

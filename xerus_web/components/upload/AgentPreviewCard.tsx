@@ -113,7 +113,7 @@ export function AgentPreviewCard({ frontmatter, markdownBody, files, warning }: 
 
       {/* Warning */}
       {warning && (
-        <div className="px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-700 font-medium">
+        <div className="px-3 py-2 rounded-xl bg-warning/10 border border-warning/20 text-xs text-warning font-medium">
           {warning}
         </div>
       )}

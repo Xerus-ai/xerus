@@ -59,7 +59,7 @@ export function AgentFilesSection({
         </div>
 
         {/* All files in one card */}
-        <div className="bg-surface rounded-[24px] border border-surface-active shadow-sm p-4 space-y-3">
+        <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-4 space-y-3">
           {/* System Prompt row */}
           <div className="bg-surface-hover rounded-xl px-5 py-4 flex items-center gap-4 cursor-pointer"
             onClick={onOpenSystemPrompt}

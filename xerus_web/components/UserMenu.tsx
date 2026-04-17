@@ -194,7 +194,7 @@ export function UserMenu({ className }: UserMenuProps) {
             </div>
 
             {isLowCredits && (
-              <div className="flex items-center gap-2 text-[11px] text-amber-600 bg-amber-50 px-2 py-1 rounded-md mb-3 w-fit">
+              <div className="flex items-center gap-2 text-[11px] text-warning bg-warning/10 px-2 py-1 rounded-md mb-3 w-fit">
                 <span className="font-medium">Low credits</span>
               </div>
             )}
@@ -245,9 +245,9 @@ export function UserMenu({ className }: UserMenuProps) {
             <button
               onClick={handleLogout}
               role="menuitem"
-              className="flex items-center gap-3 px-3 py-2.5 text-[13px] font-medium text-text-secondary hover:text-red-600 hover:bg-red-50 rounded-xl transition-all duration-200 w-full text-left group"
+              className="flex items-center gap-3 px-3 py-2.5 text-[13px] font-medium text-text-secondary hover:text-destructive hover:bg-destructive/10 rounded-xl transition-all duration-200 w-full text-left group"
             >
-              <LogOut className="w-4 h-4 text-text-muted group-hover:text-red-500 transition-colors" />
+              <LogOut className="w-4 h-4 text-text-muted group-hover:text-destructive transition-colors" />
               Log out
             </button>
           </div>

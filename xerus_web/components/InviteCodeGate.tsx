@@ -87,7 +87,7 @@ export function InviteCodeGate({ email }: InviteCodeGateProps) {
         </div>
 
         {/* Card */}
-        <div className="w-full bg-card p-8 rounded-[32px] shadow-md border border-secondary/15 ring-1 ring-secondary/5">
+        <div className="w-full bg-card p-8 rounded-4xl shadow-md border border-secondary/15 ring-1 ring-secondary/5">
           {showRequestAccess ? (
             // Request access form
             <div>

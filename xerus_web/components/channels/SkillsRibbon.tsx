@@ -58,10 +58,12 @@ export function SkillsRibbon({ channelSlug, onSkillClick }: SkillsRibbonProps) {
       <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
         <PopoverTrigger asChild>
           <button
-            className="p-1 hover:bg-primary/5 text-primary rounded-full transition-colors shrink-0"
-            aria-label="Manage skills"
+            className="flex items-center gap-1 px-1.5 py-1 hover:bg-primary/5 text-primary rounded-full transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            aria-label={popoverOpen ? 'Close skills manager' : 'Manage channel skills'}
+            title="Manage skills available to agents in this channel"
           >
             {popoverOpen ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+            <span className="text-[11px] font-medium whitespace-nowrap">Skills</span>
           </button>
         </PopoverTrigger>
         <PopoverContent
@@ -95,7 +97,7 @@ export function SkillsRibbon({ channelSlug, onSkillClick }: SkillsRibbonProps) {
                       ) : (
                         <button
                           onClick={() => handleUninstall(skill)}
-                          className="w-4 h-4 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:text-red-500 text-text-muted transition-all shrink-0"
+                          className="w-4 h-4 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:text-destructive text-text-muted transition-all shrink-0"
                         >
                           <X className="w-3 h-3" />
                         </button>

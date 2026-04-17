@@ -416,7 +416,7 @@ export function OnboardingSteps({ workspace, agents, onComplete }: OnboardingSte
                   initial={{ opacity: 0, y: 18 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.35, duration: 0.5 }}
-                  className="rounded-[24px] bg-surface p-6 shadow-sm border border-surface-active/30"
+                  className="rounded-3xl bg-surface p-6 shadow-sm border border-surface-active/30"
                 >
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-5 select-none">
                     Connected Apps
@@ -457,7 +457,7 @@ export function OnboardingSteps({ workspace, agents, onComplete }: OnboardingSte
                   initial={{ opacity: 0, y: 18 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.4, duration: 0.5 }}
-                  className="rounded-[24px] bg-surface p-6 shadow-sm border border-surface-active/30"
+                  className="rounded-3xl bg-surface p-6 shadow-sm border border-surface-active/30"
                 >
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-5 select-none">
                     Skills
@@ -518,7 +518,7 @@ export function OnboardingSteps({ workspace, agents, onComplete }: OnboardingSte
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.15, duration: 0.45 }}
-                  className="lg:col-span-2 rounded-[24px] bg-surface p-5 shadow-sm border border-surface-active/30 flex flex-col"
+                  className="lg:col-span-2 rounded-3xl bg-surface p-5 shadow-sm border border-surface-active/30 flex flex-col"
                 >
                   {/* Channel tabs */}
                   <div className="flex items-center gap-1.5 mb-4">
@@ -570,7 +570,7 @@ export function OnboardingSteps({ workspace, agents, onComplete }: OnboardingSte
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.6 }}
-                      className="border-l-[3px] border-l-amber-400 bg-amber-50/40 rounded-r-xl pl-3 pr-3 py-2.5"
+                      className="border border-amber-400/30 bg-amber-50/40 rounded-xl px-3 py-2.5"
                     >
                       <div className="flex items-center gap-1.5 mb-1">
                         <AlertTriangle className="w-3 h-3 text-amber-600" />
@@ -592,7 +592,7 @@ export function OnboardingSteps({ workspace, agents, onComplete }: OnboardingSte
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.25, duration: 0.45 }}
-                  className="lg:col-span-3 rounded-[24px] bg-surface p-5 shadow-sm border border-surface-active/30"
+                  className="lg:col-span-3 rounded-3xl bg-surface p-5 shadow-sm border border-surface-active/30"
                 >
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-4 select-none">
                     Task Board

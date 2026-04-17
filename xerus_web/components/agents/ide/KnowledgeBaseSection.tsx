@@ -57,7 +57,7 @@ export function KnowledgeBaseSection({
         <h3 className="text-2xl font-serif text-text">Knowledge Base</h3>
       </div>
 
-      <div className="bg-surface rounded-[24px] border border-surface-active shadow-sm p-6">
+      <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-6">
         {agentDocs.length === 0 ? (
           <div className="text-center py-20">
             <div className="w-16 h-16 bg-surface-hover rounded-full flex items-center justify-center mx-auto mb-4">
@@ -95,7 +95,7 @@ export function KnowledgeBaseSection({
                   <button
                     onClick={() => handleRemove(doc.id)}
                     disabled={loadingId === doc.id}
-                    className="absolute top-2 right-2 w-6 h-6 bg-card/90 hover:bg-red-50 rounded-full flex items-center justify-center text-text-muted hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50 z-50"
+                    className="absolute top-2 right-2 w-6 h-6 bg-card/90 hover:bg-destructive/10 rounded-full flex items-center justify-center text-text-muted hover:text-destructive transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50 z-50"
                     title="Remove from agent"
                   >
                     {loadingId === doc.id ? (

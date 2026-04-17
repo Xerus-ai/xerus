@@ -14,10 +14,10 @@ interface MentionInputProps {
 }
 
 const STATUS_DOT: Record<string, string> = {
-  active: 'bg-emerald-500',
-  idle: 'bg-amber-400',
-  sleeping: 'bg-slate-400',
-  error: 'bg-red-500',
+  active: 'bg-success',
+  idle: 'bg-warning',
+  sleeping: 'bg-surface-pressed',
+  error: 'bg-destructive',
 }
 
 export function MentionInput({

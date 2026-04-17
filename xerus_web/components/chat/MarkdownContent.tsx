@@ -31,7 +31,7 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       type="button"
-      className="p-1 rounded-md bg-white/10 text-gray-400 hover:text-gray-200 transition-[color,opacity]"
+      className="p-1 rounded-md bg-white/10 text-white/40 hover:text-white/70 transition-[color,opacity]"
       onClick={(e) => {
         e.stopPropagation()
         navigator.clipboard.writeText(text)
@@ -57,7 +57,7 @@ const PROSE_CLASSES = cn(
   'prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:bg-surface-hover prose-code:text-text prose-code:font-mono prose-code:text-[13px]',
   'prose-code:before:content-none prose-code:after:content-none',
   // Code blocks
-  'prose-pre:bg-[#1E1E1E] prose-pre:rounded-2xl prose-pre:shadow-sm prose-pre:border prose-pre:border-gray-800',
+  'prose-pre:bg-code-bg prose-pre:rounded-2xl prose-pre:shadow-sm prose-pre:border prose-pre:border-code-border',
   // Lists — proper spacing
   'prose-ul:my-2.5 prose-ol:my-2.5 prose-li:my-1 prose-li:text-text prose-li:text-[15px] prose-li:leading-[1.6]',
   // Links — orange accent with hover underline
@@ -91,7 +91,7 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
             return !inline && match ? (
               <div className="relative group/code my-4">
                 <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 py-2 z-10">
-                  <span className="text-[11px] font-medium text-gray-500 uppercase tracking-wide">{match[1]}</span>
+                  <span className="text-[11px] font-medium text-white/40 uppercase tracking-wide">{match[1]}</span>
                   <div className="opacity-0 group-hover/code:opacity-100 transition-opacity">
                     <CopyButton text={text} />
                   </div>
@@ -100,7 +100,7 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
                   code={text}
                   language={match[1]}
                   preTag="div"
-                  className="rounded-2xl !mt-0 !mb-0 !pt-10 shadow-sm border border-gray-800 text-sm"
+                  className="rounded-2xl !mt-0 !mb-0 !pt-10 shadow-sm border border-code-border text-sm"
                 />
               </div>
             ) : (

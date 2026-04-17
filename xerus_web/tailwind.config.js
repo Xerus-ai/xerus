@@ -64,6 +64,11 @@ module.exports = {
 					DEFAULT: 'hsl(var(--destructive))',
 					foreground: 'hsl(var(--destructive-foreground))'
 				},
+				success: 'rgb(var(--clr-success) / <alpha-value>)',
+				warning: 'rgb(var(--clr-warning) / <alpha-value>)',
+				gold: 'rgb(var(--clr-gold) / <alpha-value>)',
+				'code-bg': 'rgb(var(--clr-code-bg) / <alpha-value>)',
+				'code-border': 'rgb(var(--clr-code-border) / <alpha-value>)',
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
 				ring: 'hsl(var(--ring))',
@@ -81,6 +86,8 @@ module.exports = {
 				'lg': '10px',
 				'xl': '12px',
 				'2xl': '16px',
+				'3xl': '24px',
+				'4xl': '32px',
 				'pill': '9999px',
 			},
 			boxShadow: {

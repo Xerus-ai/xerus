@@ -71,7 +71,7 @@ export function BehaviourContextPanel({ activeSection }: BehaviourContextPanelPr
     const Icon = content.icon
 
     return (
-        <div className="bg-surface rounded-[24px] border border-surface-active p-6 shadow-sm">
+        <div className="bg-surface rounded-3xl border border-surface-active p-6 shadow-sm">
             <div className="flex items-center gap-3 mb-4">
                 <div className="p-2 rounded-lg bg-surface-hover">
                     <Icon className="w-4 h-4 text-primary" />

@@ -5,7 +5,7 @@ export const PRIORITIES = ['all', 'critical', 'high', 'medium', 'low'] as const
 export const PRIORITY_STYLES: Record<string, string> = {
   critical: 'bg-destructive/10 text-destructive font-medium',
   high: 'bg-secondary/10 text-secondary font-medium',
-  medium: 'bg-amber-100/60 text-amber-700',
+  medium: 'bg-warning/10 text-warning font-medium',
   low: 'bg-surface-active text-text-muted',
 }
 

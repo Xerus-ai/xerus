@@ -115,7 +115,7 @@ export function SettingsSidebar() {
 
       {/* Mobile horizontal nav */}
       <div className="lg:hidden border-b border-border bg-surface-alt/60 px-2 py-2 overflow-x-auto scrollbar-none shrink-0">
-        <nav role="tablist" aria-label="Settings navigation" className="flex gap-1 min-w-max">
+        <nav role="tablist" aria-label="Settings navigation" className="flex gap-1 min-w-max items-center">
           {ALL_ITEMS.map((item) => {
             const isActive = pathname === item.href
             const Icon = item.icon
@@ -124,7 +124,7 @@ export function SettingsSidebar() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all shrink-0',
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all shrink-0 min-h-[36px]',
                   isActive
                     ? 'bg-surface-hover/80 text-text'
                     : 'text-text-secondary hover:bg-surface-hover/40'
@@ -135,6 +135,15 @@ export function SettingsSidebar() {
               </Link>
             )
           })}
+          <div className="w-px h-5 bg-border mx-1 shrink-0" aria-hidden="true" />
+          <button
+            onClick={handleLogout}
+            data-testid="settings-sign-out-mobile"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-text-secondary hover:bg-destructive/8 hover:text-destructive transition-all shrink-0 min-h-[36px]"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            Sign out
+          </button>
         </nav>
       </div>
     </>

@@ -39,14 +39,14 @@ function AgentStatus({ agents }: { agents: OfficeAgent[] }) {
   )
 
   return (
-    <div className="bg-surface rounded-[32px] p-6 shadow-sm h-full">
+    <div className="bg-surface rounded-4xl p-6 shadow-sm h-full">
       {/* Active agents */}
       {active.length > 0 && (
         <div className="mb-5">
           <div className="flex items-center gap-2 mb-3">
-            <Zap className="w-4 h-4 text-green-500" />
+            <Zap className="w-4 h-4 text-success" />
             <span className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">Active Now</span>
-            <span className="bg-green-50 text-green-600 text-xs font-bold px-2 py-0.5 rounded-md">
+            <span className="bg-success/10 text-success text-xs font-bold px-2 py-0.5 rounded-md">
               {active.length}
             </span>
           </div>
@@ -60,7 +60,7 @@ function AgentStatus({ agents }: { agents: OfficeAgent[] }) {
                     size="sm"
                     hideBadge
                   />
-                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-surface animate-status-pulse" />
+                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-success border-2 border-surface animate-status-pulse" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-text truncate">{agent.name}</p>
@@ -188,7 +188,7 @@ function ActivityTicker({ agents }: { agents: OfficeAgent[] }) {
     const items: { agent: string; text: string; dot: string }[] = []
     for (const agent of agents) {
       if (agent.status === 'active' && agent.current_task) {
-        items.push({ agent: agent.name, text: agent.current_task, dot: 'bg-green-500' })
+        items.push({ agent: agent.name, text: agent.current_task, dot: 'bg-success' })
       } else if (agent.status === 'sleeping') {
         items.push({ agent: agent.name, text: `Sleeping${agent.next_wake ? ` \u00b7 wakes ${agent.next_wake}` : ''}`, dot: 'bg-yellow-400' })
       } else if (agent.status === 'error') {
@@ -199,7 +199,7 @@ function ActivityTicker({ agents }: { agents: OfficeAgent[] }) {
   }, [agents])
 
   return (
-    <div className="bg-surface rounded-[32px] p-6 shadow-sm">
+    <div className="bg-surface rounded-4xl p-6 shadow-sm">
       <div className="flex items-center gap-2 mb-3">
         <Zap className="w-4 h-4 text-text-muted" />
         <span className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">
@@ -291,10 +291,13 @@ export function OfficeDashboard() {
 
             {/* OFFICE tab */}
             <TabsContent value="office" className="space-y-6 stagger-in">
-              {/* Hero: Canvas + Agent Status */}
+              {/* Hero: Canvas + Agent Status.
+                  On phones the pixel-art canvas becomes unreadable (<500px), so we
+                  hide it below sm and let AgentStatus take full width. Canvas returns
+                  on tablets+ as the discoverable hero. */}
               <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-4 sm:gap-6">
-                {/* Left: Office Canvas */}
-                <div>
+                {/* Left: Office Canvas (sm+) */}
+                <div className="hidden sm:block">
                   <OfficeCanvas
                     agents={agents}
                     transitions={transitions}
@@ -302,8 +305,9 @@ export function OfficeDashboard() {
                   />
                 </div>
 
-                {/* Right: Agent Status (active + upcoming) */}
-                <div>
+                {/* Right: Agent Status (active + upcoming) — always rendered,
+                    first card on phones. */}
+                <div className="order-first sm:order-none">
                   <AgentStatus agents={agents} />
                 </div>
               </div>

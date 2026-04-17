@@ -225,7 +225,7 @@ export function EscalationMessage({
               'bg-primary hover:bg-primary/90 text-white',
               'active:scale-95',
             ),
-            'bg-emerald-500/10 text-emerald-700 cursor-default',
+            'bg-success/10 text-success cursor-default',
           )}
           {renderActionButton(
             'rejected',
@@ -237,7 +237,7 @@ export function EscalationMessage({
               'bg-surface-hover hover:bg-surface-pressed text-text',
               'active:scale-95',
             ),
-            'bg-red-500/10 text-red-700 cursor-default',
+            'bg-destructive/10 text-destructive cursor-default',
           )}
           {renderActionButton(
             'discussing',
@@ -249,7 +249,7 @@ export function EscalationMessage({
               'text-primary hover:bg-primary/8',
               'active:scale-95',
             ),
-            'bg-blue-500/10 text-blue-700 cursor-default',
+            'bg-primary/10 text-primary cursor-default',
           )}
         </div>
       </div>

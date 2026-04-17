@@ -206,7 +206,7 @@ export function FileUploadPanel({ isOpen, onClose, folders, currentFolderId, upl
                         {/* Drag & Drop Zone */}
                         <div
                             className={cn(
-                                "border-2 border-dashed rounded-[24px] h-40 flex flex-col items-center justify-center text-center transition-colors cursor-pointer mb-8",
+                                "border-2 border-dashed rounded-3xl h-40 flex flex-col items-center justify-center text-center transition-colors cursor-pointer mb-8",
                                 isDragActive
                                     ? "border-primary bg-primary/5"
                                     : "border-surface-active hover:border-primary hover:bg-surface"
@@ -227,7 +227,7 @@ export function FileUploadPanel({ isOpen, onClose, folders, currentFolderId, upl
                             <div className="flex flex-col items-center gap-2">
                                 <div className="flex items-center gap-2 text-text font-medium">
                                     <Upload className="w-5 h-5" />
-                                    <span>Drop and drop or browse files</span>
+                                    <span>Drag and drop or browse files</span>
                                 </div>
                                 <p className="text-xs text-text-secondary">
                                     Maximum 500 MB file size
@@ -243,7 +243,7 @@ export function FileUploadPanel({ isOpen, onClose, folders, currentFolderId, upl
                                 </h4>
                                 <div className="space-y-2">
                                     {attachmentFiles.map(file => (
-                                        <div key={file.id} className="group flex items-center gap-3 p-3 rounded-[16px] border border-surface-active bg-card hover:bg-surface-hover transition-colors">
+                                        <div key={file.id} className="group flex items-center gap-3 p-3 rounded-2xl border border-surface-active bg-card hover:bg-surface-hover transition-colors">
                                             {/* Icon */}
                                             <div className="w-8 h-8 rounded-full bg-surface flex items-center justify-center shrink-0">
                                                 {file.type === 'pdf' && <span className="text-sm font-serif italic text-text-secondary">@</span>}
@@ -292,7 +292,7 @@ export function FileUploadPanel({ isOpen, onClose, folders, currentFolderId, upl
                                                 )}
                                                 <button
                                                     onClick={() => removeFile(file.id)}
-                                                    className="p-2 text-text-secondary hover:text-red-500 transition-colors"
+                                                    className="p-2 text-text-secondary hover:text-destructive transition-colors"
                                                     aria-label="Remove file"
                                                 >
                                                     <X className="w-4 h-4" />
@@ -309,7 +309,7 @@ export function FileUploadPanel({ isOpen, onClose, folders, currentFolderId, upl
                             <div className="mb-8">
                                 <div className="grid grid-cols-3 gap-3">
                                     {imageFiles.map(file => (
-                                        <div key={file.id} className="relative aspect-video rounded-[16px] overflow-hidden group border border-surface-active">
+                                        <div key={file.id} className="relative aspect-video rounded-2xl overflow-hidden group border border-surface-active">
                                             <img
                                                 src={URL.createObjectURL(file.file)}
                                                 alt={file.file.name}
@@ -321,7 +321,7 @@ export function FileUploadPanel({ isOpen, onClose, folders, currentFolderId, upl
                                             </div>
                                             <button
                                                 onClick={() => removeFile(file.id)}
-                                                className="absolute top-2 right-2 w-6 h-6 bg-card/80 hover:bg-card rounded-full flex items-center justify-center text-text-secondary hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                                                className="absolute top-2 right-2 w-6 h-6 bg-card/80 hover:bg-card rounded-full flex items-center justify-center text-text-secondary hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
                                                 aria-label="Remove image"
                                             >
                                                 <X className="w-3 h-3" />
@@ -331,7 +331,7 @@ export function FileUploadPanel({ isOpen, onClose, folders, currentFolderId, upl
                                     {/* Add Button */}
                                     <button
                                         onClick={() => fileInputRef.current?.click()}
-                                        className="aspect-video rounded-[16px] bg-surface border border-surface-active flex items-center justify-center hover:bg-surface-hover transition-colors"
+                                        className="aspect-video rounded-2xl bg-surface border border-surface-active flex items-center justify-center hover:bg-surface-hover transition-colors"
                                         aria-label="Add image"
                                     >
                                         <Plus className="w-6 h-6 text-text-secondary" />
@@ -351,7 +351,7 @@ export function FileUploadPanel({ isOpen, onClose, folders, currentFolderId, upl
                                     {tags.map(tag => (
                                         <span key={tag} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-surface text-xs font-medium text-text">
                                             {tag}
-                                            <button onClick={() => removeTag(tag)} className="hover:text-red-500" aria-label={`Remove tag ${tag}`}>
+                                            <button onClick={() => removeTag(tag)} className="hover:text-destructive" aria-label={`Remove tag ${tag}`}>
                                                 <X className="w-3 h-3" />
                                             </button>
                                         </span>
