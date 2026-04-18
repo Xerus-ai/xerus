@@ -39,14 +39,14 @@ function AgentStatus({ agents }: { agents: OfficeAgent[] }) {
   )
 
   return (
-    <div className="bg-surface rounded-[32px] p-6 shadow-sm h-full">
+    <div className="bg-surface rounded-4xl p-6 shadow-sm h-full">
       {/* Active agents */}
       {active.length > 0 && (
         <div className="mb-5">
           <div className="flex items-center gap-2 mb-3">
-            <Zap className="w-4 h-4 text-green-500" />
+            <Zap className="w-4 h-4 text-success" />
             <span className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">Active Now</span>
-            <span className="bg-green-50 text-green-600 text-xs font-bold px-2 py-0.5 rounded-md">
+            <span className="bg-success/10 text-success text-xs font-bold px-2 py-0.5 rounded-md">
               {active.length}
             </span>
           </div>
@@ -60,7 +60,7 @@ function AgentStatus({ agents }: { agents: OfficeAgent[] }) {
                     size="sm"
                     hideBadge
                   />
-                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-surface animate-status-pulse" />
+                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-success border-2 border-surface animate-status-pulse" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-text truncate">{agent.name}</p>
@@ -81,7 +81,7 @@ function AgentStatus({ agents }: { agents: OfficeAgent[] }) {
       {scheduled.length > 0 && (
         <div>
           <div className="flex items-center gap-2 mb-3">
-            <Clock className="w-4 h-4 text-primary" />
+            <Clock className="w-4 h-4 text-secondary" />
             <span className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">Upcoming</span>
           </div>
           <div className="space-y-2.5">
@@ -150,29 +150,29 @@ function AgentStatus({ agents }: { agents: OfficeAgent[] }) {
           <div className="flex flex-col gap-3 w-full">
             <Link
               href="/chat"
-              className="group relative flex items-center gap-4 p-4 rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/[0.04] to-transparent hover:border-primary/40 hover:from-primary/[0.08] transition-all duration-200"
+              className="group relative flex items-center gap-4 p-4 rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/[0.04] to-transparent hover:border-primary/40 hover:from-primary/[0.08] hover:-translate-y-0.5 hover:shadow-md transition-all duration-200"
             >
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/15 transition-colors">
-                <MessageSquare className="w-[18px] h-[18px] text-primary" />
+                <MessageSquare className="w-[18px] h-[18px] text-secondary" />
               </div>
               <div className="text-left min-w-0 flex-1">
                 <p className="text-[13px] font-semibold text-text">Chat with Xerus</p>
                 <p className="text-[11px] text-text-muted mt-0.5">Ask anything to get started</p>
               </div>
-              <ArrowRight className="w-4 h-4 text-text-muted group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
+              <ArrowRight className="w-4 h-4 text-text-muted group-hover:text-secondary group-hover:translate-x-0.5 transition-all shrink-0" />
             </Link>
             <Link
               href="/workspace"
-              className="group relative flex items-center gap-4 p-4 rounded-2xl border border-surface-active bg-surface-alt hover:border-primary/30 hover:shadow-sm transition-all duration-200"
+              className="group relative flex items-center gap-4 p-4 rounded-2xl border border-surface-active bg-surface-alt hover:border-primary/30 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200"
             >
               <div className="w-10 h-10 rounded-xl bg-surface-hover flex items-center justify-center shrink-0 group-hover:bg-primary/10 transition-colors">
-                <Users className="w-[18px] h-[18px] text-text-secondary group-hover:text-primary transition-colors" />
+                <Users className="w-[18px] h-[18px] text-text-secondary group-hover:text-secondary transition-colors" />
               </div>
               <div className="text-left min-w-0 flex-1">
                 <p className="text-[13px] font-semibold text-text">Agent Marketplace</p>
                 <p className="text-[11px] text-text-muted mt-0.5">Find and hire agents for your team</p>
               </div>
-              <ArrowRight className="w-4 h-4 text-text-muted group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
+              <ArrowRight className="w-4 h-4 text-text-muted group-hover:text-secondary group-hover:translate-x-0.5 transition-all shrink-0" />
             </Link>
           </div>
         </div>
@@ -188,7 +188,7 @@ function ActivityTicker({ agents }: { agents: OfficeAgent[] }) {
     const items: { agent: string; text: string; dot: string }[] = []
     for (const agent of agents) {
       if (agent.status === 'active' && agent.current_task) {
-        items.push({ agent: agent.name, text: agent.current_task, dot: 'bg-green-500' })
+        items.push({ agent: agent.name, text: agent.current_task, dot: 'bg-success' })
       } else if (agent.status === 'sleeping') {
         items.push({ agent: agent.name, text: `Sleeping${agent.next_wake ? ` \u00b7 wakes ${agent.next_wake}` : ''}`, dot: 'bg-yellow-400' })
       } else if (agent.status === 'error') {
@@ -199,7 +199,7 @@ function ActivityTicker({ agents }: { agents: OfficeAgent[] }) {
   }, [agents])
 
   return (
-    <div className="bg-surface rounded-[32px] p-6 shadow-sm">
+    <div className="bg-surface rounded-4xl p-6 shadow-sm">
       <div className="flex items-center gap-2 mb-3">
         <Zap className="w-4 h-4 text-text-muted" />
         <span className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">
@@ -263,11 +263,11 @@ export function OfficeDashboard() {
       <div className="max-w-[1140px] mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
         {/* Page header */}
         <header className="mb-8 flex items-center gap-3">
-          <Building2 className="w-7 h-7 text-primary" />
+          <Building2 className="w-7 h-7 text-secondary" />
           <div>
-            <h1 className="font-serif text-2xl text-text">Your Office</h1>
+            <h1 className="font-serif text-2xl text-text tracking-tight">Welcome to your Office</h1>
             <p className="text-sm text-text-secondary">
-              Live overview of your AI workforce
+              Here's what your AI workforce is up to
             </p>
           </div>
         </header>
@@ -281,20 +281,23 @@ export function OfficeDashboard() {
         ) : (
           <Tabs defaultValue="office" className="space-y-6">
             <TabsList className="bg-surface p-[0.325rem] rounded-full inline-flex h-auto w-auto border-none">
-              <TabsTrigger value="office" className="rounded-full px-6 py-2.5 text-sm font-medium transition-all data-[state=active]:bg-text data-[state=active]:text-white data-[state=active]:shadow-sm text-text-secondary hover:text-text">
+              <TabsTrigger value="office" className="rounded-full px-6 py-2.5 text-sm font-medium transition-all data-[state=active]:bg-secondary/10 data-[state=active]:text-secondary data-[state=active]:shadow-sm text-text-secondary hover:text-text">
                 Office
               </TabsTrigger>
-              <TabsTrigger value="board" className="rounded-full px-6 py-2.5 text-sm font-medium transition-all data-[state=active]:bg-text data-[state=active]:text-white data-[state=active]:shadow-sm text-text-secondary hover:text-text">
+              <TabsTrigger value="board" className="rounded-full px-6 py-2.5 text-sm font-medium transition-all data-[state=active]:bg-secondary/10 data-[state=active]:text-secondary data-[state=active]:shadow-sm text-text-secondary hover:text-text">
                 Board
               </TabsTrigger>
             </TabsList>
 
             {/* OFFICE tab */}
-            <TabsContent value="office" className="space-y-6">
-              {/* Hero: Canvas + Agent Status */}
+            <TabsContent value="office" className="space-y-6 stagger-in">
+              {/* Hero: Canvas + Agent Status.
+                  On phones the pixel-art canvas becomes unreadable (<500px), so we
+                  hide it below sm and let AgentStatus take full width. Canvas returns
+                  on tablets+ as the discoverable hero. */}
               <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-4 sm:gap-6">
-                {/* Left: Office Canvas */}
-                <div>
+                {/* Left: Office Canvas (sm+) */}
+                <div className="hidden sm:block">
                   <OfficeCanvas
                     agents={agents}
                     transitions={transitions}
@@ -302,8 +305,9 @@ export function OfficeDashboard() {
                   />
                 </div>
 
-                {/* Right: Agent Status (active + upcoming) */}
-                <div>
+                {/* Right: Agent Status (active + upcoming) — always rendered,
+                    first card on phones. */}
+                <div className="order-first sm:order-none">
                   <AgentStatus agents={agents} />
                 </div>
               </div>

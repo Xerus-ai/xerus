@@ -171,10 +171,10 @@ export function RunHistory({ agent }: RunHistoryProps) {
         return (
             <div className="space-y-6">
                 <div className="flex items-center gap-3">
-                    <History className="w-6 h-6 text-primary" />
+                    <History className="w-6 h-6 text-secondary" />
                     <h2 className="text-2xl font-serif text-text">Run History</h2>
                 </div>
-                <div className="bg-surface p-6 rounded-[24px] border border-surface-active shadow-sm">
+                <div className="bg-surface p-6 rounded-3xl border border-surface-active shadow-sm">
                     <div className="space-y-4">
                         {[1, 2, 3].map(i => (
                             <div key={i} className="flex items-start gap-3 animate-pulse">
@@ -201,7 +201,7 @@ export function RunHistory({ agent }: RunHistoryProps) {
             <div className="flex items-center justify-between">
                 {/* Left: Heading */}
                 <div className="flex items-center gap-3">
-                    <History className="w-6 h-6 text-primary" />
+                    <History className="w-6 h-6 text-secondary" />
                     <h2 className="text-2xl font-serif text-text">Run History</h2>
                     <span className="text-sm text-text-secondary bg-surface px-3 py-1 rounded-full">
                         {runs.length} {runs.length === 1 ? 'run' : 'runs'}
@@ -211,12 +211,12 @@ export function RunHistory({ agent }: RunHistoryProps) {
                 {/* Right: Tab Switcher + Pagination */}
                 <div className="flex items-center gap-3">
                     {/* Tab Switcher */}
-                    <div className="flex items-center bg-surface rounded-[12px] p-1 border border-surface-active">
+                    <div className="flex items-center bg-surface rounded-xl p-1 border border-surface-active">
                         <button
                             onClick={() => handleTabChange('all')}
-                            className={`px-4 py-1.5 rounded-[8px] text-sm font-medium transition-all ${
+                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
                                 activeTab === 'all'
-                                    ? 'bg-white text-text shadow-sm'
+                                    ? 'bg-card text-text shadow-sm'
                                     : 'text-text-secondary hover:text-text'
                             }`}
                         >
@@ -224,9 +224,9 @@ export function RunHistory({ agent }: RunHistoryProps) {
                         </button>
                         <button
                             onClick={() => handleTabChange('success')}
-                            className={`px-4 py-1.5 rounded-[8px] text-sm font-medium transition-all ${
+                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
                                 activeTab === 'success'
-                                    ? 'bg-white text-text shadow-sm'
+                                    ? 'bg-card text-text shadow-sm'
                                     : 'text-text-secondary hover:text-text'
                             }`}
                         >
@@ -234,9 +234,9 @@ export function RunHistory({ agent }: RunHistoryProps) {
                         </button>
                         <button
                             onClick={() => handleTabChange('failed')}
-                            className={`px-4 py-1.5 rounded-[8px] text-sm font-medium transition-all ${
+                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
                                 activeTab === 'failed'
-                                    ? 'bg-white text-text shadow-sm'
+                                    ? 'bg-card text-text shadow-sm'
                                     : 'text-text-secondary hover:text-text'
                             }`}
                         >
@@ -246,7 +246,7 @@ export function RunHistory({ agent }: RunHistoryProps) {
 
                     {/* Pagination */}
                     {totalPages > 1 && (
-                        <div className="flex items-center gap-2 bg-white rounded-[12px] px-3 py-1.5 border border-surface-active">
+                        <div className="flex items-center gap-2 bg-card rounded-xl px-3 py-1.5 border border-surface-active">
                             <button
                                 onClick={() => setPage(p => Math.max(1, p - 1))}
                                 disabled={page === 1}
@@ -272,7 +272,7 @@ export function RunHistory({ agent }: RunHistoryProps) {
             </div>
 
             {/* Content Card */}
-            <div className="bg-surface p-6 rounded-[24px] border border-surface-active shadow-sm">
+            <div className="bg-surface p-6 rounded-3xl border border-surface-active shadow-sm">
                 {paginatedRuns.length > 0 ? (
                     <div className="space-y-4">
                         {paginatedRuns.map((run, i) => (
@@ -300,10 +300,10 @@ export function RunHistory({ agent }: RunHistoryProps) {
                                         <h4 className="font-medium text-text">{run.task || 'Untitled run'}</h4>
                                         <span className={`text-xs px-2 py-0.5 rounded-full ${
                                             run.status === 'success'
-                                                ? 'bg-green-100 text-green-700'
+                                                ? 'bg-success/15 text-success'
                                                 : run.status === 'failed'
-                                                ? 'bg-red-100 text-red-700'
-                                                : 'bg-amber-100 text-amber-700'
+                                                ? 'bg-destructive/15 text-destructive'
+                                                : 'bg-warning/15 text-warning'
                                         }`}>
                                             {run.status === 'running' ? 'Running' : run.status}
                                         </span>

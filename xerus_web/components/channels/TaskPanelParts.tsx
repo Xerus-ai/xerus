@@ -45,7 +45,7 @@ export function TagInput({ labels, labelInput, onLabelInputChange, onAddLabel, o
   const available = TAG_SUGGESTIONS.filter(s => !labels.includes(s))
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-1.5 px-3 py-2 rounded-xl bg-[#FDF8F3] border border-surface-active/20 min-h-[36px]">
+      <div className="flex flex-wrap items-center gap-1.5 px-3 py-2 rounded-xl bg-surface border border-border/20 min-h-[36px]">
         {labels.map((label) => {
           const color = getLabelColorByName(label)
           return (
@@ -102,7 +102,7 @@ export function AttachmentSection({ count }: { count: number }) {
           const ext = getFileExtension(name)
           const colors = FILE_TYPE_COLORS[ext] || { bg: '#F3F4F6', text: '#4B5563' }
           return (
-            <div key={name} className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-[#FDF8F3] border border-surface-active/10 min-w-[180px]">
+            <div key={name} className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-surface border border-border/10 min-w-[180px]">
               <div className="w-10 h-10 rounded-lg flex items-center justify-center text-[10px] font-bold uppercase tracking-wide" style={{ backgroundColor: colors.bg, color: colors.text }}>
                 {ext}
               </div>
@@ -113,7 +113,7 @@ export function AttachmentSection({ count }: { count: number }) {
             </div>
           )
         })}
-        <button className="w-10 h-10 rounded-xl border-2 border-dashed border-surface-active flex items-center justify-center hover:border-primary/40 hover:bg-primary/5 transition-colors">
+        <button className="w-10 h-10 rounded-xl border-2 border-dashed border-border flex items-center justify-center hover:border-primary/40 hover:bg-primary/5 transition-colors">
           <Plus className="w-4 h-4 text-text-muted" />
         </button>
       </div>
@@ -129,7 +129,7 @@ export function ActivityTabs({ task }: { task: KanbanTask }) {
   const [tab, setTab] = useState<'subtasks' | 'comments' | 'activities'>('activities')
   return (
     <div>
-      <div className="flex items-center gap-6 border-b border-surface-active/30 mb-4">
+      <div className="flex items-center gap-6 border-b border-border/30 mb-4">
         {(['subtasks', 'comments', 'activities'] as const).map((t) => (
           <button
             key={t}
@@ -175,9 +175,7 @@ export function ActivityTabs({ task }: { task: KanbanTask }) {
 function ActivityItem({ text, date }: { text: React.ReactNode; date: string }) {
   return (
     <div className="flex items-start gap-3">
-      <svg width="10" height="10" viewBox="0 0 10 10" className="mt-1.5 shrink-0">
-        <circle cx="5" cy="5" r="5" fill="#FF6600" />
-      </svg>
+      <span className="w-2 h-2 rounded-full bg-primary mt-2 shrink-0" />
       <div>
         <p className="text-sm font-medium text-text">{text}</p>
         <p className="text-xs text-text-muted">{date}</p>

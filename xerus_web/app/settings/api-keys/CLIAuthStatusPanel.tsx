@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Sparkles, Cpu, ExternalLink, Loader2, CheckCircle2, ArrowRight, ClipboardPaste, X } from 'lucide-react'
+import { ExternalLink, Loader2, CheckCircle2, ArrowRight, ClipboardPaste, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from '@/lib/toast'
 import { triggerCliLogin, completeCliLogin, getCliAuthStatus, type CliAuthStatus } from '@/lib/api/user'
@@ -110,26 +110,26 @@ export function CLIAuthStatusPanel({ cliAuthStatus, onStatusChange }: CLIAuthSta
 
       <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
         {/* Claude Code login card */}
-        <div className="p-4 bg-white rounded-xl border border-surface-active/50">
+        <div className="p-4 bg-card rounded-xl border border-surface-active/50">
           <div className="flex items-center gap-2.5 mb-3">
-            <div className="w-8 h-8 bg-gradient-to-br from-orange-50 to-amber-50 rounded-lg flex items-center justify-center border border-orange-100">
-              <Sparkles className="w-4 h-4 text-orange-500" />
+            <div className="w-8 h-8 bg-surface rounded-lg flex items-center justify-center border border-surface-active/50 shrink-0">
+              <img src="/icons/claudecode-color.svg" alt="Claude Code" className="w-5 h-5 object-contain" />
             </div>
             <div>
-              <span className="text-sm font-medium text-text">Claude</span>
+              <span className="text-sm font-medium text-text">Claude Code</span>
               <p className="text-[10px] text-text-secondary">Anthropic subscription</p>
             </div>
           </div>
 
           {claudeConnected ? (
-            <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 rounded-lg border border-emerald-100">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span className="text-xs font-medium text-emerald-700">
+            <div className="flex items-center gap-2 px-3 py-2 bg-success/10 rounded-lg border border-success/20">
+              <CheckCircle2 className="w-4 h-4 text-success" />
+              <span className="text-xs font-medium text-success">
                 {claudeAuth?.method === 'subscription' ? 'Subscription' : 'API Key'}
               </span>
               <button
                 onClick={() => handleLogin('claudecode')}
-                className="ml-auto text-[10px] font-medium text-text bg-white border border-surface-active rounded-md px-2 py-0.5 hover:bg-surface-hover transition-colors"
+                className="ml-auto text-[10px] font-medium text-text bg-surface border border-surface-active rounded-md px-2 py-0.5 hover:bg-surface-hover transition-colors"
               >
                 Disconnect
               </button>
@@ -156,10 +156,10 @@ export function CLIAuthStatusPanel({ cliAuthStatus, onStatusChange }: CLIAuthSta
         </div>
 
         {/* Codex login card - Coming Soon */}
-        <div className="p-4 bg-white rounded-xl border border-surface-active/50 opacity-60">
+        <div className="p-4 bg-card rounded-xl border border-surface-active/50 opacity-60">
           <div className="flex items-center gap-2.5 mb-3">
-            <div className="w-8 h-8 bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg flex items-center justify-center border border-green-100">
-              <Cpu className="w-4 h-4 text-green-600" />
+            <div className="w-8 h-8 bg-surface rounded-lg flex items-center justify-center border border-surface-active/50 shrink-0">
+              <img src="/icons/codex-color.svg" alt="Codex" className="w-5 h-5 object-contain" />
             </div>
             <div>
               <span className="text-sm font-medium text-text">Codex</span>
@@ -167,8 +167,8 @@ export function CLIAuthStatusPanel({ cliAuthStatus, onStatusChange }: CLIAuthSta
             </div>
           </div>
 
-          <div className="flex items-center justify-center gap-2 px-3 py-2.5 bg-gray-50 rounded-lg border border-gray-200">
-            <span className="text-xs font-medium text-gray-400 italic">Coming Soon</span>
+          <div className="flex items-center justify-center gap-2 px-3 py-2.5 bg-surface-hover rounded-lg border border-surface-active">
+            <span className="text-xs font-medium text-text-muted italic">Coming Soon</span>
           </div>
         </div>
       </div>
@@ -177,7 +177,7 @@ export function CLIAuthStatusPanel({ cliAuthStatus, onStatusChange }: CLIAuthSta
       <AnimatePresence>
         {pendingAdapter && (
           <motion.div
-            className="mt-4 bg-white rounded-xl border border-surface-active/50 overflow-hidden"
+            className="mt-4 bg-card rounded-xl border border-surface-active/50 overflow-hidden"
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
@@ -211,7 +211,7 @@ export function CLIAuthStatusPanel({ cliAuthStatus, onStatusChange }: CLIAuthSta
                   <span>You&#39;ll see a page that won&#39;t load — that&#39;s expected</span>
                 </div>
                 <div className="flex items-start gap-2">
-                  <span className="w-4 h-4 rounded-full bg-amber-100 flex items-center justify-center text-[10px] font-medium text-amber-700 shrink-0 mt-px">3</span>
+                  <span className="w-4 h-4 rounded-full bg-warning/15 flex items-center justify-center text-[10px] font-medium text-warning shrink-0 mt-px">3</span>
                   <span className="font-medium text-text">Copy the full URL from the address bar and paste it below</span>
                 </div>
               </div>

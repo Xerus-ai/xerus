@@ -115,7 +115,7 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
         <div className="flex items-start gap-6">
             {/* Icon Box with Model Badge - matches AgentCard layout */}
             <div className="relative pb-3 shrink-0">
-                <div className="w-20 h-20 bg-surface rounded-[24px] flex items-center justify-center shadow-sm border border-surface-active overflow-hidden">
+                <div className="w-20 h-20 bg-surface rounded-xl flex items-center justify-center shadow-sm border border-surface-active overflow-hidden">
                     {isMascotConfig(agent.avatarUrl) ? (
                         <MascotAvatar config={agent.avatarUrl!} size={80} className="w-full h-full" alt={agent.name} />
                     ) : agent.avatarUrl ? (
@@ -128,7 +128,7 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                     )}
                 </div>
                 {/* Claude Code adapter badge */}
-                <div className="absolute -top-2 -left-2 bg-white border border-blue-200 rounded-md p-0.5 shadow-sm z-20" title="Claude Code">
+                <div className="absolute -top-2 -left-2 bg-card border border-secondary/20 rounded-md p-0.5 shadow-sm z-20" title="Claude Code">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src="/icons/claudecode-color.svg" alt="Claude Code" className="w-5 h-5 object-contain" />
                 </div>
@@ -136,13 +136,13 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                 {localAgent.model && (
                     isEditable ? (
                         <Select value={localAgent.model} onValueChange={handleModelChange}>
-                            <SelectTrigger className="absolute -bottom-1 left-1/2 -translate-x-1/2 h-auto px-2 py-0.5 bg-white border border-surface-active rounded-md shadow-sm focus:ring-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary hover:bg-surface-hover transition-colors w-auto gap-1 z-10">
+                            <SelectTrigger className="absolute -bottom-1 left-1/2 -translate-x-1/2 h-auto px-2 py-0.5 bg-card border border-surface-active rounded-md shadow-sm focus:ring-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary hover:bg-surface-hover transition-colors w-auto gap-1 z-10">
                                 <div className="flex items-center gap-1">
                                     <ModelIcon model={localAgent.model} size="sm" />
                                     <span className="text-[10px] font-bold text-text-secondary whitespace-nowrap">{formatModelName(localAgent.model)}</span>
                                 </div>
                             </SelectTrigger>
-                            <SelectContent className="bg-white border border-surface-active rounded-md shadow-lg min-w-[220px] max-h-[320px]">
+                            <SelectContent className="bg-card border border-surface-active rounded-md shadow-lg min-w-[220px] max-h-[320px]">
                                 {isLoadingModels ? (
                                     <SelectItem value="__loading" disabled>
                                         <span className="text-xs text-text-secondary">Loading models...</span>
@@ -151,7 +151,7 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                                     <>
                                         {anthropicModels.length > 0 && (
                                             <SelectGroup>
-                                                <SelectLabel className="text-[10px] font-semibold uppercase tracking-wide text-text-secondary/70 px-2 py-1">Anthropic</SelectLabel>
+                                                <SelectLabel className="text-[10px] font-semibold uppercase tracking-wide text-text/[0.38] px-2 py-1">Anthropic</SelectLabel>
                                                 {anthropicModels.map((m) => (
                                                     <SelectItem key={m.id} value={m.id}>
                                                         <div className="flex items-center gap-1.5">
@@ -166,7 +166,7 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                                             <>
                                                 {anthropicModels.length > 0 && <SelectSeparator />}
                                                 <SelectGroup>
-                                                    <SelectLabel className="text-[10px] font-semibold uppercase tracking-wide text-text-secondary/70 px-2 py-1">OpenAI</SelectLabel>
+                                                    <SelectLabel className="text-[10px] font-semibold uppercase tracking-wide text-text/[0.38] px-2 py-1">OpenAI</SelectLabel>
                                                     {openaiModels.map((m) => (
                                                         <SelectItem key={m.id} value={m.id}>
                                                             <div className="flex items-center gap-1.5">
@@ -182,7 +182,7 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                                             <>
                                                 <SelectSeparator />
                                                 <SelectGroup>
-                                                    <SelectLabel className="text-[10px] font-semibold uppercase tracking-wide text-text-secondary/70 px-2 py-1">Google</SelectLabel>
+                                                    <SelectLabel className="text-[10px] font-semibold uppercase tracking-wide text-text/[0.38] px-2 py-1">Google</SelectLabel>
                                                     {googleModels.map((m) => (
                                                         <SelectItem key={m.id} value={m.id}>
                                                             <div className="flex items-center gap-1.5">
@@ -198,7 +198,7 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                                             <>
                                                 <SelectSeparator />
                                                 <SelectGroup>
-                                                    <SelectLabel className="text-[10px] font-semibold uppercase tracking-wide text-text-secondary/70 px-2 py-1">Other</SelectLabel>
+                                                    <SelectLabel className="text-[10px] font-semibold uppercase tracking-wide text-text/[0.38] px-2 py-1">Other</SelectLabel>
                                                     {remainingModels.map((m) => (
                                                         <SelectItem key={m.id} value={m.id}>
                                                             <div className="flex items-center gap-1.5">
@@ -220,7 +220,7 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                             </SelectContent>
                         </Select>
                     ) : (
-                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 h-auto px-2 py-0.5 bg-white border border-surface-active rounded-md shadow-sm flex items-center gap-1 z-10">
+                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 h-auto px-2 py-0.5 bg-card border border-surface-active rounded-md shadow-sm flex items-center gap-1 z-10">
                             <ModelIcon model={localAgent.model} size="sm" />
                             <span className="text-[10px] font-bold text-text-secondary whitespace-nowrap">{formatModelName(localAgent.model)}</span>
                         </div>
@@ -242,20 +242,20 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                                 if (e.key === 'Enter') handleBlur('name')
                             }}
                             data-testid="agent-name-input"
-                            className="font-serif !text-3xl text-text bg-transparent border-none shadow-none !h-auto focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none placeholder:text-text-secondary/50 w-auto min-w-[280px] p-0"
+                            className="font-serif !text-3xl tracking-tight text-text bg-transparent border-none shadow-none !h-auto focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none placeholder:text-text-secondary/50 w-auto min-w-[280px] p-0"
                             placeholder="Agent Name"
                         />
                     ) : (
                         <div className="flex items-center gap-2">
                             <h1
                                 onClick={() => isEditable && setIsEditingName(true)}
-                                className={`font-serif text-3xl text-text ${isEditable ? 'cursor-text hover:text-text/80' : ''} transition-colors`}
+                                className={`font-serif text-3xl tracking-tight text-text ${isEditable ? 'cursor-text hover:text-text/80' : ''} transition-colors`}
                             >
                                 {localAgent.name}
                             </h1>
                             {/* Verified Badge - small orange circle with checkmark */}
                             {agent.isVerified && (
-                                <span className="shrink-0 w-4 h-4 bg-primary rounded-full flex items-center justify-center" title="Verified">
+                                <span className="shrink-0 w-4 h-4 bg-secondary rounded-full flex items-center justify-center" title="Verified">
                                     <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
                                         <polyline points="20 6 9 17 4 12" />
                                     </svg>
@@ -264,7 +264,7 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                             {isEditable && (
                                 <button
                                     onClick={() => setIsEditingName(true)}
-                                    className="p-1.5 rounded-lg hover:bg-surface-hover text-text-secondary hover:text-primary transition-colors"
+                                    className="p-1.5 rounded-lg hover:bg-surface-hover text-text-secondary hover:text-secondary transition-colors"
                                     title="Edit name"
                                 >
                                     <Pencil className="w-5 h-5" />
@@ -308,7 +308,7 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                             {isEditable && (
                                 <button
                                     onClick={() => setIsEditingDesc(true)}
-                                    className="p-1.5 rounded-lg hover:bg-surface-hover text-text-secondary hover:text-primary transition-colors shrink-0"
+                                    className="p-1.5 rounded-lg hover:bg-surface-hover text-text-secondary hover:text-secondary transition-colors shrink-0"
                                     title="Edit description"
                                 >
                                     <Pencil className="w-5 h-5" />

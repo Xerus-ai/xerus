@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import useSWR from 'swr'
 import { apiGet, apiPost, apiPatch } from '@/lib/api/client'
 import { toast } from '@/lib/toast'
 import type { ChannelMessage } from '@/components/channels/ChannelActivity'
@@ -26,7 +27,8 @@ export interface Deliverable {
 // Channel Messages
 // ---------------------------------------------------------------------------
 
-const POLL_INTERVAL_MS = 5000
+const POLL_INTERVAL_MS = 8000
+const POLL_MAX_BACKOFF_MS = 60_000
 
 interface UseChannelMessagesReturn {
   messages: ChannelMessage[]
@@ -36,73 +38,36 @@ interface UseChannelMessagesReturn {
   refetch: () => void
 }
 
+const fetchChannelMessages = async ([, id]: readonly [string, string]): Promise<ChannelMessage[]> => {
+  const result = await apiGet<{ data?: { messages: ChannelMessage[] }; messages?: ChannelMessage[] }>(
+    `/company/channels/${id}/messages`,
+  )
+  const payload = result.data ?? result
+  return payload.messages ?? []
+}
+
 export function useChannelMessages(channelId: string): UseChannelMessagesReturn {
-  const [messages, setMessages] = useState<ChannelMessage[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const initialLoadDone = useRef(false)
+  const swrKey = channelId ? (['channel-messages', channelId] as const) : null
 
-  const fetchMessages = useCallback(async (silent = false) => {
-    if (!silent) {
-      setIsLoading(true)
-      setError(null)
-    }
-    try {
-      const result = await apiGet<{ data?: { messages: ChannelMessage[] }; messages?: ChannelMessage[] }>(
-        `/company/channels/${channelId}/messages`
-      )
-      // Backend wraps response in { success, data: { messages }, meta }
-      const payload = result.data ?? result
-      const incoming = payload.messages ?? []
-
-      // Only update state if the message list actually changed
-      // Compare count + first ID + last ID to catch mid-list insertions
-      setMessages(prev => {
-        if (
-          prev.length === incoming.length &&
-          prev.length > 0 &&
-          prev[0].id === incoming[0]?.id &&
-          prev[prev.length - 1].id === incoming[incoming.length - 1]?.id
-        ) {
-          return prev // no change, keep same reference to avoid re-renders
-        }
-        return incoming
-      })
-    } catch (err) {
-      // Only surface errors on initial load, not on silent polls
-      if (!silent) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch messages')
-      }
-    } finally {
-      if (!silent) {
-        setIsLoading(false)
-      }
-    }
-  }, [channelId])
-
-  // Initial fetch
-  useEffect(() => {
-    initialLoadDone.current = false
-    fetchMessages(false).then(() => {
-      initialLoadDone.current = true
-    })
-  }, [fetchMessages])
-
-  // Polling: silent refetch every POLL_INTERVAL_MS after initial load
-  // Pauses when browser tab is hidden to save bandwidth
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (initialLoadDone.current && document.visibilityState === 'visible') {
-        fetchMessages(true)
-      }
-    }, POLL_INTERVAL_MS)
-
-    return () => clearInterval(interval)
-  }, [fetchMessages])
+  const { data, isLoading, error, mutate } = useSWR<ChannelMessage[]>(
+    swrKey,
+    fetchChannelMessages,
+    {
+      refreshInterval: POLL_INTERVAL_MS,
+      refreshWhenHidden: false,
+      // Polling retries indefinitely with capped exponential backoff so transient
+      // outages recover automatically — overrides the global errorRetryCount cap.
+      onErrorRetry: (_err, _key, _config, revalidate, { retryCount }) => {
+        const delay = Math.min(POLL_MAX_BACKOFF_MS, POLL_INTERVAL_MS * 2 ** retryCount)
+        setTimeout(() => revalidate({ retryCount }), delay)
+      },
+    },
+  )
 
   const sendMessage = useCallback(async (content: string) => {
+    if (!channelId) return
     const optimistic: ChannelMessage = {
-      id: `msg-${Date.now()}`,
+      id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       channel_id: channelId,
       sender_type: 'human',
       sender_slug: 'human',
@@ -111,27 +76,46 @@ export function useChannelMessages(channelId: string): UseChannelMessagesReturn 
       message_type: 'post',
       created_at: new Date().toISOString(),
     }
-    setMessages(prev => [...prev, optimistic])
 
     try {
-      const result = await apiPost<{ data?: { message: ChannelMessage }; message?: ChannelMessage }>(
-        `/company/channels/${channelId}/messages`,
-        { content, sender_type: 'human' }
+      await mutate(
+        async (current) => {
+          const result = await apiPost<{ data?: { message: ChannelMessage }; message?: ChannelMessage }>(
+            `/company/channels/${channelId}/messages`,
+            { content, sender_type: 'human' },
+          )
+          const savedPayload = result.data ?? result
+          const saved = savedPayload.message ?? optimistic
+          const base = (current ?? []).filter(m => m.id !== optimistic.id)
+          return [...base, saved]
+        },
+        {
+          optimisticData: (current) => [...(current ?? []), optimistic],
+          rollbackOnError: true,
+          revalidate: false,
+        },
       )
-      // Backend wraps response in { success, data: { message }, meta }
-      const savedPayload = result.data ?? result
-      const saved = savedPayload.message ?? optimistic
-      setMessages(prev =>
-        prev.map(m => (m.id === optimistic.id ? saved : m))
-      )
-    } catch {
-      // Remove optimistic message on failure
-      setMessages(prev => prev.filter(m => m.id !== optimistic.id));
-      toast.error("Your message wasn't sent", { description: 'Please try again.' });
+    } catch (err) {
+      toast.error("Your message wasn't sent", { description: 'Please try again.' })
+      throw err
     }
-  }, [channelId])
+  }, [channelId, mutate])
 
-  return { messages, isLoading, error, sendMessage, refetch: () => fetchMessages(false) }
+  const refetch = useCallback(() => {
+    mutate()
+  }, [mutate])
+
+  const errorMessage = error instanceof Error
+    ? error.message
+    : (error ? 'Failed to fetch messages' : null)
+
+  return {
+    messages: data ?? [],
+    isLoading,
+    error: errorMessage,
+    sendMessage,
+    refetch,
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -173,37 +157,53 @@ export function useChannelTasks(channelId: string): UseChannelTasksReturn {
   const [tasks, setTasks] = useState<KanbanTask[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const channelIdRef = useRef(channelId)
+  const inFlightRef = useRef(false)
 
-  const fetchTasks = useCallback(async () => {
+  const fetchTasks = useCallback(async (signal?: AbortSignal) => {
+    if (!channelId) return
+    if (inFlightRef.current) return
+    inFlightRef.current = true
     setIsLoading(true)
     setError(null)
     try {
       const result = await apiGet<{ data?: { tasks: KanbanTask[] }; tasks?: KanbanTask[] }>(
-        `/channels/${channelId}/tasks`
+        `/channels/${channelId}/tasks`,
+        signal ? { signal } : undefined,
       )
-      // Backend wraps response in { success, data: { tasks }, meta }
+      if (signal?.aborted || channelIdRef.current !== channelId) return
       const payload = result.data ?? result
       setTasks(payload.tasks ?? [])
     } catch (err) {
+      if (signal?.aborted || (err instanceof Error && err.name === 'AbortError')) return
       setError(err instanceof Error ? err.message : 'Failed to fetch tasks')
     } finally {
-      setIsLoading(false)
+      inFlightRef.current = false
+      if (!signal?.aborted && channelIdRef.current === channelId) {
+        setIsLoading(false)
+      }
     }
   }, [channelId])
 
   useEffect(() => {
-    fetchTasks()
-  }, [fetchTasks])
+    channelIdRef.current = channelId
+    inFlightRef.current = false
+    const controller = new AbortController()
+    fetchTasks(controller.signal)
+    return () => controller.abort()
+  }, [channelId, fetchTasks])
 
   const updateTaskStatus = useCallback(async (taskId: string, newStatus: string) => {
+    const previous = tasks
     setTasks(prev => prev.map(t => (t.id === taskId ? { ...t, status: newStatus } : t)))
     try {
       await apiPost(`/tasks/${taskId}/status`, { status: newStatus })
-    } catch {
+    } catch (err) {
+      setTasks(previous)
       toast.error("Couldn't update that task -- reverting", { description: 'Your changes could not be saved. The task has been restored.' })
-      fetchTasks()
+      throw err
     }
-  }, [fetchTasks])
+  }, [tasks])
 
   const createTaskFn = useCallback(async (chId: string, payload: CreateTaskPayload): Promise<KanbanTask | null> => {
     try {
@@ -277,27 +277,41 @@ export function useChannelDeliverables(channelId: string): UseChannelDeliverable
   const [deliverables, setDeliverables] = useState<Deliverable[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const channelIdRef = useRef(channelId)
+  const inFlightRef = useRef(false)
 
-  const fetchDeliverables = useCallback(async () => {
+  const fetchDeliverables = useCallback(async (signal?: AbortSignal) => {
+    if (!channelId) return
+    if (inFlightRef.current) return
+    inFlightRef.current = true
     setIsLoading(true)
     setError(null)
     try {
       const raw = await apiGet<{ data?: { deliverables: Deliverable[] }; deliverables?: Deliverable[] }>(
-        `/channels/${channelId}/deliverables`
+        `/channels/${channelId}/deliverables`,
+        signal ? { signal } : undefined,
       )
-      // Backend wraps response in { success, data: { deliverables }, meta }
+      if (signal?.aborted || channelIdRef.current !== channelId) return
       const payload = raw.data ?? raw
       setDeliverables(payload.deliverables ?? [])
     } catch (err) {
+      if (signal?.aborted || (err instanceof Error && err.name === 'AbortError')) return
       setError(err instanceof Error ? err.message : 'Failed to fetch deliverables')
     } finally {
-      setIsLoading(false)
+      inFlightRef.current = false
+      if (!signal?.aborted && channelIdRef.current === channelId) {
+        setIsLoading(false)
+      }
     }
   }, [channelId])
 
   useEffect(() => {
-    fetchDeliverables()
-  }, [fetchDeliverables])
+    channelIdRef.current = channelId
+    inFlightRef.current = false
+    const controller = new AbortController()
+    fetchDeliverables(controller.signal)
+    return () => controller.abort()
+  }, [channelId, fetchDeliverables])
 
   return { deliverables, isLoading, error, refetch: fetchDeliverables }
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import useSWR from 'swr'
 import { getUserAgents } from '@/lib/api/agents'
 import type { OfficeAgent } from '@/hooks/useOfficeData'
@@ -27,10 +27,19 @@ export function useOfficePolling(intervalMs = 30000): UseOfficePollingReturn {
   const { data: agents, error, isLoading, mutate } = useSWR(
     'office-agents',
     fetchOfficeAgents,
-    { refreshInterval: intervalMs }
+    {
+      refreshInterval: intervalMs,
+      // Pause polling on hidden tabs and don't fire a fresh request on every focus —
+      // SWR's default of refetch-on-focus stacks on top of the interval and floods the API.
+      refreshWhenHidden: false,
+      revalidateOnFocus: false,
+      dedupingInterval: Math.min(intervalMs, 5000),
+    },
   )
 
-  const agentList = agents ?? []
+  // SWR returns the same array reference for the same response, but `?? []`
+  // would create a new empty array each render. Memoise so derived effects stay stable.
+  const agentList = useMemo(() => agents ?? [], [agents])
   const previousAgentsRef = useRef<Map<string, OfficeAgent>>(new Map())
   const [transitions, setTransitions] = useState<StatusTransition[]>([])
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
@@ -58,7 +67,9 @@ export function useOfficePolling(intervalMs = 30000): UseOfficePollingReturn {
     previousAgentsRef.current = nextMap
 
     if (newTransitions.length > 0) {
-      setTransitions(newTransitions)
+      // Append rather than replace — back-to-back polls in the same tick would
+      // otherwise clobber unread transitions before the 3s clear timer fires.
+      setTransitions(prev => [...prev, ...newTransitions])
     }
   }, [])
 
@@ -69,16 +80,15 @@ export function useOfficePolling(intervalMs = 30000): UseOfficePollingReturn {
     }
   }, [agentList, detectTransitions])
 
-  // Clear transitions after animation window
+  // Clear the queue after the animation window. Re-enters whenever new
+  // transitions are appended, so each batch gets its own visibility window.
   useEffect(() => {
-    if (transitions.length > 0) {
-      const timer = setTimeout(() => setTransitions([]), 3000)
-      return () => clearTimeout(timer)
-    }
+    if (transitions.length === 0) return
+    const timer = setTimeout(() => setTransitions([]), 3000)
+    return () => clearTimeout(timer)
   }, [transitions])
 
-  // Derive domains
-  const domains = (() => {
+  const domains = useMemo(() => {
     const seen = new Map<string, { id: string; slug: string; name: string }>()
     for (const agent of agentList) {
       const slug = agent.domain || 'general'
@@ -91,10 +101,9 @@ export function useOfficePolling(intervalMs = 30000): UseOfficePollingReturn {
       }
     }
     return Array.from(seen.values())
-  })()
+  }, [agentList])
 
-  // Group agents by domain
-  const agentsByDomain = (() => {
+  const agentsByDomain = useMemo(() => {
     const map = new Map<string, OfficeAgent[]>()
     for (const agent of agentList) {
       const domain = agent.domain || 'general'
@@ -103,7 +112,11 @@ export function useOfficePolling(intervalMs = 30000): UseOfficePollingReturn {
       map.set(domain, existing)
     }
     return map
-  })()
+  }, [agentList])
+
+  const refetch = useCallback(() => {
+    mutate()
+  }, [mutate])
 
   return {
     agents: agentList,
@@ -113,6 +126,6 @@ export function useOfficePolling(intervalMs = 30000): UseOfficePollingReturn {
     error: error ? (error instanceof Error ? error.message : 'Failed to load office data') : null,
     transitions,
     lastRefresh,
-    refetch: () => mutate(),
+    refetch,
   }
 }

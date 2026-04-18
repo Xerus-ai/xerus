@@ -34,11 +34,11 @@ export function ThoughtBubble({ task, isHovered }: ThoughtBubbleProps) {
           exit={{ opacity: 0, y: 4, scale: 0.95 }}
           transition={{ duration: 0.2 }}
         >
-          <div className="bg-white border border-surface-active shadow-sm rounded-xl px-2.5 py-1 text-[10px] text-text-secondary max-w-[160px] truncate">
+          <div className="bg-card border border-surface-active shadow-sm rounded-xl px-2.5 py-1 text-[10px] text-text-secondary max-w-[160px] truncate">
             {truncate(task, 50)}
           </div>
           {/* Bubble tail */}
-          <div className="w-2 h-2 bg-white border-b border-r border-surface-active rotate-45 absolute -bottom-1 left-1/2 -translate-x-1/2" />
+          <div className="w-2 h-2 bg-card border-b border-r border-surface-active rotate-45 absolute -bottom-1 left-1/2 -translate-x-1/2" />
         </motion.div>
       )}
     </AnimatePresence>

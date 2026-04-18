@@ -102,14 +102,14 @@ export const AgentAvatarWithModel = ({
                     className="w-full h-full object-contain"
                 />
             ) : (
-                <span className="w-full h-full flex items-center justify-center bg-primary/10 text-primary font-semibold text-sm">
+                <span className="w-full h-full flex items-center justify-center bg-secondary/10 text-secondary font-semibold text-sm">
                     {resolvedName.substring(0, 2).toUpperCase()}
                 </span>
             )}
 
             {/* Model Badge Overlay - bottom-right */}
             {(!hideBadge && resolvedModel && modelIconPath) && (
-                <div className="absolute -bottom-0.5 -right-0.5 bg-white border border-surface-active rounded-tl-lg px-1.5 py-0.5 shadow-sm flex items-center gap-1 z-10">
+                <div className="absolute -bottom-0.5 -right-0.5 bg-card border border-surface-active rounded-tl-lg px-1.5 py-0.5 shadow-sm flex items-center gap-1 z-10">
                     <ModelIcon model={resolvedModel} size="xs" />
                 </div>
             )}

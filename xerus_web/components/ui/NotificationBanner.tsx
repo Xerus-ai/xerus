@@ -24,27 +24,27 @@ interface NotificationBannerProps {
 const typeConfig = {
   info: {
     icon: Info,
-    iconColor: 'text-indigo-600',
-    iconBg: 'bg-indigo-50',
-    ringColor: 'ring-indigo-100',
+    iconColor: 'text-secondary',
+    iconBg: 'bg-secondary/10',
+    ringColor: 'ring-secondary/20',
   },
   success: {
     icon: CheckCircle,
-    iconColor: 'text-emerald-600',
-    iconBg: 'bg-emerald-50',
-    ringColor: 'ring-emerald-100',
+    iconColor: 'text-success',
+    iconBg: 'bg-success/10',
+    ringColor: 'ring-success/20',
   },
   warning: {
     icon: AlertTriangle,
-    iconColor: 'text-amber-600',
-    iconBg: 'bg-amber-50',
-    ringColor: 'ring-amber-100',
+    iconColor: 'text-warning',
+    iconBg: 'bg-warning/10',
+    ringColor: 'ring-warning/20',
   },
   error: {
     icon: AlertCircle,
-    iconColor: 'text-red-600',
-    iconBg: 'bg-red-50',
-    ringColor: 'ring-red-100',
+    iconColor: 'text-destructive',
+    iconBg: 'bg-destructive/10',
+    ringColor: 'ring-destructive/20',
   },
 }
 
@@ -94,10 +94,10 @@ export function NotificationBanner({
   if (!isVisible) return null
 
   return (
-    <div className="fixed top-4 right-5 z-50 flex flex-col items-center w-full max-w-[23rem] font-sans">
+    <div className="fixed top-4 right-4 z-50 flex flex-col items-center w-full max-w-[23rem] font-sans animate-slide-in-top">
       {/* Main Card */}
-      <div className="w-full bg-white border border-black/[0.06] rounded-[16px] shadow-[0_6px_24px_rgb(0,0,0,0.08)] overflow-hidden transition-all duration-300 ease-out">
-        <div className="flex items-center pl-3 pr-2.5 py-2.5 gap-2.5">
+      <div className="w-full bg-card border border-border rounded-2xl shadow-lg overflow-hidden transition-all duration-200">
+        <div className="flex items-center pl-3 pr-2 py-2 gap-2">
           {/* Icon */}
           <div className={`shrink-0 w-6 h-6 rounded-full ${config.iconBg} flex items-center justify-center ring-2 ${config.ringColor}`}>
             <Icon className={`w-3 h-3 ${config.iconColor}`} strokeWidth={2.5} />
@@ -105,9 +105,9 @@ export function NotificationBanner({
 
           {/* Content */}
           <div className="flex-1 min-w-0 flex flex-col justify-center">
-            <p className="text-[12px] font-semibold text-[#1a1a1a] leading-tight">{title}</p>
+            <p className="text-[12px] font-semibold text-text leading-tight">{title}</p>
             {message && (
-              <p className="text-[10px] text-[#6e6e6e] font-normal leading-snug mt-px">{message}</p>
+              <p className="text-[10px] text-text-secondary font-normal leading-snug mt-0.5">{message}</p>
             )}
           </div>
 
@@ -119,7 +119,7 @@ export function NotificationBanner({
                   <button
                     key={idx}
                     onClick={action.onClick}
-                    className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-white text-[#1a1a1a] border border-black/[0.12] hover:bg-[#f5f5f5] transition-colors"
+                    className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-card text-text border border-border hover:bg-surface-hover transition-colors"
                   >
                     {action.label}
                   </button>
@@ -130,7 +130,7 @@ export function NotificationBanner({
             {/* Close Button */}
             <button
               onClick={handleClose}
-              className="shrink-0 w-5 h-5 flex items-center justify-center rounded-full text-[#999] hover:text-[#1a1a1a] transition-colors"
+              className="shrink-0 w-5 h-5 flex items-center justify-center rounded-full text-text-muted hover:text-text transition-colors"
               aria-label="Close notification"
             >
               <X className="w-3 h-3" />
@@ -141,8 +141,8 @@ export function NotificationBanner({
 
       {/* Countdown */}
       {autoCloseSeconds && countdown > 0 && (
-        <div className="mt-1.5 text-center animate-in fade-in slide-in-from-top-1 duration-300">
-          <p className="text-[9px] text-[#999] font-medium tracking-wide">
+        <div className="mt-2 text-center animate-in fade-in slide-in-from-top-1 duration-300">
+          <p className="text-[9px] text-text-muted font-medium tracking-wide">
             This message will automatically close in <span className="text-primary font-bold">{countdown} sec</span>
           </p>
         </div>

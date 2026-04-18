@@ -14,7 +14,7 @@ import { XerusLoader } from '@/components/common/XerusLoader'
 
 function MiniInboxPreview() {
   return (
-    <div className="rounded-[24px] overflow-hidden bg-gradient-to-br from-surface-hover to-surface p-4 flex gap-3">
+    <div className="rounded-3xl overflow-hidden bg-gradient-to-br from-surface-hover to-surface p-4 flex gap-3">
       {/* Mini sidebar */}
       <div className="w-[140px] shrink-0 bg-surface-alt rounded-2xl p-3 flex flex-col">
         <div className="flex items-center justify-between mb-2 px-0.5">

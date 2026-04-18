@@ -135,7 +135,7 @@ function AgentsVisual({ agents }: { agents: Agent[] }) {
               <img src={agent.avatarUrl!} alt={agent.name} className="w-full h-full object-cover" />
             )}
             {/* Status dot */}
-            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-surface bg-[#22C55E]" />
+            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-surface bg-success" />
           </div>
         ))}
         {displayAgents.length === 0 && (
@@ -164,14 +164,14 @@ function DelegateVisual() {
         </div>
         {/* Column 2: Doing */}
         <div className="w-14 flex flex-col gap-1">
-          <div className="h-1 w-6 rounded-full bg-[#22C55E]/30 mb-1" />
-          <div className="h-7 rounded-md bg-[#22C55E]/[0.06] border border-[#22C55E]/10" />
+          <div className="h-1 w-6 rounded-full bg-success/30 mb-1" />
+          <div className="h-7 rounded-md bg-success/[0.06] border border-[#22C55E]/10" />
         </div>
         {/* Column 3: Done */}
         <div className="w-14 flex flex-col gap-1">
-          <div className="h-1 w-7 rounded-full bg-[#3B82F6]/20 mb-1" />
-          <div className="h-5 rounded-md bg-[#3B82F6]/[0.06] border border-[#3B82F6]/10" />
-          <div className="h-5 rounded-md bg-[#3B82F6]/[0.04] border border-[#3B82F6]/8" />
+          <div className="h-1 w-7 rounded-full bg-primary/20 mb-1" />
+          <div className="h-5 rounded-md bg-primary/[0.06] border border-[#3B82F6]/10" />
+          <div className="h-5 rounded-md bg-primary/[0.04] border border-[#3B82F6]/8" />
         </div>
       </div>
     </div>
@@ -192,7 +192,7 @@ function SummarizeVisual() {
           <div className="h-[3px] w-6 rounded-full bg-primary/8 transition-all duration-500 group-hover:opacity-0" />
         </div>
         {/* Summary badge that appears on hover */}
-        <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[8px] font-bold opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-200">
+        <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-secondary/10 text-secondary text-[8px] font-bold opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-200">
           TL;DR
         </div>
       </div>
@@ -204,7 +204,7 @@ function SummarizeVisual() {
 function IconVisual({ icon }: { icon: ReactNode }) {
   return (
     <div className="relative w-full h-24 flex items-center justify-center">
-      <div className="w-14 h-14 rounded-2xl bg-primary/12 flex items-center justify-center text-primary/60 group-hover:text-primary group-hover:scale-110 group-hover:bg-primary/18 transition-all duration-300">
+      <div className="w-14 h-14 rounded-2xl bg-secondary/12 flex items-center justify-center text-secondary/60 group-hover:text-secondary group-hover:scale-110 group-hover:bg-secondary/18 transition-all duration-300">
         <div className="w-7 h-7 [&>svg]:w-7 [&>svg]:h-7">
           {icon}
         </div>
@@ -275,7 +275,7 @@ function AgentHeroAvatar({ agent, size }: { agent: Agent; size: number }) {
     return <img src={avatarUrl} alt={agent.name} className="w-full h-full object-cover rounded-2xl" />
   }
   return (
-    <span className="w-full h-full flex items-center justify-center bg-primary/10 text-primary text-2xl font-semibold rounded-2xl">
+    <span className="w-full h-full flex items-center justify-center bg-secondary/10 text-secondary text-2xl font-semibold rounded-2xl">
       {agent.name.substring(0, 2).toUpperCase()}
     </span>
   )
@@ -300,18 +300,18 @@ function AgentProfileInline({ agent }: { agent: Agent }) {
             // eslint-disable-next-line @next/next/no-img-element
             <img src={avatarUrl} alt={agent.name} className="w-full h-full object-cover" />
           ) : (
-            <span className="w-full h-full flex items-center justify-center bg-primary/10 text-primary text-lg font-semibold">
+            <span className="w-full h-full flex items-center justify-center bg-secondary/10 text-secondary text-lg font-semibold">
               {agent.name.substring(0, 2).toUpperCase()}
             </span>
           )}
         </div>
         {/* Claude Code adapter badge */}
-        <div className="absolute -top-1.5 -left-1.5 bg-white border border-blue-200 rounded-md p-0.5 shadow-sm z-20" title="Claude Code">
+        <div className="absolute -top-1.5 -left-1.5 bg-card border border-secondary/20 rounded-md p-0.5 shadow-sm z-20" title="Claude Code">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/icons/claudecode-color.svg" alt="Claude Code" className="w-4 h-4 object-contain" />
         </div>
         {agent.model && (
-          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 bg-white border border-surface-active rounded-md px-1.5 py-0.5 shadow-sm flex items-center gap-0.5 whitespace-nowrap">
+          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 bg-card border border-surface-active rounded-md px-1.5 py-0.5 shadow-sm flex items-center gap-0.5 whitespace-nowrap">
             <ModelIcon model={agent.model} size="sm" />
             <span className="text-[9px] font-bold text-text-secondary max-w-[80px] truncate">{formatModelName(agent.model)}</span>
           </div>
@@ -330,7 +330,7 @@ function AgentProfileInline({ agent }: { agent: Agent }) {
             {tools.slice(0, 5).map((tool) => (
               <div
                 key={tool.name_slug}
-                className="w-6 h-6 rounded-md bg-white border border-surface-active flex items-center justify-center overflow-hidden shadow-sm"
+                className="w-6 h-6 rounded-md bg-card border border-surface-active flex items-center justify-center overflow-hidden shadow-sm"
                 title={tool.name}
               >
                 {tool.img_src ? (
@@ -392,17 +392,17 @@ export function ChatWelcome({
         </h1>
 
         {/* Suggestion cards */}
-        <div className="grid grid-cols-4 gap-4 text-left">
+        <div className="grid grid-cols-4 gap-4 text-left stagger-in">
           {suggestions.map((s) => (
             <button
               key={s.label}
               type="button"
               onClick={() => onSuggestionClick?.(s.prompt)}
               className={cn(
-                'group flex flex-col rounded-[32px] p-4 overflow-hidden',
+                'group flex flex-col rounded-4xl p-4 overflow-hidden',
                 'bg-surface/60 backdrop-blur-sm shadow-[0_2px_16px_rgba(255,102,0,0.15)]',
-                'hover:shadow-[0_4px_24px_rgba(255,102,0,0.22)]',
-                'active:scale-[0.98] transition-all duration-300 cursor-pointer',
+                'hover:-translate-y-0.5 hover:shadow-md',
+                'active:scale-[0.98] transition-all duration-200 cursor-pointer',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30',
               )}
             >
@@ -410,7 +410,7 @@ export function ChatWelcome({
               {s.visual ?? (s.icon && <IconVisual icon={s.icon} />)}
 
               {/* Text */}
-              <h3 className="font-serif text-base text-text group-hover:text-primary transition-colors duration-300 mb-1">
+              <h3 className="font-serif text-base text-text group-hover:text-secondary transition-colors duration-300 mb-1">
                 {s.label}
               </h3>
               <p className="text-sm text-text-muted leading-relaxed line-clamp-2">

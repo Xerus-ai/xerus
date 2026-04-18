@@ -54,12 +54,12 @@ export function AgentFilesSection({
       {/* Agent Files - Unified Section */}
       <div className="space-y-4">
         <div className="flex items-center gap-2 px-1">
-          <FileText className="w-6 h-6 text-primary" />
+          <FileText className="w-6 h-6 text-secondary" />
           <h3 className="text-2xl font-serif text-text">Agent Files</h3>
         </div>
 
         {/* All files in one card */}
-        <div className="bg-surface rounded-[24px] border border-surface-active shadow-sm p-4 space-y-3">
+        <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-4 space-y-3">
           {/* System Prompt row */}
           <div className="bg-surface-hover rounded-xl px-5 py-4 flex items-center gap-4 cursor-pointer"
             onClick={onOpenSystemPrompt}
@@ -75,7 +75,7 @@ export function AgentFilesSection({
             {isEditable ? (
               <Button
                 variant="ghost"
-                className="h-9 px-4 bg-text hover:bg-primary rounded-xl text-white flex items-center gap-2 shrink-0"
+                className="h-9 px-4 bg-text hover:bg-text/85 rounded-xl text-white hover:text-white flex items-center gap-2 shrink-0 transition-colors"
               >
                 <Pencil className="w-3.5 h-3.5" />
                 <span className="text-sm font-medium">Edit</span>
@@ -83,7 +83,7 @@ export function AgentFilesSection({
             ) : (
               <Button
                 variant="ghost"
-                className="h-9 px-4 bg-text/70 rounded-xl text-white flex items-center gap-2 shrink-0 cursor-default"
+                className="h-9 px-4 bg-text/70 hover:bg-text/70 rounded-xl text-white hover:text-white flex items-center gap-2 shrink-0 cursor-default"
               >
                 <Lock className="w-3.5 h-3.5" />
                 <span className="text-sm font-medium">View Only</span>
@@ -135,7 +135,7 @@ export function AgentFilesSection({
                   isEditable ? (
                     <Button
                       variant="ghost"
-                      className="h-9 px-4 bg-text hover:bg-primary rounded-xl text-white flex items-center gap-2 shrink-0"
+                      className="h-9 px-4 bg-text hover:bg-text/85 rounded-xl text-white hover:text-white flex items-center gap-2 shrink-0 transition-colors"
                     >
                       <Pencil className="w-3.5 h-3.5" />
                       <span className="text-sm font-medium">{hasContent ? 'Edit' : 'Create'}</span>
@@ -143,7 +143,7 @@ export function AgentFilesSection({
                   ) : (
                     <Button
                       variant="ghost"
-                      className="h-9 px-4 bg-text/70 rounded-xl text-white flex items-center gap-2 shrink-0 cursor-default"
+                      className="h-9 px-4 bg-text/70 hover:bg-text/70 rounded-xl text-white hover:text-white flex items-center gap-2 shrink-0 cursor-default"
                     >
                       <Lock className="w-3.5 h-3.5" />
                       <span className="text-sm font-medium">View Only</span>

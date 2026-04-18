@@ -36,7 +36,7 @@ const THINKING_OPTIONS = [
 
 export function ThinkingLevelSelector({ value, onChange }: ThinkingLevelSelectorProps) {
     return (
-        <div className="bg-surface rounded-[24px] border border-surface-active p-6 shadow-sm">
+        <div className="bg-surface rounded-3xl border border-surface-active p-6 shadow-sm">
             <h3 className="text-sm font-semibold text-text mb-4">Thinking Level</h3>
             <div className="grid grid-cols-3 gap-3">
                 {THINKING_OPTIONS.map((option) => {
@@ -82,7 +82,7 @@ export function ThinkingLevelSelector({ value, onChange }: ThinkingLevelSelector
                             {/* Tag */}
                             <span className={`inline-block ml-0 text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full ${
                                 isSelected
-                                    ? 'text-primary bg-primary/10'
+                                    ? 'text-secondary bg-secondary/10'
                                     : 'text-text bg-surface border border-surface-active'
                             }`}>
                                 {option.tag}

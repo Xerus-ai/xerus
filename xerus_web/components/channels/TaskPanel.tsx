@@ -19,7 +19,50 @@ import {
   STATUS_CFG, PRIORITY_CFG, getAgentColor, getLabelColor,
   fmtDateLong,
 } from '@/lib/task-utils'
+import { isMascotConfig } from '@/lib/mascot-config'
+import { MascotAvatar } from '@/components/agents/MascotAvatar'
 import { FieldRow, TagInput, AttachmentSection, ActivityTabs } from './TaskPanelParts'
+
+// ---------------------------------------------------------------------------
+// Avatar disc — renders mascot SVG, image URL, or letter fallback
+// ---------------------------------------------------------------------------
+
+function AgentAvatarDisc({
+  name, avatarUrl, size = 20,
+}: { name: string; avatarUrl?: string; size?: number }) {
+  const hasMascot = isMascotConfig(avatarUrl)
+  const hasImageUrl = !!avatarUrl && !hasMascot
+  const color = getAgentColor(name)
+  const dim = { width: size, height: size }
+
+  if (hasMascot) {
+    return (
+      <span className="inline-flex rounded-full overflow-hidden" style={dim}>
+        <MascotAvatar config={avatarUrl!} size={size} className="w-full h-full" alt={name} />
+      </span>
+    )
+  }
+  if (hasImageUrl) {
+    return (
+      <span className="inline-flex rounded-full overflow-hidden" style={dim}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={avatarUrl} alt={name} className="w-full h-full object-cover" />
+      </span>
+    )
+  }
+  return (
+    <span
+      className="inline-flex items-center justify-center rounded-full font-semibold text-white"
+      style={{
+        ...dim,
+        backgroundColor: color,
+        fontSize: Math.max(Math.round(size * 0.45), 9),
+      }}
+    >
+      {name.charAt(0).toUpperCase()}
+    </span>
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -35,7 +78,7 @@ interface TaskPanelProps {
   isSubmitting?: boolean
   defaultStatus?: string
   channelTag?: string
-  agents?: Array<{ id: string; name: string; slug: string }>
+  agents?: Array<{ id: string; name: string; slug: string; avatar_url?: string }>
 }
 
 // ---------------------------------------------------------------------------
@@ -139,14 +182,14 @@ export function TaskPanel({
       variant="clean"
     >
       {({ close, minimize }) => (
-        <div className="bg-white rounded-[32px] h-full w-full flex flex-col overflow-hidden">
+        <div className="bg-card rounded-2xl h-full w-full flex flex-col overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-6 pt-5 pb-3 shrink-0">
             <div className="flex items-center gap-2">
-              <button onClick={close} className="p-1.5 bg-[#F5F5F5] hover:bg-[#E5E5E5] rounded-full transition-colors" aria-label="Close">
+              <button onClick={close} className="p-1.5 bg-surface-hover hover:bg-surface-pressed rounded-full transition-colors" aria-label="Close">
                 <X className="w-4 h-4 text-text" />
               </button>
-              <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); minimize() }} className="p-1.5 bg-[#F5F5F5] hover:bg-[#E5E5E5] rounded-full transition-colors" aria-label="Minimize">
+              <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); minimize() }} className="p-1.5 bg-surface-hover hover:bg-surface-pressed rounded-full transition-colors" aria-label="Minimize">
                 <Minus className="w-4 h-4 text-text" />
               </button>
             </div>
@@ -156,7 +199,7 @@ export function TaskPanel({
               {(channelTag || task?.channelTag) && (
                 <>
                   <span className="font-medium"># {channelTag || task?.channelTag}</span>
-                  <span className="text-surface-active">|</span>
+                  <span className="text-text-muted">|</span>
                 </>
               )}
               <span style={{ color: statusInfo.color }}>{statusInfo.label}</span>
@@ -169,7 +212,7 @@ export function TaskPanel({
                   onClick={() => setMode('view')}
                   className={cn(
                     'flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-xs font-semibold transition-all',
-                    mode === 'view' ? 'bg-white shadow-sm text-text' : 'text-text-secondary hover:text-text',
+                    mode === 'view' ? 'bg-card shadow-sm text-text' : 'text-text-secondary hover:text-text',
                   )}
                 >
                   <Eye className="w-3.5 h-3.5" />
@@ -179,7 +222,7 @@ export function TaskPanel({
                   onClick={() => setMode('edit')}
                   className={cn(
                     'flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-xs font-semibold transition-all',
-                    mode === 'edit' ? 'bg-white shadow-sm text-text' : 'text-text-secondary hover:text-text',
+                    mode === 'edit' ? 'bg-card shadow-sm text-text' : 'text-text-secondary hover:text-text',
                   )}
                 >
                   <Pencil className="w-3.5 h-3.5" />
@@ -196,8 +239,9 @@ export function TaskPanel({
                 ref={titleRef}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="What needs to be done?"
-                className="w-full text-xl font-bold text-text bg-transparent border-none outline-none placeholder:text-text-muted font-serif"
+                placeholder="Task title…"
+                aria-label="Task title"
+                className="w-full text-xl font-bold text-text bg-transparent border-none outline-none placeholder:text-text-muted/60 placeholder:italic placeholder:font-normal font-serif"
               />
             ) : (
               <h2 className="text-xl font-bold text-text font-serif">{task?.title}</h2>
@@ -220,7 +264,7 @@ export function TaskPanel({
                   <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
                     <PopoverTrigger asChild>
                       <button className={cn(
-                        'flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#FDF8F3] border border-surface-active/20 text-sm transition-colors hover:border-primary/40',
+                        'flex items-center gap-2 px-3 py-1.5 rounded-xl bg-surface border border-border/20 text-sm transition-colors hover:border-primary/40',
                         dueDate ? 'text-text' : 'text-text-muted',
                       )}>
                         <CalendarIcon className="w-3.5 h-3.5" />
@@ -239,32 +283,40 @@ export function TaskPanel({
               <FieldRow icon={<User className="w-4 h-4" />} label="Assignee">
                 {isEditable ? (
                   agents.length > 0 ? (
-                    <Select value={assignee || '__none'} onValueChange={(v) => setAssignee(v === '__none' ? '' : v)}>
-                      <SelectTrigger className="rounded-xl bg-[#FDF8F3] border-surface-active/20 h-9 text-sm w-52">
-                        <SelectValue placeholder="Select agent" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none">Unassigned</SelectItem>
-                        {agents.map((a) => (
-                          <SelectItem key={a.id} value={a.slug}>
-                            <span className="flex items-center gap-2">
-                              <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold text-white" style={{ backgroundColor: getAgentColor(a.name) }}>
-                                {a.name.charAt(0).toUpperCase()}
-                              </span>
-                              {a.name}
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    (() => {
+                      const selectedAgent = assignee ? agents.find(a => a.slug === assignee) : null
+                      return (
+                        <Select value={assignee || '__none'} onValueChange={(v) => setAssignee(v === '__none' ? '' : v)}>
+                          <SelectTrigger className="rounded-xl bg-surface border-border/20 h-9 text-sm w-52">
+                            {selectedAgent ? (
+                              <div className="flex items-center gap-2 min-w-0">
+                                <AgentAvatarDisc name={selectedAgent.name} avatarUrl={selectedAgent.avatar_url} size={20} />
+                                <span className="truncate leading-none">{selectedAgent.name}</span>
+                              </div>
+                            ) : (
+                              <SelectValue placeholder="Unassigned" />
+                            )}
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none">Unassigned</SelectItem>
+                            {agents.map((a) => (
+                              <SelectItem key={a.id} value={a.slug}>
+                                <span className="flex items-center gap-2">
+                                  <AgentAvatarDisc name={a.name} avatarUrl={a.avatar_url} size={20} />
+                                  {a.name}
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )
+                    })()
                   ) : (
                     <span className="text-xs text-text-muted italic">Add agents to this channel first</span>
                   )
                 ) : task?.assignedAgents?.[0] ? (
                   <div className="flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold text-white" style={{ backgroundColor: getAgentColor(task.assignedAgents[0].name) }}>
-                      {task.assignedAgents[0].name.charAt(0).toUpperCase()}
-                    </span>
+                    <AgentAvatarDisc name={task.assignedAgents[0].name} avatarUrl={task.assignedAgents[0].avatar_url} size={24} />
                     <span className="text-sm text-text">{task.assignedAgents[0].name}</span>
                   </div>
                 ) : (
@@ -305,10 +357,10 @@ export function TaskPanel({
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Add more details..."
                   rows={4}
-                  className="w-full px-4 py-3 rounded-[20px] bg-[#FDF8F3] border border-surface-active/20 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary/40 resize-none"
+                  className="w-full px-4 py-3 rounded-2xl bg-surface border border-border/20 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary/40 resize-none"
                 />
               ) : (
-                <div className="px-4 py-3 rounded-[20px] bg-[#FDF8F3] border border-surface-active/10">
+                <div className="px-4 py-3 rounded-2xl bg-surface border border-border/10">
                   <p className="text-sm text-text-secondary leading-relaxed whitespace-pre-wrap">
                     {task?.description || 'No description provided.'}
                   </p>
@@ -327,10 +379,10 @@ export function TaskPanel({
 
           {/* Footer toolbar */}
           {isEditable && (
-            <div className="mx-6 mb-5 p-1.5 rounded-[20px] border border-surface-active bg-white flex items-center justify-between shadow-sm shrink-0">
+            <div className="mx-6 mb-5 p-1.5 rounded-2xl border border-border bg-card flex items-center justify-between shadow-sm shrink-0">
               <div className="flex items-center gap-2">
                 <Select value={priority} onValueChange={setPriority}>
-                  <SelectTrigger className="h-9 px-3 rounded-[12px] bg-transparent border-none text-sm font-medium text-text gap-1.5 hover:bg-surface transition-colors w-auto">
+                  <SelectTrigger className="h-9 px-3 rounded-xl bg-transparent border-none text-sm font-medium text-text gap-1.5 hover:bg-surface transition-colors w-auto">
                     <div className="flex items-center gap-1.5">
                       <svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill={PRIORITY_CFG[priority]?.color || '#F59E0B'} /></svg>
                       <span>{PRIORITY_CFG[priority]?.label || 'Medium'}</span>
@@ -351,8 +403,9 @@ export function TaskPanel({
               <button
                 onClick={handleSave}
                 disabled={isSubmitting || (mode === 'create' && !title.trim())}
-                className="w-9 h-9 bg-text text-white rounded-[12px] flex items-center justify-center hover:bg-primary transition-colors shadow-md disabled:opacity-50"
+                className="w-9 h-9 bg-text text-white rounded-xl flex items-center justify-center hover:bg-primary transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label={mode === 'create' ? 'Create task' : 'Save changes'}
+                title={mode === 'create' && !title.trim() ? 'Add a task title to create' : undefined}
               >
                 {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowUp className="w-4 h-4" />}
               </button>

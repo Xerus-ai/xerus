@@ -85,7 +85,7 @@ interface InstallOverlayProps {
 export function InstallOverlay({ skill, agents, onInstall, onUninstall, isOpen, onClose }: InstallOverlayProps) {
     return (
         <div
-            className={`absolute inset-0 z-20 rounded-[32px] overflow-hidden transition-all duration-300 ${
+            className={`absolute inset-0 z-20 rounded-4xl overflow-hidden transition-all duration-300 ${
                 isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
             }`}
             onClick={(e) => e.stopPropagation()}
@@ -200,8 +200,8 @@ function InstallFlow({ skill, agents, onInstall, onUninstall, onClose }: Install
                         onClick={() => setStep('channel')}
                         className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-surface-hover transition-colors text-left"
                     >
-                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                            <Hash className="w-4 h-4 text-primary" />
+                        <div className="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center shrink-0">
+                            <Hash className="w-4 h-4 text-secondary" />
                         </div>
                         <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-text">Channel</p>

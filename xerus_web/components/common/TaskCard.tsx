@@ -4,6 +4,8 @@ import React from 'react'
 import { Calendar, MessageSquare, Circle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getAgentColor, getLabelColor, formatShortDate } from '@/lib/task-utils'
+import { isMascotConfig } from '@/lib/mascot-config'
+import { MascotAvatar } from '@/components/agents/MascotAvatar'
 import type { Agent } from './PresenceAvatars'
 
 export interface KanbanTask {
@@ -56,10 +58,10 @@ export function TaskCard({
       role="article"
       aria-label={task.title}
       className={cn(
-        'bg-surface hover:bg-surface-hover rounded-2xl p-4 shadow-sm',
+        'bg-surface-alt hover:bg-surface-hover rounded-2xl p-4 shadow-sm',
         'transition-all duration-200',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-        isDragging && 'opacity-40 shadow-lg scale-[1.02]',
+        isDragging && 'opacity-50 shadow-lg scale-[1.02]',
         onClick && 'cursor-pointer hover:shadow-md',
         className
       )}
@@ -82,18 +84,27 @@ export function TaskCard({
           <div className="flex items-center flex-shrink-0 mt-px">
             {task.assignedAgents.slice(0, 3).map((agent, index) => {
               const color = getAgentColor(agent.name)
+              const hasMascot = isMascotConfig(agent.avatar_url)
+              const hasImageUrl = !!agent.avatar_url && !hasMascot
               return (
                 <div
                   key={agent.id}
-                  className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold text-white ring-2 ring-surface"
+                  className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold text-white ring-2 ring-surface overflow-hidden"
                   style={{
-                    backgroundColor: color,
+                    backgroundColor: hasMascot || hasImageUrl ? 'transparent' : color,
                     marginLeft: index === 0 ? 0 : -6,
                     zIndex: 3 - index,
                   }}
                   title={agent.name}
                 >
-                  {getInitial(agent.name)}
+                  {hasMascot ? (
+                    <MascotAvatar config={agent.avatar_url!} size={24} className="w-full h-full" alt={agent.name} />
+                  ) : hasImageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={agent.avatar_url} alt={agent.name} className="w-full h-full object-cover" />
+                  ) : (
+                    getInitial(agent.name)
+                  )}
                 </div>
               )
             })}

@@ -111,9 +111,9 @@ export default function ProfilePage() {
       <div className="max-w-[680px]">
         <h1 className="font-serif text-[22px] text-text tracking-tight mb-1">Profile</h1>
         <p className="text-sm text-text-secondary mb-8">Manage your personal information</p>
-        <div className="bg-red-50/30 rounded-2xl border border-red-200/60 p-6">
-          <p className="text-sm text-red-600 font-medium">Failed to load profile</p>
-          <p className="text-xs text-red-500/80 mt-1">
+        <div className="bg-destructive/5 rounded-2xl border border-destructive/20 p-6">
+          <p className="text-sm text-destructive font-medium">Failed to load profile</p>
+          <p className="text-xs text-destructive/80 mt-1">
             We couldn&apos;t load your profile data. Please refresh the page or try again later.
           </p>
         </div>
@@ -134,7 +134,7 @@ export default function ProfilePage() {
 
       {/* Identity card */}
       <motion.div
-        className="bg-surface/60 rounded-2xl border border-surface-active/60 p-6 mb-8"
+        className="bg-surface/60 rounded-2xl border border-border p-6 mb-8"
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: 0.05 }}
@@ -153,7 +153,7 @@ export default function ProfilePage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span data-testid="plan-badge" className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-surface-hover text-text border border-surface-active/60">
+            <span data-testid="plan-badge" className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-surface-hover text-text border border-border">
               <Crown className="w-3 h-3 text-text-secondary" />
               {planLabel}
             </span>
@@ -183,7 +183,7 @@ export default function ProfilePage() {
             value={displayNameInput}
             onChange={(e) => setDisplayNameInput(e.target.value)}
             data-testid="display-name-input"
-            className="flex-1 max-w-sm px-4 py-2.5 bg-white border border-surface-active rounded-xl text-sm text-text placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary/40 transition-all"
+            className="flex-1 max-w-sm px-4 py-2.5 bg-card border border-border rounded-xl text-sm text-text placeholder:text-text-muted focus:outline-none transition-colors"
             maxLength={32}
             placeholder="Enter your display name"
           />
@@ -200,7 +200,7 @@ export default function ProfilePage() {
       </motion.div>
 
       {/* Separator */}
-      <div className="border-t border-surface-active/40 my-8" />
+      <div className="border-t border-border my-8" />
 
       {/* Danger Zone */}
       <motion.div
@@ -212,7 +212,7 @@ export default function ProfilePage() {
           <AlertTriangle className="w-4 h-4 text-red-400" />
           <h3 className="text-sm font-medium text-red-500">Danger zone</h3>
         </div>
-        <div className="rounded-xl border border-red-200/60 bg-red-50/20 p-5">
+        <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-5">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-text">Delete account</p>

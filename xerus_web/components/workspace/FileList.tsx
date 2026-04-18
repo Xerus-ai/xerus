@@ -46,7 +46,7 @@ export function FileList({ files, selectedPath, onSelect, onContextMenu, classNa
   })
 
   return (
-    <div className={cn('bg-surface rounded-[24px] border border-surface-active shadow-sm overflow-hidden', className)}>
+    <div className={cn('bg-surface rounded-3xl border border-surface-active shadow-sm overflow-hidden', className)}>
       {/* Header */}
       <div className="grid grid-cols-[1fr_100px_80px_100px_110px] gap-4 px-5 py-3 bg-surface-hover/50 border-b border-surface-active">
         <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Name</span>

@@ -107,13 +107,13 @@ export function PropertyBar({ filePath }: PropertyBarProps) {
           key={conn.id}
           className={cn(
             'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium',
-            'bg-primary/10 text-primary',
+            'bg-secondary/10 text-secondary',
           )}
         >
           &rarr; {conn.target_ref}
           <button
             onClick={() => handleRemoveConnection(conn.id)}
-            className="p-0.5 rounded-full hover:bg-primary/20 text-primary/60 hover:text-primary transition-colors"
+            className="p-0.5 rounded-full hover:bg-secondary/20 text-secondary/60 hover:text-secondary transition-colors"
           >
             <X className="w-3 h-3" />
           </button>
@@ -133,7 +133,7 @@ export function PropertyBar({ filePath }: PropertyBarProps) {
 
         {/* Dropdown */}
         {showDropdown && (
-          <div className="absolute z-50 top-full left-0 mt-1 w-40 bg-white rounded-xl shadow-lg border border-surface-active overflow-hidden">
+          <div className="absolute z-50 top-full left-0 mt-1 w-40 bg-card rounded-xl shadow-lg border border-surface-active overflow-hidden">
             <button
               onClick={() => handleDropdownSelect('tag')}
               className="w-full flex items-center gap-2 px-3 py-2 hover:bg-surface-hover/60 text-sm text-text text-left transition-colors"

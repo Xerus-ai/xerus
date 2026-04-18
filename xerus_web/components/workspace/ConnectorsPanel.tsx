@@ -66,7 +66,7 @@ export function ConnectorsPanel() {
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="bg-surface rounded-[32px] p-6 shadow-sm h-[280px] animate-pulse" />
+              <div key={i} className="bg-surface rounded-4xl p-6 shadow-sm h-[280px] animate-pulse" />
             ))}
           </div>
         </div>
@@ -108,8 +108,8 @@ export function ConnectorsPanel() {
         {activeTools.length > 0 && (
           <div className="w-full mb-12">
             <div className="flex items-center gap-3 mb-6">
-              <h2 className="font-serif text-2xl text-text">Active Connections</h2>
-              <span className="bg-primary/10 text-primary text-xs font-bold px-2 py-1 rounded-md">
+              <h2 className="font-serif text-2xl text-text tracking-tight">Active Connections</h2>
+              <span className="bg-secondary/10 text-secondary text-xs font-bold px-2 py-1 rounded-md tabular-nums">
                 {activeTools.length} Active
               </span>
             </div>
@@ -131,8 +131,8 @@ export function ConnectorsPanel() {
         {libraryTools.length > 0 && (
           <div className="w-full">
             <div className="flex items-center gap-3 mb-6">
-              <h2 className="font-serif text-2xl text-text">Connectors Library</h2>
-              <span className="bg-text-secondary/10 text-text-secondary text-xs font-bold px-2 py-1 rounded-md">
+              <h2 className="font-serif text-2xl text-text tracking-tight">Connectors Library</h2>
+              <span className="bg-surface-active text-text-secondary text-xs font-bold px-2 py-1 rounded-md tabular-nums">
                 {libraryTools.length} Available
               </span>
             </div>
@@ -153,7 +153,7 @@ export function ConnectorsPanel() {
         {/* Pagination */}
         {totalTools > 0 && totalPages > 1 && (
           <div className="w-full py-8 flex justify-center">
-            <div className="flex items-center gap-4 text-sm text-text-secondary">
+            <div className="flex items-center gap-4 text-sm text-text-secondary tabular-nums">
               <span>Showing {tools.length} of {totalTools}</span>
               <div className="flex items-center gap-2">
                 <button

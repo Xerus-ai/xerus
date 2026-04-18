@@ -53,11 +53,11 @@ export function KnowledgeBaseSection({
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 px-1">
-        <Book className="w-6 h-6 text-primary" />
+        <Book className="w-6 h-6 text-secondary" />
         <h3 className="text-2xl font-serif text-text">Knowledge Base</h3>
       </div>
 
-      <div className="bg-surface rounded-[24px] border border-surface-active shadow-sm p-6">
+      <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-6">
         {agentDocs.length === 0 ? (
           <div className="text-center py-20">
             <div className="w-16 h-16 bg-surface-hover rounded-full flex items-center justify-center mx-auto mb-4">
@@ -74,7 +74,7 @@ export function KnowledgeBaseSection({
             {isEditable && !isMarketplace && (
               <Button
                 onClick={() => setShowPicker(true)}
-                className="px-6 py-2.5 rounded-full bg-text text-white hover:bg-[#1a1a1a] transition-colors text-sm font-medium inline-flex items-center gap-2 h-auto"
+                className="px-6 py-2.5 rounded-full bg-text text-white hover:bg-text/90 transition-colors text-sm font-medium inline-flex items-center gap-2 h-auto"
               >
                 <Plus className="w-4 h-4" />
                 Add Source
@@ -95,7 +95,7 @@ export function KnowledgeBaseSection({
                   <button
                     onClick={() => handleRemove(doc.id)}
                     disabled={loadingId === doc.id}
-                    className="absolute top-2 right-2 w-6 h-6 bg-white/90 hover:bg-red-50 rounded-full flex items-center justify-center text-text-muted hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50 z-50"
+                    className="absolute top-2 right-2 w-6 h-6 bg-card/90 hover:bg-destructive/10 rounded-full flex items-center justify-center text-text-muted hover:text-destructive transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50 z-50"
                     title="Remove from agent"
                   >
                     {loadingId === doc.id ? (
@@ -112,7 +112,7 @@ export function KnowledgeBaseSection({
                 onClick={() => setShowPicker(true)}
                 className="min-w-[200px] border-2 border-dashed border-surface-active rounded-xl flex flex-col items-center justify-center gap-2 text-text-secondary hover:border-primary hover:text-primary transition-colors group"
               >
-                <div className="w-10 h-10 rounded-full bg-surface flex items-center justify-center group-hover:bg-[#FFF5EB]">
+                <div className="w-10 h-10 rounded-full bg-surface flex items-center justify-center group-hover:bg-primary/5">
                   <Plus className="w-5 h-5" />
                 </div>
                 <span className="text-sm font-medium">Add Source</span>
@@ -144,7 +144,7 @@ export function KnowledgeBaseSection({
                     key={doc.id}
                     onClick={() => handleAdd(doc)}
                     disabled={loadingId === doc.id}
-                    className="flex items-center gap-3 p-3 rounded-xl border border-surface-active hover:border-primary hover:bg-[#FFF5EB]/50 transition-colors text-left disabled:opacity-50"
+                    className="flex items-center gap-3 p-3 rounded-xl border border-surface-active hover:border-primary hover:bg-primary/5 transition-colors text-left disabled:opacity-50"
                   >
                     <div className="w-8 h-8 rounded-lg bg-surface-hover flex items-center justify-center shrink-0">
                       <Book className="w-4 h-4 text-text-secondary" />

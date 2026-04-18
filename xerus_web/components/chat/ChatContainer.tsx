@@ -15,6 +15,7 @@ import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from 'reac
 import { GuidanceInterventionCard } from './GuidanceInterventionCard'
 import { ConversationSidebar } from './ConversationSidebar'
 import { useSidebarSlotRegister } from '@/components/layout/SidebarSlotContext'
+import { useLayout } from '@/components/layout/LayoutContext'
 import { cn } from '@/lib/utils'
 import type { WorkspaceFile } from './WorkspaceTree'
 import type { WorkspacePayload } from './MessageBubble'
@@ -97,6 +98,7 @@ export function ChatContainer({
 }: ChatContainerProps) {
   const chat = useChatState({ initialAgentId, conversationId, initialMessage })
   const { state, agents, user, isAuthReady, executionStream, workspaceFiles } = chat
+  const { isMobile } = useLayout()
 
   // ---- Local UI state (sandbox, viewer, panels) ----
   const [viewerContent, setViewerContent] = useState<ViewerContent | null>(null)
@@ -270,7 +272,7 @@ export function ChatContainer({
     <div className={cn('flex w-full relative h-screen overflow-hidden', className)}>
       <PanelGroup orientation="horizontal" className="flex-1 min-w-0">
         {/* Chat column */}
-        <Panel defaultSize={isSandboxOpen ? 50 : 100} minSize={30}>
+        <Panel defaultSize={isSandboxOpen ? 50 : viewerContent ? 55 : 100} minSize={30}>
           <div className="flex flex-col h-full relative overflow-hidden">
             <MessageList
               messages={state.messages as ChatMessageExtended[]}
@@ -342,8 +344,8 @@ export function ChatContainer({
           </div>
         </Panel>
 
-        {/* Sandbox panel */}
-        {isSandboxOpen && (
+        {/* Sandbox panel — side-by-side on md+, full-screen sheet on mobile */}
+        {isSandboxOpen && !isMobile && (
           <>
             <PanelResizeHandle className="w-2 flex items-center justify-center cursor-col-resize group shrink-0">
               <div className="w-px h-8 rounded-full bg-[#E5E5E5] group-hover:bg-primary/50 group-hover:h-16 transition-all" />
@@ -364,13 +366,13 @@ export function ChatContainer({
           </>
         )}
 
-        {/* Artifact viewer */}
-        {!isSandboxOpen && viewerContent && (
+        {/* Artifact viewer — side-by-side on md+, full-screen sheet on mobile */}
+        {!isSandboxOpen && viewerContent && !isMobile && (
           <>
             <PanelResizeHandle className="w-2 flex items-center justify-center cursor-col-resize group shrink-0">
               <div className="w-px h-8 rounded-full bg-[#E5E5E5] group-hover:bg-primary/50 group-hover:h-16 transition-all" />
             </PanelResizeHandle>
-            <Panel defaultSize={40} minSize={20}>
+            <Panel defaultSize={45} minSize={20}>
               <ArtifactViewerPanel
                 content={viewerContent}
                 onClose={() => setViewerContent(null)}
@@ -390,6 +392,32 @@ export function ChatContainer({
           />
         )}
       </PanelGroup>
+
+      {/* Mobile full-screen overlays — sandbox / artifact viewer */}
+      {isMobile && isSandboxOpen && (
+        <div className="fixed inset-0 z-50 bg-surface flex flex-col" role="dialog" aria-label="Sandbox">
+          <SandboxPanel
+            terminalUrl={terminalUrl}
+            browserUrl={state.pendingGuidance?.ui_hint === 'browser' && state.pendingGuidance.browser_url
+              ? state.pendingGuidance.browser_url
+              : browserUrl}
+            previewUrl={null}
+            activeTab={sandboxTab}
+            onTabChange={setSandboxTab}
+            onClose={handleCloseSandboxPanel}
+            className="h-full"
+          />
+        </div>
+      )}
+
+      {isMobile && !isSandboxOpen && viewerContent && (
+        <div className="fixed inset-0 z-50 bg-surface flex flex-col" role="dialog" aria-label="Artifact viewer">
+          <ArtifactViewerPanel
+            content={viewerContent}
+            onClose={() => setViewerContent(null)}
+          />
+        </div>
+      )}
 
       {/* Execution detail slide-over */}
       {showExecution && (

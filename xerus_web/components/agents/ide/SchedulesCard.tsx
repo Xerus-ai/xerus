@@ -41,13 +41,13 @@ export function SchedulesCard({
         <div className="space-y-2">
             <div className="flex items-center justify-between px-1">
                 <div className="flex items-center gap-2">
-                    <Calendar className="w-6 h-6 text-primary" />
+                    <Calendar className="w-6 h-6 text-secondary" />
                     <h3 className="text-2xl font-serif text-text">Schedules</h3>
                 </div>
                 {!isMarketplace && (
                     <button
                         onClick={onNavigateToSchedules}
-                        className="p-2 hover:bg-[#FFF5EB] text-primary rounded-full transition-colors"
+                        className="p-2 hover:bg-secondary/10 text-secondary rounded-full transition-colors"
                         aria-label="Add schedule"
                     >
                         <Plus className="w-5 h-5" />
@@ -55,7 +55,7 @@ export function SchedulesCard({
                 )}
             </div>
 
-            <div className="bg-surface rounded-[24px] border border-surface-active shadow-sm p-6">
+            <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-6">
                 {schedules.length > 0 ? (
                     <div className="space-y-4">
                         {schedules.slice(0, 5).map((schedule, i) => (
@@ -83,7 +83,7 @@ export function SchedulesCard({
                         {schedules.length > 5 && (
                             <button
                                 onClick={onNavigateToSchedules}
-                                className="text-sm text-primary hover:underline font-medium"
+                                className="text-sm text-secondary hover:underline font-medium"
                             >
                                 View all {schedules.length} schedules
                             </button>
@@ -92,7 +92,7 @@ export function SchedulesCard({
                 ) : (
                     <div className="text-center py-8 border-2 border-dashed border-surface-active rounded-xl">
                         <p className="text-xs text-text-secondary italic">
-                            {isMarketplace ? 'Clone this agent to add schedules' : 'No active schedules'}
+                            {isMarketplace ? 'Clone this agent to add schedules' : 'No schedules yet -- your agent is always on standby'}
                         </p>
                     </div>
                 )}

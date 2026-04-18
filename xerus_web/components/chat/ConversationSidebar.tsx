@@ -116,7 +116,7 @@ function ChannelPickerPanel({
                         className={cn(
                           'flex items-center gap-1.5 w-full px-2 py-1 rounded-lg text-xs transition-colors',
                           isActive
-                            ? 'bg-primary/10 text-primary font-medium'
+                            ? 'bg-surface-hover text-text font-medium'
                             : 'text-text-secondary hover:bg-surface-hover hover:text-text',
                         )}
                       >
@@ -158,7 +158,7 @@ function formatRelativeTime(timestamp: number): string {
 // ---------------------------------------------------------------------------
 
 const STATUS_CONFIG: Record<SessionStatus, { dotColor: string; textColor: string; label: string }> = {
-  working: { dotColor: 'text-primary', textColor: 'text-primary', label: 'Working' },
+  working: { dotColor: 'text-secondary', textColor: 'text-secondary', label: 'Working' },
   pending_approval: { dotColor: 'text-amber-500', textColor: 'text-amber-500', label: 'Pending your approval' },
   finished: { dotColor: 'text-emerald-500', textColor: 'text-emerald-500', label: 'Finished' },
   error: { dotColor: 'text-red-500', textColor: 'text-red-500', label: 'Error during generation' },
@@ -240,7 +240,7 @@ const SessionRow = memo(function SessionRow({
       className={cn(
         'group relative flex items-center gap-2 w-full text-left px-3 py-2 rounded-lg transition-all duration-150',
         isActive
-          ? 'bg-primary/10'
+          ? 'bg-surface-hover text-text font-medium'
           : 'hover:bg-surface-hover'
       )}
     >
@@ -253,12 +253,12 @@ const SessionRow = memo(function SessionRow({
       <div className="flex-1 min-w-0">
         <div className={cn(
           'text-sm font-medium truncate leading-tight',
-          isActive ? 'text-primary' : 'text-text',
+          isActive ? 'text-text' : 'text-text',
         )}>
           {session.title}
         </div>
         <div className={cn(
-          'text-[11px] mt-0.5 truncate',
+          'text-[11px] mt-0.5 truncate tabular-nums',
           session.status === 'idle' ? 'text-text-muted' : statusConfig.textColor,
         )}>
           {session.status === 'idle'
@@ -397,7 +397,7 @@ export function ConversationSidebar({
         <button
           type="button"
           onClick={onToggleCollapse}
-          className="p-2 rounded-xl text-text-muted hover:text-primary hover:bg-primary/8 transition-colors"
+          className="p-2 rounded-xl text-text-muted hover:text-secondary hover:bg-secondary/8 transition-colors"
           aria-label="Expand sidebar"
         >
           <PanelLeftOpen className="w-4 h-4" />
@@ -405,7 +405,7 @@ export function ConversationSidebar({
         <button
           type="button"
           onClick={onNewConversation}
-          className="p-2 rounded-xl text-text-muted hover:text-primary hover:bg-primary/8 transition-colors"
+          className="p-2 rounded-xl text-text-muted hover:text-secondary hover:bg-secondary/8 transition-colors"
           aria-label="New session"
         >
           <Plus className="w-4 h-4" />
@@ -432,7 +432,7 @@ export function ConversationSidebar({
           <button
             type="button"
             onClick={onToggleCollapse}
-            className="p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-primary/8 transition-colors"
+            className="p-1.5 rounded-lg text-text-muted hover:text-secondary hover:bg-secondary/8 transition-colors"
             aria-label="Collapse sidebar"
           >
             <PanelLeftClose className="w-4 h-4" />
@@ -475,8 +475,8 @@ export function ConversationSidebar({
               <p className="text-sm text-text-muted">No matching sessions</p>
             ) : (
               <>
-                <p className="text-sm text-text-muted">No conversations yet</p>
-                <p className="text-xs text-text-muted mt-1">Send a message to get started</p>
+                <p className="text-sm text-text-muted">Start a conversation to see it here</p>
+                <p className="text-xs text-text-muted mt-1">Your sessions will appear as you chat</p>
               </>
             )}
           </div>
@@ -504,7 +504,7 @@ export function ConversationSidebar({
               Channels
             </span>
             {selectedChannel && (
-              <button type="button" onClick={() => { onClearChannel!(); setIsChannelPickerOpen(false) }} className="text-[10px] text-primary hover:underline">
+              <button type="button" onClick={() => { onClearChannel!(); setIsChannelPickerOpen(false) }} className="text-[10px] text-secondary hover:underline">
                 Clear
               </button>
             )}
@@ -528,8 +528,8 @@ export function ConversationSidebar({
           className={cn(
             'flex items-center justify-center gap-1.5 flex-1 px-3 py-2 rounded-xl text-sm',
             selectedChannel
-              ? 'text-primary bg-primary/8 font-medium'
-              : 'text-text-secondary hover:text-primary hover:bg-primary/8',
+              ? 'text-secondary bg-secondary/8 font-medium'
+              : 'text-text-secondary hover:text-secondary hover:bg-secondary/8',
             'transition-colors active:scale-[0.98]',
           )}
           title={selectedChannel ? `${selectedChannel.domainName} / ${selectedChannel.name}` : 'Select channel'}
@@ -543,7 +543,7 @@ export function ConversationSidebar({
           data-testid="new-session-button"
           className={cn(
             'flex items-center justify-center gap-1.5 flex-1 px-3 py-2 rounded-xl text-sm',
-            'text-text-secondary hover:text-primary hover:bg-primary/8',
+            'text-text-secondary hover:text-secondary hover:bg-secondary/8',
             'transition-colors active:scale-[0.98]',
           )}
         >

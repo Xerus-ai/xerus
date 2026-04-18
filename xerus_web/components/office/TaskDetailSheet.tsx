@@ -51,12 +51,12 @@ export function TaskDetailSheet({ selectedTask, onClose }: TaskDetailSheetProps)
     >
       <SheetContent
         side="right"
-        className="!top-3 !right-3 !bottom-3 !h-auto !rounded-2xl !border !border-surface-active/30 !shadow-xl w-[500px] sm:max-w-[500px] p-0 overflow-y-auto bg-white"
+        className="!top-3 !right-3 !bottom-3 !h-auto !rounded-2xl !border !border-surface-active/30 !shadow-lg w-[500px] sm:max-w-[500px] p-0 overflow-y-auto bg-card"
       >
         {selectedTask && (
           <>
             {/* Top bar: breadcrumb + actions */}
-            <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm px-7 pt-5 pb-3 flex items-center justify-between border-b border-surface-active/20">
+            <div className="sticky top-0 z-10 bg-card/95 backdrop-blur-sm px-7 pt-5 pb-3 flex items-center justify-between border-b border-surface-active/20">
               <div className="flex items-center gap-1.5 text-xs text-text-muted">
                 {selectedTask.channelTag && (
                   <>

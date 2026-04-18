@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import useSWR from 'swr'
 import { MarkdownPreview } from '@/components/workspace/MarkdownPreview'
-import { ArrowLeft, FileText, Trash2, Pencil, Loader2, Hash, Bot, X, Minus, Eye, Sparkles, ArrowUp, Shield } from 'lucide-react'
+import { ArrowLeft, FileText, Trash2, Pencil, Loader2, Hash, Bot, X, Minus, Eye, Sparkles, ArrowUp, Shield, Clock } from 'lucide-react'
 import { getSkill, installSkill, uninstallSkill, deleteSkill } from '@/lib/api/skills'
 import { getAssistants } from '@/lib/api/agents'
 import type { SkillDetail, Assistant } from '@/lib/api/types'
@@ -41,7 +41,7 @@ function SkillAgentsCard({ isInstalled, agents, installedByAgents }: { isInstall
   const installedSet = new Set(installedByAgents)
   const assignedAgents = agents.filter((a) => installedSet.has(a.id))
   return (
-    <div className="bg-surface rounded-[24px] border border-surface-active shadow-sm p-6">
+    <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-6">
       {assignedAgents.length > 0 ? (
         <div className="space-y-2">
           {assignedAgents.map((agent) => (
@@ -64,7 +64,7 @@ function SkillAgentsCard({ isInstalled, agents, installedByAgents }: { isInstall
 
 function SkillChannelsCard({ skillSlug }: { skillSlug: string }) {
   return (
-    <div className="bg-surface rounded-[24px] border border-surface-active shadow-sm p-6">
+    <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-6">
       <p className="text-xs text-text-secondary py-2">
         Channel-scoped installs are not wired yet for <span className="font-medium text-text">{skillSlug}</span>. Install this skill once and it becomes available from the shared workspace.
       </p>
@@ -200,7 +200,7 @@ export function SkillDetailView({ skillSlug, onBack }: SkillDetailViewProps) {
             Back to Skills
           </button>
           {isOwner && (
-            <button onClick={handleDelete} disabled={deleting} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm text-text-secondary hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50">
+            <button onClick={handleDelete} disabled={deleting} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm text-text-secondary hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50">
               {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />} Delete
             </button>
           )}
@@ -214,7 +214,7 @@ export function SkillDetailView({ skillSlug, onBack }: SkillDetailViewProps) {
           </div>
           <div className="shrink-0">
             {isInstalled ? (
-              <button onClick={async () => { await handleUninstall(0); mutateSkill() }} className="flex items-center gap-2 bg-black hover:bg-[#1a1a1a] text-white font-medium px-5 py-2.5 rounded-xl text-sm shadow-sm transition-all">
+              <button onClick={async () => { await handleUninstall(0); mutateSkill() }} className="flex items-center gap-2 bg-black hover:bg-text/90 text-white font-medium px-5 py-2.5 rounded-xl text-sm shadow-sm transition-all">
                 Uninstall
               </button>
             ) : (
@@ -228,20 +228,20 @@ export function SkillDetailView({ skillSlug, onBack }: SkillDetailViewProps) {
           <div className="lg:col-span-2 space-y-8">
             {isInstalled && requiredEnvKeys.length > 0 && (
               <div className="space-y-2">
-                <h3 className="font-serif text-xl flex items-center gap-2 px-1"><Shield className="w-5 h-5 text-primary" /> Authentication</h3>
+                <h3 className="font-serif text-xl flex items-center gap-2 px-1"><Shield className="w-5 h-5 text-secondary" /> Authentication</h3>
                 <SkillSecretsCard skillSlug={skill.slug} envKeys={requiredEnvKeys} />
               </div>
             )}
 
             <div className="space-y-2">
-              <div className="flex items-center gap-2 px-1"><FileText className="w-5 h-5 text-primary" /><h3 className="text-2xl font-serif text-text">Skill Files</h3></div>
-              <div className="bg-surface rounded-[24px] border border-surface-active shadow-sm p-4 space-y-3">
+              <div className="flex items-center gap-2 px-1"><FileText className="w-5 h-5 text-secondary" /><h3 className="text-2xl font-serif text-text">Skill Files</h3></div>
+              <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-4 space-y-3">
                 <div className="bg-surface-hover rounded-xl px-5 py-4 flex items-center gap-4 cursor-pointer" onClick={() => setActiveFile('SKILL.md')}>
                   <div className="flex-1 min-w-0">
                     <span className="text-sm font-semibold text-text mb-1 block">SKILL.md</span>
                     <p className="text-sm leading-relaxed text-text font-medium line-clamp-2">{skillMdContent ? skillMdContent.split('\n').filter(Boolean).slice(0, 2).join(' ') : 'Loading...'}</p>
                   </div>
-                  <button className="h-9 px-4 bg-text hover:bg-primary rounded-xl text-white flex items-center gap-2 shrink-0 text-sm font-medium transition-colors">
+                  <button className="h-9 px-4 bg-text hover:bg-text/85 rounded-xl text-white flex items-center gap-2 shrink-0 text-sm font-medium transition-colors">
                     {isInstalled || isOwner ? <><Pencil className="w-3.5 h-3.5" /> Edit</> : <><FileText className="w-3.5 h-3.5" /> View</>}
                   </button>
                 </div>
@@ -253,7 +253,7 @@ export function SkillDetailView({ skillSlug, onBack }: SkillDetailViewProps) {
                           <span className="text-sm font-semibold text-text">{file.path}</span>
                           <p className="text-xs text-text-secondary mt-0.5">{file.size > 1024 ? `${(file.size / 1024).toFixed(1)} KB` : `${file.size} B`}</p>
                         </div>
-                        <button className="h-9 px-4 bg-text hover:bg-primary rounded-xl text-white flex items-center gap-2 shrink-0 text-sm font-medium transition-colors">
+                        <button className="h-9 px-4 bg-text hover:bg-text/85 rounded-xl text-white flex items-center gap-2 shrink-0 text-sm font-medium transition-colors">
                           {isInstalled || isOwner ? <><Pencil className="w-3.5 h-3.5" /> Edit</> : <><FileText className="w-3.5 h-3.5" /> View</>}
                         </button>
                       </div>
@@ -265,8 +265,8 @@ export function SkillDetailView({ skillSlug, onBack }: SkillDetailViewProps) {
 
             {readmeFile && (
               <div className="space-y-2">
-                <div className="flex items-center gap-2 px-1"><FileText className="w-5 h-5 text-primary" /><h3 className="text-2xl font-serif text-text">README</h3></div>
-                <div className="bg-surface rounded-[24px] border border-surface-active shadow-sm p-6">
+                <div className="flex items-center gap-2 px-1"><FileText className="w-5 h-5 text-secondary" /><h3 className="text-2xl font-serif text-text">README</h3></div>
+                <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-6">
                   <SkillFileViewer slug={skillSlug} filePath={readmeFile.path} />
                 </div>
               </div>
@@ -276,11 +276,11 @@ export function SkillDetailView({ skillSlug, onBack }: SkillDetailViewProps) {
           <FloatingPanelProvider>
             <FloatingPanel isOpen={!!activeFile} onClose={() => setActiveFile(null)} title={activeFile || ''} minimizedTitle={activeFile || ''} icon={<FileText className="w-4 h-4" />} className="w-[600px] h-[600px] rounded-[40px] shadow-sm bg-surface p-2" variant="clean">
               {({ close, minimize }) => (
-                <div className="bg-white rounded-[32px] h-full w-full flex flex-col p-6 overflow-hidden">
+                <div className="bg-card rounded-2xl h-full w-full flex flex-col p-6 overflow-hidden">
                   <div className="flex items-center justify-between mb-4 shrink-0">
                     <div className="flex items-center gap-2">
-                      <button onClick={close} className="p-1.5 bg-[#F5F5F5] hover:bg-[#E5E5E5] rounded-full transition-colors"><X className="w-4 h-4 text-text" /></button>
-                      <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); minimize() }} className="p-1.5 bg-[#F5F5F5] hover:bg-[#E5E5E5] rounded-full transition-colors"><Minus className="w-4 h-4 text-text" /></button>
+                      <button onClick={close} className="p-1.5 bg-surface-hover hover:bg-surface-pressed rounded-full transition-colors"><X className="w-4 h-4 text-text" /></button>
+                      <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); minimize() }} className="p-1.5 bg-surface-hover hover:bg-surface-pressed rounded-full transition-colors"><Minus className="w-4 h-4 text-text" /></button>
                     </div>
                     <span className="text-sm font-bold text-text">{activeFile}</span>
                   </div>
@@ -291,19 +291,19 @@ export function SkillDetailView({ skillSlug, onBack }: SkillDetailViewProps) {
                       activeFile && <SkillFileViewer slug={skillSlug} filePath={activeFile} onContentLoaded={setEditContent} />
                     )}
                   </div>
-                  <div className="mt-4 p-1.5 rounded-[20px] border border-surface-active bg-white flex items-center justify-between shadow-sm shrink-0">
-                    <button disabled className="h-9 px-3 rounded-[12px] flex items-center gap-2 text-text-secondary font-medium text-sm opacity-50 cursor-not-allowed"><Sparkles className="w-4 h-4" /> Write with AI</button>
+                  <div className="mt-4 p-1.5 rounded-2xl border border-surface-active bg-card flex items-center justify-between shadow-sm shrink-0">
+                    <button disabled className="h-9 px-3 rounded-xl flex items-center gap-2 text-text-secondary font-medium text-sm opacity-50 cursor-not-allowed"><Sparkles className="w-4 h-4" /> Write with AI</button>
                     <div className="flex items-center bg-surface rounded-[14px] p-1">
-                      <button onClick={() => setEditorMode('view')} className={`flex items-center gap-2 px-3 py-1.5 rounded-[10px] text-xs font-semibold transition-all ${editorMode === 'view' ? 'bg-white shadow-sm text-text' : 'text-text-secondary hover:text-text'}`}><Eye className="w-3.5 h-3.5" /> View</button>
-                      {(isInstalled || isOwner) && <button onClick={() => setEditorMode('edit')} className={`flex items-center gap-2 px-3 py-1.5 rounded-[10px] text-xs font-semibold transition-all ${editorMode === 'edit' ? 'bg-white shadow-sm text-text' : 'text-text-secondary hover:text-text'}`}><Pencil className="w-3.5 h-3.5" /> Edit</button>}
+                      <button onClick={() => setEditorMode('view')} className={`flex items-center gap-2 px-3 py-1.5 rounded-[10px] text-xs font-semibold transition-all ${editorMode === 'view' ? 'bg-card shadow-sm text-text' : 'text-text-secondary hover:text-text'}`}><Eye className="w-3.5 h-3.5" /> View</button>
+                      {(isInstalled || isOwner) && <button onClick={() => setEditorMode('edit')} className={`flex items-center gap-2 px-3 py-1.5 rounded-[10px] text-xs font-semibold transition-all ${editorMode === 'edit' ? 'bg-card shadow-sm text-text' : 'text-text-secondary hover:text-text'}`}><Pencil className="w-3.5 h-3.5" /> Edit</button>}
                     </div>
                     <div className="flex items-center gap-2">
                       {(isInstalled || isOwner) ? (
-                        <button onClick={async () => { if (!activeFile) return; setSaving(true); try { const { writeSkillFile } = await import('@/lib/api/skills'); await writeSkillFile(skillSlug, activeFile, editContent); mutateSkill() } finally { setSaving(false) } }} disabled={saving || editorMode === 'view'} className={`w-9 h-9 rounded-[12px] flex items-center justify-center shadow-md transition-colors ${editorMode === 'edit' ? 'bg-text text-white hover:bg-primary' : 'bg-surface text-text-secondary cursor-not-allowed'}`}>
+                        <button onClick={async () => { if (!activeFile) return; setSaving(true); try { const { writeSkillFile } = await import('@/lib/api/skills'); await writeSkillFile(skillSlug, activeFile, editContent); mutateSkill() } finally { setSaving(false) } }} disabled={saving || editorMode === 'view'} className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-md transition-colors ${editorMode === 'edit' ? 'bg-text text-white hover:bg-primary' : 'bg-surface text-text-secondary cursor-not-allowed'}`}>
                           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowUp className="w-4 h-4" />}
                         </button>
                       ) : (
-                        <button onClick={close} className="h-9 px-4 bg-surface hover:bg-surface-active rounded-[12px] text-text text-sm font-medium transition-colors">Close</button>
+                        <button onClick={close} className="h-9 px-4 bg-surface hover:bg-surface-active rounded-xl text-text text-sm font-medium transition-colors">Close</button>
                       )}
                     </div>
                   </div>
@@ -314,12 +314,25 @@ export function SkillDetailView({ skillSlug, onBack }: SkillDetailViewProps) {
 
           <div className="space-y-8">
             <div className="space-y-2">
-              <div className="flex items-center gap-2 px-1"><Bot className="w-5 h-5 text-primary" /><h3 className="text-2xl font-serif text-text">Agents</h3></div>
+              <div className="flex items-center gap-2 px-1"><Bot className="w-5 h-5 text-secondary" /><h3 className="text-2xl font-serif text-text">Agents</h3></div>
               <SkillAgentsCard isInstalled={isInstalled} agents={agents} installedByAgents={skill.installedByAgents || []} />
             </div>
             <div className="space-y-2">
-              <div className="flex items-center gap-2 px-1"><Hash className="w-5 h-5 text-primary" /><h3 className="text-2xl font-serif text-text">Channels</h3></div>
+              <div className="flex items-center gap-2 px-1"><Hash className="w-5 h-5 text-secondary" /><h3 className="text-2xl font-serif text-text">Channels</h3></div>
               <SkillChannelsCard skillSlug={skill.slug} />
+            </div>
+            {/* Triggers — parallels the Schedules section on the agent detail page.
+                Skills aren't scheduled directly; agents invoke them on demand.
+                Surfacing this keeps the two detail pages visually balanced. */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 px-1"><Clock className="w-5 h-5 text-secondary" /><h3 className="text-2xl font-serif text-text">Triggers</h3></div>
+              <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-6">
+                <p className="text-xs text-text-secondary leading-relaxed">
+                  Skills run on demand — an agent invokes this skill when a message, task, or schedule
+                  calls for it. To run on a timer, add a <span className="font-medium text-text">schedule</span> to an
+                  agent that has this skill installed.
+                </p>
+              </div>
             </div>
           </div>
         </div>

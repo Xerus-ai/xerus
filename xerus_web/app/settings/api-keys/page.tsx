@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ExternalLink, Eye, EyeOff, RefreshCw, Network, Shield, ArrowUpRight } from 'lucide-react'
+import { ExternalLink, Eye, EyeOff, RefreshCw, Shield, ArrowUpRight } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { toast } from '@/lib/toast'
 import { useRedirectIfNotAuth } from '@/utils/AuthContext'
@@ -13,7 +13,7 @@ const PROVIDERS = [
     id: 'openrouter',
     name: 'OpenRouter',
     description: 'Unified API gateway powering all agent AI models. Provides access to Claude, GPT, Gemini, DeepSeek, and 230+ more.',
-    Icon: Network,
+    iconSrc: '/icons/openrouter.svg',
     keyUrl: 'https://openrouter.ai/keys',
     docsUrl: 'https://openrouter.ai/docs',
     usageUrl: 'https://openrouter.ai/activity',
@@ -132,13 +132,13 @@ export default function ApiKeysPage() {
               {/* Header */}
               <div className="p-5 pb-4">
                 <div className="flex items-center gap-2.5 mb-1">
-                  <div className="relative w-8 h-8 bg-surface-hover rounded-lg flex items-center justify-center shrink-0">
-                    <provider.Icon className="w-4 h-4 text-text-secondary" />
+                  <div className="relative w-8 h-8 bg-surface rounded-lg flex items-center justify-center border border-surface-active/50 shrink-0">
+                    <img src={provider.iconSrc} alt={provider.name} className="w-5 h-5 object-contain" />
                   </div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm font-medium text-text">{provider.name}</h3>
                     {isHydrated && isSet && (
-                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      <span className="w-2 h-2 rounded-full bg-success" />
                     )}
                   </div>
                 </div>
@@ -158,7 +158,7 @@ export default function ApiKeysPage() {
                           [provider.id]: e.target.value,
                         }))
                       }
-                      className="w-full px-3 py-2.5 pr-9 bg-white border border-surface-active/70 rounded-xl text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary/40 transition-all placeholder:text-text-secondary/60"
+                      className="w-full px-3 py-2.5 pr-9 bg-card border border-surface-active/70 rounded-xl text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary/40 transition-all placeholder:text-text-secondary/60"
                       placeholder={
                         isSet && maskedPreview
                           ? maskedPreview
@@ -237,7 +237,7 @@ export default function ApiKeysPage() {
                       (model) => (
                         <span
                           key={model}
-                          className="text-[10px] font-medium text-text-secondary bg-white/80 border border-surface-active/40 px-2 py-0.5 rounded-md"
+                          className="text-[10px] font-medium text-text bg-card border border-surface-active/60 px-2 py-0.5 rounded-md"
                         >
                           {model}
                         </span>

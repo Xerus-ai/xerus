@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronDown, User, Settings, LogOut, Users } from 'lucide-react'
+import { useTheme } from 'next-themes'
+import { ChevronDown, User, Settings, LogOut, Users, Sun, Moon } from 'lucide-react'
 import { toast } from '@/lib/toast'
 import { useAuth } from '@/utils/AuthContext'
 import { logout, getCreditBalance, type CreditBalance } from '@/lib/api/user'
@@ -27,6 +28,7 @@ export function UserMenu({ className }: UserMenuProps) {
   const [creditsLoading, setCreditsLoading] = useState(true)
   const router = useRouter()
   const { user, isLoading } = useAuth()
+  const { theme, setTheme } = useTheme()
 
   // Only render user-dependent content after mount to avoid hydration mismatch
   useEffect(() => {
@@ -149,7 +151,7 @@ export function UserMenu({ className }: UserMenuProps) {
         aria-haspopup="menu"
         className="flex items-center gap-2 w-full px-2 py-2 rounded-xl hover:bg-surface-hover/60 transition-all duration-200"
       >
-        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary shrink-0">
+        <div className="w-8 h-8 rounded-full bg-secondary/10 border border-secondary/20 flex items-center justify-center text-sm font-semibold text-secondary shrink-0">
           {getUserInitial()}
         </div>
         <div className="flex-1 min-w-0 text-left">
@@ -161,7 +163,7 @@ export function UserMenu({ className }: UserMenuProps) {
 
       {/* Dropdown Menu */}
       {showDropdown && (
-        <div role="menu" className="absolute bottom-full left-0 mb-3 w-[280px] bg-surface-alt rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-surface-active py-2 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200 z-50">
+        <div role="menu" className="absolute bottom-full left-0 mb-3 w-[280px] bg-surface-alt rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-border py-2 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150 z-50">
           {/* Credits Section */}
           <div className="px-5 py-4 border-b border-surface-active/50">
             <div className="flex items-center justify-between mb-3">
@@ -186,13 +188,13 @@ export function UserMenu({ className }: UserMenuProps) {
             {/* Progress Bar */}
             <div className="h-1.5 w-full bg-surface-hover rounded-full overflow-hidden mb-3">
               <div
-                className="h-full bg-primary rounded-full shadow-sm transition-all duration-300"
+                className="h-full bg-secondary rounded-full shadow-sm transition-all duration-300"
                 style={{ width: `${getProgressPercentage()}%` }}
               />
             </div>
 
             {isLowCredits && (
-              <div className="flex items-center gap-2 text-[11px] text-amber-600 bg-amber-50 px-2 py-1 rounded-md mb-3 w-fit">
+              <div className="flex items-center gap-2 text-[11px] text-warning bg-warning/10 px-2 py-1 rounded-md mb-3 w-fit">
                 <span className="font-medium">Low credits</span>
               </div>
             )}
@@ -207,7 +209,7 @@ export function UserMenu({ className }: UserMenuProps) {
               {credits?.plan_type !== 'prodigy' && (
                 <button
                   onClick={() => router.push('/settings/billing')}
-                  className="text-primary font-medium hover:text-primary/90 transition-colors hover:underline"
+                  className="text-secondary font-medium hover:text-secondary/90 transition-colors hover:underline"
                 >
                   Upgrade Plan
                 </button>
@@ -217,6 +219,18 @@ export function UserMenu({ className }: UserMenuProps) {
 
           {/* Menu Items */}
           <div className="p-2 space-y-0.5">
+            <button
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              role="menuitem"
+              className="flex items-center gap-3 px-3 py-2.5 text-[13px] font-medium text-text-secondary hover:text-text hover:bg-surface-hover rounded-xl transition-all duration-200 w-full text-left group"
+            >
+              {theme === 'dark'
+                ? <Sun className="w-4 h-4 text-text-muted group-hover:text-text-secondary transition-colors" />
+                : <Moon className="w-4 h-4 text-text-muted group-hover:text-text-secondary transition-colors" />
+              }
+              {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+            </button>
+
             <a
               href="https://discord.gg/xerus"
               target="_blank"
@@ -231,9 +245,9 @@ export function UserMenu({ className }: UserMenuProps) {
             <button
               onClick={handleLogout}
               role="menuitem"
-              className="flex items-center gap-3 px-3 py-2.5 text-[13px] font-medium text-text-secondary hover:text-red-600 hover:bg-red-50 rounded-xl transition-all duration-200 w-full text-left group"
+              className="flex items-center gap-3 px-3 py-2.5 text-[13px] font-medium text-text-secondary hover:text-destructive hover:bg-destructive/10 rounded-xl transition-all duration-200 w-full text-left group"
             >
-              <LogOut className="w-4 h-4 text-text-muted group-hover:text-red-500 transition-colors" />
+              <LogOut className="w-4 h-4 text-text-muted group-hover:text-destructive transition-colors" />
               Log out
             </button>
           </div>

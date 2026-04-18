@@ -15,6 +15,8 @@ import { ExecutionDetail } from './ExecutionDetail'
 import { useChannelMessages } from '@/hooks/useChannelData'
 import { getAssistants } from '@/lib/api/agents'
 import type { Agent } from '@/components/common/PresenceAvatars'
+import type { ChannelAgent } from '@/hooks/useChannelAgents'
+import { Users, AlertCircle } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -35,6 +37,8 @@ export interface ChannelMessage {
 interface ChannelActivityProps {
   channelId: string
   className?: string
+  assignedAgents?: ChannelAgent[]
+  onManageAgents?: () => void
 }
 
 // ---------------------------------------------------------------------------
@@ -121,11 +125,13 @@ function groupMessages(messages: ChannelMessage[]): MessageGroup[] {
 // Main component
 // ---------------------------------------------------------------------------
 
-export function ChannelActivity({ channelId, className }: ChannelActivityProps) {
+export function ChannelActivity({ channelId, className, assignedAgents, onManageAgents }: ChannelActivityProps) {
   const { messages, isLoading, error, sendMessage, refetch } = useChannelMessages(channelId)
   const [viewingExecution, setViewingExecution] = useState<string | null>(null)
   const [channelAgents, setChannelAgents] = useState<Agent[]>([])
+  const [pendingSince, setPendingSince] = useState<number | null>(null)
   const insertRef = useRef<((text: string) => void) | null>(null)
+  const hasAssignedAgents = (assignedAgents?.length ?? 0) > 0
 
   const [agentError, setAgentError] = useState<string | null>(null)
 
@@ -210,9 +216,26 @@ export function ChannelActivity({ channelId, className }: ChannelActivityProps) 
   const handleSend = useCallback(
     (content: string) => {
       sendMessage(content)
+      // Show "agent working" indicator if agents are assigned — cleared when next
+      // non-human message arrives via polling. Honest about the gap: inbox polls,
+      // chat streams. User at least sees acknowledgement instead of silent wait.
+      if (hasAssignedAgents) {
+        setPendingSince(Date.now())
+      }
     },
-    [sendMessage]
+    [sendMessage, hasAssignedAgents]
   )
+
+  // Clear pending indicator when a non-human message arrives after our send
+  useEffect(() => {
+    if (!pendingSince) return
+    const latest = messages[messages.length - 1]
+    if (!latest) return
+    const latestTime = new Date(latest.created_at).getTime()
+    if (latest.sender_type !== 'human' && latestTime >= pendingSince) {
+      setPendingSince(null)
+    }
+  }, [messages, pendingSince])
 
   if (isLoading) {
     return (
@@ -234,7 +257,7 @@ export function ChannelActivity({ channelId, className }: ChannelActivityProps) 
     <div className={cn('flex flex-col h-full', className)}>
       {agentError && (
         <div className="px-4 py-2">
-          <p className="text-xs text-red-500">{agentError}</p>
+          <p className="text-xs text-destructive">{agentError}</p>
         </div>
       )}
       <ScrollArea className="flex-1">
@@ -249,11 +272,11 @@ export function ChannelActivity({ channelId, className }: ChannelActivityProps) 
                     role="separator"
                     aria-label={formatDateSeparator(group.date)}
                   >
-                    <div className="flex-1 h-px bg-surface-active" />
-                    <span className="text-xs font-medium text-text-muted">
+                    <div className="flex-1 h-px bg-border" />
+                    <span className="text-xs font-medium text-text-muted tabular-nums">
                       {formatDateSeparator(group.date)}
                     </span>
-                    <div className="flex-1 h-px bg-surface-active" />
+                    <div className="flex-1 h-px bg-border" />
                   </div>
                 )
 
@@ -306,8 +329,72 @@ export function ChannelActivity({ channelId, className }: ChannelActivityProps) 
                 )
             }
           })}
+
+          {/* Agent working indicator — shown after send until next non-human message arrives */}
+          {pendingSince && assignedAgents && assignedAgents.length > 0 && (
+            <div className="flex items-start gap-3 py-3 px-1" data-testid="channel-pending-indicator" aria-live="polite">
+              <div className="flex -space-x-1.5 shrink-0 mt-0.5">
+                {assignedAgents.slice(0, 3).map((agent) => (
+                  <div
+                    key={agent.id}
+                    className="w-7 h-7 rounded-lg overflow-hidden bg-surface-hover border border-surface ring-2 ring-card"
+                  >
+                    {agent.avatar_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={agent.avatar_url} alt={agent.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="w-full h-full flex items-center justify-center bg-secondary/10 text-secondary text-[10px] font-semibold">
+                        {agent.name.substring(0, 2).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="flex-1 min-w-0 pt-0.5">
+                <p className="text-xs font-medium text-secondary mb-1">
+                  {assignedAgents.length === 1
+                    ? assignedAgents[0].name
+                    : `${assignedAgents.length} agents`}
+                </p>
+                <div className="flex items-center gap-1.5 text-xs text-text-secondary">
+                  <span className="inline-flex gap-0.5">
+                    <span className="w-1 h-1 rounded-full bg-secondary/60 animate-[pulse_1.4s_ease-in-out_infinite]" />
+                    <span className="w-1 h-1 rounded-full bg-secondary/60 animate-[pulse_1.4s_ease-in-out_0.2s_infinite]" />
+                    <span className="w-1 h-1 rounded-full bg-secondary/60 animate-[pulse_1.4s_ease-in-out_0.4s_infinite]" />
+                  </span>
+                  <span>working on it...</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </ScrollArea>
+
+      {/* Empty-agent guidance — prevents silent sends into channels with no agents */}
+      {!hasAssignedAgents && !isLoading && (
+        <div
+          className="mx-4 mb-2 flex items-start gap-2.5 rounded-xl border border-amber-400/30 bg-amber-50/40 px-3.5 py-2.5"
+          role="status"
+          data-testid="channel-no-agents-banner"
+        >
+          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium text-text">No agents in this channel yet</p>
+            <p className="text-[11px] text-text-secondary mt-0.5">
+              Assign an agent so they can see and respond to messages you post here.
+            </p>
+          </div>
+          {onManageAgents && (
+            <button
+              onClick={onManageAgents}
+              className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium text-secondary bg-secondary/10 hover:bg-secondary/15 transition-colors"
+            >
+              <Users className="w-3 h-3" />
+              Add agent
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Skills ribbon above message input */}
       <SkillsRibbon
@@ -319,7 +406,7 @@ export function ChannelActivity({ channelId, className }: ChannelActivityProps) 
       <MentionInput
         agents={channelAgents}
         onSend={handleSend}
-        placeholder="Message this channel..."
+        placeholder="Message your agents..."
         insertRef={insertRef}
       />
 

@@ -95,7 +95,7 @@ export function SyntaxViewer({ content, filename, className }: SyntaxViewerProps
   const language = extensionToLanguage(ext)
 
   return (
-    <div className={cn('h-full overflow-auto bg-white', className)}>
+    <div className={cn('h-full overflow-auto bg-card', className)}>
       <CodeBlock
         code={content}
         language={language}

@@ -95,12 +95,12 @@ export function AgentsPanel({ onSelect, onCountChange }: AgentsPanelProps) {
         {/* My Agents */}
         <div data-testid="my-agents-section" className="w-full mb-12">
           <div className="flex items-center gap-3 mb-6">
-            <h2 className="font-serif text-2xl text-text">My Agents</h2>
-            <span className="bg-primary/10 text-primary text-xs font-bold px-2 py-1 rounded-md">
+            <h2 className="font-serif text-2xl text-text tracking-tight">My Agents</h2>
+            <span className="bg-secondary/10 text-secondary text-xs font-bold px-2 py-1 rounded-md tabular-nums">
               {myAgents.length} Agents
             </span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 stagger-in">
             <CreateAgentCard onClick={() => setUploadPanelOpen(true)} />
             {myAgents.map((agent) => (
               <AgentCard
@@ -117,12 +117,12 @@ export function AgentsPanel({ onSelect, onCountChange }: AgentsPanelProps) {
         {/* Marketplace */}
         <div data-testid="marketplace-section" className="w-full">
           <div className="flex items-center gap-3 mb-6">
-            <h2 className="font-serif text-2xl text-text">Agent Marketplace</h2>
-            <span className="bg-text-secondary/10 text-text-secondary text-xs font-bold px-2 py-1 rounded-md">
+            <h2 className="font-serif text-2xl text-text tracking-tight">Agent Marketplace</h2>
+            <span className="bg-surface-active text-text-secondary text-xs font-bold px-2 py-1 rounded-md tabular-nums">
               {marketplaceAgents.length} Available
             </span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 stagger-in">
             {marketplaceAgents.map((agent) => {
               const slug = agent.slug || String(agent.id)
               return (
@@ -141,7 +141,7 @@ export function AgentsPanel({ onSelect, onCountChange }: AgentsPanelProps) {
 
         {myAgents.length === 0 && marketplaceAgents.length === 0 && searchQuery && (
           <div className="w-full text-center py-20">
-            <p className="text-text-secondary">No agents found matching your criteria.</p>
+            <p className="text-text-secondary">No agents match your search -- try a different keyword or browse the marketplace.</p>
           </div>
         )}
       </div>

@@ -59,7 +59,7 @@ export function AgentSelectRow({
                 key={agent.id}
                 whileTap={{ scale: 0.97 }}
                 className={`
-                  shrink-0 w-[172px] rounded-[24px] p-4 cursor-pointer
+                  shrink-0 w-[172px] rounded-3xl p-4 cursor-pointer
                   transition-all duration-300 flex flex-col
                   ${isSelected
                     ? 'bg-surface ring-2 ring-primary shadow-md'

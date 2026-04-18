@@ -196,7 +196,7 @@ export default function SkillDetailPage() {
                         {isInstalled && requiredEnvKeys.length > 0 && (
                             <div className="space-y-2">
                                 <h3 className="font-serif text-xl flex items-center gap-2 px-1">
-                                    <Shield className="w-5 h-5 text-primary" />
+                                    <Shield className="w-5 h-5 text-secondary" />
                                     Authentication
                                 </h3>
                                 <SkillSecretsCard skillSlug={skill.slug} envKeys={requiredEnvKeys} />
@@ -206,11 +206,11 @@ export default function SkillDetailPage() {
                         {/* Skill Files */}
                         <div className="space-y-2">
                             <div className="flex items-center gap-2 px-1">
-                                <FileText className="w-5 h-5 text-primary" />
+                                <FileText className="w-5 h-5 text-secondary" />
                                 <h3 className="text-2xl font-serif text-text">Skill Files</h3>
                             </div>
 
-                            <div className="bg-surface rounded-[24px] border border-surface-active shadow-sm p-4 space-y-3">
+                            <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-4 space-y-3">
                                 {/* SKILL.md — full width primary row */}
                                 <div
                                     className="bg-surface-hover rounded-xl px-5 py-4 flex items-center gap-4 cursor-pointer"
@@ -225,7 +225,7 @@ export default function SkillDetailPage() {
                                         </p>
                                     </div>
                                     {(isInstalled || isOwner) ? (
-                                        <button className="h-9 px-4 bg-text hover:bg-primary rounded-xl text-white flex items-center gap-2 shrink-0 text-sm font-medium transition-colors">
+                                        <button className="h-9 px-4 bg-text hover:bg-text/85 rounded-xl text-white flex items-center gap-2 shrink-0 text-sm font-medium transition-colors">
                                             <Pencil className="w-3.5 h-3.5" />
                                             Edit
                                         </button>
@@ -253,7 +253,7 @@ export default function SkillDetailPage() {
                                                     </p>
                                                 </div>
                                                 {(isInstalled || isOwner) ? (
-                                                    <button className="h-9 px-4 bg-text hover:bg-primary rounded-xl text-white flex items-center gap-2 shrink-0 text-sm font-medium transition-colors">
+                                                    <button className="h-9 px-4 bg-text hover:bg-text/85 rounded-xl text-white flex items-center gap-2 shrink-0 text-sm font-medium transition-colors">
                                                         <Pencil className="w-3.5 h-3.5" />
                                                         Edit
                                                     </button>
@@ -274,11 +274,11 @@ export default function SkillDetailPage() {
                         {readmeFile && (
                             <div className="space-y-2">
                                 <div className="flex items-center gap-2 px-1">
-                                    <FileText className="w-5 h-5 text-primary" />
+                                    <FileText className="w-5 h-5 text-secondary" />
                                     <h3 className="text-2xl font-serif text-text">README</h3>
                                 </div>
 
-                                <div className="bg-surface rounded-[24px] border border-surface-active shadow-sm p-6">
+                                <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-6">
                                     <SkillFileViewer slug={slug} filePath={readmeFile.path} />
                                 </div>
                             </div>
@@ -297,7 +297,7 @@ export default function SkillDetailPage() {
                         variant="clean"
                     >
                         {({ close, minimize }) => (
-                            <div className="bg-white rounded-[32px] h-full w-full flex flex-col p-6 overflow-hidden">
+                            <div className="bg-white rounded-4xl h-full w-full flex flex-col p-6 overflow-hidden">
                                 {/* Header */}
                                 <div className="flex items-center justify-between mb-4 shrink-0">
                                     <div className="flex items-center gap-2">
@@ -397,7 +397,7 @@ export default function SkillDetailPage() {
                         <div className="space-y-2">
                             <div className="flex items-center gap-2 px-1">
                                 <div className="flex items-center gap-2">
-                                    <Bot className="w-5 h-5 text-primary" />
+                                    <Bot className="w-5 h-5 text-secondary" />
                                     <h3 className="text-2xl font-serif text-text">Agents</h3>
                                 </div>
                             </div>
@@ -412,7 +412,7 @@ export default function SkillDetailPage() {
                         <div className="space-y-2">
                             <div className="flex items-center gap-2 px-1">
                                 <div className="flex items-center gap-2">
-                                    <Hash className="w-5 h-5 text-primary" />
+                                    <Hash className="w-5 h-5 text-secondary" />
                                     <h3 className="text-2xl font-serif text-text">Channels</h3>
                                 </div>
                             </div>
@@ -477,7 +477,7 @@ function SkillChannelsCard({ skillSlug }: {
     onTogglePicker: () => void;
 }) {
     return (
-        <div className="bg-surface rounded-[24px] border border-surface-active shadow-sm p-6">
+        <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-6">
             <p className="text-xs text-text-secondary py-2">
                 Channel-scoped installs are not wired yet for <span className="font-medium text-text">{skillSlug}</span>.
                 Install this skill once and it becomes available from the shared workspace.
@@ -495,7 +495,7 @@ function SkillAgentsCard({ isInstalled, agents, installedByAgents }: { isInstall
     const assignedAgents = agents.filter(a => installedSet.has(a.id));
 
     return (
-        <div className="bg-surface rounded-[24px] border border-surface-active shadow-sm p-6">
+        <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-6">
             {assignedAgents.length > 0 ? (
                 <div className="space-y-2">
                     {assignedAgents.map(agent => (

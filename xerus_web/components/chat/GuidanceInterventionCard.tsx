@@ -87,14 +87,14 @@ export function GuidanceInterventionCard({
   }, [onRespond, feedbackText])
 
   return (
-    <div className="mx-4 mb-2 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3">
+    <div className="mx-4 mb-2 rounded-2xl border border-secondary/20 bg-secondary/5 px-4 py-3">
       <div className="flex items-start gap-3">
         {/* Left: Icon + Content */}
         <div className="flex-1 min-w-0">
           {/* Label row */}
           <div className="flex items-center gap-2 mb-1.5">
-            <div className="w-7 h-7 rounded-xl flex items-center justify-center bg-primary/15 shrink-0">
-              <Icon className="w-3.5 h-3.5 text-primary" />
+            <div className="w-7 h-7 rounded-xl flex items-center justify-center bg-secondary/15 shrink-0">
+              <Icon className="w-3.5 h-3.5 text-secondary" />
             </div>
             <span className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">
               {label}
@@ -129,7 +129,7 @@ export function GuidanceInterventionCard({
                 href={browser_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary/90 font-medium transition-colors"
+                className="inline-flex items-center gap-1 text-xs text-secondary hover:text-secondary/90 font-medium transition-colors"
               >
                 <Globe className="w-3 h-3" />
                 View in browser
@@ -140,7 +140,7 @@ export function GuidanceInterventionCard({
                 href={preview_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary/90 font-medium transition-colors"
+                className="inline-flex items-center gap-1 text-xs text-secondary hover:text-secondary/90 font-medium transition-colors"
               >
                 <Eye className="w-3 h-3" />
                 Preview

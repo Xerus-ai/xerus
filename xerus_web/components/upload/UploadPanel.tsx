@@ -402,20 +402,20 @@ export function UploadPanel(props: UploadPanelProps) {
             variant="clean"
         >
             {({ close, minimize }) => (
-                <div className="bg-white rounded-[32px] h-full w-full flex flex-col p-8 overflow-hidden font-sans">
+                <div className="bg-card rounded-2xl h-full w-full flex flex-col p-8 overflow-hidden font-sans">
                     {/* Header */}
                     <div className="flex items-center justify-between mb-6 shrink-0">
                         <div className="flex items-center gap-2">
                             <button
                                 onClick={close}
-                                className="p-2 bg-[#F5F5F5] hover:bg-[#E5E5E5] rounded-full transition-colors"
+                                className="p-2 bg-surface-hover hover:bg-surface-pressed rounded-full transition-colors"
                                 aria-label="Close"
                             >
                                 <X className="w-4 h-4 text-text" />
                             </button>
                             <button
                                 onClick={minimize}
-                                className="p-2 bg-[#F5F5F5] hover:bg-[#E5E5E5] rounded-full transition-colors"
+                                className="p-2 bg-surface-hover hover:bg-surface-pressed rounded-full transition-colors"
                                 aria-label="Minimize"
                             >
                                 <Minus className="w-4 h-4 text-text" />
@@ -438,7 +438,7 @@ export function UploadPanel(props: UploadPanelProps) {
                         {/* Drop zone — always visible, compact when files already added */}
                         <div
                             className={cn(
-                                "border-2 border-dashed rounded-[24px] flex flex-col items-center justify-center text-center transition-colors cursor-pointer mb-8",
+                                "border-2 border-dashed rounded-3xl flex flex-col items-center justify-center text-center transition-colors cursor-pointer mb-8",
                                 hasContent ? "h-24" : "h-48",
                                 isDragActive
                                     ? "border-primary bg-primary/5"
@@ -495,17 +495,17 @@ export function UploadPanel(props: UploadPanelProps) {
 
                         {/* Hint when regular files dropped in import context */}
                         {detectedType === 'files' && context === 'import' && rawFiles.length > 0 && (
-                            <div className="px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-700">
+                            <div className="px-4 py-3 rounded-xl bg-warning/10 border border-warning/20 text-sm text-warning">
                                 <p className="font-medium">No agent or skill detected</p>
                                 <p className="text-xs mt-1 text-amber-600">
-                                    To import an agent, include an <code className="bg-amber-100 px-1 rounded">agent.md</code> file. For a skill, include a <code className="bg-amber-100 px-1 rounded">SKILL.md</code> file.
+                                    To import an agent, include an <code className="bg-warning/15 px-1 rounded">agent.md</code> file. For a skill, include a <code className="bg-warning/15 px-1 rounded">SKILL.md</code> file.
                                 </p>
                             </div>
                         )}
 
                         {/* Import error */}
                         {importError && (
-                            <div className="mt-4 px-3 py-2 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 font-medium">
+                            <div className="mt-4 px-3 py-2 rounded-xl bg-destructive/10 border border-destructive/20 text-xs text-destructive font-medium">
                                 {importError}
                             </div>
                         )}
@@ -516,7 +516,7 @@ export function UploadPanel(props: UploadPanelProps) {
                             {attachmentFiles.length > 0 ? (
                                 <div className="space-y-2">
                                     {attachmentFiles.map(file => (
-                                        <div key={file.id} className="group flex items-center gap-3 p-3 rounded-[16px] border border-surface-active bg-white hover:bg-[#F9F9F9] transition-colors">
+                                        <div key={file.id} className="group flex items-center gap-3 p-3 rounded-2xl border border-surface-active bg-card hover:bg-surface-hover transition-colors">
                                             <div className="w-8 h-8 rounded-full bg-surface flex items-center justify-center shrink-0">
                                                 {file.type === 'pdf' && <span className="text-sm font-serif italic text-text-secondary">@</span>}
                                                 {file.type === 'audio' && <Mic className="w-4 h-4 text-text-secondary" />}
@@ -530,7 +530,7 @@ export function UploadPanel(props: UploadPanelProps) {
                                             </div>
                                             <button
                                                 onClick={() => removeFile(file.id)}
-                                                className="p-2 text-text-secondary hover:text-red-500 transition-colors"
+                                                className="p-2 text-text-secondary hover:text-destructive transition-colors"
                                                 aria-label="Remove file"
                                             >
                                                 <X className="w-4 h-4" />
@@ -547,7 +547,7 @@ export function UploadPanel(props: UploadPanelProps) {
                         <div className="mb-6">
                             <div className="grid grid-cols-3 gap-3">
                                 {imageFiles.map(file => (
-                                    <div key={file.id} className="relative aspect-video rounded-[16px] overflow-hidden group border border-surface-active">
+                                    <div key={file.id} className="relative aspect-video rounded-2xl overflow-hidden group border border-surface-active">
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img
                                             src={file.blobUrl || ''}
@@ -559,7 +559,7 @@ export function UploadPanel(props: UploadPanelProps) {
                                         </div>
                                         <button
                                             onClick={() => removeFile(file.id)}
-                                            className="absolute top-2 right-2 w-6 h-6 bg-white/80 hover:bg-white rounded-full flex items-center justify-center text-text-secondary hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                                            className="absolute top-2 right-2 w-6 h-6 bg-card/80 hover:bg-card rounded-full flex items-center justify-center text-text-secondary hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
                                             aria-label="Remove image"
                                         >
                                             <X className="w-3 h-3" />
@@ -568,7 +568,7 @@ export function UploadPanel(props: UploadPanelProps) {
                                 ))}
                                 <button
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="aspect-video rounded-[16px] bg-surface border border-surface-active flex items-center justify-center hover:bg-surface-hover transition-colors"
+                                    className="aspect-video rounded-2xl bg-surface border border-surface-active flex items-center justify-center hover:bg-surface-hover transition-colors"
                                     aria-label="Add image"
                                 >
                                     <PlusIcon className="w-6 h-6 text-text-secondary" />
@@ -583,11 +583,11 @@ export function UploadPanel(props: UploadPanelProps) {
                                 <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider flex items-center gap-2">
                                     <Tag className="w-3 h-3" /> Tags
                                 </label>
-                                <div className="flex flex-wrap gap-2 bg-white p-2 rounded-lg border border-surface-active focus-within:ring-1 focus-within:ring-primary transition-shadow">
+                                <div className="flex flex-wrap gap-2 bg-card p-2 rounded-lg border border-surface-active focus-within:ring-1 focus-within:ring-primary transition-shadow">
                                     {tags.map(tag => (
                                         <span key={tag} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-surface text-xs font-medium text-text">
                                             {tag}
-                                            <button onClick={() => removeTag(tag)} className="hover:text-red-500" aria-label={`Remove tag ${tag}`}>
+                                            <button onClick={() => removeTag(tag)} className="hover:text-destructive" aria-label={`Remove tag ${tag}`}>
                                                 <X className="w-3 h-3" />
                                             </button>
                                         </span>
@@ -625,7 +625,7 @@ export function UploadPanel(props: UploadPanelProps) {
                                     <select
                                         value={selectedFolderId || ''}
                                         onChange={(e) => setSelectedFolderId(e.target.value || null)}
-                                        className="w-full appearance-none bg-white border border-surface-active text-text text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-primary transition-colors"
+                                        className="w-full appearance-none bg-card border border-surface-active text-text text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-primary transition-colors"
                                     >
                                         <option value="">{context === 'workspace' ? 'No Folder (Root)' : 'No Channel'}</option>
                                         {(props.folders || []).map(folder => (
@@ -646,7 +646,7 @@ export function UploadPanel(props: UploadPanelProps) {
                             {/* Left: Write with AI */}
                             <button
                                 disabled
-                                className="h-9 px-3 rounded-[12px] flex items-center gap-2 text-text-secondary font-medium text-sm opacity-50 cursor-not-allowed"
+                                className="h-9 px-3 rounded-xl flex items-center gap-2 text-text-secondary font-medium text-sm opacity-50 cursor-not-allowed"
                             >
                                 <Sparkles className="w-4 h-4" />
                                 Write with AI
@@ -656,7 +656,7 @@ export function UploadPanel(props: UploadPanelProps) {
                             <div className="flex items-center gap-3">
                                 <button
                                     onClick={onClose}
-                                    className="px-6 py-2.5 rounded-[12px] border border-surface-active text-text hover:bg-surface font-medium text-sm transition-colors"
+                                    className="px-6 py-2.5 rounded-xl border border-surface-active text-text hover:bg-surface font-medium text-sm transition-colors"
                                 >
                                     Cancel
                                 </button>
@@ -666,7 +666,7 @@ export function UploadPanel(props: UploadPanelProps) {
                                     <button
                                         onClick={() => handleImport(minimize)}
                                         disabled={isImporting}
-                                        className="px-6 py-2.5 rounded-[12px] bg-text text-white text-sm font-medium hover:bg-[#1a1a1a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                        className="px-6 py-2.5 rounded-xl bg-text text-white text-sm font-medium hover:bg-text/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                                     >
                                         {isImporting ? (
                                             <>
@@ -684,7 +684,7 @@ export function UploadPanel(props: UploadPanelProps) {
                                     <button
                                         onClick={() => handleWorkspaceUpload(minimize)}
                                         disabled={fileItems.length === 0 || isUploading}
-                                        className="px-6 py-2.5 rounded-[12px] bg-text text-white text-sm font-medium hover:bg-[#1a1a1a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                        className="px-6 py-2.5 rounded-xl bg-text text-white text-sm font-medium hover:bg-text/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                                     >
                                         {isUploading ? (
                                             <>

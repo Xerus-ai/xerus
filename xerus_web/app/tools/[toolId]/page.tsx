@@ -119,7 +119,7 @@ export default function ToolDetailPage() {
 
                 {/* Header Section */}
                 <div className="flex items-start gap-6 mb-10">
-                    <div className="w-20 h-20 bg-surface rounded-[24px] flex items-center justify-center text-4xl shadow-sm border border-surface-active">
+                    <div className="w-20 h-20 bg-surface rounded-3xl flex items-center justify-center text-4xl shadow-sm border border-surface-active">
                         {tool?.icon.startsWith('http') || tool?.icon.startsWith('/') ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={tool?.icon} alt={tool?.name} className="w-12 h-12 object-contain" />
@@ -147,7 +147,7 @@ export default function ToolDetailPage() {
                                     Authentication
                                 </h3>
 
-                                <div className="bg-surface p-6 rounded-[24px] border border-surface-active shadow-sm">
+                                <div className="bg-surface p-6 rounded-3xl border border-surface-active shadow-sm">
                                     <div className="space-y-6">
                                     {/* Connection Status Row */}
                                     <div className="flex items-center justify-between p-4 bg-surface-alt rounded-xl border border-surface-active">
@@ -245,7 +245,7 @@ export default function ToolDetailPage() {
                                     )}
                                 </div>
 
-                                <div className="bg-surface p-6 rounded-[24px] border border-surface-active shadow-sm">
+                                <div className="bg-surface p-6 rounded-3xl border border-surface-active shadow-sm">
                                     <div className="space-y-4">
                                         {tool.capabilities
                                             .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
@@ -349,7 +349,7 @@ export default function ToolDetailPage() {
                                 </div>
 
                                 {/* Content Card */}
-                                <div className="bg-surface p-6 rounded-[24px] border border-surface-active shadow-sm">
+                                <div className="bg-surface p-6 rounded-3xl border border-surface-active shadow-sm">
 
                                 {/* Actions Section */}
                                 {activeSection === 'actions' && (
@@ -406,7 +406,7 @@ export default function ToolDetailPage() {
 
                         {/* Configuration */}
                         {tool.configuration && Object.keys(tool.configuration).length > 0 && (
-                            <div className="bg-surface p-6 rounded-[24px] border border-surface-active shadow-sm">
+                            <div className="bg-surface p-6 rounded-3xl border border-surface-active shadow-sm">
                                 <h3 className="font-serif text-xl mb-4 flex items-center gap-2">
                                     <Settings className="w-5 h-5 text-primary" />
                                     Configuration
@@ -426,7 +426,7 @@ export default function ToolDetailPage() {
                         </h3>
 
                         {/* Details Card */}
-                        <div className="bg-surface p-6 rounded-[24px] border border-surface-active shadow-sm">
+                        <div className="bg-surface p-6 rounded-3xl border border-surface-active shadow-sm">
                             <div className="space-y-3 text-sm">
                                 <div className="flex justify-between py-2">
                                     <span className="text-text-secondary">Provider</span>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { apiGet, apiCall } from '@/lib/api/client'
 import { useAuth } from '@/utils/AuthContext'
 import { toast } from '@/lib/toast'
@@ -44,76 +44,131 @@ export function useChannelAgents(channelSlug: string): UseChannelAgentsReturn {
   const [agents, setAgents] = useState<ChannelAgent[]>([])
   const [allAgents, setAllAgents] = useState<ChannelAgent[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const channelSlugRef = useRef(channelSlug)
 
-  const fetchAgents = useCallback(async () => {
+  const fetchAssigned = useCallback(async (signal?: AbortSignal) => {
     if (!isAuthReady || !channelSlug) return
-
-    try {
-      setIsLoading(true)
-
-      // Fetch assigned agents and all agents in parallel (2 requests total)
-      const [assignedResult, allResult] = await Promise.all([
-        apiGet<{ data?: { agents: ChannelAgent[] }; agents?: ChannelAgent[] }>(
-          `/company/channels/${channelSlug}/agents`
-        ),
-        apiGet<{ data?: { agents: Array<Record<string, unknown>> }; agents?: Array<Record<string, unknown>> }>(
-          '/agents?limit=50'
-        ),
-      ])
-
-      // Parse assigned agents
-      const assignedData = assignedResult.data ?? assignedResult
-      setAgents(assignedData.agents ?? [])
-
-      // Parse all workspace agents
-      const allData = allResult.data ?? allResult
-      const rawAgents = allData.agents ?? []
-      const mapped: ChannelAgent[] = rawAgents.map((a) => ({
-        id: String(a.id),
-        name: (a.name as string) ?? 'Agent',
-        slug: (a.slug as string) ?? '',
-        avatar_url: (a.avatar_url as string | undefined),
-        status: (a.is_active ? 'active' : 'idle') as ChannelAgent['status'],
-        ai_model: (a.ai_model as string | undefined),
-        adapter_type: (a.adapter_type as string | undefined),
-        description: (a.description as string | undefined),
-      }))
-      setAllAgents(mapped)
-    } catch {
-      toast.error("Couldn't load channel agents", {
-        description: 'Please refresh the page and try again.',
-      })
-      setAgents([])
-      setAllAgents([])
-    } finally {
-      setIsLoading(false)
-    }
+    const result = await apiGet<{ data?: { agents: ChannelAgent[] }; agents?: ChannelAgent[] }>(
+      `/company/channels/${channelSlug}/agents`,
+      signal ? { signal } : undefined,
+    )
+    if (signal?.aborted || channelSlugRef.current !== channelSlug) return
+    const data = result.data ?? result
+    setAgents(data.agents ?? [])
   }, [isAuthReady, channelSlug])
 
-  useEffect(() => {
-    fetchAgents()
-  }, [fetchAgents])
+  const fetchAll = useCallback(async (signal?: AbortSignal) => {
+    if (!isAuthReady) return
+    const result = await apiGet<{ data?: { agents: Array<Record<string, unknown>> }; agents?: Array<Record<string, unknown>> }>(
+      '/agents?limit=50',
+      signal ? { signal } : undefined,
+    )
+    if (signal?.aborted) return
+    const data = result.data ?? result
+    const rawAgents = data.agents ?? []
+    const mapped: ChannelAgent[] = rawAgents.map((a) => ({
+      id: String(a.id),
+      name: typeof a.name === 'string' ? a.name : 'Agent',
+      slug: typeof a.slug === 'string' ? a.slug : '',
+      avatar_url: typeof a.avatar_url === 'string' ? a.avatar_url : undefined,
+      status: (a.is_active ? 'active' : 'idle') as ChannelAgent['status'],
+      ai_model: typeof a.ai_model === 'string' ? a.ai_model : undefined,
+      adapter_type: typeof a.adapter_type === 'string' ? a.adapter_type : undefined,
+      description: typeof a.description === 'string' ? a.description : undefined,
+    }))
+    setAllAgents(mapped)
+  }, [isAuthReady])
 
+  const fetchAgents = useCallback(async (signal?: AbortSignal) => {
+    if (!isAuthReady || !channelSlug) return
+    setIsLoading(true)
+    // allSettled so a transient failure on one endpoint doesn't wipe data the
+    // other endpoint just successfully loaded.
+    const [assignedResult, allResult] = await Promise.allSettled([
+      fetchAssigned(signal),
+      fetchAll(signal),
+    ])
+    if (signal?.aborted) {
+      setIsLoading(false)
+      return
+    }
+
+    const failed: string[] = []
+    if (assignedResult.status === 'rejected') {
+      const reason = assignedResult.reason
+      if (!(reason instanceof Error && reason.name === 'AbortError')) {
+        setAgents([])
+        failed.push('channel agents')
+      }
+    }
+    if (allResult.status === 'rejected') {
+      const reason = allResult.reason
+      if (!(reason instanceof Error && reason.name === 'AbortError')) {
+        setAllAgents([])
+        failed.push('workspace agents')
+      }
+    }
+    if (failed.length > 0) {
+      toast.error(`Couldn't load ${failed.join(' and ')}`, {
+        description: 'Please refresh the page and try again.',
+      })
+    }
+    if (channelSlugRef.current === channelSlug) {
+      setIsLoading(false)
+    }
+  }, [isAuthReady, channelSlug, fetchAssigned, fetchAll])
+
+  useEffect(() => {
+    channelSlugRef.current = channelSlug
+    const controller = new AbortController()
+    fetchAgents(controller.signal)
+    return () => controller.abort()
+  }, [channelSlug, fetchAgents])
+
+  // Mutations only refresh the assigned list — the workspace agents catalogue
+  // doesn't change when membership flips, so re-fetching it is wasted work.
   const assignAgent = useCallback(
     async (agentId: string, targetChannelSlug: string) => {
       await apiCall(`/agents/${agentId}/channels`, {
         method: 'POST',
         body: JSON.stringify({ channel_slug: targetChannelSlug }),
       })
-      await fetchAgents()
+      if (targetChannelSlug === channelSlugRef.current) {
+        await fetchAssigned().catch(() => { /* toast already fired by apiCall */ })
+      }
     },
-    [fetchAgents]
+    [fetchAssigned],
   )
 
   const unassignAgent = useCallback(
     async (agentId: string, targetChannelSlug: string) => {
-      await apiCall(`/agents/${agentId}/channels/${targetChannelSlug}`, {
-        method: 'DELETE',
-      })
-      await fetchAgents()
+      // Snapshot BEFORE the optimistic update so we can restore even if the
+      // recovery refetch itself fails (network down during DELETE).
+      const isCurrentChannel = targetChannelSlug === channelSlugRef.current
+      const snapshot = isCurrentChannel ? agents : null
+      if (isCurrentChannel) {
+        setAgents(prev => prev.filter(a => a.id !== agentId))
+      }
+      try {
+        await apiCall(`/agents/${agentId}/channels/${targetChannelSlug}`, {
+          method: 'DELETE',
+        })
+        if (isCurrentChannel) {
+          await fetchAssigned().catch(() => { /* keep optimistic state — server confirmed delete */ })
+        }
+      } catch (err) {
+        if (isCurrentChannel && snapshot) {
+          // Restore from snapshot first; refetch the source of truth in the background.
+          setAgents(snapshot)
+          fetchAssigned().catch(() => { /* snapshot already restored */ })
+        }
+        throw err
+      }
     },
-    [fetchAgents]
+    [agents, fetchAssigned],
   )
+
+  const refetch = useCallback(() => fetchAgents(), [fetchAgents])
 
   return {
     agents,
@@ -121,6 +176,6 @@ export function useChannelAgents(channelSlug: string): UseChannelAgentsReturn {
     isLoading,
     assignAgent,
     unassignAgent,
-    refetch: fetchAgents,
+    refetch,
   }
 }

@@ -166,7 +166,7 @@ export function AgentDetailView({ agentId, onBack }: AgentDetailViewProps) {
               </button>
             )}
             {canDeleteAgent && (
-              <button data-testid="agent-delete-button" onClick={handleDelete} disabled={isDeleting} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-text-secondary hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors disabled:opacity-50">
+              <button data-testid="agent-delete-button" onClick={handleDelete} disabled={isDeleting} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-text-secondary hover:text-destructive hover:bg-destructive/10 rounded-xl transition-colors disabled:opacity-50">
                 {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                 {isDeleting ? 'Deleting...' : 'Delete'}
               </button>
@@ -198,7 +198,7 @@ export function AgentDetailView({ agentId, onBack }: AgentDetailViewProps) {
               <TabsTrigger
                 key={tab}
                 value={tab}
-                className="rounded-full px-6 py-2.5 text-sm font-medium transition-all data-[state=active]:bg-text data-[state=active]:text-white data-[state=active]:shadow-sm text-text-secondary hover:text-text capitalize"
+                className="rounded-full px-6 py-2.5 text-sm font-medium transition-all data-[state=active]:bg-secondary/10 data-[state=active]:text-secondary data-[state=active]:shadow-sm text-text-secondary hover:text-text capitalize"
               >
                 {tab}
               </TabsTrigger>

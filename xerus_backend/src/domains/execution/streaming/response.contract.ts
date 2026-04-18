@@ -9,6 +9,7 @@ import {
     ExecutionErrorInfo,
     DoneEventMeta,
 } from '../types';
+import type { ExecutionTimelineStep } from '../execution-timeline';
 
 // -----------------------------------------------------------------------------
 // SSE Response Envelope (matches spec: type, success, execution_id, content, meta)
@@ -157,6 +158,8 @@ export interface ExecutionStatusResponse {
     progress?: { phase: string; percent: number };
     summary?: ExecutionSummary;
     error?: ExecutionErrorInfo;
+    steps?: ExecutionTimelineStep[];
+    files_changed?: string[];
 }
 
 interface SerializeExecutionStatusInput {
@@ -168,6 +171,8 @@ interface SerializeExecutionStatusInput {
     progress?: { phase: string; percent: number };
     summary?: ExecutionSummary;
     error?: ExecutionErrorInfo;
+    steps?: ExecutionTimelineStep[];
+    filesChanged?: string[];
 }
 
 export function serializeExecutionStatus(input: SerializeExecutionStatusInput): ExecutionStatusResponse {
@@ -192,6 +197,14 @@ export function serializeExecutionStatus(input: SerializeExecutionStatusInput): 
 
     if (input.error) {
         response.error = input.error;
+    }
+
+    if (input.steps && input.steps.length > 0) {
+        response.steps = input.steps;
+    }
+
+    if (input.filesChanged && input.filesChanged.length > 0) {
+        response.files_changed = input.filesChanged;
     }
 
     return response;

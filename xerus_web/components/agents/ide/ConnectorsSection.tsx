@@ -50,13 +50,13 @@ export function ConnectorsSection({
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 px-1">
-        <div className="text-primary">
+        <div className="text-secondary">
           <ConnectorsIcon />
         </div>
         <h3 className="text-2xl font-serif text-text">Connectors</h3>
       </div>
 
-      <div className="bg-surface rounded-[24px] border border-surface-active shadow-sm p-6">
+      <div className="bg-surface rounded-xl border border-surface-active shadow-sm p-6">
         {agentTools.length === 0 ? (
           <div className="text-center py-20">
             <div className="w-16 h-16 bg-surface-hover rounded-full flex items-center justify-center mx-auto mb-4">
@@ -66,7 +66,7 @@ export function ConnectorsSection({
             <p className="text-text-secondary mb-6">Connect tools to give your agent capabilities.</p>
             <Button
               onClick={onOpenToolPanel}
-              className="px-6 py-2.5 rounded-full bg-text text-white hover:bg-[#1a1a1a] transition-colors text-sm font-medium inline-flex items-center gap-2 h-auto"
+              className="px-6 py-2.5 rounded-full bg-text text-white hover:bg-text/90 transition-colors text-sm font-medium inline-flex items-center gap-2 h-auto"
             >
               <Plus className="w-4 h-4" />
               Connect Tool
@@ -76,10 +76,10 @@ export function ConnectorsSection({
           <div className="space-y-4">
             {/* Read-only notice for system templates */}
             {!isEditable && (
-              <div className="flex items-center justify-between gap-3 p-4 bg-primary/5 border border-primary/20 rounded-2xl">
+              <div className="flex items-center justify-between gap-3 p-4 bg-secondary/5 border border-secondary/20 rounded-2xl">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
-                    <Lock className="w-4 h-4 text-primary" />
+                  <div className="w-8 h-8 rounded-xl bg-secondary/10 flex items-center justify-center">
+                    <Lock className="w-4 h-4 text-secondary" />
                   </div>
                   <span className="text-sm text-text">To modify tools, clone this agent first.</span>
                 </div>
@@ -124,15 +124,15 @@ export function ConnectorsSection({
                           <Settings className="w-6 h-6 text-text-secondary" />
                         )}
                       </div>
-                      <div className={`absolute bottom-0 left-1/2 -translate-x-1/2 bg-white border border-surface-active px-1.5 py-0.5 rounded text-[9px] font-semibold shadow-sm flex items-center gap-1 whitespace-nowrap z-10 ${
+                      <div className={`absolute bottom-0 left-1/2 -translate-x-1/2 bg-card border border-surface-active px-1.5 py-0.5 rounded text-[9px] font-semibold shadow-sm flex items-center gap-1 whitespace-nowrap z-10 ${
                         tool.requires_auth
                           ? (isConnected ? 'text-text' : 'text-text-secondary')
                           : 'text-text'
                       }`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${
                           tool.requires_auth
-                            ? (isConnected ? 'bg-green-500' : 'bg-surface-active')
-                            : 'bg-green-500'
+                            ? (isConnected ? 'bg-success' : 'bg-surface-active')
+                            : 'bg-success'
                         }`}></span>
                         {tool.requires_auth
                           ? (isConnected ? 'Connected' : 'Disconnected')
@@ -163,7 +163,7 @@ export function ConnectorsSection({
                         <button
                           onClick={() => onDisconnectTool(tool)}
                           disabled={isConfiguring}
-                          className="flex items-center justify-center gap-1.5 bg-black hover:bg-[#1a1a1a] text-white font-medium px-4 py-2 rounded-xl text-sm transition-colors disabled:opacity-50"
+                          className="flex items-center justify-center gap-1.5 bg-black hover:bg-text/90 text-white font-medium px-4 py-2 rounded-xl text-sm transition-colors disabled:opacity-50"
                         >
                           {isConfiguring ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
@@ -189,7 +189,7 @@ export function ConnectorsSection({
                         <button
                           onClick={() => onRemoveTool(toolSlug)}
                           disabled={toolLoading === toolSlug}
-                          className="p-2 text-text-secondary hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                          className="p-2 text-text-secondary hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors disabled:opacity-50"
                           title="Remove from agent"
                         >
                           {toolLoading === toolSlug ? (
@@ -215,9 +215,9 @@ export function ConnectorsSection({
               className="rounded-2xl border-2 border-dashed border-surface-active hover:border-primary py-4 flex items-center justify-center gap-3 hover:bg-surface-hover/50 transition-all duration-300 cursor-pointer group"
             >
               <div className="w-8 h-8 bg-surface rounded-full flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform duration-300">
-                <Plus className="w-4 h-4 text-primary" />
+                <Plus className="w-4 h-4 text-secondary" />
               </div>
-              <span className="font-medium text-text-secondary group-hover:text-primary transition-colors text-sm">
+              <span className="font-medium text-text-secondary group-hover:text-secondary transition-colors text-sm">
                 Add Tool
               </span>
             </div>

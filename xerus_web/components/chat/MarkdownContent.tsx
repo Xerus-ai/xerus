@@ -31,7 +31,7 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       type="button"
-      className="p-1 rounded-md bg-white/10 text-gray-400 hover:text-gray-200 transition-colors"
+      className="p-1 rounded-md bg-white/10 text-white/40 hover:text-white/70 transition-[color,opacity]"
       onClick={(e) => {
         e.stopPropagation()
         navigator.clipboard.writeText(text)
@@ -46,20 +46,29 @@ function CopyButton({ text }: { text: string }) {
 }
 
 const PROSE_CLASSES = cn(
-  'prose prose-sm max-w-none overflow-hidden',
-  'prose-p:leading-relaxed prose-p:text-black prose-p:text-[15px] prose-p:my-1.5',
-  'prose-headings:font-semibold prose-headings:text-black prose-headings:mt-4 prose-headings:mb-2',
-  'prose-h2:text-lg prose-h3:text-base',
-  'prose-strong:text-black prose-strong:font-semibold',
-  'prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-lg prose-code:bg-surface prose-code:text-primary prose-code:font-mono prose-code:text-sm',
+  'prose prose-sm max-w-[65ch] overflow-hidden',
+  // Paragraphs — comfortable reading line-height
+  'prose-p:leading-[1.6] prose-p:text-text prose-p:text-[15px] prose-p:my-2',
+  // Headings — clear size steps with tight leading
+  'prose-headings:font-semibold prose-headings:text-text prose-headings:mt-5 prose-headings:mb-2',
+  'prose-h1:text-xl prose-h1:leading-tight prose-h2:text-lg prose-h2:leading-snug prose-h3:text-[15px] prose-h3:leading-snug prose-h3:uppercase prose-h3:tracking-wide prose-h3:text-text-secondary',
+  'prose-strong:text-text prose-strong:font-semibold',
+  // Inline code
+  'prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:bg-surface-hover prose-code:text-text prose-code:font-mono prose-code:text-[13px]',
   'prose-code:before:content-none prose-code:after:content-none',
-  'prose-pre:bg-[#1E1E1E] prose-pre:rounded-2xl prose-pre:shadow-sm prose-pre:border prose-pre:border-gray-800',
-  'prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-li:text-black prose-li:text-[15px]',
-  'prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-a:font-medium',
-  'prose-table:text-sm prose-th:text-left prose-th:text-black prose-th:font-semibold prose-th:pb-2',
-  'prose-td:text-black prose-td:py-1.5',
+  // Code blocks
+  'prose-pre:bg-code-bg prose-pre:rounded-2xl prose-pre:shadow-sm prose-pre:border prose-pre:border-code-border',
+  // Lists — proper spacing
+  'prose-ul:my-2.5 prose-ol:my-2.5 prose-li:my-1 prose-li:text-text prose-li:text-[15px] prose-li:leading-[1.6]',
+  // Links — orange accent with hover underline
+  'prose-a:text-secondary prose-a:no-underline hover:prose-a:underline prose-a:font-medium',
+  // Blockquotes — subtle bg tint + italic, no heavy left border
+  'prose-blockquote:border-l-0 prose-blockquote:not-italic prose-blockquote:bg-surface-hover/60 prose-blockquote:rounded-lg prose-blockquote:px-4 prose-blockquote:py-3 prose-blockquote:text-text-secondary prose-blockquote:italic prose-blockquote:font-serif',
+  // Tables
+  'prose-table:text-sm prose-th:text-left prose-th:text-text prose-th:font-semibold prose-th:pb-2',
+  'prose-td:text-text prose-td:py-1.5',
   'prose-tr:border-b prose-tr:border-surface-active',
-  'prose-em:text-black/80',
+  'prose-em:text-text/80',
 )
 
 interface MarkdownContentProps {
@@ -82,7 +91,7 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
             return !inline && match ? (
               <div className="relative group/code my-4">
                 <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 py-2 z-10">
-                  <span className="text-[11px] font-medium text-gray-500 uppercase tracking-wide">{match[1]}</span>
+                  <span className="text-[11px] font-medium text-white/40 uppercase tracking-wide">{match[1]}</span>
                   <div className="opacity-0 group-hover/code:opacity-100 transition-opacity">
                     <CopyButton text={text} />
                   </div>
@@ -91,11 +100,11 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
                   code={text}
                   language={match[1]}
                   preTag="div"
-                  className="rounded-2xl !mt-0 !mb-0 !pt-10 shadow-sm border border-gray-800 text-sm"
+                  className="rounded-2xl !mt-0 !mb-0 !pt-10 shadow-sm border border-code-border text-sm"
                 />
               </div>
             ) : (
-              <code className="px-1.5 py-0.5 rounded-lg bg-surface font-mono text-sm text-primary" {...props}>
+              <code className="px-1.5 py-0.5 rounded-lg bg-surface-hover font-mono text-sm text-primary" {...props}>
                 {children}
               </code>
             )
@@ -115,7 +124,7 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
               return <span>{children}</span>;
             }
             return (
-              <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">
+              <a href={href} target="_blank" rel="noopener noreferrer" className="text-secondary hover:underline font-medium">
                 {children}
               </a>
             )

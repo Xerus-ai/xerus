@@ -3,8 +3,8 @@
 import { useEffect, useRef } from 'react'
 import { MessageBubble } from './MessageBubble'
 import { ChatWelcome } from './ChatWelcome'
-import { Bot } from 'lucide-react'
 import { ThinkingIndicator } from './ThinkingIndicator'
+import { XERUS_AGENT } from './AgentDropdown'
 import { cn } from '@/lib/utils'
 import { Agent, ExecutionState } from './types'
 import type { ChatMessageExtended } from './chat-message.types'
@@ -38,7 +38,7 @@ function AgentAvatarIcon({ agent, size = 28 }: { agent: Agent; size?: number }) 
     return <img src={avatarUrl} alt={agent.name} className="w-full h-full object-cover rounded-full" loading="lazy" />
   }
   return (
-    <span className="w-full h-full flex items-center justify-center bg-primary/10 text-primary text-[10px] font-semibold rounded-full">
+    <span className="w-full h-full flex items-center justify-center bg-secondary/10 text-secondary text-[10px] font-semibold rounded-full">
       {agent.name.substring(0, 2).toUpperCase()}
     </span>
   )
@@ -96,49 +96,57 @@ export function MessageList({
   return (
     <div data-testid="message-list" className={cn('flex-1 overflow-y-auto scrollbar-thin [contain:layout_style]', className)}>
       <div className="max-w-3xl mx-auto pb-4 animate-[fadeInUp_0.4s_ease-out]">
-        {/* Messages */}
+        {/* Messages — pass currentAgent only as hint for messages without their own
+            agentSlug; MessageBubble prefers per-message agent resolution to preserve
+            identity across delegation (Consistency is the UX). */}
         <div className="divide-y divide-surface-active/50">
-          {allMessages.map((message) => (
-            <MessageBubble
-              key={message.id}
-              message={message}
-              agent={
-                message.role === 'assistant' && currentAgent
-                  ? currentAgent
-                  : null
-              }
-              agents={agents}
-              isStreaming={message.isStreaming}
-              onViewExecution={onViewExecution}
-              onOpenWorkspace={onOpenWorkspace}
-            />
-          ))}
+          {allMessages.map((message) => {
+            const messageHasIdentity = !!(message.agentSlug || message.agentName)
+            return (
+              <MessageBubble
+                key={message.id}
+                message={message}
+                agent={
+                  message.role === 'assistant' && !messageHasIdentity && currentAgent
+                    ? currentAgent
+                    : null
+                }
+                agents={agents}
+                isStreaming={message.isStreaming}
+                onViewExecution={onViewExecution}
+                onOpenWorkspace={onOpenWorkspace}
+              />
+            )
+          })}
         </div>
 
-        {/* Thinking indicator — show while waiting for first token */}
-        {isLoading && !streamingTurn && (
-          <div className="px-6 py-5">
-            <div className="flex items-start gap-3">
-              {/* Agent avatar */}
-              <div className="h-9 w-9 shrink-0 mt-0.5 rounded-full overflow-hidden">
-                {currentAgent ? (
-                  <AgentAvatarIcon agent={currentAgent} size={36} />
-                ) : (
-                  <span className="w-full h-full flex items-center justify-center bg-primary/10 text-primary">
-                    <Bot className="h-4.5 w-4.5" />
-                  </span>
-                )}
-              </div>
+        {/* Thinking indicator — show while waiting for first token. Prefer the
+            delegated subagent (from executionState) over currentAgent so the avatar
+            matches the agent actually working. */}
+        {isLoading && !streamingTurn && (() => {
+          const delegatedSlug = executionState?.agents?.[executionState.agents.length - 1]
+          const thinkingAgent =
+            (delegatedSlug && agents?.find((a) => a.slug === delegatedSlug || a.name === delegatedSlug)) ||
+            currentAgent ||
+            XERUS_AGENT
+          return (
+            <div className="px-6 py-5">
+              <div className="flex items-start gap-3">
+                {/* Agent avatar */}
+                <div className="h-9 w-9 shrink-0 mt-0.5 rounded-full overflow-hidden flex items-center justify-center">
+                  <AgentAvatarIcon agent={thinkingAgent} size={36} />
+                </div>
 
-              <div className="flex-1 min-w-0">
-                <span className="text-base font-semibold text-primary block">
-                  {currentAgent?.name || 'Xerus'}
-                </span>
-                <ThinkingIndicator executionState={executionState} />
+                <div className="flex-1 min-w-0">
+                  <span className="text-base font-semibold text-secondary block">
+                    {thinkingAgent.name}
+                  </span>
+                  <ThinkingIndicator executionState={executionState} />
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
 
         {/* Scroll anchor */}
         <div ref={bottomRef} className="h-px" />

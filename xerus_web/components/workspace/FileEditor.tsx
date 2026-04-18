@@ -120,7 +120,7 @@ export function FileEditor({ path, name, size, onDirtyChange, className }: FileE
               setLoading(false)
             })
           }}
-          className="text-sm text-primary font-medium hover:underline"
+          className="text-sm text-secondary font-medium hover:underline"
         >
           Retry
         </button>
@@ -138,20 +138,21 @@ export function FileEditor({ path, name, size, onDirtyChange, className }: FileE
   const showSyntaxViewer = mode === 'view' && !isMd
 
   return (
-    <div className={cn("flex flex-col h-full", className)}>
-
-      {/* Read-only notice — matching agent IDE pattern */}
-      {!isEditable && (
-        <div className="mx-8 mt-6 mb-4 flex items-center gap-3 p-4 bg-primary/5 border border-primary/20 rounded-2xl shrink-0">
-          <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-            <Lock className="w-4 h-4 text-primary" />
-          </div>
-          <span className="text-sm text-text">This file is read-only</span>
-        </div>
-      )}
+    <div className={cn("flex flex-col h-full min-h-0", className)}>
 
       {/* Content area */}
-      <div className="flex-1 overflow-hidden relative">
+      <div className="flex-1 min-h-0 overflow-hidden relative">
+        {/* Read-only label — pure overlay, no card / no background */}
+        {!isEditable && (
+          <div
+            className="absolute top-4 right-6 z-10 inline-flex items-center gap-1.5 text-sm text-text-muted pointer-events-none"
+            aria-label="This file is read-only"
+          >
+            <Lock className="w-3.5 h-3.5" />
+            <span>Read-only</span>
+          </div>
+        )}
+
         {showPreview ? (
           <MarkdownPreview content={content} className="h-full overflow-y-auto" />
         ) : showEditor ? (
@@ -175,65 +176,71 @@ export function FileEditor({ path, name, size, onDirtyChange, className }: FileE
         )}
       </div>
 
-      {/* Footer Toolbar — matching skill editor pattern */}
-      <div className="mx-4 mb-4 mt-2 p-1.5 rounded-[20px] border border-surface-active bg-white flex items-center justify-between shadow-sm shrink-0">
-        {/* Left: Write with AI */}
-        <div className="flex items-center gap-2">
-          <button
-            disabled
-            className="h-9 px-3 rounded-[12px] flex items-center gap-2 text-text-secondary font-medium text-sm opacity-50 cursor-not-allowed"
-          >
-            <Sparkles className="w-4 h-4" />
-            Write with AI
-          </button>
-        </div>
+      {/* Footer Toolbar — overflow-proof layout.
+          Editor lives in a user-resizable panel, so viewport breakpoints can't
+          drive responsiveness. Instead: every fixed-width control is shrink-0,
+          and the word count is the only flex-1/min-w-0/truncate item — when
+          the panel narrows, the word count clips first while every button
+          stays fully visible. */}
+      <div className="mx-3 mb-3 mt-2 p-1 rounded-xl border border-surface-active bg-card flex items-center gap-2 shadow-sm shrink-0">
+        <button
+          disabled
+          aria-label="Write with AI"
+          title="Write with AI (coming soon)"
+          className="h-8 w-8 rounded-lg flex items-center justify-center text-text-secondary opacity-50 cursor-not-allowed shrink-0"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+        </button>
 
-        {/* Center: View/Edit segmented control */}
-        <div className="flex items-center bg-surface rounded-[14px] p-1">
+        <div className="flex items-center bg-surface rounded-[10px] p-0.5 shrink-0">
           <button
             onClick={() => setMode('view')}
             className={cn(
-              'flex items-center gap-2 px-3 py-1.5 rounded-[10px] text-xs font-semibold transition-all',
-              mode === 'view' ? 'bg-white shadow-sm text-text' : 'text-text-secondary hover:text-text',
+              'flex items-center gap-1.5 px-2.5 py-1 rounded-[8px] text-[11px] font-semibold transition-all',
+              mode === 'view' ? 'bg-card shadow-sm text-text' : 'text-text-secondary hover:text-text',
             )}
           >
-            <Eye className="w-3.5 h-3.5" />
+            <Eye className="w-3 h-3" />
             View
           </button>
           {isEditable && (
             <button
               onClick={() => setMode('edit')}
               className={cn(
-                'flex items-center gap-2 px-3 py-1.5 rounded-[10px] text-xs font-semibold transition-all',
-                mode === 'edit' ? 'bg-white shadow-sm text-text' : 'text-text-secondary hover:text-text',
+                'flex items-center gap-1.5 px-2.5 py-1 rounded-[8px] text-[11px] font-semibold transition-all',
+                mode === 'edit' ? 'bg-card shadow-sm text-text' : 'text-text-secondary hover:text-text',
               )}
             >
-              <Pencil className="w-3.5 h-3.5" />
+              <Pencil className="w-3 h-3" />
               Edit
             </button>
           )}
         </div>
 
-        {/* Right: Word count + Save */}
-        <div className="flex items-center gap-3">
-          <span className="text-[11px] text-text-muted font-medium tabular-nums">
-            {wordCount.toLocaleString()}w &middot; {charCount.toLocaleString()}c
-          </span>
-          {isEditable ? (
-            <button
-              onClick={handleSave}
-              disabled={saving || !isDirty}
-              className={cn(
-                'w-9 h-9 rounded-[12px] flex items-center justify-center shadow-md transition-colors',
-                mode === 'edit' && isDirty
-                  ? 'bg-text text-white hover:bg-primary'
-                  : 'bg-surface text-text-secondary cursor-not-allowed',
-              )}
-            >
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowUp className="w-4 h-4" />}
-            </button>
-          ) : null}
-        </div>
+        {/* Spacer that swallows leftover space and clips the count first */}
+        <span
+          className="flex-1 min-w-0 text-right text-[11px] text-text-muted font-medium tabular-nums whitespace-nowrap truncate"
+          title={`${wordCount.toLocaleString()} words · ${charCount.toLocaleString()} characters`}
+        >
+          {wordCount.toLocaleString()}w · {charCount.toLocaleString()}c
+        </span>
+
+        {isEditable && (
+          <button
+            onClick={handleSave}
+            disabled={saving || !isDirty}
+            aria-label={mode === 'edit' && isDirty ? 'Save changes' : 'No changes to save'}
+            title={mode === 'edit' && isDirty ? 'Save (Ctrl/Cmd+S)' : 'No changes to save'}
+            className={cn(
+              'w-8 h-8 rounded-lg flex items-center justify-center shadow-sm transition-colors shrink-0',
+              mode === 'edit' && isDirty
+                ? 'bg-text text-white hover:bg-primary'
+                : 'bg-surface text-text-secondary cursor-not-allowed',
+            )}
+          >
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowUp className="w-3.5 h-3.5" />}
+          </button>
+        )}
       </div>
     </div>
   )

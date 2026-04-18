@@ -89,6 +89,35 @@ async function fetchToolBySlug(toolSlug: string): Promise<Tool> {
   return enrichTools([toolData], accountInfo)[0]
 }
 
+// Bounded concurrency map — keeps the request burst small enough for the
+// backend rate limiter even when a workspace has dozens of tools to look up.
+const TOOL_LOOKUP_CONCURRENCY = 5
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  worker: (item: T) => Promise<R>,
+): Promise<PromiseSettledResult<R>[]> {
+  if (items.length === 0) return []
+  const results: PromiseSettledResult<R>[] = new Array(items.length)
+  let cursor = 0
+
+  const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (true) {
+      const index = cursor++
+      if (index >= items.length) return
+      try {
+        results[index] = { status: 'fulfilled', value: await worker(items[index]) }
+      } catch (reason) {
+        results[index] = { status: 'rejected', reason }
+      }
+    }
+  })
+
+  await Promise.all(runners)
+  return results
+}
+
 async function fetchToolsBySlugs(toolSlugs: string[], accountInfo?: ConnectedAccountInfo): Promise<Tool[]> {
   const uniqueSlugs = Array.from(new Set(toolSlugs.filter(Boolean)))
   if (uniqueSlugs.length === 0) {
@@ -96,7 +125,7 @@ async function fetchToolsBySlugs(toolSlugs: string[], accountInfo?: ConnectedAcc
   }
 
   const resolvedAccountInfo = accountInfo ?? await fetchConnectedAccounts()
-  const results = await Promise.allSettled(uniqueSlugs.map((toolSlug) => getTool(toolSlug)))
+  const results = await mapWithConcurrency(uniqueSlugs, TOOL_LOOKUP_CONCURRENCY, (toolSlug) => getTool(toolSlug))
   const toolsData = results
     .filter((result): result is PromiseFulfilledResult<Record<string, unknown> | null> => result.status === 'fulfilled')
     .map((result) => result.value)
@@ -109,14 +138,20 @@ export function useToolCatalog(limit: number = 24) {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [page, setPage] = useState(1)
 
+  // Memoise so the SWR key reference is stable across renders that don't change selection.
+  const sortedCategories = useMemo(
+    () => [...selectedCategories].sort(),
+    [selectedCategories],
+  )
+
   const { data, isLoading, error: swrError, mutate } = useSWR(
-    ['tool-catalog', page, limit, searchQuery, selectedCategories.join(',')],
+    ['tool-catalog', page, limit, searchQuery, sortedCategories],
     ([, currentPage, currentLimit, currentSearch, currentCategories]) =>
       fetchCatalog({
         page: currentPage as number,
         limit: currentLimit as number,
         searchQuery: currentSearch as string,
-        selectedCategories: currentCategories ? String(currentCategories).split(',').filter(Boolean) : [],
+        selectedCategories: currentCategories as string[],
       })
   )
 
@@ -221,7 +256,7 @@ export function useToolLookup(toolSlugs: string[]) {
   )
 
   const { data, isLoading, error: swrError, mutate } = useSWR(
-    normalizedSlugs.length > 0 ? ['tool-lookup', normalizedSlugs.join(',')] : null,
+    normalizedSlugs.length > 0 ? ['tool-lookup', normalizedSlugs] : null,
     () => fetchToolsBySlugs(normalizedSlugs)
   )
 

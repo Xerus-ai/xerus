@@ -29,7 +29,7 @@ const TOOL_COLOR: Record<ToolCallIcon, string> = {
   search: 'bg-amber-500/10 text-amber-600',
   web: 'bg-cyan-500/10 text-cyan-600',
   think: 'bg-slate-500/10 text-slate-600',
-  agent: 'bg-primary/10 text-primary',
+  agent: 'bg-secondary/10 text-secondary',
   skill: 'bg-purple-500/10 text-purple-600',
   task: 'bg-teal-500/10 text-teal-600',
   question: 'bg-rose-500/10 text-rose-600',
@@ -86,7 +86,7 @@ export function ToolCallCard({ tool }: ToolCallCardProps) {
         </div>
         <span className="text-xs font-medium text-text shrink-0">{tool.name}</span>
         {tool.target && (
-          <span className="text-xs text-primary font-mono truncate min-w-0 flex-1 px-1.5 py-0.5 rounded-md border border-primary/15 bg-primary/5">
+          <span className="text-xs text-secondary font-mono truncate min-w-0 flex-1 px-1.5 py-0.5 rounded-md border border-secondary/15 bg-secondary/5">
             {tool.target}
           </span>
         )}

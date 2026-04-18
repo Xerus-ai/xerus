@@ -284,7 +284,7 @@ export function BehaviourTab({
         {/* HEARTBEAT.md - Card in Card */}
         <div
           className={cn(
-            "bg-surface rounded-[24px] border shadow-sm p-4 cursor-pointer transition-all",
+            "bg-surface rounded-xl border shadow-sm p-4 cursor-pointer transition-all",
             activeSection === 'heartbeat'
               ? 'border-primary/30 ring-1 ring-primary/10'
               : 'border-surface-active'
@@ -356,13 +356,13 @@ export function BehaviourTab({
           variant="clean"
         >
           {({ close, minimize }) => (
-            <div className="bg-white rounded-[32px] h-full w-full flex flex-col p-6 overflow-hidden">
+            <div className="bg-card rounded-2xl h-full w-full flex flex-col p-6 overflow-hidden">
               {/* Header */}
               <div className="flex items-center justify-between mb-4 shrink-0">
                 <div className="flex items-center gap-2">
                   <button
                     onClick={close}
-                    className="p-1.5 bg-[#F5F5F5] hover:bg-[#E5E5E5] rounded-full transition-colors"
+                    className="p-1.5 bg-surface-hover hover:bg-surface-pressed rounded-full transition-colors"
                     aria-label="Close"
                   >
                     <X className="w-4 h-4 text-text" />
@@ -370,7 +370,7 @@ export function BehaviourTab({
                   <button
                     type="button"
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); minimize() }}
-                    className="p-1.5 bg-[#F5F5F5] hover:bg-[#E5E5E5] rounded-full transition-colors"
+                    className="p-1.5 bg-surface-hover hover:bg-surface-pressed rounded-full transition-colors"
                     aria-label="Minimize"
                   >
                     <Minus className="w-4 h-4 text-text" />
@@ -394,20 +394,20 @@ export function BehaviourTab({
                 value={editContent}
                 onChange={(e) => setEditContent(e.target.value)}
                 placeholder={HEARTBEAT_PLACEHOLDER}
-                className="flex-1 w-full resize-none outline-none text-sm text-text bg-transparent leading-relaxed placeholder:text-[#9CA3AF] placeholder:whitespace-pre-wrap font-sans"
+                className="flex-1 w-full resize-none outline-none text-sm text-text bg-transparent leading-relaxed placeholder:text-text-muted placeholder:whitespace-pre-wrap font-sans"
                 autoFocus
                 readOnly={!isEditable || mode === 'view'}
               />
 
               {/* Footer Toolbar */}
-              <div className="mt-6 p-1.5 rounded-[20px] border border-surface-active bg-white flex items-center justify-between shadow-sm shrink-0">
+              <div className="mt-6 p-1.5 rounded-2xl border border-surface-active bg-card flex items-center justify-between shadow-sm shrink-0">
                 <div className="flex items-center gap-2">
                   {isEditable && mode === 'edit' && (
                     <button
                       onClick={handleWriteWithAI}
                       disabled={isFormatting}
                       className={cn(
-                        "h-9 px-3 hover:bg-surface rounded-[12px] flex items-center gap-2 transition-colors text-text font-medium text-sm",
+                        "h-9 px-3 hover:bg-surface rounded-xl flex items-center gap-2 transition-colors text-text font-medium text-sm",
                         isFormatting && "opacity-50 cursor-not-allowed"
                       )}
                       title="Format with AI"
@@ -423,7 +423,7 @@ export function BehaviourTab({
                     onClick={() => setMode('view')}
                     className={cn(
                       "flex items-center gap-2 px-3 py-1.5 rounded-[10px] text-xs font-semibold transition-all",
-                      mode === 'view' ? "bg-white shadow-sm text-text" : "text-text-secondary hover:text-text"
+                      mode === 'view' ? "bg-card shadow-sm text-text" : "text-text-secondary hover:text-text"
                     )}
                   >
                     <Eye className="w-3.5 h-3.5" />
@@ -434,7 +434,7 @@ export function BehaviourTab({
                       onClick={() => setMode('edit')}
                       className={cn(
                         "flex items-center gap-2 px-3 py-1.5 rounded-[10px] text-xs font-semibold transition-all",
-                        mode === 'edit' ? "bg-white shadow-sm text-text" : "text-text-secondary hover:text-text"
+                        mode === 'edit' ? "bg-card shadow-sm text-text" : "text-text-secondary hover:text-text"
                       )}
                     >
                       <Pencil className="w-3.5 h-3.5" />
@@ -449,7 +449,7 @@ export function BehaviourTab({
                       onClick={handleSaveFile}
                       disabled={isSaving}
                       className={cn(
-                        "w-9 h-9 bg-text text-white rounded-[12px] flex items-center justify-center hover:bg-primary transition-colors shadow-md",
+                        "w-9 h-9 bg-text text-white rounded-xl flex items-center justify-center hover:bg-primary transition-colors shadow-md",
                         isSaving && "opacity-50 cursor-not-allowed"
                       )}
                       aria-label="Save"
@@ -463,7 +463,7 @@ export function BehaviourTab({
                   ) : (
                     <button
                       onClick={close}
-                      className="h-9 px-4 bg-surface hover:bg-surface-active rounded-[12px] text-text text-sm font-medium transition-colors"
+                      className="h-9 px-4 bg-surface hover:bg-surface-active rounded-xl text-text text-sm font-medium transition-colors"
                     >
                       Close
                     </button>

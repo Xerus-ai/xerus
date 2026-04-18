@@ -61,29 +61,29 @@ const warmCodeTheme: Record<string, React.CSSProperties> = {
 
 export function MarkdownPreview({ content, className }: MarkdownPreviewProps) {
   return (
-    <div className={cn('px-12 py-10 overflow-y-auto bg-white', className)}>
+    <div className={cn('px-12 py-10 overflow-y-auto bg-card', className)}>
       <article className={cn(
-        'prose prose-base max-w-3xl mx-auto',
-        // Headings
+        'prose prose-base max-w-[65ch] mx-auto',
+        // Headings — serif, clear size steps, tight leading
         'prose-headings:font-serif prose-headings:text-text prose-headings:font-normal',
-        'prose-h1:text-4xl prose-h1:leading-tight prose-h2:text-2xl prose-h2:mt-10 prose-h3:text-xl',
-        // Body
-        'prose-p:text-text prose-p:leading-[1.8]',
+        'prose-h1:text-[2.25rem] prose-h1:leading-[1.1] prose-h1:tracking-tight prose-h2:text-[1.5rem] prose-h2:leading-[1.2] prose-h2:mt-10 prose-h3:text-[1.15rem] prose-h3:leading-[1.3]',
+        // Body — relaxed line-height
+        'prose-p:text-text prose-p:leading-[1.7]',
         'prose-strong:text-text prose-strong:font-semibold',
-        'prose-li:text-text prose-li:leading-[1.8]',
-        // Links
-        'prose-a:text-primary prose-a:no-underline hover:prose-a:underline',
+        'prose-li:text-text prose-li:leading-[1.7]',
+        // Links — orange accent
+        'prose-a:text-secondary prose-a:no-underline hover:prose-a:underline',
         // Inline code — warm bg, no backtick quotes
-        'prose-code:bg-surface-hover prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:text-sm prose-code:font-mono prose-code:text-text',
+        'prose-code:bg-surface-hover prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:text-[13px] prose-code:font-mono prose-code:text-text',
         'prose-code:before:content-none prose-code:after:content-none',
         // Code blocks (pre) — handled by SyntaxHighlighter but fallback styles
-        'prose-pre:bg-surface prose-pre:rounded-xl prose-pre:p-0 prose-pre:my-4 prose-pre:border prose-pre:border-surface-active',
+        'prose-pre:bg-surface prose-pre:rounded-xl prose-pre:p-0 prose-pre:my-5 prose-pre:border prose-pre:border-surface-active',
         // Lists
         'prose-ul:list-disc prose-ol:list-decimal',
         // HR
         'prose-hr:border-surface-active prose-hr:my-8',
-        // Blockquote
-        'prose-blockquote:border-l-primary prose-blockquote:bg-primary/5 prose-blockquote:py-1 prose-blockquote:rounded-r-lg',
+        // Blockquote — subtle bg tint + italic serif, no heavy left border
+        'prose-blockquote:border-l-0 prose-blockquote:not-italic prose-blockquote:bg-surface-hover/60 prose-blockquote:rounded-lg prose-blockquote:px-5 prose-blockquote:py-3 prose-blockquote:text-text-secondary prose-blockquote:italic prose-blockquote:font-serif',
         // Tables
         'prose-table:text-sm [&_th]:bg-surface [&_th]:p-2 [&_td]:p-2 [&_tr]:border-b [&_tr]:border-surface-active',
       )}>

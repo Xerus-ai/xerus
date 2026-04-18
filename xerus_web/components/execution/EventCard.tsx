@@ -152,7 +152,7 @@ function MessageCard({ event }: { event: ExecutionEvent }) {
         isThinking && 'bg-surface-alt border border-surface-active',
         isUser && 'bg-surface border border-surface-active',
         isSubagent && 'bg-accent-subtle border border-accent/20',
-        !isThinking && !isUser && !isSubagent && 'bg-white border border-surface-active'
+        !isThinking && !isUser && !isSubagent && 'bg-card border border-surface-active'
       )}
     >
       <div className="flex items-center gap-2 mb-1">

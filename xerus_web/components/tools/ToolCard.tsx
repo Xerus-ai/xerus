@@ -43,7 +43,7 @@ const ToolCardComponent = ({ tool, onClick, onConnect, onDisconnect, onStartStop
                             )}
                         </div>
                         {/* Status Badge */}
-                        <div className={`absolute bottom-0 left-1/2 -translate-x-1/2 bg-white border border-surface-active px-1.5 py-0.5 rounded text-[9px] font-semibold shadow-sm flex items-center gap-1 whitespace-nowrap z-10 ${
+                        <div className={`absolute bottom-0 left-1/2 -translate-x-1/2 bg-card border border-surface-active px-1.5 py-0.5 rounded text-[9px] font-semibold shadow-sm flex items-center gap-1 whitespace-nowrap z-10 ${
                             isMcp
                                 ? (isRunning ? 'text-text' : 'text-text-secondary')
                                 : tool.requires_auth
@@ -52,10 +52,10 @@ const ToolCardComponent = ({ tool, onClick, onConnect, onDisconnect, onStartStop
                         }`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${
                                 isMcp
-                                    ? (isRunning ? 'bg-green-500' : 'bg-surface-active')
+                                    ? (isRunning ? 'bg-success' : 'bg-surface-active')
                                     : tool.requires_auth
-                                        ? (isConnected ? 'bg-green-500' : 'bg-surface-active')
-                                        : 'bg-green-500'
+                                        ? (isConnected ? 'bg-success' : 'bg-surface-active')
+                                        : 'bg-success'
                             }`}></span>
                             {isMcp
                                 ? (isRunning ? 'Running' : 'Stopped')
@@ -70,7 +70,7 @@ const ToolCardComponent = ({ tool, onClick, onConnect, onDisconnect, onStartStop
 
                 {/* Body */}
                 <div className="mb-4">
-                    <h3 className="font-serif text-lg text-text mb-1 group-hover:text-primary transition-colors line-clamp-1" title={tool.name}>
+                    <h3 className="font-serif text-lg text-text mb-1 group-hover:text-secondary transition-colors line-clamp-1" title={tool.name}>
                         {tool.name}
                     </h3>
                     <p className="text-xs text-text-secondary leading-relaxed line-clamp-2">
@@ -96,7 +96,7 @@ const ToolCardComponent = ({ tool, onClick, onConnect, onDisconnect, onStartStop
                                 e.stopPropagation();
                                 onConnect(e);
                             }}
-                            className="flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white font-medium py-2.5 rounded-xl text-sm shadow-sm transition-all"
+                            className="flex items-center justify-center gap-2 bg-secondary hover:bg-secondary/90 text-white font-medium py-2.5 rounded-xl text-sm shadow-sm transition-all"
                         >
                             Connect
                         </button>
@@ -106,7 +106,7 @@ const ToolCardComponent = ({ tool, onClick, onConnect, onDisconnect, onStartStop
                                 e.stopPropagation();
                                 onDisconnect(e);
                             }}
-                            className="flex items-center justify-center gap-2 bg-black hover:bg-[#1a1a1a] text-white font-medium py-2.5 rounded-xl text-sm transition-colors"
+                            className="flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white font-medium py-2.5 rounded-xl text-sm transition-colors"
                         >
                             Disconnect
                         </button>
@@ -119,8 +119,8 @@ const ToolCardComponent = ({ tool, onClick, onConnect, onDisconnect, onStartStop
                             disabled={isOperating}
                             className={`flex items-center justify-center gap-2 font-medium py-2.5 rounded-xl text-sm transition-all disabled:opacity-50 ${
                                 isRunning
-                                    ? 'bg-primary/10 text-primary hover:bg-primary hover:text-white'
-                                    : 'bg-primary hover:bg-primary/90 text-white shadow-sm'
+                                    ? 'bg-secondary/10 text-secondary hover:bg-primary hover:text-white'
+                                    : 'bg-secondary hover:bg-secondary/90 text-white shadow-sm'
                             }`}
                         >
                             {isOperating ? (

@@ -51,7 +51,7 @@ export function MobileBottomBar() {
                 'transition-colors duration-200',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-lg',
                 isActive
-                  ? 'text-primary'
+                  ? 'text-secondary'
                   : 'text-text-muted hover:text-text-secondary'
               )}
               aria-label={item.name}

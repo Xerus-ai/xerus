@@ -67,7 +67,7 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 min-w-[220px] py-2 bg-white rounded-2xl shadow-2xl border border-surface-active/60 animate-in fade-in zoom-in-95 duration-150"
+      className="fixed z-50 min-w-[220px] py-2 bg-card rounded-2xl shadow-2xl border border-surface-active/60 animate-in fade-in zoom-in-95 duration-150"
       style={{ left: adjustedPos.x, top: adjustedPos.y }}
     >
       {items.map((item, idx) => (
@@ -85,7 +85,7 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
               item.disabled
                 ? 'text-text-muted cursor-not-allowed'
                 : item.variant === 'danger'
-                  ? 'text-red-600 hover:bg-red-50'
+                  ? 'text-destructive hover:bg-destructive/10'
                   : 'text-text hover:bg-surface-hover',
             )}
           >

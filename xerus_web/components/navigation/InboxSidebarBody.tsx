@@ -100,9 +100,9 @@ export function InboxSidebarBody({ counts, markRead, showNewRow, onNewRowDone }:
 
   const newProjectRow = showNewRow ? (
     <div className="mb-1 animate-[fadeInUp_0.15s_ease-out]">
-      <div className="flex items-center gap-2 w-full px-3 py-2 rounded-xl">
+      <div className="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl">
         <ChevronRight className="w-4 h-4 text-text-secondary shrink-0" />
-        <FolderOpen className="w-[18px] h-[18px] text-primary shrink-0" />
+        <FolderOpen className="w-[18px] h-[18px] text-secondary shrink-0" />
         <input
           ref={newRowRef}
           value={newName}
@@ -116,7 +116,7 @@ export function InboxSidebarBody({ counts, markRead, showNewRow, onNewRowDone }:
           disabled={isCreating}
           className="flex-1 bg-transparent border-none outline-none text-sm font-medium text-text placeholder:text-text-muted caret-primary"
         />
-        <span className="text-[10px] text-text-muted bg-surface rounded px-1.5 py-0.5 shrink-0">↵</span>
+        <span className="text-[10px] text-text-muted bg-surface rounded px-1.5 py-0.5 shrink-0">&#8629;</span>
       </div>
     </div>
   ) : null
@@ -135,27 +135,27 @@ export function InboxSidebarBody({ counts, markRead, showNewRow, onNewRowDone }:
         {newProjectRow}
         <div className="opacity-30 pointer-events-none select-none" aria-hidden="true">
           <div className="mb-1">
-            <div className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-sm font-medium text-text">
+            <div className="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-text">
               <ChevronDown className="w-4 h-4 text-text-secondary shrink-0" />
-              <FolderOpen className="w-[18px] h-[18px] text-primary shrink-0" />
+              <FolderOpen className="w-[18px] h-[18px] text-secondary shrink-0" />
               <span className="flex-1 text-left truncate">Product</span>
-              <span className="text-[11px] font-medium text-text-secondary bg-surface-hover rounded-full px-2 py-0.5">3</span>
+              <span className="text-xs font-medium text-text-muted tabular-nums">3</span>
             </div>
-            <div className="pl-6 pr-2 py-0.5 space-y-0.5">
+            <div className="pl-7 pr-2 py-0.5 space-y-0.5">
               {['Onboarding', 'Analytics', 'Design'].map((name) => (
-                <div key={name} className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm text-text-secondary">
-                  <Hash className="w-4 h-4 shrink-0" />
+                <div key={name} className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-text-secondary">
+                  <Hash className="w-[16px] h-[16px] shrink-0" />
                   <span>{name}</span>
                 </div>
               ))}
             </div>
           </div>
           <div className="mb-1">
-            <div className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-sm font-medium text-text">
+            <div className="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-text">
               <ChevronRight className="w-4 h-4 text-text-secondary shrink-0" />
               <Folder className="w-[18px] h-[18px] text-text-secondary shrink-0" />
               <span className="flex-1 text-left truncate">Engineering</span>
-              <span className="text-[11px] font-medium text-text-secondary bg-surface-hover rounded-full px-2 py-0.5">2</span>
+              <span className="text-xs font-medium text-text-muted tabular-nums">2</span>
             </div>
           </div>
         </div>
@@ -172,35 +172,35 @@ export function InboxSidebarBody({ counts, markRead, showNewRow, onNewRowDone }:
           const domainUnread = domain.channels.reduce((sum, ch) => sum + (counts[ch.id] ?? 0), 0)
           return (
             <div key={domain.id} className="mb-1">
-              <button onClick={() => toggleDomain(domain.id)} className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-sm font-medium text-text hover:bg-surface-hover transition-colors group">
+              <button onClick={() => toggleDomain(domain.id)} className="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-text hover:bg-surface-hover transition-colors group">
                 {isExpanded ? <ChevronDown className="w-4 h-4 text-text-secondary shrink-0" /> : <ChevronRight className="w-4 h-4 text-text-secondary shrink-0" />}
-                {isExpanded ? <FolderOpen className="w-[18px] h-[18px] text-primary shrink-0" /> : <Folder className="w-[18px] h-[18px] text-text-secondary shrink-0" />}
+                {isExpanded ? <FolderOpen className="w-[18px] h-[18px] text-secondary shrink-0" /> : <Folder className="w-[18px] h-[18px] text-text-secondary shrink-0" />}
                 <span className="flex-1 text-left truncate">{domain.name}</span>
                 {domainUnread > 0 ? (
-                  <span className="min-w-[18px] h-5 px-1.5 flex items-center justify-center rounded-full bg-primary text-white text-[10px] font-semibold">{domainUnread > 99 ? '99+' : domainUnread}</span>
+                  <span className="min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full bg-secondary/15 text-secondary text-[11px] font-semibold tabular-nums">{domainUnread > 99 ? '99+' : domainUnread}</span>
                 ) : (
-                  <span className="text-[11px] font-medium text-text-secondary bg-surface-hover rounded-full px-2 py-0.5">{domain.channels.length}</span>
+                  <span className="text-xs font-medium text-text-muted tabular-nums">{domain.channels.length}</span>
                 )}
               </button>
               <div className={cn('overflow-hidden transition-all duration-200', isExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0')}>
-                <div className="pl-6 pr-2 py-0.5 space-y-0.5">
+                <div className="pl-7 pr-2 py-0.5 space-y-0.5">
                   {domain.channels.map((channel) => {
                     const isActive = pathname === `/inbox/${domain.slug}/${channel.slug}`
                     const unread = counts[channel.id] ?? 0
                     return (
-                      <Link key={channel.id} href={`/inbox/${domain.slug}/${channel.slug}`} onClick={() => unread > 0 && markRead(channel.id)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm transition-colors', isActive ? 'bg-primary/10 text-primary font-medium' : unread > 0 ? 'text-text font-semibold hover:bg-surface-hover' : 'text-text-secondary hover:bg-surface-hover hover:text-text')}>
-                        <Hash className="w-4 h-4 shrink-0" />
+                      <Link key={channel.id} href={`/inbox/${domain.slug}/${channel.slug}`} onClick={() => unread > 0 && markRead(channel.id)} className={cn('flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-colors', isActive ? 'bg-surface-hover text-text font-medium' : unread > 0 ? 'text-text font-semibold hover:bg-surface-hover' : 'text-text-secondary hover:bg-surface-hover hover:text-text')}>
+                        <Hash className="w-[16px] h-[16px] shrink-0" />
                         <span className="flex-1 truncate">{channel.name}</span>
                         {unread > 0 && !isActive && (
-                          <span className="min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-primary text-white text-[10px] font-semibold">{unread > 99 ? '99+' : unread}</span>
+                          <span className="min-w-[18px] h-5 px-1 flex items-center justify-center rounded-full bg-secondary/15 text-secondary text-[11px] font-medium tabular-nums">{unread > 99 ? '99+' : unread}</span>
                         )}
                       </Link>
                     )
                   })}
                   {creatingChannelFor === domain.slug ? (
                     <div className="animate-[fadeInUp_0.15s_ease-out]">
-                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl">
-                        <Hash className="w-4 h-4 text-primary shrink-0" />
+                      <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl">
+                        <Hash className="w-[16px] h-[16px] text-secondary shrink-0" />
                         <input
                           ref={newChannelRef}
                           value={newChannelName}
@@ -225,10 +225,10 @@ export function InboxSidebarBody({ counts, markRead, showNewRow, onNewRowDone }:
                         }
                         setCreatingChannelFor(domain.slug)
                       }}
-                      className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm text-text-muted hover:text-text-secondary hover:bg-surface-hover transition-colors w-full"
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-text-muted hover:text-secondary hover:bg-secondary/5 transition-colors w-full group"
                       aria-label={`Add channel to ${domain.name}`}
                     >
-                      <Plus className="w-4 h-4 shrink-0" />
+                      <Plus className="w-4 h-4 shrink-0 text-secondary/70 group-hover:text-secondary" />
                       <span>Add channel</span>
                     </button>
                   )}

@@ -203,16 +203,16 @@ export function ChatInput({
         {showPicker && filteredAgents.length > 0 && (
           <div
             ref={pickerRef}
-            className="absolute bottom-full left-0 right-0 mb-2 bg-surface-alt border border-surface-active rounded-2xl shadow-lg overflow-hidden max-h-[240px] overflow-y-auto z-10"
+            className="absolute bottom-full left-0 w-[280px] mb-2 bg-card border border-border rounded-xl shadow-lg backdrop-blur-sm overflow-hidden max-h-[220px] overflow-y-auto z-10"
             role="listbox"
             aria-label="Mention an agent"
           >
-            <div className="px-3 py-2 border-b border-surface-active">
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">
+            <div className="px-3 py-1.5 border-b border-border">
+              <span className="text-[11px] font-medium uppercase tracking-wide text-text-muted">
                 Agents
               </span>
             </div>
-            <div>
+            <div className="p-1">
               {filteredAgents.map((agent, idx) => (
                 <button
                   key={agent.id}
@@ -220,9 +220,9 @@ export function ChatInput({
                   role="option"
                   aria-selected={idx === selectedIdx}
                   className={cn(
-                    'flex items-center gap-3 w-full px-3 py-2 text-left text-sm transition-colors',
+                    'flex items-center gap-2.5 w-full px-2 py-1.5 text-left text-sm rounded-md transition-colors duration-100',
                     idx === selectedIdx
-                      ? 'bg-primary/8 text-primary'
+                      ? 'bg-surface-hover text-text'
                       : 'text-text hover:bg-surface-hover'
                   )}
                   onMouseDown={(e) => {
@@ -231,16 +231,9 @@ export function ChatInput({
                   }}
                   onMouseEnter={() => setSelectedIdx(idx)}
                 >
-                  <div
-                    className={cn(
-                      'w-7 h-7 rounded-xl overflow-hidden shrink-0 flex items-center justify-center',
-                      idx === selectedIdx
-                        ? 'bg-primary/15 text-primary'
-                        : 'bg-surface-alt text-text-secondary'
-                    )}
-                  >
+                  <div className="w-6 h-6 rounded-lg overflow-hidden shrink-0 flex items-center justify-center bg-surface-hover text-text-secondary">
                     {isMascotConfig(agent.avatarUrl) ? (
-                      <MascotAvatar config={agent.avatarUrl!} size={28} className="w-full h-full" alt={agent.name} />
+                      <MascotAvatar config={agent.avatarUrl!} size={24} className="w-full h-full" alt={agent.name} />
                     ) : agent.avatarUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={agent.avatarUrl} alt={agent.name} className="w-full h-full object-cover" />
@@ -248,12 +241,7 @@ export function ChatInput({
                       <Bot className="w-3.5 h-3.5" />
                     )}
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="font-medium truncate">{agent.name}</div>
-                    {agent.domain && (
-                      <div className="text-[11px] text-text-muted truncate">{agent.domain}</div>
-                    )}
-                  </div>
+                  <span className="font-medium truncate">{agent.name}</span>
                 </button>
               ))}
             </div>
@@ -263,10 +251,10 @@ export function ChatInput({
         {/* Composer Card */}
         <div
           className={cn(
-            'rounded-2xl border bg-white dark:bg-white/95 transition-all duration-200',
+            'rounded-2xl border bg-card transition-all duration-150',
             focused
-              ? 'border-primary/40 shadow-[0_2px_12px_rgba(255,102,0,0.08)]'
-              : 'border-surface-active shadow-sm hover:shadow-md hover:border-surface-hover'
+              ? 'border-primary/30 shadow-sm'
+              : 'border-border shadow-sm hover:border-border/80'
           )}
         >
           {/* Textarea */}
@@ -317,7 +305,7 @@ export function ChatInput({
                 aria-label="Mention an agent"
                 className={cn(
                   'p-1.5 rounded-lg text-text-muted transition-colors',
-                  'hover:text-primary hover:bg-primary/8',
+                  'hover:text-secondary hover:bg-secondary/8',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
                   'disabled:opacity-40 disabled:cursor-not-allowed'
                 )}
@@ -351,8 +339,8 @@ export function ChatInput({
                     'p-1.5 rounded-lg transition-colors',
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
                     isTerminalOpen
-                      ? 'text-primary bg-primary/8'
-                      : 'text-text-muted hover:text-primary hover:bg-primary/8',
+                      ? 'text-secondary bg-secondary/8'
+                      : 'text-text-muted hover:text-secondary hover:bg-secondary/8',
                     isTerminalLoading && 'opacity-40 cursor-not-allowed'
                   )}
                 >
@@ -371,8 +359,8 @@ export function ChatInput({
                     'p-1.5 rounded-lg transition-colors',
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
                     isBrowserOpen
-                      ? 'text-primary bg-primary/8'
-                      : 'text-text-muted hover:text-primary hover:bg-primary/8',
+                      ? 'text-secondary bg-secondary/8'
+                      : 'text-text-muted hover:text-secondary hover:bg-secondary/8',
                     isBrowserLoading && 'opacity-40 cursor-not-allowed'
                   )}
                 >

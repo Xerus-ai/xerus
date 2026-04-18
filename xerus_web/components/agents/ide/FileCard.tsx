@@ -63,11 +63,11 @@ export function FileCard({
         <div className="flex items-center gap-2.5">
           <div className={cn(
             'w-8 h-8 rounded-lg flex items-center justify-center',
-            isMissing ? 'bg-surface-hover/50' : 'bg-primary/5 group-hover:bg-primary/10'
+            isMissing ? 'bg-surface-hover/50' : 'bg-muted group-hover:bg-muted'
           )}>
             <FileText className={cn(
               'w-4 h-4',
-              isMissing ? 'text-text-secondary/50' : 'text-primary'
+              isMissing ? 'text-text-secondary/50' : 'text-secondary'
             )} />
           </div>
           <div>

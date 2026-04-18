@@ -1,6 +1,7 @@
 import './globals.css'
 import type { Metadata, Viewport } from 'next'
 import { Playfair_Display } from 'next/font/google'
+import { ThemeProvider } from '@/components/ThemeProvider'
 import AppLayout from '@/components/layout/AppLayout'
 import { NotificationProvider } from '@/components/ui/NotificationProvider'
 
@@ -14,7 +15,7 @@ const playfair = Playfair_Display({
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: '#FF6600',
+  themeColor: '#f2f1ed',
 }
 
 export const metadata: Metadata = {
@@ -45,12 +46,14 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={playfair.variable}>
+    <html lang="en" className={playfair.variable} suppressHydrationWarning>
       <body>
-        <AppLayout>
-          {children}
-        </AppLayout>
-        <NotificationProvider />
+        <ThemeProvider>
+          <AppLayout>
+            {children}
+          </AppLayout>
+          <NotificationProvider />
+        </ThemeProvider>
       </body>
     </html>
   )

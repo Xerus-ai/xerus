@@ -27,19 +27,19 @@ export function ChatRightPanel({
 }: ChatRightPanelProps) {
   const expanded = !isWorkspaceCollapsed
 
+  // Animate via grid-template-columns instead of width to avoid layout thrash.
+  // Outer grid transitions its column size; inner panel lives in that column at 100%.
   return (
     <div
       data-testid="chat-right-panel"
       className={cn(
-        'hidden md:flex flex-col shrink-0 overflow-hidden',
-        'h-full',
-        'transition-all duration-200 ease-in-out',
-        expanded
-          ? 'w-[300px] bg-surface-alt/80 backdrop-blur-sm'
-          : 'w-[140px]',
+        'hidden md:grid shrink-0 overflow-hidden h-full',
+        'transition-[grid-template-columns] duration-200 ease-out',
+        expanded ? 'bg-surface-alt/80 backdrop-blur-sm' : '',
         className,
       )}
-    >
+      style={{ gridTemplateColumns: expanded ? '300px' : '140px' }}
+    ><div className="flex flex-col h-full w-full overflow-hidden">
       {/* Top row — workspace button + collapse icon */}
       <div className={cn(
         'flex items-center pt-4 pb-2.5 shrink-0',
@@ -88,6 +88,7 @@ export function ChatRightPanel({
           />
         </div>
       )}
+      </div>
     </div>
   )
 }

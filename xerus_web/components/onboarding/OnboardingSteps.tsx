@@ -211,7 +211,7 @@ export function OnboardingSteps({ workspace, agents, onComplete }: OnboardingSte
         <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-8 select-none">
           Office Setup
         </p>
-        <nav className="space-y-2">
+        <nav className="space-y-2 stagger-in">
           {PROGRESS_STEPS.map((step, idx) => {
             const isDone = idx <= completedPhase || done
             const isActive = !done && idx === activePhase
@@ -221,7 +221,7 @@ export function OnboardingSteps({ workspace, agents, onComplete }: OnboardingSte
               <div
                 key={step.label}
                 className={`flex items-start gap-3.5 px-3.5 py-3 rounded-2xl transition-all duration-200 ${
-                  isActive ? 'bg-primary/5' : ''
+                  isActive ? 'bg-secondary/5' : ''
                 }`}
               >
                 {isDone ? (
@@ -229,13 +229,13 @@ export function OnboardingSteps({ workspace, agents, onComplete }: OnboardingSte
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                    className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5"
+                    className="w-8 h-8 rounded-full bg-secondary/10 flex items-center justify-center shrink-0 mt-0.5"
                   >
-                    <Check className="w-4 h-4 text-primary" />
+                    <Check className="w-4 h-4 text-secondary" />
                   </motion.div>
                 ) : isActive ? (
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                    <Loader2 className="w-4 h-4 text-primary animate-spin" />
+                  <div className="w-8 h-8 rounded-full bg-secondary/10 flex items-center justify-center shrink-0 mt-0.5">
+                    <Loader2 className="w-4 h-4 text-secondary animate-spin" />
                   </div>
                 ) : (
                   <div className="w-8 h-8 rounded-full bg-surface-hover flex items-center justify-center shrink-0 mt-0.5">
@@ -246,7 +246,7 @@ export function OnboardingSteps({ workspace, agents, onComplete }: OnboardingSte
                 <div className="min-w-0 pt-0.5">
                   <span className={`text-base font-semibold leading-tight transition-colors duration-200 block ${
                     isDone ? 'text-text-secondary' :
-                    isActive ? 'text-primary' :
+                    isActive ? 'text-secondary' :
                     'text-text-muted'
                   }`}>
                     {step.label}
@@ -267,13 +267,13 @@ export function OnboardingSteps({ workspace, agents, onComplete }: OnboardingSte
           {PROGRESS_STEPS.map((step, idx) => (
             <div key={step.label} className="flex items-center gap-3">
               <div className={`w-2 h-2 rounded-full transition-colors duration-200 ${
-                (idx <= completedPhase || done) ? 'bg-primary' :
-                (!done && idx === activePhase) ? 'bg-primary/50' :
+                (idx <= completedPhase || done) ? 'bg-secondary' :
+                (!done && idx === activePhase) ? 'bg-secondary/50' :
                 'bg-surface-active'
               }`} />
               {idx < PROGRESS_STEPS.length - 1 && (
                 <div className={`w-4 h-px ${
-                  (done || completedPhase >= idx + 1) ? 'bg-primary/30' : 'bg-surface-active'
+                  (done || completedPhase >= idx + 1) ? 'bg-secondary/30' : 'bg-surface-active'
                 }`} />
               )}
             </div>
@@ -291,16 +291,16 @@ export function OnboardingSteps({ workspace, agents, onComplete }: OnboardingSte
             /* ── Completion ── */
             <motion.div
               key="complete"
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4 }}
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }}
               className="flex flex-col items-center text-center py-16"
             >
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.2 }}
-                className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-6"
+                className="w-16 h-16 rounded-full bg-secondary/10 flex items-center justify-center mb-6"
               >
                 <Image src="/logo/xerus.svg" alt="Xerus" width={36} height={36} />
               </motion.div>
@@ -338,7 +338,7 @@ export function OnboardingSteps({ workspace, agents, onComplete }: OnboardingSte
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 1, type: 'spring', stiffness: 200, damping: 20 }}
                 onClick={onComplete}
-                className="mt-8 w-full max-w-xs px-8 py-4 rounded-2xl bg-[#2D2D2D] hover:bg-[#1a1a1a] text-white text-base font-medium transition-all duration-200 flex items-center justify-center gap-2.5 active:scale-[0.98] shadow-sm hover:shadow-md"
+                className="mt-8 w-full max-w-xs px-8 py-4 rounded-2xl bg-text hover:bg-text/90 text-white text-base font-medium transition-all duration-200 flex items-center justify-center gap-2.5 active:scale-[0.98] shadow-sm hover:shadow-md"
               >
                 Enter your office
                 <ArrowRight className="w-4 h-4" />
@@ -409,14 +409,14 @@ export function OnboardingSteps({ workspace, agents, onComplete }: OnboardingSte
               </motion.div>
 
               {/* Row 2: Two bento cards — Apps Mosaic + Skills Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 stagger-in">
 
                 {/* ── Apps Mosaic ── */}
                 <motion.div
                   initial={{ opacity: 0, y: 18 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.35, duration: 0.5 }}
-                  className="rounded-[24px] bg-surface p-6 shadow-sm border border-surface-active/30"
+                  className="rounded-3xl bg-surface p-6 shadow-sm border border-surface-active/30"
                 >
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-5 select-none">
                     Connected Apps
@@ -457,7 +457,7 @@ export function OnboardingSteps({ workspace, agents, onComplete }: OnboardingSte
                   initial={{ opacity: 0, y: 18 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.4, duration: 0.5 }}
-                  className="rounded-[24px] bg-surface p-6 shadow-sm border border-surface-active/30"
+                  className="rounded-3xl bg-surface p-6 shadow-sm border border-surface-active/30"
                 >
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-5 select-none">
                     Skills
@@ -474,8 +474,8 @@ export function OnboardingSteps({ workspace, agents, onComplete }: OnboardingSte
                           transition={{ delay: 0.5 + i * 0.07 }}
                           className="rounded-xl bg-surface-alt/60 border border-surface-active/20 p-3.5 flex flex-col gap-2.5"
                         >
-                          <div className="w-9 h-9 rounded-lg bg-primary/8 flex items-center justify-center">
-                            <Icon className="w-[18px] h-[18px] text-primary" />
+                          <div className="w-9 h-9 rounded-lg bg-secondary/8 flex items-center justify-center">
+                            <Icon className="w-[18px] h-[18px] text-secondary" />
                           </div>
                           <div>
                             <div className="text-[13px] font-semibold text-text leading-tight">{skill.name}</div>
@@ -518,7 +518,7 @@ export function OnboardingSteps({ workspace, agents, onComplete }: OnboardingSte
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.15, duration: 0.45 }}
-                  className="lg:col-span-2 rounded-[24px] bg-surface p-5 shadow-sm border border-surface-active/30 flex flex-col"
+                  className="lg:col-span-2 rounded-3xl bg-surface p-5 shadow-sm border border-surface-active/30 flex flex-col"
                 >
                   {/* Channel tabs */}
                   <div className="flex items-center gap-1.5 mb-4">
@@ -527,7 +527,7 @@ export function OnboardingSteps({ workspace, agents, onComplete }: OnboardingSte
                         key={ch.name}
                         className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                           ch.active
-                            ? 'bg-primary/8 text-primary'
+                            ? 'bg-secondary/8 text-secondary'
                             : 'text-text-muted hover:text-text-secondary'
                         }`}
                       >
@@ -570,7 +570,7 @@ export function OnboardingSteps({ workspace, agents, onComplete }: OnboardingSte
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.6 }}
-                      className="border-l-[3px] border-l-amber-400 bg-amber-50/40 rounded-r-xl pl-3 pr-3 py-2.5"
+                      className="border border-amber-400/30 bg-amber-50/40 rounded-xl px-3 py-2.5"
                     >
                       <div className="flex items-center gap-1.5 mb-1">
                         <AlertTriangle className="w-3 h-3 text-amber-600" />
@@ -592,7 +592,7 @@ export function OnboardingSteps({ workspace, agents, onComplete }: OnboardingSte
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.25, duration: 0.45 }}
-                  className="lg:col-span-3 rounded-[24px] bg-surface p-5 shadow-sm border border-surface-active/30"
+                  className="lg:col-span-3 rounded-3xl bg-surface p-5 shadow-sm border border-surface-active/30"
                 >
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-4 select-none">
                     Task Board

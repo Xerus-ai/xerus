@@ -48,17 +48,50 @@ function parseLabels(raw: string | null): Array<{ name: string; color: string }>
     if (!Array.isArray(parsed)) {
         throw new Error(`Expected labels to be an array, got ${typeof parsed}`);
     }
-    return parsed;
+    // Tasks are persisted with labels as string[] (see task-workspace-db.service.ts
+    // createTask/updateTask — labels are JSON.stringify'd string arrays). The REST
+    // contract advertises Array<{name, color}>, so normalize here instead of
+    // letting raw strings leak out and crash consumers on label.name.toLowerCase().
+    return parsed.map((item) => {
+        if (typeof item === 'string') {
+            return { name: item, color: '' };
+        }
+        if (item && typeof item === 'object') {
+            const obj = item as { name?: unknown; color?: unknown };
+            if (typeof obj.name === 'string') {
+                return { name: obj.name, color: typeof obj.color === 'string' ? obj.color : '' };
+            }
+        }
+        throw new Error(`Invalid label entry: ${JSON.stringify(item)}`);
+    });
+}
+
+function extractAvatarUrl(config: string | null): string | null {
+    if (!config) return null;
+    try {
+        const parsed = JSON.parse(config) as Record<string, unknown>;
+        const mascot = typeof parsed.mascot === 'string' ? parsed.mascot : null;
+        const avatar = typeof parsed.avatar_url === 'string' ? parsed.avatar_url : null;
+        return mascot || avatar;
+    } catch {
+        return null;
+    }
 }
 
 function formatTask(row: WorkspaceTaskRow, agentMap: Map<string, WorkspaceAgentRow>) {
-    const assignedAgents: Array<{ id: string; name: string; slug: string; status: string }> = [];
+    const assignedAgents: Array<{ id: string; name: string; slug: string; status: string; avatar_url: string | null }> = [];
     if (row.assigned_agent) {
         const agent = agentMap.get(row.assigned_agent);
         assignedAgents.push(
             agent
-                ? { id: agent.slug, name: agent.name, slug: agent.slug, status: agent.status }
-                : { id: row.assigned_agent, name: row.assigned_agent, slug: row.assigned_agent, status: 'idle' },
+                ? {
+                    id: agent.slug,
+                    name: agent.name,
+                    slug: agent.slug,
+                    status: agent.status,
+                    avatar_url: extractAvatarUrl(agent.config),
+                }
+                : { id: row.assigned_agent, name: row.assigned_agent, slug: row.assigned_agent, status: 'idle', avatar_url: null },
         );
     }
 

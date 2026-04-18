@@ -153,7 +153,7 @@ export function FileCard({
   return (
     <div
       className={cn(
-        'bg-white border border-surface-active rounded-[24px] overflow-hidden',
+        'bg-card border border-surface-active rounded-xl overflow-hidden',
         className
       )}
     >

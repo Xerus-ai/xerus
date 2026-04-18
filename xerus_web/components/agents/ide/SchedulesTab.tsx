@@ -77,7 +77,7 @@ export function SchedulesTab({
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <Calendar className="w-6 h-6 text-primary" />
+                    <Calendar className="w-6 h-6 text-secondary" />
                     <h2 className="text-2xl font-serif text-text">Schedules</h2>
                     <span className="text-sm text-text-secondary bg-surface px-3 py-1 rounded-full">
                         {schedules.length} {schedules.length === 1 ? 'schedule' : 'schedules'}
@@ -85,7 +85,7 @@ export function SchedulesTab({
                 </div>
                 <Button
                     onClick={() => setIsCreateOpen(true)}
-                    className="bg-text text-white hover:bg-[#1a1a1a] rounded-xl px-4 py-2 flex items-center gap-2"
+                    className="bg-text text-white hover:bg-text/90 rounded-xl px-4 py-2 flex items-center gap-2"
                 >
                     <Plus className="w-4 h-4" />
                     Create Schedule
@@ -93,7 +93,7 @@ export function SchedulesTab({
             </div>
 
             {/* Schedules List */}
-            <div className="bg-surface rounded-[24px] border border-surface-active shadow-sm p-6">
+            <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-6">
                 {schedules.length > 0 ? (
                     <div className="space-y-4">
                         {schedules.map((schedule, i) => (
@@ -115,7 +115,7 @@ export function SchedulesTab({
                                                 <h4 className="font-medium text-text">
                                                     {schedule.name || 'Unnamed Schedule'}
                                                 </h4>
-                                                <span className={`text-xs px-2 py-0.5 rounded-full ${schedule.enabled ? 'bg-green-100 text-green-700' : 'bg-surface-hover text-text-secondary'}`}>
+                                                <span className={`text-xs px-2 py-0.5 rounded-full ${schedule.enabled ? 'bg-success/15 text-success' : 'bg-surface-hover text-text-secondary'}`}>
                                                     {schedule.enabled ? 'Active' : 'Paused'}
                                                 </span>
                                             </div>
@@ -159,7 +159,7 @@ export function SchedulesTab({
                                         <Button
                                             variant="ghost"
                                             size="sm"
-                                            className="h-8 w-8 p-0 hover:bg-red-50 rounded-lg"
+                                            className="h-8 w-8 p-0 hover:bg-destructive/10 rounded-lg"
                                             onClick={() => onDelete(schedule.id)}
                                             aria-label="Delete schedule"
                                         >
@@ -179,7 +179,7 @@ export function SchedulesTab({
                         <p className="text-text-secondary mb-6">Create a schedule to run your agent automatically.</p>
                         <Button
                             onClick={() => setIsCreateOpen(true)}
-                            className="px-6 py-2.5 rounded-full bg-text text-white hover:bg-[#1a1a1a] transition-colors text-sm font-medium inline-flex items-center gap-2 h-auto"
+                            className="px-6 py-2.5 rounded-full bg-text text-white hover:bg-text/90 transition-colors text-sm font-medium inline-flex items-center gap-2 h-auto"
                         >
                             <Plus className="w-4 h-4" />
                             Create Schedule
@@ -199,19 +199,19 @@ export function SchedulesTab({
                 variant="clean"
             >
                 {({ close, minimize }) => (
-                    <div className="bg-white rounded-[32px] h-full w-full flex flex-col p-6 overflow-hidden">
+                    <div className="bg-card rounded-2xl h-full w-full flex flex-col p-6 overflow-hidden">
                         <div className="flex items-center justify-between mb-4 shrink-0">
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={close}
-                                    className="p-1.5 bg-[#F5F5F5] hover:bg-[#E5E5E5] rounded-full transition-colors"
+                                    className="p-1.5 bg-surface-hover hover:bg-surface-pressed rounded-full transition-colors"
                                     aria-label="Close"
                                 >
                                     <X className="w-4 h-4 text-text" />
                                 </button>
                                 <button
                                     onClick={minimize}
-                                    className="p-1.5 bg-[#F5F5F5] hover:bg-[#E5E5E5] rounded-full transition-colors"
+                                    className="p-1.5 bg-surface-hover hover:bg-surface-pressed rounded-full transition-colors"
                                     aria-label="Minimize"
                                 >
                                     <Minus className="w-4 h-4 text-text" />
@@ -246,19 +246,19 @@ export function SchedulesTab({
                 variant="clean"
             >
                 {({ close, minimize }) => (
-                    <div className="bg-white rounded-[32px] h-full w-full flex flex-col p-6 overflow-hidden">
+                    <div className="bg-card rounded-2xl h-full w-full flex flex-col p-6 overflow-hidden">
                         <div className="flex items-center justify-between mb-4 shrink-0">
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={close}
-                                    className="p-1.5 bg-[#F5F5F5] hover:bg-[#E5E5E5] rounded-full transition-colors"
+                                    className="p-1.5 bg-surface-hover hover:bg-surface-pressed rounded-full transition-colors"
                                     aria-label="Close"
                                 >
                                     <X className="w-4 h-4 text-text" />
                                 </button>
                                 <button
                                     onClick={minimize}
-                                    className="p-1.5 bg-[#F5F5F5] hover:bg-[#E5E5E5] rounded-full transition-colors"
+                                    className="p-1.5 bg-surface-hover hover:bg-surface-pressed rounded-full transition-colors"
                                     aria-label="Minimize"
                                 >
                                     <Minus className="w-4 h-4 text-text" />
@@ -277,7 +277,7 @@ export function SchedulesTab({
                                 <div>
                                     <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Status</label>
                                     <p className="mt-1">
-                                        <span className={`inline-flex items-center gap-1.5 text-sm px-3 py-1 rounded-full ${selectedSchedule.enabled ? 'bg-green-100 text-green-700' : 'bg-surface-hover text-text-secondary'}`}>
+                                        <span className={`inline-flex items-center gap-1.5 text-sm px-3 py-1 rounded-full ${selectedSchedule.enabled ? 'bg-success/15 text-success' : 'bg-surface-hover text-text-secondary'}`}>
                                             {selectedSchedule.enabled ? <Check className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
                                             {selectedSchedule.enabled ? 'Active' : 'Paused'}
                                         </span>
@@ -315,7 +315,7 @@ export function SchedulesTab({
                                     </Button>
                                     <Button
                                         variant="ghost"
-                                        className="h-10 px-4 bg-red-50 hover:bg-red-100 rounded-xl text-red-600"
+                                        className="h-10 px-4 bg-destructive/10 hover:bg-destructive/15 rounded-xl text-destructive"
                                         onClick={() => {
                                             onDelete(selectedSchedule.id)
                                             setSelectedSchedule(null)

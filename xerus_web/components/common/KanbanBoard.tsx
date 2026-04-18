@@ -46,17 +46,17 @@ interface KanbanBoardProps {
 }
 
 const DEFAULT_COLUMNS: KanbanColumn[] = [
-  { id: 'todo', title: 'Todo', color: '#6B7280' },
-  { id: 'in_progress', title: 'In Progress', color: '#3B82F6' },
-  { id: 'done', title: 'Completed', color: '#22C55E' },
-  { id: 'needs_approval', title: 'Needs Approval', color: '#F59E0B' },
+  { id: 'todo', title: 'Todo', color: '#9ca3af' },
+  { id: 'in_progress', title: 'In Progress', color: '#3b82f6' },
+  { id: 'done', title: 'Completed', color: '#1f8a65' },
+  { id: 'needs_approval', title: 'Needs Approval', color: '#f59e0b' },
 ]
 
 const COLUMN_BG: Record<string, string> = {
-  todo: 'bg-[#FDF8F3]',
-  in_progress: 'bg-[#FDF8F3]',
-  done: 'bg-[#FDF8F3]',
-  needs_approval: 'bg-[#FDF8F3]',
+  todo: 'bg-surface',
+  in_progress: 'bg-surface',
+  done: 'bg-surface',
+  needs_approval: 'bg-surface',
 }
 
 // --- Sortable Task Item ---
@@ -129,7 +129,7 @@ function DroppableColumn({
   return (
     <div
       className={cn(
-        'flex flex-col rounded-2xl border border-surface-active/40',
+        'flex flex-col rounded-2xl border border-border',
         bgClass
       )}
     >
@@ -161,7 +161,7 @@ function DroppableColumn({
         ref={setNodeRef}
         className={cn(
           'flex-1 px-3 pb-3 space-y-2.5 min-h-[80px] transition-colors duration-200',
-          isOver && 'bg-[#FFF4E6]/40'
+          isOver && 'bg-primary/5'
         )}
       >
         <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
@@ -289,16 +289,27 @@ export function KanbanBoard({
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        <div className="grid grid-cols-4 gap-4">
+        <div
+          className={cn(
+            'gap-4',
+            // Mobile/tablet: horizontal scroll with snap, desktop: 4-col grid
+            'flex overflow-x-auto snap-x snap-mandatory scrollbar-none -mx-4 px-4 pb-2',
+            'lg:grid lg:grid-cols-4 lg:overflow-visible lg:snap-none lg:mx-0 lg:px-0 lg:pb-0',
+          )}
+        >
           {columns.map((column) => (
-            <DroppableColumn
+            <div
               key={column.id}
-              column={column}
-              tasks={tasksByColumn[column.id] || []}
-              onTaskClick={onTaskClick}
-              onColumnAdd={onColumnAdd}
-              renderCard={renderCard}
-            />
+              className="snap-start shrink-0 w-[calc(85vw-1rem)] max-w-[320px] lg:w-auto lg:max-w-none"
+            >
+              <DroppableColumn
+                column={column}
+                tasks={tasksByColumn[column.id] || []}
+                onTaskClick={onTaskClick}
+                onColumnAdd={onColumnAdd}
+                renderCard={renderCard}
+              />
+            </div>
           ))}
         </div>
 

@@ -77,10 +77,10 @@ export function MemoryTab({ agent }: MemoryTabProps) {
         return (
             <div className="space-y-6">
                 <div className="flex items-center gap-3">
-                    <Brain className="w-6 h-6 text-primary" />
+                    <Brain className="w-6 h-6 text-secondary" />
                     <h2 className="text-2xl font-serif text-text">Agent Memory</h2>
                 </div>
-                <div className="bg-surface p-6 rounded-[24px] border border-surface-active shadow-sm">
+                <div className="bg-surface p-6 rounded-3xl border border-surface-active shadow-sm">
                     <div className="space-y-4">
                         {[1, 2, 3].map(i => (
                             <div key={i} className="animate-pulse space-y-2">
@@ -100,7 +100,7 @@ export function MemoryTab({ agent }: MemoryTabProps) {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <Brain className="w-6 h-6 text-primary" />
+                    <Brain className="w-6 h-6 text-secondary" />
                     <h2 className="text-2xl font-serif text-text">Agent Memory</h2>
                     <span className="text-sm text-text-secondary bg-surface px-3 py-1 rounded-full">
                         {memories.length} {memories.length === 1 ? 'entry' : 'entries'}
@@ -108,14 +108,14 @@ export function MemoryTab({ agent }: MemoryTabProps) {
                 </div>
 
                 {/* Filter Pills */}
-                <div className="flex items-center bg-surface rounded-[12px] p-1 border border-surface-active">
+                <div className="flex items-center bg-surface rounded-xl p-1 border border-surface-active">
                     {MEMORY_FILTERS.map(f => (
                         <button
                             key={f.value}
                             onClick={() => setActiveFilter(f.value)}
-                            className={`px-4 py-1.5 rounded-[8px] text-sm font-medium transition-all ${
+                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
                                 activeFilter === f.value
-                                    ? 'bg-white text-text shadow-sm'
+                                    ? 'bg-card text-text shadow-sm'
                                     : 'text-text-secondary hover:text-text'
                             }`}
                         >
@@ -126,7 +126,7 @@ export function MemoryTab({ agent }: MemoryTabProps) {
             </div>
 
             {/* Content */}
-            <div className="bg-surface p-6 rounded-[24px] border border-surface-active shadow-sm">
+            <div className="bg-surface p-6 rounded-3xl border border-surface-active shadow-sm">
                 {filteredMemories.length > 0 ? (
                     <div className="space-y-6">
                         {Object.entries(groupedMemories).map(([type, entries]) => (
@@ -138,7 +138,7 @@ export function MemoryTab({ agent }: MemoryTabProps) {
                                     {entries.map(entry => (
                                         <div
                                             key={entry.id}
-                                            className="p-3 bg-white rounded-xl border border-surface-active/60"
+                                            className="p-3 bg-card rounded-xl border border-surface-active/60"
                                         >
                                             {entry.filePath && (
                                                 <p className="text-xs text-text-muted font-mono mb-1 truncate">
