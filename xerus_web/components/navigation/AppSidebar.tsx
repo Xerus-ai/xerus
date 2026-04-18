@@ -77,7 +77,7 @@ export function AppSidebar() {
             return (
               <Tooltip key={tab.name}>
                 <TooltipTrigger asChild>
-                  <Link href={tab.href} className={cn('relative flex items-center justify-center w-9 h-9 rounded-xl transition-colors', active ? 'bg-surface-hover text-text' : 'text-text-muted hover:bg-surface-hover hover:text-text')} aria-label={tab.name} aria-current={active ? 'page' : undefined}>
+                  <Link href={tab.href} className={cn('relative flex items-center justify-center w-9 h-9 rounded-xl transition-colors', active ? 'bg-secondary/10 text-secondary' : 'text-text-muted hover:bg-surface-hover hover:text-text')} aria-label={tab.name} aria-current={active ? 'page' : undefined}>
                     <tab.icon className="w-[18px] h-[18px]" />
                     {tab.name === 'Inbox' && totalUnread > 0 && (
                       <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-0.5 flex items-center justify-center rounded-full bg-secondary text-white text-[9px] font-semibold tabular-nums">{totalUnread > 99 ? '99+' : totalUnread}</span>
@@ -122,7 +122,7 @@ export function AppSidebar() {
               href={tab.href}
               className={cn(
                 'relative flex items-center gap-2 rounded-lg transition-all duration-150',
-                active ? 'bg-surface-hover text-text px-3 py-2 font-medium' : 'text-text-muted hover:bg-surface-hover/60 hover:text-text p-2'
+                active ? 'bg-secondary/10 text-secondary px-3 py-2 font-medium' : 'text-text-muted hover:bg-surface-hover/60 hover:text-text p-2'
               )}
               aria-current={active ? 'page' : undefined}
               aria-label={tab.name}
@@ -139,7 +139,7 @@ export function AppSidebar() {
         {activeTab === 'inbox' && (
           <button
             onClick={() => setShowNewProjectRow(true)}
-            className="ml-auto p-1.5 rounded-lg hover:bg-surface-hover text-text-muted hover:text-text transition-colors"
+            className="ml-auto p-1.5 rounded-lg text-secondary hover:bg-secondary/10 hover:text-secondary transition-colors"
             title="Create project"
           >
             <Plus className="w-4 h-4" />
@@ -173,7 +173,7 @@ export function AppSidebar() {
             href="/settings"
             className={cn(
               'flex items-center justify-center w-8 h-8 rounded-lg shrink-0 transition-colors',
-              pathname.startsWith('/settings') ? 'bg-surface-hover text-text' : 'text-text-muted hover:bg-surface-hover hover:text-text'
+              pathname.startsWith('/settings') ? 'bg-secondary/10 text-secondary' : 'text-text-muted hover:bg-surface-hover hover:text-text'
             )}
             aria-label="Settings"
           >
@@ -237,13 +237,13 @@ function HomeSidebarBody({ activeSection, isOnWorkspace, onSectionClick, onPathC
                 onClick={() => onSectionClick(item.id)}
                 className={cn(
                   'flex items-center w-full gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150',
-                  active ? 'bg-surface-hover text-text font-medium' : 'text-text-secondary hover:bg-surface-hover/60 hover:text-text'
+                  active ? 'bg-secondary/10 text-secondary font-medium shadow-sm' : 'text-text-secondary hover:bg-surface-hover/60 hover:text-text'
                 )}
               >
-                <Icon className={cn('w-[18px] h-[18px]', active ? 'text-text' : 'text-text-muted')} />
+                <Icon className={cn('w-[18px] h-[18px]', active ? 'text-secondary' : 'text-text-muted')} />
                 {item.label}
                 {item.count !== undefined && item.count > 0 && (
-                  <span className="ml-auto text-xs font-normal text-text-muted tabular-nums">{item.count}</span>
+                  <span className={cn('ml-auto text-xs font-normal tabular-nums', active ? 'text-secondary/80' : 'text-text-muted')}>{item.count}</span>
                 )}
               </button>
             )
@@ -259,10 +259,10 @@ function HomeSidebarBody({ activeSection, isOnWorkspace, onSectionClick, onPathC
             onClick={() => onSectionClick('files')}
             className={cn(
               'flex items-center w-full gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150',
-              isOnWorkspace && activeSection === 'files' ? 'bg-surface-hover text-text font-medium' : 'text-text-secondary hover:bg-surface-hover/60 hover:text-text'
+              isOnWorkspace && activeSection === 'files' ? 'bg-secondary/10 text-secondary font-medium shadow-sm' : 'text-text-secondary hover:bg-surface-hover/60 hover:text-text'
             )}
           >
-            <Files className={cn('w-[18px] h-[18px]', isOnWorkspace && activeSection === 'files' ? 'text-text' : 'text-text-muted')} />
+            <Files className={cn('w-[18px] h-[18px]', isOnWorkspace && activeSection === 'files' ? 'text-secondary' : 'text-text-muted')} />
             All Files
           </button>
         </div>

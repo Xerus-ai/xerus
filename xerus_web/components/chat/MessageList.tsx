@@ -3,8 +3,8 @@
 import { useEffect, useRef } from 'react'
 import { MessageBubble } from './MessageBubble'
 import { ChatWelcome } from './ChatWelcome'
-import { Bot } from 'lucide-react'
 import { ThinkingIndicator } from './ThinkingIndicator'
+import { XERUS_AGENT } from './AgentDropdown'
 import { cn } from '@/lib/utils'
 import { Agent, ExecutionState } from './types'
 import type { ChatMessageExtended } from './chat-message.types'
@@ -127,24 +127,19 @@ export function MessageList({
           const delegatedSlug = executionState?.agents?.[executionState.agents.length - 1]
           const thinkingAgent =
             (delegatedSlug && agents?.find((a) => a.slug === delegatedSlug || a.name === delegatedSlug)) ||
-            currentAgent
+            currentAgent ||
+            XERUS_AGENT
           return (
             <div className="px-6 py-5">
               <div className="flex items-start gap-3">
                 {/* Agent avatar */}
-                <div className="h-9 w-9 shrink-0 mt-0.5 rounded-full overflow-hidden">
-                  {thinkingAgent ? (
-                    <AgentAvatarIcon agent={thinkingAgent} size={36} />
-                  ) : (
-                    <span className="w-full h-full flex items-center justify-center bg-secondary/10 text-secondary">
-                      <Bot className="h-4.5 w-4.5" />
-                    </span>
-                  )}
+                <div className="h-9 w-9 shrink-0 mt-0.5 rounded-full overflow-hidden flex items-center justify-center">
+                  <AgentAvatarIcon agent={thinkingAgent} size={36} />
                 </div>
 
                 <div className="flex-1 min-w-0">
                   <span className="text-base font-semibold text-secondary block">
-                    {thinkingAgent?.name || 'Xerus'}
+                    {thinkingAgent.name}
                   </span>
                   <ThinkingIndicator executionState={executionState} />
                 </div>

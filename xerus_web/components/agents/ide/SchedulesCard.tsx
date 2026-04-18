@@ -41,13 +41,13 @@ export function SchedulesCard({
         <div className="space-y-2">
             <div className="flex items-center justify-between px-1">
                 <div className="flex items-center gap-2">
-                    <Calendar className="w-6 h-6 text-primary" />
+                    <Calendar className="w-6 h-6 text-secondary" />
                     <h3 className="text-2xl font-serif text-text">Schedules</h3>
                 </div>
                 {!isMarketplace && (
                     <button
                         onClick={onNavigateToSchedules}
-                        className="p-2 hover:bg-primary/5 text-primary rounded-full transition-colors"
+                        className="p-2 hover:bg-secondary/10 text-secondary rounded-full transition-colors"
                         aria-label="Add schedule"
                     >
                         <Plus className="w-5 h-5" />
@@ -83,7 +83,7 @@ export function SchedulesCard({
                         {schedules.length > 5 && (
                             <button
                                 onClick={onNavigateToSchedules}
-                                className="text-sm text-primary hover:underline font-medium"
+                                className="text-sm text-secondary hover:underline font-medium"
                             >
                                 View all {schedules.length} schedules
                             </button>

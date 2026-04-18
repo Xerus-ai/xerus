@@ -70,6 +70,8 @@ interface ExecutionStatusResponse {
     tool_calls: number
     agents_used: number
   }
+  steps?: ExecutionStep[]
+  files_changed?: string[]
 }
 
 interface ExecutionDetailProps {
@@ -132,8 +134,8 @@ function mapStatusResponse(resp: ExecutionStatusResponse): ExecutionData {
     duration_ms: durationMs,
     tokens_used: resp.summary?.total_tokens ?? 0,
     cost_credits: 0,
-    steps: [],
-    files_changed: [],
+    steps: resp.steps ?? [],
+    files_changed: resp.files_changed ?? [],
   }
 }
 

@@ -171,7 +171,7 @@ export function RunHistory({ agent }: RunHistoryProps) {
         return (
             <div className="space-y-6">
                 <div className="flex items-center gap-3">
-                    <History className="w-6 h-6 text-primary" />
+                    <History className="w-6 h-6 text-secondary" />
                     <h2 className="text-2xl font-serif text-text">Run History</h2>
                 </div>
                 <div className="bg-surface p-6 rounded-3xl border border-surface-active shadow-sm">
@@ -201,7 +201,7 @@ export function RunHistory({ agent }: RunHistoryProps) {
             <div className="flex items-center justify-between">
                 {/* Left: Heading */}
                 <div className="flex items-center gap-3">
-                    <History className="w-6 h-6 text-primary" />
+                    <History className="w-6 h-6 text-secondary" />
                     <h2 className="text-2xl font-serif text-text">Run History</h2>
                     <span className="text-sm text-text-secondary bg-surface px-3 py-1 rounded-full">
                         {runs.length} {runs.length === 1 ? 'run' : 'runs'}

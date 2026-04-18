@@ -75,7 +75,7 @@ export function AgentFilesSection({
             {isEditable ? (
               <Button
                 variant="ghost"
-                className="h-9 px-4 bg-text hover:bg-primary rounded-xl text-white flex items-center gap-2 shrink-0"
+                className="h-9 px-4 bg-text hover:bg-text/85 rounded-xl text-white hover:text-white flex items-center gap-2 shrink-0 transition-colors"
               >
                 <Pencil className="w-3.5 h-3.5" />
                 <span className="text-sm font-medium">Edit</span>
@@ -83,7 +83,7 @@ export function AgentFilesSection({
             ) : (
               <Button
                 variant="ghost"
-                className="h-9 px-4 bg-text/70 rounded-xl text-white flex items-center gap-2 shrink-0 cursor-default"
+                className="h-9 px-4 bg-text/70 hover:bg-text/70 rounded-xl text-white hover:text-white flex items-center gap-2 shrink-0 cursor-default"
               >
                 <Lock className="w-3.5 h-3.5" />
                 <span className="text-sm font-medium">View Only</span>
@@ -135,7 +135,7 @@ export function AgentFilesSection({
                   isEditable ? (
                     <Button
                       variant="ghost"
-                      className="h-9 px-4 bg-text hover:bg-primary rounded-xl text-white flex items-center gap-2 shrink-0"
+                      className="h-9 px-4 bg-text hover:bg-text/85 rounded-xl text-white hover:text-white flex items-center gap-2 shrink-0 transition-colors"
                     >
                       <Pencil className="w-3.5 h-3.5" />
                       <span className="text-sm font-medium">{hasContent ? 'Edit' : 'Create'}</span>
@@ -143,7 +143,7 @@ export function AgentFilesSection({
                   ) : (
                     <Button
                       variant="ghost"
-                      className="h-9 px-4 bg-text/70 rounded-xl text-white flex items-center gap-2 shrink-0 cursor-default"
+                      className="h-9 px-4 bg-text/70 hover:bg-text/70 rounded-xl text-white hover:text-white flex items-center gap-2 shrink-0 cursor-default"
                     >
                       <Lock className="w-3.5 h-3.5" />
                       <span className="text-sm font-medium">View Only</span>

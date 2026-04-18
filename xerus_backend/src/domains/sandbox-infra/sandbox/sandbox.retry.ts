@@ -35,7 +35,13 @@ export async function withRetry<T>(operation: () => Promise<T>, context: string)
                 const jitter = RETRY_CONFIG.jitter ? Math.random() * delay * 0.1 : 0;
                 const actualDelay = Math.min(delay + jitter, RETRY_CONFIG.maxDelayMs);
 
-                log.info('Retry attempt failed', { context, attempt, retry_delay_ms: Math.round(actualDelay) });
+                log.info('Retry attempt failed', {
+                    context,
+                    attempt,
+                    retry_delay_ms: Math.round(actualDelay),
+                    error_code: errorCode || undefined,
+                    error_message: errorMessage,
+                });
                 await sleep(actualDelay);
                 delay *= RETRY_CONFIG.multiplier;
             }

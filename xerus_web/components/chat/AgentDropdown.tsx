@@ -36,7 +36,7 @@ export const CTO_AGENT: Agent = {
   slug: XERUS_CTO_SLUG,
   name: 'Claude Code',
   description: 'Your technical CTO. Writes and ships code.',
-  avatarUrl: undefined,
+  avatarUrl: '/icons/claudecode-color.svg',
   model: 'anthropic/claude-sonnet-4.5',
   status: 'active',
   capabilities: [],

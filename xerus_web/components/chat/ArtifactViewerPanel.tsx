@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { motion, useReducedMotion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { CodeBlock } from '@/components/shared/CodeBlock'
 import {
@@ -316,14 +317,16 @@ export function ArtifactViewerPanel({
 
   // Full-bleed content (html, pdf, image) shouldn't scroll via overflow-y-auto
   const isFullBleed = content.type === 'html' || content.type === 'pdf' || content.type === 'image'
+  const reduceMotion = useReducedMotion()
 
   return (
-    <div
+    <motion.div
+      initial={reduceMotion ? { opacity: 0 } : { opacity: 0, x: 24 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.28, ease: [0.25, 1, 0.5, 1] }}
       className={cn(
-        'hidden md:flex flex-col shrink-0 overflow-hidden',
-        'h-full',
-        'w-[50%] bg-card border-l border-surface-active/40',
-        'transition-all duration-200 ease-in-out',
+        'flex flex-col h-full w-full overflow-hidden',
+        'bg-card border-l border-surface-active/40',
         className,
       )}
     >
@@ -391,6 +394,6 @@ export function ArtifactViewerPanel({
       <div className={cn('flex-1', isFullBleed ? 'overflow-hidden' : 'overflow-y-auto scrollbar-thin')}>
         {renderContent()}
       </div>
-    </div>
+    </motion.div>
   )
 }

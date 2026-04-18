@@ -272,7 +272,7 @@ export function ChatContainer({
     <div className={cn('flex w-full relative h-screen overflow-hidden', className)}>
       <PanelGroup orientation="horizontal" className="flex-1 min-w-0">
         {/* Chat column */}
-        <Panel defaultSize={isSandboxOpen ? 50 : 100} minSize={30}>
+        <Panel defaultSize={isSandboxOpen ? 50 : viewerContent ? 55 : 100} minSize={30}>
           <div className="flex flex-col h-full relative overflow-hidden">
             <MessageList
               messages={state.messages as ChatMessageExtended[]}
@@ -372,7 +372,7 @@ export function ChatContainer({
             <PanelResizeHandle className="w-2 flex items-center justify-center cursor-col-resize group shrink-0">
               <div className="w-px h-8 rounded-full bg-[#E5E5E5] group-hover:bg-primary/50 group-hover:h-16 transition-all" />
             </PanelResizeHandle>
-            <Panel defaultSize={40} minSize={20}>
+            <Panel defaultSize={45} minSize={20}>
               <ArtifactViewerPanel
                 content={viewerContent}
                 onClose={() => setViewerContent(null)}

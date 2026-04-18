@@ -77,7 +77,7 @@ export function MemoryTab({ agent }: MemoryTabProps) {
         return (
             <div className="space-y-6">
                 <div className="flex items-center gap-3">
-                    <Brain className="w-6 h-6 text-primary" />
+                    <Brain className="w-6 h-6 text-secondary" />
                     <h2 className="text-2xl font-serif text-text">Agent Memory</h2>
                 </div>
                 <div className="bg-surface p-6 rounded-3xl border border-surface-active shadow-sm">
@@ -100,7 +100,7 @@ export function MemoryTab({ agent }: MemoryTabProps) {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <Brain className="w-6 h-6 text-primary" />
+                    <Brain className="w-6 h-6 text-secondary" />
                     <h2 className="text-2xl font-serif text-text">Agent Memory</h2>
                     <span className="text-sm text-text-secondary bg-surface px-3 py-1 rounded-full">
                         {memories.length} {memories.length === 1 ? 'entry' : 'entries'}

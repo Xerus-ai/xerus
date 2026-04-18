@@ -82,8 +82,8 @@ export function PostMessage({
           </ReactMarkdown>
         </div>
 
-        <div className="flex items-center gap-3 mt-1.5 opacity-0 group-hover:opacity-100 transition-all duration-200">
-          {executionId && (
+        {executionId && (
+          <div className="flex items-center gap-3 mt-1.5">
             <button
               type="button"
               onClick={() => onViewWork(executionId)}
@@ -95,8 +95,8 @@ export function PostMessage({
               View work
               <ArrowRight className="w-3 h-3" />
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   )

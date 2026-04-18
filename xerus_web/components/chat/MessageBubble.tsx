@@ -11,7 +11,7 @@ import {
 import type { ChatMessageExtended, ToolCall, TodoItem, WorkspaceArtifact } from './chat-message.types'
 import type { TurnPart } from './streaming-turn.types'
 import type { Agent } from './types'
-import Image from 'next/image'
+import { XERUS_AGENT } from './AgentDropdown'
 import { isMascotConfig } from '@/lib/mascot-config'
 import { MascotAvatar } from '@/components/agents/MascotAvatar'
 import { MarkdownContent } from './MarkdownContent'
@@ -313,14 +313,15 @@ export const MessageBubble = memo(function MessageBubble({
   // Agent identity resolution (consistency principle): if `agent` prop is null,
   // try to resolve from message.agentSlug/agentName against the agents array.
   // This prevents the bug where the Xerus logo flashes on a message that was
-  // actually produced by a specific agent.
-  const resolvedAgent: Agent | null = agent ?? (
+  // actually produced by a specific agent. Fall back to the canonical XERUS_AGENT
+  // so the header always renders with a real agent identity (no hardcoded logos).
+  const resolvedAgent: Agent = agent ?? (
     agents && (message.agentSlug || message.agentName)
       ? agents.find((a) =>
           (message.agentSlug && a.slug === message.agentSlug) ||
           (message.agentName && a.name === message.agentName)
-        ) ?? null
-      : null
+        ) ?? XERUS_AGENT
+      : XERUS_AGENT
   )
   const hasExecution =
     !isUser &&
@@ -348,25 +349,15 @@ export const MessageBubble = memo(function MessageBubble({
       <div className="flex items-center gap-2 mb-2">
         {!isUser && (
           <div className="w-7 h-7 rounded-lg overflow-hidden shrink-0 flex items-center justify-center">
-            {resolvedAgent ? (
-              isMascotConfig(resolvedAgent.avatarUrl) ? (
-                <MascotAvatar config={resolvedAgent.avatarUrl!} size={28} className="w-full h-full" alt={resolvedAgent.name} />
-              ) : resolvedAgent.avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={resolvedAgent.avatarUrl} alt={resolvedAgent.name} className="w-7 h-7 object-cover" />
-              ) : (
-                <span className="w-full h-full flex items-center justify-center bg-secondary/10 text-secondary text-[10px] font-semibold">
-                  {resolvedAgent.name.substring(0, 2).toUpperCase()}
-                </span>
-              )
+            {isMascotConfig(resolvedAgent.avatarUrl) ? (
+              <MascotAvatar config={resolvedAgent.avatarUrl!} size={28} className="w-full h-full" alt={resolvedAgent.name} />
+            ) : resolvedAgent.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={resolvedAgent.avatarUrl} alt={resolvedAgent.name} className="w-7 h-7 object-cover" />
             ) : (
-              <Image
-                src="/logo/xerus.svg"
-                alt="Xerus"
-                width={28}
-                height={28}
-                className="w-7 h-7"
-              />
+              <span className="w-full h-full flex items-center justify-center bg-secondary/10 text-secondary text-[10px] font-semibold">
+                {resolvedAgent.name.substring(0, 2).toUpperCase()}
+              </span>
             )}
           </div>
         )}
@@ -374,7 +365,7 @@ export const MessageBubble = memo(function MessageBubble({
           'text-sm font-medium',
           isUser ? 'text-text' : 'text-secondary'
         )}>
-          {isUser ? 'You' : resolvedAgent?.name || message.agentName || 'Xerus'}
+          {isUser ? 'You' : resolvedAgent.name}
         </span>
         {!isUser && (
           <span className="text-[10px] font-medium text-text-muted bg-surface-hover rounded-full px-1.5 py-0.5">

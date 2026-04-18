@@ -53,7 +53,7 @@ export function KnowledgeBaseSection({
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 px-1">
-        <Book className="w-6 h-6 text-primary" />
+        <Book className="w-6 h-6 text-secondary" />
         <h3 className="text-2xl font-serif text-text">Knowledge Base</h3>
       </div>
 

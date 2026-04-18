@@ -225,10 +225,10 @@ export function InboxSidebarBody({ counts, markRead, showNewRow, onNewRowDone }:
                         }
                         setCreatingChannelFor(domain.slug)
                       }}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-text-muted hover:text-text-secondary hover:bg-surface-hover transition-colors w-full"
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-text-muted hover:text-secondary hover:bg-secondary/5 transition-colors w-full group"
                       aria-label={`Add channel to ${domain.name}`}
                     >
-                      <Plus className="w-4 h-4 shrink-0" />
+                      <Plus className="w-4 h-4 shrink-0 text-secondary/70 group-hover:text-secondary" />
                       <span>Add channel</span>
                     </button>
                   )}

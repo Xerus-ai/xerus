@@ -228,20 +228,20 @@ export function SkillDetailView({ skillSlug, onBack }: SkillDetailViewProps) {
           <div className="lg:col-span-2 space-y-8">
             {isInstalled && requiredEnvKeys.length > 0 && (
               <div className="space-y-2">
-                <h3 className="font-serif text-xl flex items-center gap-2 px-1"><Shield className="w-5 h-5 text-primary" /> Authentication</h3>
+                <h3 className="font-serif text-xl flex items-center gap-2 px-1"><Shield className="w-5 h-5 text-secondary" /> Authentication</h3>
                 <SkillSecretsCard skillSlug={skill.slug} envKeys={requiredEnvKeys} />
               </div>
             )}
 
             <div className="space-y-2">
-              <div className="flex items-center gap-2 px-1"><FileText className="w-5 h-5 text-primary" /><h3 className="text-2xl font-serif text-text">Skill Files</h3></div>
+              <div className="flex items-center gap-2 px-1"><FileText className="w-5 h-5 text-secondary" /><h3 className="text-2xl font-serif text-text">Skill Files</h3></div>
               <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-4 space-y-3">
                 <div className="bg-surface-hover rounded-xl px-5 py-4 flex items-center gap-4 cursor-pointer" onClick={() => setActiveFile('SKILL.md')}>
                   <div className="flex-1 min-w-0">
                     <span className="text-sm font-semibold text-text mb-1 block">SKILL.md</span>
                     <p className="text-sm leading-relaxed text-text font-medium line-clamp-2">{skillMdContent ? skillMdContent.split('\n').filter(Boolean).slice(0, 2).join(' ') : 'Loading...'}</p>
                   </div>
-                  <button className="h-9 px-4 bg-text hover:bg-primary rounded-xl text-white flex items-center gap-2 shrink-0 text-sm font-medium transition-colors">
+                  <button className="h-9 px-4 bg-text hover:bg-text/85 rounded-xl text-white flex items-center gap-2 shrink-0 text-sm font-medium transition-colors">
                     {isInstalled || isOwner ? <><Pencil className="w-3.5 h-3.5" /> Edit</> : <><FileText className="w-3.5 h-3.5" /> View</>}
                   </button>
                 </div>
@@ -253,7 +253,7 @@ export function SkillDetailView({ skillSlug, onBack }: SkillDetailViewProps) {
                           <span className="text-sm font-semibold text-text">{file.path}</span>
                           <p className="text-xs text-text-secondary mt-0.5">{file.size > 1024 ? `${(file.size / 1024).toFixed(1)} KB` : `${file.size} B`}</p>
                         </div>
-                        <button className="h-9 px-4 bg-text hover:bg-primary rounded-xl text-white flex items-center gap-2 shrink-0 text-sm font-medium transition-colors">
+                        <button className="h-9 px-4 bg-text hover:bg-text/85 rounded-xl text-white flex items-center gap-2 shrink-0 text-sm font-medium transition-colors">
                           {isInstalled || isOwner ? <><Pencil className="w-3.5 h-3.5" /> Edit</> : <><FileText className="w-3.5 h-3.5" /> View</>}
                         </button>
                       </div>
@@ -265,7 +265,7 @@ export function SkillDetailView({ skillSlug, onBack }: SkillDetailViewProps) {
 
             {readmeFile && (
               <div className="space-y-2">
-                <div className="flex items-center gap-2 px-1"><FileText className="w-5 h-5 text-primary" /><h3 className="text-2xl font-serif text-text">README</h3></div>
+                <div className="flex items-center gap-2 px-1"><FileText className="w-5 h-5 text-secondary" /><h3 className="text-2xl font-serif text-text">README</h3></div>
                 <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-6">
                   <SkillFileViewer slug={skillSlug} filePath={readmeFile.path} />
                 </div>
@@ -314,18 +314,18 @@ export function SkillDetailView({ skillSlug, onBack }: SkillDetailViewProps) {
 
           <div className="space-y-8">
             <div className="space-y-2">
-              <div className="flex items-center gap-2 px-1"><Bot className="w-5 h-5 text-primary" /><h3 className="text-2xl font-serif text-text">Agents</h3></div>
+              <div className="flex items-center gap-2 px-1"><Bot className="w-5 h-5 text-secondary" /><h3 className="text-2xl font-serif text-text">Agents</h3></div>
               <SkillAgentsCard isInstalled={isInstalled} agents={agents} installedByAgents={skill.installedByAgents || []} />
             </div>
             <div className="space-y-2">
-              <div className="flex items-center gap-2 px-1"><Hash className="w-5 h-5 text-primary" /><h3 className="text-2xl font-serif text-text">Channels</h3></div>
+              <div className="flex items-center gap-2 px-1"><Hash className="w-5 h-5 text-secondary" /><h3 className="text-2xl font-serif text-text">Channels</h3></div>
               <SkillChannelsCard skillSlug={skill.slug} />
             </div>
             {/* Triggers — parallels the Schedules section on the agent detail page.
                 Skills aren't scheduled directly; agents invoke them on demand.
                 Surfacing this keeps the two detail pages visually balanced. */}
             <div className="space-y-2">
-              <div className="flex items-center gap-2 px-1"><Clock className="w-5 h-5 text-primary" /><h3 className="text-2xl font-serif text-text">Triggers</h3></div>
+              <div className="flex items-center gap-2 px-1"><Clock className="w-5 h-5 text-secondary" /><h3 className="text-2xl font-serif text-text">Triggers</h3></div>
               <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-6">
                 <p className="text-xs text-text-secondary leading-relaxed">
                   Skills run on demand — an agent invokes this skill when a message, task, or schedule

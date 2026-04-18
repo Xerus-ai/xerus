@@ -34,6 +34,8 @@ import {
     serializeHITLAcknowledgment,
     serializeCancellationResult,
 } from './streaming/response.contract';
+import { buildExecutionTimeline } from './execution-timeline';
+import type { ToolCallDetail } from './execution-pipeline.types';
 import {
     validateUUID,
     validateMessageBody,
@@ -417,10 +419,13 @@ router.get('/:id/status', auth, async (req: AuthenticatedRequest, res: Response,
             throw new Error(`Data integrity: execution ${row.id} has status '${row.status}' but null started_at`);
         }
 
-        // Derive tool call count from message_metadata JSONB (no dedicated column exists)
-        const toolCalls = Array.isArray(row.message_metadata?.tool_calls)
-            ? row.message_metadata.tool_calls.length
-            : 0;
+        // Tool calls are persisted in message_metadata JSONB (no dedicated column).
+        // Build a step-level timeline for the "View work" panel; the summary's
+        // toolCalls count is derived from the same array.
+        const rawToolCalls: ToolCallDetail[] = Array.isArray(row.message_metadata?.tool_calls)
+            ? (row.message_metadata.tool_calls as ToolCallDetail[])
+            : [];
+        const timeline = buildExecutionTimeline(rawToolCalls);
 
         const response = serializeExecutionStatus({
             executionId: row.id,
@@ -433,10 +438,12 @@ router.get('/:id/status', auth, async (req: AuthenticatedRequest, res: Response,
                 durationMs: row.completed_at && row.started_at
                     ? new Date(row.completed_at).getTime() - new Date(row.started_at).getTime()
                     : 0,
-                toolCalls,
+                toolCalls: rawToolCalls.length,
                 agentsUsed: 1,
                 billingType: row.key_source ?? undefined,
             } : undefined,
+            steps: timeline.steps,
+            filesChanged: timeline.files_changed,
         });
 
         sendResponse(res, 200, response, startTime);

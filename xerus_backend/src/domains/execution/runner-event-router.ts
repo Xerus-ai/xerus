@@ -561,7 +561,10 @@ async function handleAgentMessage(
             channel: data.channel,
             content: data.content,
             message_type: data.message_type || 'chat',
-            metadata: data.metadata,
+            // Tag every agent-emitted channel message with its execution_id so
+            // the frontend "View work" button can open the step-level timeline
+            // via GET /execute/:id/status.
+            metadata: { ...(data.metadata ?? {}), execution_id: ctx.executionId },
         });
     } catch (err) {
         if (err instanceof ChannelNotFoundError) {

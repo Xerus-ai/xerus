@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { FolderOpen, Upload, LayoutGrid, FolderClosed } from 'lucide-react'
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from 'react-resizable-panels'
+import { motion, useReducedMotion } from 'framer-motion'
 import { XerusLoader } from '@/components/common/XerusLoader'
 import { FloatingPanelProvider } from '@/components/common/FloatingPanelContext'
 import { UploadPanel } from '@/components/upload/UploadPanel'
@@ -195,6 +196,8 @@ export default function WorkspacePage() {
     }
   }, [])
 
+  const reduceMotion = useReducedMotion()
+
   // Stable callbacks for panels (rule: rerender-functional-setstate)
   const handleAgentSelect = useCallback((agent: Assistant) => {
     setDetailView({ type: 'agent', id: agent.slug || agent.id })
@@ -344,12 +347,17 @@ export default function WorkspacePage() {
                         <div className="w-px h-8 rounded-full bg-surface-active/40 group-hover:bg-primary/40 group-hover:h-16 transition-all" />
                       </PanelResizeHandle>
                       <Panel defaultSize={55} minSize={25}>
-                        <div className="flex flex-col h-full overflow-hidden">
+                        <motion.div
+                          initial={reduceMotion ? { opacity: 0 } : { opacity: 0, x: 24 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ duration: 0.28, ease: [0.25, 1, 0.5, 1] }}
+                          className="flex flex-col h-full overflow-hidden"
+                        >
                           <TabBar tabs={openTabs} activeTab={activeTab} onSelectTab={setActiveTab} onCloseTab={handleCloseTab} onCloseAll={handleCloseAll} />
                           {activeTab && activeFileNode && (
                             <FileEditor key={activeTab} path={activeTab} name={activeFileNode.name} size={activeFileNode.size} onDirtyChange={handleDirtyChange} className="flex-1" />
                           )}
-                        </div>
+                        </motion.div>
                       </Panel>
                     </>
                   )}
