@@ -1,10 +1,10 @@
 'use client'
 
-import { useRef, useState, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { FolderOpen, Plus, Upload, Search, LayoutGrid, List, ArrowUpDown, FolderInput } from 'lucide-react'
 import { toast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
-import { FolderCard, FolderSvgDefinitions } from '@/components/FolderCard'
+import { FolderCard, FolderSvgDefinitions, NewFolderCard } from '@/components/FolderCard'
 import { FileCard } from './FileCard'
 import { FileList } from './FileList'
 import { ContextMenu, buildFileMenuItems, buildFolderMenuItems } from './ContextMenu'
@@ -103,13 +103,11 @@ export function BrowseView({
   const [newFolderName, setNewFolderName] = useState('')
   const [folderCreating, setFolderCreating] = useState(false)
   const [folderError, setFolderError] = useState('')
-  const folderInputRef = useRef<HTMLInputElement>(null)
 
   const startNewFolder = useCallback(() => {
     setIsCreatingFolder(true)
     setNewFolderName('')
     setFolderError('')
-    setTimeout(() => folderInputRef.current?.focus(), 50)
   }, [])
 
   const cancelNewFolder = useCallback(() => {
@@ -267,48 +265,19 @@ export function BrowseView({
           <div className="mb-8">
             <FolderSvgDefinitions />
             <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
-              {/* Inline new folder creation */}
+              {/* Inline new folder creation — matches FolderCard silhouette */}
               {isCreatingFolder && (
-                <div className="rounded-2xl bg-surface border border-dashed border-surface-active p-3 flex items-center justify-center">
-                  <div className="w-full max-w-[180px] mx-auto">
-                    <input
-                      ref={folderInputRef}
-                      value={newFolderName}
-                      onChange={(e) => {
-                        setNewFolderName(e.target.value)
-                        if (folderError) setFolderError('')
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleConfirmFolder()
-                        if (e.key === 'Escape') cancelNewFolder()
-                      }}
-                      placeholder="New folder"
-                      className={cn(
-                        'w-full text-center text-sm px-3 py-2 rounded-lg border bg-card focus:outline-none focus:border-primary transition-colors',
-                        folderError ? 'border-red-500' : 'border-surface-active',
-                      )}
-                    />
-                    {folderError && (
-                      <p className="mt-2 text-xs text-red-600 text-center">{folderError}</p>
-                    )}
-                    <div className="mt-3 flex items-center justify-center gap-2">
-                      <button
-                        onClick={cancelNewFolder}
-                        disabled={folderCreating}
-                        className="px-3 py-1.5 rounded-full text-xs font-medium text-text-secondary hover:bg-surface-hover transition-colors"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleConfirmFolder}
-                        disabled={folderCreating}
-                        className="px-3 py-1.5 rounded-full text-xs font-medium bg-primary text-white hover:bg-primary/90 transition-colors"
-                      >
-                        {folderCreating ? 'Creating...' : 'Create'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                <NewFolderCard
+                  value={newFolderName}
+                  error={folderError}
+                  creating={folderCreating}
+                  onChange={(v) => {
+                    setNewFolderName(v)
+                    if (folderError) setFolderError('')
+                  }}
+                  onConfirm={handleConfirmFolder}
+                  onCancel={cancelNewFolder}
+                />
               )}
               {visibleDirs.map((dir, index) => (
                 <FolderCard

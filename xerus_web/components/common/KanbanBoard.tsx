@@ -47,9 +47,9 @@ interface KanbanBoardProps {
 
 const DEFAULT_COLUMNS: KanbanColumn[] = [
   { id: 'todo', title: 'Todo', color: '#9ca3af' },
-  { id: 'in_progress', title: 'In Progress', color: '#f54e00' },
+  { id: 'in_progress', title: 'In Progress', color: '#3b82f6' },
   { id: 'done', title: 'Completed', color: '#1f8a65' },
-  { id: 'needs_approval', title: 'Needs Approval', color: '#c08532' },
+  { id: 'needs_approval', title: 'Needs Approval', color: '#f59e0b' },
 ]
 
 const COLUMN_BG: Record<string, string> = {

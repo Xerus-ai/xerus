@@ -20,19 +20,19 @@ import {
 interface ChannelTasksProps {
   channelId: string
   className?: string
-  agents?: Array<{ id: string; name: string; slug: string }>
+  agents?: Array<{ id: string; name: string; slug: string; avatar_url?: string }>
 }
 
 // ---------------------------------------------------------------------------
 // Priority filter pills
 // ---------------------------------------------------------------------------
 
-const PRIORITY_FILTERS: readonly { value: string; label: string; color?: string }[] = [
+const PRIORITY_FILTERS: readonly { value: string; label: string }[] = [
   { value: 'all', label: 'All' },
-  { value: 'critical', label: 'Critical', color: '#EF4444' },
-  { value: 'high', label: 'High', color: '#F97316' },
-  { value: 'medium', label: 'Medium', color: '#EAB308' },
-  { value: 'low', label: 'Low', color: '#22C55E' },
+  { value: 'critical', label: 'Critical' },
+  { value: 'high', label: 'High' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'low', label: 'Low' },
 ]
 
 // Map workspace DB status -> kanban column id
@@ -71,12 +71,11 @@ function FilterBar({
             key={pf.value}
             onClick={() => onPriorityChange(pf.value)}
             className={cn(
-              'px-5 py-2 rounded-full text-sm font-medium transition-all border',
+              'px-4 py-1.5 rounded-full text-[13px] font-medium transition-all border',
               isActive
-                ? 'bg-secondary/10 text-secondary border-secondary/20'
+                ? 'bg-text text-background border-text shadow-sm'
                 : 'bg-transparent hover:bg-surface-hover text-text-secondary border-border',
             )}
-            style={isActive && pf.color ? { backgroundColor: pf.color, borderColor: pf.color } : undefined}
           >
             {pf.label}
           </button>
@@ -84,7 +83,7 @@ function FilterBar({
       })}
 
       <Select value={agentFilter} onValueChange={onAgentChange}>
-        <SelectTrigger className="h-[38px] px-5 rounded-full border-border bg-transparent text-sm font-medium text-text-secondary gap-1.5 w-auto">
+        <SelectTrigger className="h-[34px] px-4 rounded-full border-border bg-transparent text-[13px] font-medium text-text-secondary gap-1.5 w-auto">
           <SelectValue placeholder="Agent" />
         </SelectTrigger>
         <SelectContent>
@@ -127,15 +126,34 @@ export function ChannelTasks({ channelId, className, agents = [] }: ChannelTasks
     return Array.from(agentMap.values())
   }, [tasks])
 
+  // Map slug -> avatar_url from channel agents (where mascot data lives).
+  // The /channels/:id/tasks endpoint can't ship mascots because workspace
+  // SQLite agents.config only holds {model, temperature}; the mascot is in
+  // the filesystem config.json. Join here to enrich assignedAgents.
+  const agentAvatarMap = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const a of agents) {
+      if (a.avatar_url) map.set(a.slug, a.avatar_url)
+    }
+    return map
+  }, [agents])
+
   const displayTasks = useMemo(() => {
     return tasks
-      .map((t) => ({ ...t, status: STATUS_MAP[t.status] || t.status }))
+      .map((t) => ({
+        ...t,
+        status: STATUS_MAP[t.status] || t.status,
+        assignedAgents: t.assignedAgents?.map((a) => ({
+          ...a,
+          avatar_url: a.avatar_url || agentAvatarMap.get(a.slug),
+        })),
+      }))
       .filter((t) => {
         if (priorityFilter !== 'all' && t.priority !== priorityFilter) return false
         if (agentFilter !== 'all' && !t.assignedAgents?.some((a) => a.slug === agentFilter)) return false
         return true
       })
-  }, [tasks, priorityFilter, agentFilter])
+  }, [tasks, priorityFilter, agentFilter, agentAvatarMap])
 
   const handleDragEnd = useCallback((taskId: string, newStatus: string) => {
     updateTaskStatus(taskId, COLUMN_TO_DB_STATUS[newStatus] || newStatus)

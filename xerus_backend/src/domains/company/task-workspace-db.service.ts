@@ -32,6 +32,7 @@ export interface WorkspaceAgentRow {
     slug: string;
     name: string;
     status: string;
+    config: string | null;
 }
 
 // -----------------------------------------------------------------------------
@@ -242,7 +243,7 @@ export async function resolveAgentsFromWorkspace(
     const inClause = unique.map(s => `'${escapeSQL(s)}'`).join(', ');
 
     const sql = `
-        SELECT slug, name, status
+        SELECT slug, name, status, config
         FROM agents
         WHERE slug IN (${inClause})
     `;

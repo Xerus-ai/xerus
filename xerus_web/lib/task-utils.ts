@@ -22,15 +22,28 @@ export function getAgentColor(name: string): string {
 // ---------------------------------------------------------------------------
 
 export const LABEL_COLOR_MAP: Record<string, string> = {
+  // Engineering / product labels
   feature: '#22C55E',
   onboarding: '#06B6D4',
   billing: '#F97316',
   security: '#EF4444',
-  design: '#EC4899',
   v2: '#6B7280',
   bug: '#EF4444',
   infra: '#8B5CF6',
   docs: '#3B82F6',
+  execution: '#3B82F6',
+  kb: '#8B5CF6',
+  // Business workflow labels (mirrors TaskPanelParts.TAG_SUGGESTIONS)
+  strategy: '#8B5CF6',
+  content: '#22C55E',
+  research: '#06B6D4',
+  launch: '#F97316',
+  campaign: '#3B82F6',
+  analytics: '#6366F1',
+  design: '#EC4899',
+  budget: '#EAB308',
+  outreach: '#14B8A6',
+  review: '#EF4444',
 }
 
 const LABEL_FALLBACK_COLORS = [

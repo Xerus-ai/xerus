@@ -19,7 +19,50 @@ import {
   STATUS_CFG, PRIORITY_CFG, getAgentColor, getLabelColor,
   fmtDateLong,
 } from '@/lib/task-utils'
+import { isMascotConfig } from '@/lib/mascot-config'
+import { MascotAvatar } from '@/components/agents/MascotAvatar'
 import { FieldRow, TagInput, AttachmentSection, ActivityTabs } from './TaskPanelParts'
+
+// ---------------------------------------------------------------------------
+// Avatar disc — renders mascot SVG, image URL, or letter fallback
+// ---------------------------------------------------------------------------
+
+function AgentAvatarDisc({
+  name, avatarUrl, size = 20,
+}: { name: string; avatarUrl?: string; size?: number }) {
+  const hasMascot = isMascotConfig(avatarUrl)
+  const hasImageUrl = !!avatarUrl && !hasMascot
+  const color = getAgentColor(name)
+  const dim = { width: size, height: size }
+
+  if (hasMascot) {
+    return (
+      <span className="inline-flex rounded-full overflow-hidden" style={dim}>
+        <MascotAvatar config={avatarUrl!} size={size} className="w-full h-full" alt={name} />
+      </span>
+    )
+  }
+  if (hasImageUrl) {
+    return (
+      <span className="inline-flex rounded-full overflow-hidden" style={dim}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={avatarUrl} alt={name} className="w-full h-full object-cover" />
+      </span>
+    )
+  }
+  return (
+    <span
+      className="inline-flex items-center justify-center rounded-full font-semibold text-white"
+      style={{
+        ...dim,
+        backgroundColor: color,
+        fontSize: Math.max(Math.round(size * 0.45), 9),
+      }}
+    >
+      {name.charAt(0).toUpperCase()}
+    </span>
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -35,7 +78,7 @@ interface TaskPanelProps {
   isSubmitting?: boolean
   defaultStatus?: string
   channelTag?: string
-  agents?: Array<{ id: string; name: string; slug: string }>
+  agents?: Array<{ id: string; name: string; slug: string; avatar_url?: string }>
 }
 
 // ---------------------------------------------------------------------------
@@ -196,8 +239,9 @@ export function TaskPanel({
                 ref={titleRef}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="What needs to be done?"
-                className="w-full text-xl font-bold text-text bg-transparent border-none outline-none placeholder:text-text-muted font-serif"
+                placeholder="Task title…"
+                aria-label="Task title"
+                className="w-full text-xl font-bold text-text bg-transparent border-none outline-none placeholder:text-text-muted/60 placeholder:italic placeholder:font-normal font-serif"
               />
             ) : (
               <h2 className="text-xl font-bold text-text font-serif">{task?.title}</h2>
@@ -239,32 +283,40 @@ export function TaskPanel({
               <FieldRow icon={<User className="w-4 h-4" />} label="Assignee">
                 {isEditable ? (
                   agents.length > 0 ? (
-                    <Select value={assignee || '__none'} onValueChange={(v) => setAssignee(v === '__none' ? '' : v)}>
-                      <SelectTrigger className="rounded-xl bg-surface border-border/20 h-9 text-sm w-52">
-                        <SelectValue placeholder="Select agent" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none">Unassigned</SelectItem>
-                        {agents.map((a) => (
-                          <SelectItem key={a.id} value={a.slug}>
-                            <span className="flex items-center gap-2">
-                              <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold text-white" style={{ backgroundColor: getAgentColor(a.name) }}>
-                                {a.name.charAt(0).toUpperCase()}
-                              </span>
-                              {a.name}
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    (() => {
+                      const selectedAgent = assignee ? agents.find(a => a.slug === assignee) : null
+                      return (
+                        <Select value={assignee || '__none'} onValueChange={(v) => setAssignee(v === '__none' ? '' : v)}>
+                          <SelectTrigger className="rounded-xl bg-surface border-border/20 h-9 text-sm w-52">
+                            {selectedAgent ? (
+                              <div className="flex items-center gap-2 min-w-0">
+                                <AgentAvatarDisc name={selectedAgent.name} avatarUrl={selectedAgent.avatar_url} size={20} />
+                                <span className="truncate leading-none">{selectedAgent.name}</span>
+                              </div>
+                            ) : (
+                              <SelectValue placeholder="Unassigned" />
+                            )}
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none">Unassigned</SelectItem>
+                            {agents.map((a) => (
+                              <SelectItem key={a.id} value={a.slug}>
+                                <span className="flex items-center gap-2">
+                                  <AgentAvatarDisc name={a.name} avatarUrl={a.avatar_url} size={20} />
+                                  {a.name}
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )
+                    })()
                   ) : (
                     <span className="text-xs text-text-muted italic">Add agents to this channel first</span>
                   )
                 ) : task?.assignedAgents?.[0] ? (
                   <div className="flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold text-white" style={{ backgroundColor: getAgentColor(task.assignedAgents[0].name) }}>
-                      {task.assignedAgents[0].name.charAt(0).toUpperCase()}
-                    </span>
+                    <AgentAvatarDisc name={task.assignedAgents[0].name} avatarUrl={task.assignedAgents[0].avatar_url} size={24} />
                     <span className="text-sm text-text">{task.assignedAgents[0].name}</span>
                   </div>
                 ) : (
@@ -351,8 +403,9 @@ export function TaskPanel({
               <button
                 onClick={handleSave}
                 disabled={isSubmitting || (mode === 'create' && !title.trim())}
-                className="w-9 h-9 bg-text text-white rounded-xl flex items-center justify-center hover:bg-primary transition-colors shadow-md disabled:opacity-50"
+                className="w-9 h-9 bg-text text-white rounded-xl flex items-center justify-center hover:bg-primary transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label={mode === 'create' ? 'Create task' : 'Save changes'}
+                title={mode === 'create' && !title.trim() ? 'Add a task title to create' : undefined}
               >
                 {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowUp className="w-4 h-4" />}
               </button>

@@ -1,7 +1,7 @@
 'use client'
 
-import React from 'react';
-import { MoreHorizontal, FileText, HardDrive, User } from 'lucide-react';
+import React, { useEffect, useRef } from 'react';
+import { MoreHorizontal, FileText, HardDrive, User, Loader2 } from 'lucide-react';
 
 // --- Utility Components ---
 
@@ -78,6 +78,100 @@ interface FolderCardProps {
     onContextMenu?: (e: React.MouseEvent) => void;
     className?: string;
 }
+
+// --- New Folder Card (draft state, used during folder creation) ---
+//
+// Shares the FolderCard silhouette (same w-full h-44 plate + #nano-banana-curve
+// SVG) so an empty draft sits in the grid without breaking visual rhythm.
+// Title bar becomes an editable input; status bar becomes Cancel/Create.
+
+interface NewFolderCardProps {
+    value: string;
+    error?: string;
+    creating?: boolean;
+    onChange: (v: string) => void;
+    onConfirm: () => void;
+    onCancel: () => void;
+}
+
+export const NewFolderCard = ({ value, error, creating, onChange, onConfirm, onCancel }: NewFolderCardProps) => {
+    const inputRef = useRef<HTMLInputElement>(null);
+    useEffect(() => {
+        const id = setTimeout(() => inputRef.current?.focus(), 50);
+        return () => clearTimeout(id);
+    }, []);
+
+    return (
+        <div className="relative group w-full h-44 rounded-2xl">
+            <div className="relative w-full h-full rounded-2xl shadow-xl bg-surface-hover overflow-hidden border border-dashed border-surface-active">
+                {/* Folder silhouette (no stacked papers — it's empty) */}
+                <div
+                    className="absolute inset-0 z-20 flex flex-col justify-end pointer-events-none"
+                    style={{ transformStyle: 'preserve-3d' }}
+                >
+                    <div className="relative w-full h-[82%] pointer-events-auto origin-bottom">
+                        {/* Shadow */}
+                        <svg className="absolute inset-0 w-full h-full text-black/20 translate-y-1 blur-md transform scale-[1.02]">
+                            <use href="#nano-banana-curve" />
+                        </svg>
+                        {/* Fill */}
+                        <svg className="absolute inset-0 w-full h-full text-text z-20">
+                            <use href="#nano-banana-curve" />
+                        </svg>
+                        {/* Gloss */}
+                        <svg className="absolute inset-0 w-full h-full pointer-events-none mix-blend-overlay opacity-40 z-30">
+                            <use href="#folder-gloss" />
+                        </svg>
+
+                        {/* Editable title + actions */}
+                        <div className="absolute inset-0 px-3 pt-6 pb-0 text-white flex flex-col justify-end z-40">
+                            <input
+                                ref={inputRef}
+                                value={value}
+                                onChange={(e) => onChange(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') onConfirm();
+                                    if (e.key === 'Escape') onCancel();
+                                }}
+                                placeholder="folder-name"
+                                disabled={creating}
+                                aria-label="New folder name"
+                                className="w-full bg-transparent text-sm font-semibold tracking-tight text-white placeholder:text-white/40 outline-none mb-1 truncate"
+                            />
+                            <div className="h-px bg-white/10" />
+                            <div className="w-full py-1.5 flex items-center justify-between gap-2">
+                                {error ? (
+                                    <span className="text-[10px] text-red-300 truncate" title={error}>{error}</span>
+                                ) : (
+                                    <span className="text-[10px] text-white/50">Lowercase, numbers, hyphens</span>
+                                )}
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                    <button
+                                        type="button"
+                                        onClick={onCancel}
+                                        disabled={creating}
+                                        className="px-2 py-1 rounded-full text-[10px] font-medium text-white/70 hover:bg-white/10 hover:text-white transition-colors disabled:opacity-40"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={onConfirm}
+                                        disabled={creating || !value.trim()}
+                                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-white text-text hover:bg-white/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {creating && <Loader2 className="w-2.5 h-2.5 animate-spin" />}
+                                        {creating ? 'Creating' : 'Create'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 // 2. Updated Compact Folder Card Component
 export const FolderCard = ({
