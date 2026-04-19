@@ -102,19 +102,32 @@ export function BehaviourTab({
         )
         if (activeSchedule) {
           setActiveScheduleId(activeSchedule.id)
+          // Parse persisted config JSON if present so timezone, activeHours,
+          // weekdaysOnly etc. survive a page reload. Fall back to sensible
+          // defaults only when nothing was ever saved.
+          let persisted: Partial<HeartbeatConfigDTO> = {}
+          if (activeSchedule.config) {
+            try {
+              persisted = JSON.parse(activeSchedule.config) as Partial<HeartbeatConfigDTO>
+            } catch {
+              persisted = {}
+            }
+          }
           setHeartbeatConfig({
             agentId: agent.id,
             enabled: true,
-            cronExpression: activeSchedule.rrule ?? '*/30 * * * *',
-            timezone: 'UTC',
-            weekdaysOnly: false,
-            maxDurationSeconds: 300,
-            retryOnFailure: true,
-            tokenBudget: 8000,
-            eventTokenBudget: 4000,
-            maxAlertsPerHour: 3,
-            suppressToken: 'HEARTBEAT_OK',
-            staggerOffsetMs: 0,
+            cronExpression: activeSchedule.rrule ?? persisted.cronExpression ?? '*/30 * * * *',
+            timezone: persisted.timezone ?? 'UTC',
+            activeHoursStart: persisted.activeHoursStart,
+            activeHoursEnd: persisted.activeHoursEnd,
+            weekdaysOnly: persisted.weekdaysOnly ?? false,
+            maxDurationSeconds: persisted.maxDurationSeconds ?? 300,
+            retryOnFailure: persisted.retryOnFailure ?? true,
+            tokenBudget: persisted.tokenBudget ?? 8000,
+            eventTokenBudget: persisted.eventTokenBudget ?? 4000,
+            maxAlertsPerHour: persisted.maxAlertsPerHour ?? 3,
+            suppressToken: persisted.suppressToken ?? 'HEARTBEAT_OK',
+            staggerOffsetMs: persisted.staggerOffsetMs ?? 0,
           })
         } else {
           setActiveScheduleId(null)
@@ -188,10 +201,14 @@ export function BehaviourTab({
   }
 
   // Behaviour handlers
+  // Backend Joi schema (validators.ts) expects snake_case `thinking_level` /
+  // `autonomy_level`. Camel-case keys get stripped as unknown, leaving the
+  // update body empty — which trips the `.min(1)` rule with
+  // "value must have at least 1 key".
   const handleThinkingChange = useCallback(
     (level: ThinkingLevel) => {
       setActiveSection('thinking')
-      onUpdateAgent({ thinkingLevel: level })
+      onUpdateAgent({ thinking_level: level } as Partial<Assistant>)
     },
     [onUpdateAgent]
   )
@@ -199,7 +216,7 @@ export function BehaviourTab({
   const handleAutonomyChange = useCallback(
     (level: AutonomyLevel) => {
       setActiveSection('autonomy')
-      onUpdateAgent({ autonomyLevel: level })
+      onUpdateAgent({ autonomy_level: level } as Partial<Assistant>)
     },
     [onUpdateAgent]
   )
@@ -209,11 +226,27 @@ export function BehaviourTab({
       setActiveSection('proactivity')
       try {
         const rrule = config.cronExpression ?? '*/30 * * * *'
+        // Everything non-rrule goes in `config` (persisted JSON on the schedule row).
+        // rrule stays as a first-class column because the 9to5 scheduler daemon reads it.
+        const configJson = JSON.stringify({
+          timezone: config.timezone ?? 'UTC',
+          activeHoursStart: config.activeHoursStart,
+          activeHoursEnd: config.activeHoursEnd,
+          weekdaysOnly: config.weekdaysOnly ?? false,
+          maxDurationSeconds: config.maxDurationSeconds ?? 300,
+          retryOnFailure: config.retryOnFailure ?? true,
+          tokenBudget: config.tokenBudget ?? 8000,
+          eventTokenBudget: config.eventTokenBudget ?? 4000,
+          maxAlertsPerHour: config.maxAlertsPerHour ?? 3,
+          suppressToken: config.suppressToken ?? 'HEARTBEAT_OK',
+          staggerOffsetMs: config.staggerOffsetMs ?? 0,
+        })
         if (activeScheduleId) {
           // Update existing schedule
           await updateSchedule(activeScheduleId, {
             rrule,
             status: 'active',
+            config: configJson,
           })
         } else {
           // Create a new heartbeat schedule
@@ -222,6 +255,7 @@ export function BehaviourTab({
             name: `${agentSlug}-heartbeat`,
             prompt: 'Heartbeat check-in: review goals, reflect on progress, and take proactive action.',
             rrule,
+            config: configJson,
           })
           setActiveScheduleId(result.schedule.id)
         }
@@ -253,8 +287,9 @@ export function BehaviourTab({
     setActiveSection('proactivity')
     try {
       if (activeScheduleId) {
-        await updateSchedule(activeScheduleId, { status: 'paused' })
+        await deleteScheduleApi(activeScheduleId)
       }
+      setActiveScheduleId(null)
       setHeartbeatConfig(null)
       toast.success('Proactivity disabled')
     } catch {

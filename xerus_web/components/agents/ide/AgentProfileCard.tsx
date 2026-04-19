@@ -87,19 +87,32 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
         if (field === 'description') setIsEditingDesc(false)
 
         if (localAgent[field] !== agent[field]) {
-            await onUpdate({ [field]: localAgent[field] })
+            const previous = agent[field]
+            try {
+                await onUpdate({ [field]: localAgent[field] })
+            } catch {
+                // Roll the optimistic update back so the UI reflects what's actually in the DB.
+                // The API client already surfaces a toast for the failure.
+                setLocalAgent(prev => ({ ...prev, [field]: previous }))
+            }
         }
     }
 
     const handleModelChange = async (value: string) => {
+        const previousModel = localAgent.model
+        const previousAdapter = localAgent.adapter_type
         handleChange('model', value)
         // All models run through Claude Code adapter (Codex adapter coming soon)
         const adapterType: AdapterType = 'claudecode'
-        if (adapterType !== localAgent.adapter_type) {
-            setLocalAgent(prev => ({ ...prev, adapter_type: adapterType }))
-            await onUpdate({ ai_model: value, adapter_type: adapterType })
-        } else {
-            await onUpdate({ ai_model: value })
+        try {
+            if (adapterType !== localAgent.adapter_type) {
+                setLocalAgent(prev => ({ ...prev, adapter_type: adapterType }))
+                await onUpdate({ ai_model: value, adapter_type: adapterType })
+            } else {
+                await onUpdate({ ai_model: value })
+            }
+        } catch {
+            setLocalAgent(prev => ({ ...prev, model: previousModel, adapter_type: previousAdapter }))
         }
     }
 

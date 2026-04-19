@@ -6,7 +6,6 @@ import { useAuth } from '@/utils/AuthContext'
 import { toast } from '@/lib/toast'
 
 export interface AgentChannel {
-  channel_id: string
   channel_slug: string
   channel_name: string
   domain_slug: string
@@ -23,9 +22,9 @@ interface UseAgentChannelsReturn {
   assignedChannels: AgentChannel[]
   isLoading: boolean
   processing: string | null
-  assignChannel: (channelId: string) => Promise<void>
-  unassignChannel: (channelId: string) => Promise<void>
-  setPrimaryChannel: (channelId: string) => Promise<void>
+  assignChannel: (channelSlug: string) => Promise<void>
+  unassignChannel: (channelSlug: string) => Promise<void>
+  setPrimaryChannel: (channelSlug: string) => Promise<void>
   refetch: () => Promise<void>
 }
 
@@ -60,13 +59,13 @@ export function useAgentChannels(agentId: number): UseAgentChannelsReturn {
     fetchChannels()
   }, [fetchChannels])
 
-  const assignChannel = useCallback(async (channelId: string) => {
+  const assignChannel = useCallback(async (channelSlug: string) => {
     if (!agentId || agentId < 0) return
-    setProcessing(channelId)
+    setProcessing(channelSlug)
     try {
       const response = await apiCall(`/agents/${agentId}/channels`, {
         method: 'POST',
-        body: JSON.stringify({ channel_id: channelId }),
+        body: JSON.stringify({ channel_slug: channelSlug }),
       })
       setAssignedChannels(await parseChannelsResponse(response))
     } catch {
@@ -76,11 +75,11 @@ export function useAgentChannels(agentId: number): UseAgentChannelsReturn {
     }
   }, [agentId])
 
-  const unassignChannel = useCallback(async (channelId: string) => {
+  const unassignChannel = useCallback(async (channelSlug: string) => {
     if (!agentId || agentId < 0) return
-    setProcessing(channelId)
+    setProcessing(channelSlug)
     try {
-      const response = await apiCall(`/agents/${agentId}/channels/${channelId}`, { method: 'DELETE' })
+      const response = await apiCall(`/agents/${agentId}/channels/${channelSlug}`, { method: 'DELETE' })
       setAssignedChannels(await parseChannelsResponse(response))
     } catch {
       // apiCall already shows error toast
@@ -89,11 +88,11 @@ export function useAgentChannels(agentId: number): UseAgentChannelsReturn {
     }
   }, [agentId])
 
-  const setPrimaryChannel = useCallback(async (channelId: string) => {
+  const setPrimaryChannel = useCallback(async (channelSlug: string) => {
     if (!agentId || agentId < 0) return
-    setProcessing(channelId)
+    setProcessing(channelSlug)
     try {
-      const response = await apiCall(`/agents/${agentId}/channels/${channelId}/primary`, {
+      const response = await apiCall(`/agents/${agentId}/channels/${channelSlug}/primary`, {
         method: 'POST',
         body: JSON.stringify({}),
       })

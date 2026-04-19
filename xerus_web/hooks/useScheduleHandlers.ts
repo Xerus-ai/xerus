@@ -55,12 +55,17 @@ function buildRruleFromSchedule(schedule: ScheduledExecution): string | undefine
 interface UseScheduleHandlersArgs {
   agentId: number
   agentSlug: string
+  // Current visible list — used to seed local state on the very first mutation,
+  // otherwise `setSchedules(prev => prev ? ... : prev)` silently drops the
+  // update because `localSchedules` is still null until something is set.
+  schedules: ScheduledExecution[]
   setSchedules: Dispatch<SetStateAction<ScheduledExecution[] | null>>
 }
 
 export function useScheduleHandlers({
   agentId,
   agentSlug,
+  schedules,
   setSchedules,
 }: UseScheduleHandlersArgs) {
   const slug = agentSlug
@@ -77,38 +82,47 @@ export function useScheduleHandlers({
 
     // Map backend ScheduleEntry to frontend ScheduledExecution for local state
     const created = mapEntryToScheduledExecution(result.schedule, agentId)
-    setSchedules(prev => prev ? [...prev, created] : [created])
+    setSchedules(prev => [...(prev ?? schedules), created])
     toast.success('Schedule created')
-  }, [slug, agentId, setSchedules])
+  }, [slug, agentId, schedules, setSchedules])
+
+  const handleScheduleUpdate = useCallback(async (scheduleId: string, scheduleData: ScheduledExecution) => {
+    const rrule = buildRruleFromSchedule(scheduleData)
+
+    const result = await updateSchedule(scheduleId, {
+      name: scheduleData.name,
+      prompt: scheduleData.taskPrompt ?? scheduleData.description ?? '',
+      ...(rrule !== undefined ? { rrule } : {}),
+    })
+
+    const updated = mapEntryToScheduledExecution(result.schedule, agentId)
+    setSchedules(prev => (prev ?? schedules).map(s => s.id === scheduleId ? updated : s))
+    toast.success('Schedule updated')
+  }, [agentId, schedules, setSchedules])
 
   const handleScheduleToggle = useCallback(async (scheduleId: string, enabled: boolean) => {
     const newStatus = enabled ? 'active' : 'paused'
 
     const result = await updateSchedule(scheduleId, { status: newStatus })
 
-    setSchedules(prev => {
-      if (!prev) return prev
-      return prev.map(s =>
-        s.id === scheduleId
-          ? { ...s, enabled: result.schedule.status === 'active' }
-          : s
-      )
-    })
+    setSchedules(prev => (prev ?? schedules).map(s =>
+      s.id === scheduleId
+        ? { ...s, enabled: result.schedule.status === 'active' }
+        : s
+    ))
     toast.success(enabled ? 'Schedule activated' : 'Schedule paused')
-  }, [setSchedules])
+  }, [schedules, setSchedules])
 
   const handleScheduleDelete = useCallback(async (scheduleId: string) => {
     await deleteSchedule(scheduleId)
 
-    setSchedules(prev => {
-      if (!prev) return prev
-      return prev.filter(s => s.id !== scheduleId)
-    })
+    setSchedules(prev => (prev ?? schedules).filter(s => s.id !== scheduleId))
     toast.success('Schedule deleted')
-  }, [setSchedules])
+  }, [schedules, setSchedules])
 
   return {
     handleScheduleCreate,
+    handleScheduleUpdate,
     handleScheduleToggle,
     handleScheduleDelete,
   }

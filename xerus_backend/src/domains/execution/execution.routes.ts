@@ -127,10 +127,14 @@ router.get('/sessions', auth, async (req: AuthenticatedRequest, res: Response, n
             throw new BadRequestError('offset must be a non-negative integer');
         }
 
-        const params: unknown[] = [req.user.uid, limit, offset];
+        // limit and offset are validated integers above, so safe to interpolate.
+        // Binding them as parameters causes "could not determine data type" on
+        // Neon/Postgres because LIMIT/OFFSET positions don't give pg enough
+        // context to infer the type.
+        const params: unknown[] = [req.user.uid];
         let agentFilter = '';
         if (agentSlug) {
-            agentFilter = 'AND es.agent_slug = $4';
+            agentFilter = 'AND es.agent_slug = $2';
             params.push(agentSlug);
         }
 
@@ -142,7 +146,7 @@ router.get('/sessions', auth, async (req: AuthenticatedRequest, res: Response, n
              JOIN workspaces w ON es.workspace_id = w.id
              WHERE w.user_id = $1 ${agentFilter}
              ORDER BY es.created_at DESC
-             LIMIT $2 OFFSET $3`,
+             LIMIT ${limit} OFFSET ${offset}`,
             params,
         );
 
@@ -151,7 +155,7 @@ router.get('/sessions', auth, async (req: AuthenticatedRequest, res: Response, n
              FROM execution_sessions es
              JOIN workspaces w ON es.workspace_id = w.id
              WHERE w.user_id = $1 ${agentFilter}`,
-            agentSlug ? [req.user.uid, agentSlug] : [req.user.uid],
+            params,
         );
 
         const total = parseInt(countResult.rows[0]?.count ?? '0', 10);

@@ -366,12 +366,18 @@ export function IdentityTab({
     setActiveFile(null)
   }
 
-  const handleEditorSave = () => {
+  const handleEditorSave = async () => {
     if (activeFile) {
       handleSave()
-    } else {
-      onUpdate({ system_prompt: tempPrompt })
+      return
+    }
+    try {
+      await onUpdate({ system_prompt: tempPrompt })
+      toast.success('System prompt saved')
       setIsPromptSheetOpen(false)
+    } catch {
+      // apiCall inside onUpdate already surfaces the server error toast.
+      // Keep the sheet open so the user can retry without losing their edit.
     }
   }
 

@@ -90,6 +90,7 @@ export function KnowledgeBaseSection({
                   fileCount={doc.chunk_count || 1}
                   storageUsed="--"
                   accessUsers={[]}
+                  surface="plate"
                 />
                 {isEditable && (
                   <button

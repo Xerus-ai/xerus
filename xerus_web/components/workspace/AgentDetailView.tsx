@@ -99,14 +99,15 @@ export function AgentDetailView({ agentId, onBack }: AgentDetailViewProps) {
   const [localSchedules, setLocalSchedules] = useState<typeof schedules | null>(null)
   const effectiveSchedules = localSchedules ?? schedules
 
-  const { handleScheduleCreate, handleScheduleToggle, handleScheduleDelete } = useScheduleHandlers({
+  const { handleScheduleCreate, handleScheduleUpdate, handleScheduleToggle, handleScheduleDelete } = useScheduleHandlers({
     agentId: agent?.id ?? 0,
     agentSlug: agent?.slug ?? '',
+    schedules: effectiveSchedules,
     setSchedules: setLocalSchedules,
   })
 
   const { isCloning, isPublishing, isDeleting, handleClone, handlePublish, handleUnpublish, handleDelete } =
-    useAgentActions({ agent, setAgent: () => mutateAgent() })
+    useAgentActions({ agent, setAgent: (next) => mutateAgent(next, false) })
 
   const handleUpdateAgent = async (updates: any) => {
     if (!agent) return
@@ -219,7 +220,7 @@ export function AgentDetailView({ agentId, onBack }: AgentDetailViewProps) {
 
           <TabsContent value="schedules" className="mt-0 animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out">
             <FloatingPanelProvider>
-              <SchedulesTab agent={agent} schedules={effectiveSchedules} workflowConfig={workflowConfig} onCreate={handleScheduleCreate} onToggle={handleScheduleToggle} onDelete={handleScheduleDelete} isLoading={isLoadingAgent} />
+              <SchedulesTab agent={agent} schedules={effectiveSchedules} workflowConfig={workflowConfig} onCreate={handleScheduleCreate} onUpdate={handleScheduleUpdate} onToggle={handleScheduleToggle} onDelete={handleScheduleDelete} isLoading={isLoadingAgent} />
             </FloatingPanelProvider>
           </TabsContent>
 

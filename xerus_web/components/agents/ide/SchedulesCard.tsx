@@ -10,25 +10,56 @@ interface SchedulesCardProps {
     onNavigateToSchedules?: () => void
 }
 
-// Helper to format cron expression to readable time
+// Reads the mapped recurrence string (RRULE or passthrough cron) and returns
+// a friendly single-line summary for the sidebar card. Mirrors the logic in
+// SchedulesTab.tsx so both views stay in sync.
 const formatScheduleTime = (schedule: any): string => {
-    if (schedule.cron_expression) {
-        // Simple cron parsing for display
-        const parts = schedule.cron_expression.split(' ')
-        if (parts.length >= 5) {
-            const minute = parts[0]
-            const hour = parts[1]
-            if (hour !== '*' && minute !== '*') {
-                const h = parseInt(hour)
-                const m = parseInt(minute)
-                const ampm = h >= 12 ? 'PM' : 'AM'
-                const displayHour = h % 12 || 12
-                return `${displayHour}:${m.toString().padStart(2, '0')} ${ampm}`
-            }
+    const expr: string | undefined = schedule?.scheduleConfig?.cron
+    if (!expr) return 'Not scheduled'
+
+    if (expr.includes('FREQ=')) {
+        const parts: Record<string, string> = {}
+        for (const segment of expr.split(';')) {
+            const [k, v] = segment.split('=')
+            if (k) parts[k] = v ?? ''
         }
-        return schedule.cron_expression
+
+        const hour = parseInt(parts.BYHOUR ?? '', 10)
+        const minute = parseInt(parts.BYMINUTE ?? '0', 10)
+        const time = Number.isFinite(hour)
+            ? `${(hour % 12) || 12}:${(Number.isFinite(minute) ? minute : 0).toString().padStart(2, '0')} ${hour >= 12 ? 'PM' : 'AM'}`
+            : undefined
+
+        let frequency: string
+        if (parts.FREQ === 'DAILY') {
+            frequency = 'Daily'
+        } else if (parts.FREQ === 'WEEKLY') {
+            const dayMap: Record<string, string> = { SU: 'Sun', MO: 'Mon', TU: 'Tue', WE: 'Wed', TH: 'Thu', FR: 'Fri', SA: 'Sat' }
+            const days = (parts.BYDAY ?? '').split(',').map(d => dayMap[d]).filter(Boolean)
+            frequency = days.length > 0 ? `Every ${days.join(', ')}` : 'Weekly'
+        } else if (parts.FREQ === 'MONTHLY') {
+            frequency = `Day ${parts.BYMONTHDAY ?? '1'} of each month`
+        } else if (parts.FREQ === 'HOURLY') {
+            frequency = 'Hourly'
+        } else {
+            frequency = parts.FREQ ? parts.FREQ[0] + parts.FREQ.slice(1).toLowerCase() : expr
+        }
+
+        if (time && frequency) return `${frequency} at ${time}`
+        return frequency || time || expr
     }
-    return 'Not scheduled'
+
+    const cronParts = expr.split(' ')
+    if (cronParts.length >= 5) {
+        const [minute, hour] = cronParts
+        const h = parseInt(hour, 10)
+        const m = parseInt(minute, 10)
+        if (Number.isFinite(h) && Number.isFinite(m) && hour !== '*' && minute !== '*') {
+            return `${(h % 12) || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
+        }
+    }
+
+    return expr
 }
 
 export function SchedulesCard({

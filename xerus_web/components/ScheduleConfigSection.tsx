@@ -46,6 +46,47 @@ interface ScheduleConfigSectionProps {
   onSave: (schedule: ScheduledExecution) => Promise<void>;
   onCancel?: () => void;
   disabled?: boolean;
+  initial?: ScheduledExecution;
+  submitLabel?: string;
+}
+
+// Reverse-map an RRULE (or cron) recurrence string back into the UI's
+// scheduleType + scheduleConfig, so the edit form can re-hydrate cleanly.
+function deriveFromRecurrence(
+  expr: string | undefined,
+): Pick<ScheduledExecution, 'scheduleType' | 'scheduleConfig'> {
+  if (!expr) return { scheduleType: 'daily', scheduleConfig: { time: '09:00' } };
+
+  if (!expr.includes('FREQ=')) {
+    return { scheduleType: 'cron', scheduleConfig: { cron: expr } };
+  }
+
+  const parts: Record<string, string> = {};
+  for (const seg of expr.split(';')) {
+    const [k, v] = seg.split('=');
+    if (k) parts[k] = v ?? '';
+  }
+
+  const hour = parseInt(parts.BYHOUR ?? '9', 10);
+  const minute = parseInt(parts.BYMINUTE ?? '0', 10);
+  const time = `${(Number.isFinite(hour) ? hour : 9).toString().padStart(2, '0')}:${(Number.isFinite(minute) ? minute : 0).toString().padStart(2, '0')}`;
+
+  if (parts.FREQ === 'DAILY') {
+    return { scheduleType: 'daily', scheduleConfig: { time } };
+  }
+  if (parts.FREQ === 'WEEKLY') {
+    const dayMap: Record<string, number> = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
+    const days = (parts.BYDAY ?? '')
+      .split(',')
+      .map(d => dayMap[d])
+      .filter((d): d is number => d !== undefined);
+    return { scheduleType: 'weekly', scheduleConfig: { time, days } };
+  }
+  if (parts.FREQ === 'MONTHLY') {
+    const day = parseInt(parts.BYMONTHDAY ?? '1', 10);
+    return { scheduleType: 'monthly', scheduleConfig: { time, date: Number.isFinite(day) ? day : 1 } };
+  }
+  return { scheduleType: 'cron', scheduleConfig: { cron: expr } };
 }
 
 const SCHEDULE_TYPES = [
@@ -84,20 +125,34 @@ export default function ScheduleConfigSection({
   workflowConfig,
   onSave,
   onCancel,
-  disabled = false
+  disabled = false,
+  initial,
+  submitLabel = 'Schedule',
 }: ScheduleConfigSectionProps) {
-  const [schedule, setSchedule] = useState<ScheduledExecution>({
-    name: '',
-    description: '',
-    agentId,
-    workflowConfig,
-    scheduleType: 'daily',
-    scheduleConfig: {
-      time: '09:00'
-    },
-    timezone: 'UTC',
-    taskPrompt: '',
-    enabled: true
+  const [schedule, setSchedule] = useState<ScheduledExecution>(() => {
+    if (!initial) {
+      return {
+        name: '',
+        description: '',
+        agentId,
+        workflowConfig,
+        scheduleType: 'daily',
+        scheduleConfig: { time: '09:00' },
+        timezone: 'UTC',
+        taskPrompt: '',
+        enabled: true,
+      };
+    }
+    const derived = deriveFromRecurrence(initial.scheduleConfig?.cron);
+    return {
+      ...initial,
+      agentId,
+      workflowConfig: initial.workflowConfig ?? workflowConfig,
+      scheduleType: derived.scheduleType,
+      scheduleConfig: derived.scheduleConfig,
+      timezone: initial.timezone || 'UTC',
+      taskPrompt: initial.taskPrompt ?? initial.description ?? '',
+    };
   });
 
   const [isSaving, setIsSaving] = useState(false);
@@ -121,17 +176,19 @@ export default function ScheduleConfigSection({
     setIsSaving(true);
     try {
       await onSave(schedule);
-      setSchedule({
-        name: '',
-        description: '',
-        agentId,
-        workflowConfig,
-        scheduleType: 'daily',
-        scheduleConfig: { time: '09:00' },
-        timezone: 'UTC',
-        taskPrompt: '',
-        enabled: true
-      });
+      if (!initial) {
+        setSchedule({
+          name: '',
+          description: '',
+          agentId,
+          workflowConfig,
+          scheduleType: 'daily',
+          scheduleConfig: { time: '09:00' },
+          timezone: 'UTC',
+          taskPrompt: '',
+          enabled: true
+        });
+      }
     } catch (error) {
       console.error('Failed to save schedule:', error);
       toast.error("Couldn't save the schedule", { description: 'Please check your settings and try again.' });
@@ -482,7 +539,7 @@ export default function ScheduleConfigSection({
                 Saving...
               </>
             ) : (
-              'Schedule'
+              submitLabel
             )}
           </Button>
         </div>

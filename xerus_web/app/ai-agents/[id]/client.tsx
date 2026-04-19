@@ -131,11 +131,13 @@ export default function AgentDetailsClient({ agentId }: AgentDetailsClientProps)
   // --- Extracted hooks ---
   const {
     handleScheduleCreate,
+    handleScheduleUpdate,
     handleScheduleToggle,
     handleScheduleDelete,
   } = useScheduleHandlers({
     agentId: agent?.id ?? 0,
     agentSlug: agent?.slug ?? '',
+    schedules: effectiveSchedules,
     setSchedules: setLocalSchedules,
   })
 
@@ -147,7 +149,7 @@ export default function AgentDetailsClient({ agentId }: AgentDetailsClientProps)
     handlePublish,
     handleUnpublish,
     handleDelete,
-  } = useAgentActions({ agent, setAgent: () => mutateAgent() })
+  } = useAgentActions({ agent, setAgent: (next) => mutateAgent(next, false) })
 
   // --- Handlers ---
   const handleUpdateAgent = async (updates: any) => {
@@ -317,6 +319,7 @@ export default function AgentDetailsClient({ agentId }: AgentDetailsClientProps)
                 schedules={effectiveSchedules}
                 workflowConfig={workflowConfig}
                 onCreate={handleScheduleCreate}
+                onUpdate={handleScheduleUpdate}
                 onToggle={handleScheduleToggle}
                 onDelete={handleScheduleDelete}
                 isLoading={isLoadingAgent}

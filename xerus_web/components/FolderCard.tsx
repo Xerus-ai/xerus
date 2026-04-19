@@ -77,6 +77,10 @@ interface FolderCardProps {
     onClick?: () => void;
     onContextMenu?: (e: React.MouseEvent) => void;
     className?: string;
+    // `folder` (default): text sits on the dark SVG silhouette, so white reads cleanly.
+    // `plate`: used when FolderSvgDefinitions isn't mounted (e.g. agent Knowledge Base)
+    // — text sits on the cream back plate and needs theme-adaptive colour instead.
+    surface?: 'folder' | 'plate';
 }
 
 // --- New Folder Card (draft state, used during folder creation) ---
@@ -182,11 +186,27 @@ export const FolderCard = ({
     delay = "0",
     onClick,
     onContextMenu,
-    className
+    className,
+    surface = 'folder'
 }: FolderCardProps) => {
     // Custom warm background color matching the design system cards (e.g., bg-amber-50)
     const cardBgColor = 'bg-surface-hover';
     const folderIconColor = 'text-text group-hover:text-primary transition-colors duration-300'; // Dark default, Orange on hover
+
+    // Text classes swap when the silhouette isn't rendered: on the cream back
+    // plate we need dark text in light mode, white in dark mode. On the
+    // silhouette (default) we keep white at varying opacities.
+    const onPlate = surface === 'plate';
+    const txt = {
+        primary: onPlate ? 'text-text dark:text-white' : 'text-white',
+        hoverBg: onPlate ? 'hover:bg-text/10 dark:hover:bg-white/10' : 'hover:bg-white/10',
+        icon40: onPlate ? 'text-text/40 dark:text-white/40' : 'text-white/40',
+        hoverPrimary: onPlate ? 'hover:text-text dark:hover:text-white' : 'hover:text-white',
+        divider: onPlate ? 'bg-text/10 dark:bg-white/10' : 'bg-white/10',
+        status: onPlate ? 'text-text/80 dark:text-white/80' : 'text-white/80',
+        icon50: onPlate ? 'text-text/50 dark:text-white/50' : 'text-white/50',
+        icon30: onPlate ? 'text-text/30 dark:text-white/30' : 'text-white/30',
+    };
 
     return (
         <div
@@ -196,8 +216,8 @@ export const FolderCard = ({
             onContextMenu={onContextMenu}
         >
             <div
-                className={`relative w-full h-full transition-all duration-500 ease-[cubic-bezier(0.25,0.8,0.25,1)] 
-                   group-hover:-translate-y-2 group-hover:shadow-2xl rounded-2xl shadow-xl ${cardBgColor} 
+                className={`relative w-full h-full transition-all duration-500 ease-[cubic-bezier(0.25,0.8,0.25,1)]
+                   group-hover:-translate-y-2 group-hover:shadow-2xl rounded-2xl shadow-xl ${cardBgColor}
                    overflow-hidden preserve-3d border border-surface-active/50`}
             >
 
@@ -249,33 +269,33 @@ export const FolderCard = ({
                         </svg>
 
                         {/* Content Overlay — compact for h-36 */}
-                        <div className="absolute inset-0 px-3 pt-6 pb-0 text-white flex flex-col justify-end z-40">
+                        <div className={`absolute inset-0 px-3 pt-6 pb-0 ${txt.primary} flex flex-col justify-end z-40`}>
 
                             {/* Folder Title */}
                             <div className="flex justify-between items-center mb-1" style={{ backfaceVisibility: 'hidden' }}>
-                                <h2 className="text-sm font-semibold tracking-tight text-white leading-tight truncate pr-2">{title}</h2>
-                                <button className="p-1 -mr-1 rounded-full hover:bg-white/10 text-white/40 hover:text-white transition-colors pointer-events-auto" aria-label="More options">
+                                <h2 className={`text-sm font-semibold tracking-tight ${txt.primary} leading-tight truncate pr-2`}>{title}</h2>
+                                <button className={`p-1 -mr-1 rounded-full ${txt.hoverBg} ${txt.icon40} ${txt.hoverPrimary} transition-colors pointer-events-auto`} aria-label="More options">
                                     <MoreHorizontal size={14} />
                                 </button>
                             </div>
 
                             {/* Border line */}
-                            <div className="h-px bg-white/10 pointer-events-none" style={{ backfaceVisibility: 'hidden' }} />
+                            <div className={`h-px ${txt.divider} pointer-events-none`} style={{ backfaceVisibility: 'hidden' }} />
 
 
                             {/* Status bar — compact */}
                             <div
-                                className="w-full text-white/80 py-1.5 flex justify-between items-center z-50"
+                                className={`w-full ${txt.status} py-1.5 flex justify-between items-center z-50`}
                                 style={{ backfaceVisibility: 'hidden' }}
                             >
                                 <div className="flex items-center gap-1">
-                                    <HardDrive size={10} className="text-white/50" />
+                                    <HardDrive size={10} className={txt.icon50} />
                                     <span className="text-[10px] font-medium">{storageUsed}</span>
-                                    <span className="text-[10px] text-white/40 ml-1">{fileCount} Files</span>
+                                    <span className={`text-[10px] ${txt.icon40} ml-1`}>{fileCount} Files</span>
                                 </div>
                                 <div className="flex items-center gap-1">
                                     <AccessAvatars users={accessUsers} max={2} />
-                                    <User size={8} className="text-white/30" />
+                                    <User size={8} className={txt.icon30} />
                                 </div>
                             </div>
                         </div>
