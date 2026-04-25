@@ -480,6 +480,7 @@ export interface CreateScheduleInput {
     max_budget_usd?: number;
     allowed_tools?: string[];
     system_prompt?: string;
+    config?: string;  // JSON-serialized UI metadata (timezone, activeHours, weekdaysOnly, tokenBudget, etc.)
 }
 
 export interface ListSchedulesInput {
@@ -497,6 +498,7 @@ export interface UpdateScheduleInput {
     max_budget_usd?: number;
     allowed_tools?: string[];
     system_prompt?: string;
+    config?: string;  // JSON-serialized UI metadata
 }
 
 export interface DeleteScheduleInput {
@@ -513,6 +515,7 @@ export interface ScheduleEntry {
     model: string | null;
     status: string;
     max_budget_usd: number | null;
+    config: string | null;  // JSON-serialized UI metadata; null until the user saves one
     next_run_at: number | null;
     last_run_at: number | null;
     created_at: number;

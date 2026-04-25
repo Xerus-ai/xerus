@@ -5,59 +5,97 @@ import { Calendar, Plus, Check, Clock, Pencil, Trash2, Play, Pause, ChevronRight
 import { Button } from "@/components/ui/button"
 import { FloatingPanel } from "@/components/common/FloatingPanel"
 import ScheduleConfigSection from "@/components/ScheduleConfigSection"
+import type { ScheduledExecution } from "@/lib/api/types"
 
 interface SchedulesTabProps {
     agent: any
     schedules: any[]
     workflowConfig: any
     onCreate: (schedule: any) => Promise<void>
+    onUpdate: (id: string, schedule: any) => Promise<void>
     onToggle: (id: string, enabled: boolean) => Promise<void>
     onDelete: (id: string) => Promise<void>
     isLoading: boolean
 }
 
-// Helper to format cron expression to readable time
-const formatScheduleTime = (schedule: any): string => {
-    if (schedule.cron_expression) {
-        const parts = schedule.cron_expression.split(' ')
-        if (parts.length >= 5) {
-            const minute = parts[0]
-            const hour = parts[1]
-            if (hour !== '*' && minute !== '*') {
-                const h = parseInt(hour)
-                const m = parseInt(minute)
-                const ampm = h >= 12 ? 'PM' : 'AM'
-                const displayHour = h % 12 || 12
-                return `${displayHour}:${m.toString().padStart(2, '0')} ${ampm}`
-            }
-        }
-        return schedule.cron_expression
-    }
-    return 'Not scheduled'
+// Extract underlying recurrence string from the mapped schedule.
+// Backend stores it as `rrule` (RRULE or passthrough cron); the mapper
+// surfaces it via scheduleConfig.cron.
+const getRecurrence = (schedule: any): string | undefined =>
+    schedule?.scheduleConfig?.cron ?? undefined
+
+interface ParsedRecurrence {
+    time?: string
+    frequency?: string
 }
 
-// Helper to get schedule frequency description
-const getFrequencyDescription = (schedule: any): string => {
-    if (!schedule.cron_expression) return 'Not configured'
-
-    const parts = schedule.cron_expression.split(' ')
-    if (parts.length < 5) return schedule.cron_expression
-
-    const [minute, hour, dayOfMonth, month, dayOfWeek] = parts
-
-    if (dayOfWeek !== '*' && dayOfMonth === '*') {
-        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-        const dayNum = parseInt(dayOfWeek)
-        if (!isNaN(dayNum) && dayNum >= 0 && dayNum <= 6) {
-            return `Every ${days[dayNum]}`
+// Parse either RRULE (FREQ=DAILY;BYHOUR=9;...) or standard cron (m h dom mon dow).
+function parseRecurrence(expr: string): ParsedRecurrence {
+    if (expr.includes('FREQ=')) {
+        const parts: Record<string, string> = {}
+        for (const segment of expr.split(';')) {
+            const [k, v] = segment.split('=')
+            if (k) parts[k] = v ?? ''
         }
+
+        const hour = parseInt(parts.BYHOUR ?? '', 10)
+        const minute = parseInt(parts.BYMINUTE ?? '0', 10)
+        const time = Number.isFinite(hour)
+            ? `${(hour % 12) || 12}:${(Number.isFinite(minute) ? minute : 0).toString().padStart(2, '0')} ${hour >= 12 ? 'PM' : 'AM'}`
+            : undefined
+        const interval = parseInt(parts.INTERVAL ?? '', 10)
+
+        let frequency: string
+        if (parts.FREQ === 'MINUTELY') {
+            frequency = Number.isFinite(interval) && interval > 1 ? `Every ${interval} minutes` : 'Every minute'
+        } else if (parts.FREQ === 'HOURLY') {
+            frequency = Number.isFinite(interval) && interval > 1 ? `Every ${interval} hours` : 'Every hour'
+        } else if (parts.FREQ === 'DAILY') {
+            frequency = 'Daily'
+        } else if (parts.FREQ === 'WEEKLY') {
+            const dayMap: Record<string, string> = { SU: 'Sun', MO: 'Mon', TU: 'Tue', WE: 'Wed', TH: 'Thu', FR: 'Fri', SA: 'Sat' }
+            const days = (parts.BYDAY ?? '').split(',').map(d => dayMap[d]).filter(Boolean)
+            frequency = days.length > 0 ? `Every ${days.join(', ')}` : 'Weekly'
+        } else if (parts.FREQ === 'MONTHLY') {
+            frequency = `Day ${parts.BYMONTHDAY ?? '1'} of each month`
+        } else {
+            frequency = parts.FREQ ? parts.FREQ[0] + parts.FREQ.slice(1).toLowerCase() : expr
+        }
+        return { time, frequency }
     }
 
-    if (dayOfMonth === '*' && month === '*' && dayOfWeek === '*') {
-        return 'Daily'
+    const cronParts = expr.split(' ')
+    if (cronParts.length >= 5) {
+        const [minute, hour, dayOfMonth, month, dayOfWeek] = cronParts
+        const h = parseInt(hour, 10)
+        const m = parseInt(minute, 10)
+        const time = Number.isFinite(h) && Number.isFinite(m) && hour !== '*' && minute !== '*'
+            ? `${(h % 12) || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
+            : undefined
+
+        let frequency = expr
+        if (dayOfMonth === '*' && month === '*' && dayOfWeek === '*') {
+            frequency = 'Daily'
+        } else if (dayOfWeek !== '*' && dayOfMonth === '*') {
+            const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+            const d = parseInt(dayOfWeek, 10)
+            if (d >= 0 && d <= 6) frequency = `Every ${days[d]}`
+        }
+        return { time, frequency }
     }
 
-    return schedule.cron_expression
+    return { time: undefined, frequency: expr }
+}
+
+// Human-friendly single-line summary, e.g. "Daily at 9:00 AM",
+// "Every Mon, Wed at 6:30 PM", or "Every 15 minutes". Falls back to the
+// raw expression only when parsing fails.
+const describeRecurrence = (schedule: any): string => {
+    const expr = getRecurrence(schedule)
+    if (!expr) return 'Not configured'
+    const { time, frequency } = parseRecurrence(expr)
+    if (time && frequency) return `${frequency} at ${time}`
+    return frequency ?? time ?? expr
 }
 
 export function SchedulesTab({
@@ -65,12 +103,14 @@ export function SchedulesTab({
     schedules,
     workflowConfig,
     onCreate,
+    onUpdate,
     onToggle,
     onDelete,
     isLoading
 }: SchedulesTabProps) {
     const [isCreateOpen, setIsCreateOpen] = useState(false)
     const [selectedSchedule, setSelectedSchedule] = useState<any>(null)
+    const [editingSchedule, setEditingSchedule] = useState<ScheduledExecution | null>(null)
 
     return (
         <div className="space-y-6">
@@ -120,13 +160,11 @@ export function SchedulesTab({
                                                 </span>
                                             </div>
                                             <div className="flex items-center gap-4 text-sm text-text-secondary">
-                                                <span>{formatScheduleTime(schedule)}</span>
-                                                <span>•</span>
-                                                <span>{getFrequencyDescription(schedule)}</span>
+                                                <span>{describeRecurrence(schedule)}</span>
                                             </div>
-                                            {schedule.task && (
+                                            {(schedule.taskPrompt ?? schedule.description) && (
                                                 <p className="text-sm text-text-secondary mt-2 line-clamp-1">
-                                                    Task: {schedule.task}
+                                                    Task: {schedule.taskPrompt ?? schedule.description}
                                                 </p>
                                             )}
                                         </div>
@@ -235,6 +273,58 @@ export function SchedulesTab({
                 )}
             </FloatingPanel>
 
+            {/* Edit Schedule Panel */}
+            <FloatingPanel
+                isOpen={!!editingSchedule}
+                onClose={() => setEditingSchedule(null)}
+                title="Edit Schedule"
+                minimizedTitle={editingSchedule?.name || 'Edit Schedule'}
+                icon={<Pencil className="w-4 h-4" />}
+                className="w-[600px] h-[600px] max-w-[95vw] max-h-[95vh] rounded-[40px] shadow-sm bg-surface p-2"
+                variant="clean"
+            >
+                {({ close, minimize }) => (
+                    <div className="bg-card rounded-2xl h-full w-full flex flex-col p-6 overflow-hidden">
+                        <div className="flex items-center justify-between mb-4 shrink-0">
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={close}
+                                    className="p-1.5 bg-surface-hover hover:bg-surface-pressed rounded-full transition-colors"
+                                    aria-label="Close"
+                                >
+                                    <X className="w-4 h-4 text-text" />
+                                </button>
+                                <button
+                                    onClick={minimize}
+                                    className="p-1.5 bg-surface-hover hover:bg-surface-pressed rounded-full transition-colors"
+                                    aria-label="Minimize"
+                                >
+                                    <Minus className="w-4 h-4 text-text" />
+                                </button>
+                            </div>
+                            <span className="text-sm font-bold text-text">Edit Schedule</span>
+                        </div>
+
+                        <div className="space-y-8 flex-1 overflow-y-auto">
+                            {editingSchedule && (
+                                <ScheduleConfigSection
+                                    agentId={agent.id}
+                                    workflowConfig={workflowConfig}
+                                    initial={editingSchedule}
+                                    submitLabel="Save Changes"
+                                    onSave={async (s) => {
+                                        if (!editingSchedule.id) return
+                                        await onUpdate(editingSchedule.id, s)
+                                        setEditingSchedule(null)
+                                    }}
+                                    onCancel={() => setEditingSchedule(null)}
+                                />
+                            )}
+                        </div>
+                    </div>
+                )}
+            </FloatingPanel>
+
             {/* Schedule Detail Panel */}
             <FloatingPanel
                 isOpen={!!selectedSchedule}
@@ -286,18 +376,27 @@ export function SchedulesTab({
 
                                 <div>
                                     <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Schedule</label>
-                                    <p className="text-text mt-1">{formatScheduleTime(selectedSchedule)} • {getFrequencyDescription(selectedSchedule)}</p>
+                                    <p className="text-text mt-1">{describeRecurrence(selectedSchedule)}</p>
                                 </div>
 
                                 <div>
-                                    <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Cron Expression</label>
-                                    <p className="text-text mt-1 font-mono text-sm bg-surface px-3 py-2 rounded-lg">{selectedSchedule.cron_expression}</p>
+                                    <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Recurrence</label>
+                                    <div className="mt-1 bg-surface px-3 py-2 rounded-lg">
+                                        <p className="text-text text-sm">{describeRecurrence(selectedSchedule)}</p>
+                                        {getRecurrence(selectedSchedule) && (
+                                            <p className="text-text-muted text-[11px] font-mono mt-1 break-all">
+                                                {getRecurrence(selectedSchedule)}
+                                            </p>
+                                        )}
+                                    </div>
                                 </div>
 
-                                {selectedSchedule.task && (
+                                {(selectedSchedule.taskPrompt ?? selectedSchedule.description) && (
                                     <div>
                                         <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Task</label>
-                                        <p className="text-text mt-1 text-sm bg-surface px-3 py-2 rounded-lg">{selectedSchedule.task}</p>
+                                        <p className="text-text mt-1 text-sm bg-surface px-3 py-2 rounded-lg whitespace-pre-wrap">
+                                            {selectedSchedule.taskPrompt ?? selectedSchedule.description}
+                                        </p>
                                     </div>
                                 )}
 
@@ -312,6 +411,17 @@ export function SchedulesTab({
                                     >
                                         {selectedSchedule.enabled ? <Pause className="w-4 h-4 mr-2" /> : <Play className="w-4 h-4 mr-2" />}
                                         {selectedSchedule.enabled ? 'Pause' : 'Enable'}
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        className="h-10 px-4 bg-surface-hover hover:bg-surface-pressed rounded-xl text-text"
+                                        onClick={() => {
+                                            setEditingSchedule(selectedSchedule)
+                                            setSelectedSchedule(null)
+                                        }}
+                                    >
+                                        <Pencil className="w-4 h-4 mr-2" />
+                                        Edit
                                     </Button>
                                     <Button
                                         variant="ghost"

@@ -22,8 +22,8 @@ export function AgentChannelsCard({ agentId, isEditable, isMarketplace = false }
     setPrimaryChannel,
   } = useAgentChannels(agentId)
 
-  const assignedIds = useMemo(
-    () => new Set(assignedChannels.map(ac => ac.channel_id)),
+  const assignedSlugs = useMemo(
+    () => new Set(assignedChannels.map(ac => ac.channel_slug)),
     [assignedChannels],
   )
 
@@ -35,21 +35,21 @@ export function AgentChannelsCard({ agentId, isEditable, isMarketplace = false }
   )
 
   const availableChannels = useMemo(
-    () => allChannels.filter(ch => !assignedIds.has(ch.id)),
-    [allChannels, assignedIds],
+    () => allChannels.filter(ch => !assignedSlugs.has(ch.id)),
+    [allChannels, assignedSlugs],
   )
 
-  const handleAdd = async (channelId: string) => {
-    await assignChannel(channelId)
+  const handleAdd = async (channelSlug: string) => {
+    await assignChannel(channelSlug)
     setShowPicker(false)
   }
 
-  const handleRemove = async (channelId: string) => {
-    await unassignChannel(channelId)
+  const handleRemove = async (channelSlug: string) => {
+    await unassignChannel(channelSlug)
   }
 
-  const handleSetPrimary = async (channelId: string) => {
-    await setPrimaryChannel(channelId)
+  const handleSetPrimary = async (channelSlug: string) => {
+    await setPrimaryChannel(channelSlug)
   }
 
   return (
@@ -75,7 +75,7 @@ export function AgentChannelsCard({ agentId, isEditable, isMarketplace = false }
           <div className="space-y-1">
             {assignedChannels.map(ch => (
               <div
-                key={ch.channel_id}
+                key={ch.channel_slug}
                 className="flex items-center gap-2.5 py-1.5 px-2 rounded-xl hover:bg-surface-hover group transition-colors"
               >
                 <div className="w-7 h-7 rounded-lg bg-secondary/10 flex items-center justify-center shrink-0">
@@ -85,7 +85,7 @@ export function AgentChannelsCard({ agentId, isEditable, isMarketplace = false }
                   <p className="text-sm text-text truncate">{ch.channel_name}</p>
                   <p className="text-[10px] text-text-secondary">{ch.domain_name}</p>
                 </div>
-                {processing === ch.channel_id ? (
+                {processing === ch.channel_slug ? (
                   <Loader2 className="w-3.5 h-3.5 text-text-secondary animate-spin shrink-0" />
                 ) : (
                   <div className="flex items-center gap-1 shrink-0">
@@ -93,7 +93,7 @@ export function AgentChannelsCard({ agentId, isEditable, isMarketplace = false }
                       <Star className="w-3.5 h-3.5 text-secondary fill-current" />
                     ) : isEditable ? (
                       <button
-                        onClick={() => handleSetPrimary(ch.channel_id)}
+                        onClick={() => handleSetPrimary(ch.channel_slug)}
                         className="w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-primary/5 text-text-secondary hover:text-secondary transition-all"
                         title="Set as primary"
                       >
@@ -102,7 +102,7 @@ export function AgentChannelsCard({ agentId, isEditable, isMarketplace = false }
                     ) : null}
                     {isEditable && (
                       <button
-                        onClick={() => handleRemove(ch.channel_id)}
+                        onClick={() => handleRemove(ch.channel_slug)}
                         className="w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive text-text-secondary transition-all"
                         title="Remove from channel"
                       >
@@ -122,12 +122,22 @@ export function AgentChannelsCard({ agentId, isEditable, isMarketplace = false }
           </div>
         )}
 
+        {showPicker && availableChannels.length === 0 && (
+          <div className="mt-3 pt-3 border-t border-surface-active">
+            <p className="text-xs text-text-secondary italic text-center py-2">
+              {allChannels.length === 0
+                ? 'No channels exist yet. Create one in a project first.'
+                : 'This agent is already in every channel.'}
+            </p>
+          </div>
+        )}
+
         {showPicker && availableChannels.length > 0 && (
           <div className="mt-3 pt-3 border-t border-surface-active">
             <p className="text-[10px] font-medium text-text-secondary mb-1.5">Add to channel</p>
             <div className="space-y-0.5 max-h-48 overflow-y-auto">
               {(domains || []).map(domain => {
-                const domainChannels = domain.channels.filter(ch => !assignedIds.has(ch.id))
+                const domainChannels = domain.channels.filter(ch => !assignedSlugs.has(ch.id))
                 if (domainChannels.length === 0) return null
                 return (
                   <div key={domain.id}>

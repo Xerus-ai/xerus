@@ -40,14 +40,6 @@ const matchers: PathMatcher[] = [
         handler: syncAgentSoul,
     },
     {
-        pattern: /^agents\/([^/]+)\/HEARTBEAT\.md$/,
-        handler: syncAgentHeartbeat,
-    },
-    {
-        pattern: /^agents\/([^/]+)\/knowledge\/(.+)$/,
-        handler: syncAgentKB,
-    },
-    {
         pattern: /^projects\/([^/]+)\/$/,
         handler: syncDomain,
     },
@@ -127,39 +119,6 @@ async function syncAgentSoul(
     const slug = match[1];
     // SOUL.md lives in workspace files only. No DB column.
     log.debug('Agent soul sync', { event, slug, action: 'file-only, no DB column' });
-}
-
-// -----------------------------------------------------------------------------
-// Handler: agents/{slug}/HEARTBEAT.md
-// -----------------------------------------------------------------------------
-
-async function syncAgentHeartbeat(
-    event: SyncEvent,
-    match: RegExpMatchArray,
-    _content: string | null,
-    _userId: string,
-): Promise<void> {
-    const slug = match[1];
-    // Heartbeat tables deprecated in migration 081. HEARTBEAT.md is now a static template.
-    log.debug('Agent heartbeat sync', { event, slug, action: 'heartbeat tables deprecated, no DB sync' });
-}
-
-// -----------------------------------------------------------------------------
-// Handler: agents/{slug}/knowledge/{file}
-// KB assignments now live in config.json. No DB sync needed.
-// -----------------------------------------------------------------------------
-
-async function syncAgentKB(
-    event: SyncEvent,
-    match: RegExpMatchArray,
-    _content: string | null,
-    _userId: string,
-): Promise<void> {
-    const slug = match[1];
-    const fileName = match[2];
-    // KB data now lives in config.json knowledge_bases array.
-    // No agent_knowledge_bases table to sync to.
-    log.debug('Agent KB sync', { event, slug, file: fileName, action: 'filesystem is source of truth' });
 }
 
 // -----------------------------------------------------------------------------

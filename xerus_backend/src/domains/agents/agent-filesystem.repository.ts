@@ -39,7 +39,6 @@ export interface AgentConfigFile {
     last_used_at: string | null;
     // Sub-resources (replaces junction tables)
     tools: string[];
-    knowledge_bases: KBEntry[];
     // Channel assignment (replaces dropped channel_members table)
     domain: string;
     primary_channel: string;
@@ -47,12 +46,6 @@ export interface AgentConfigFile {
     // Timestamps
     created_at: string;
     updated_at: string;
-}
-
-export interface KBEntry {
-    knowledge_base_id: string;
-    kb_name: string | null;
-    access_mode: 'read' | 'write' | 'admin';
 }
 
 // Agent index.json entry
@@ -277,23 +270,10 @@ export class AgentFilesystemRepository {
         return config?.tools ?? [];
     }
 
-    async getAgentKBs(userId: string, slug: string): Promise<KBEntry[]> {
-        const config = await this.getAgentConfig(userId, slug);
-        return config?.knowledge_bases ?? [];
-    }
-
     async updateTools(userId: string, slug: string, tools: string[]): Promise<void> {
         const config = await this.getAgentConfig(userId, slug);
         if (!config) throw new Error(`Agent config not found: ${slug}`);
         config.tools = tools;
-        config.updated_at = new Date().toISOString();
-        await this.putAgentConfig(userId, slug, config);
-    }
-
-    async updateKBs(userId: string, slug: string, kbs: KBEntry[]): Promise<void> {
-        const config = await this.getAgentConfig(userId, slug);
-        if (!config) throw new Error(`Agent config not found: ${slug}`);
-        config.knowledge_bases = kbs;
         config.updated_at = new Date().toISOString();
         await this.putAgentConfig(userId, slug, config);
     }

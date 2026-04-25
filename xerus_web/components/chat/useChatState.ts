@@ -14,28 +14,15 @@ import {
   createConversationApi,
 } from '@/lib/api/execute'
 import type { Conversation as ApiConversation } from '@/lib/api/execute'
-import { getTree, type FileNode } from '@/lib/api/workspace'
 import { Agent, Conversation, ChatState, SelectedChannel, SessionEntry, ProjectGroup, SessionStatus } from './types'
 import { XERUS_MASTER_SLUG } from './AgentDropdown'
 import { useChatExecution } from './useChatExecution'
 import { toast } from '@/lib/toast'
 import type { ChatMessageExtended } from './chat-message.types'
-import type { WorkspaceFile } from './WorkspaceTree'
 
 // ---------------------------------------------------------------------------
 // Pure helpers (no hooks, no side-effects)
 // ---------------------------------------------------------------------------
-
-function mapFileNodes(nodes: FileNode[]): WorkspaceFile[] {
-  return nodes.map((n) => ({
-    name: n.name,
-    path: n.path,
-    type: n.type,
-    extension: n.type === 'file' ? n.name.split('.').pop()?.toLowerCase() : undefined,
-    size: n.size,
-    children: n.children ? mapFileNodes(n.children) : undefined,
-  }))
-}
 
 function mapConversation(c: ApiConversation): Conversation {
   return {
@@ -124,7 +111,6 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
 
   const [agents, setAgents] = useState<Agent[]>([])
   const [isLoadingAgents, setIsLoadingAgents] = useState(true)
-  const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([])
 
   // Execution stream (v3: long-lived SSE + POST messages)
   const executionStream = useChatExecution({ setState })
@@ -181,10 +167,9 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
     const loadAll = async () => {
       setIsLoadingAgents(true)
 
-      const [agentResult, convResult, treeResult] = await Promise.allSettled([
+      const [agentResult, convResult] = await Promise.allSettled([
         getAssistants(),
         getConversations(50),
-        getTree(3),
       ])
 
       if (cancelled) return
@@ -224,15 +209,6 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
         if (targetConvId) loadConversationDetailsRef.current(targetConvId)
       } else {
         console.error('Failed to load conversations:', convResult.reason)
-      }
-
-      // Process workspace tree
-      if (treeResult.status === 'fulfilled') {
-        if (treeResult.value.root?.children) {
-          setWorkspaceFiles(mapFileNodes(treeResult.value.root.children))
-        }
-      } else {
-        console.error('Failed to load workspace tree:', treeResult.reason)
       }
 
       setIsLoadingAgents(false)
@@ -423,7 +399,6 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
     setState,
     agents,
     isLoadingAgents,
-    workspaceFiles,
     projects,
     user,
     isAuthReady,

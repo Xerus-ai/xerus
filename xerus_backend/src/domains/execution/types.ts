@@ -73,6 +73,7 @@ export const STREAM_EVENT_TYPES = [
     'subagent_stop',
     'delegation',
     'file_changed',
+    'preview',
 ] as const;
 
 export type StreamEventType = (typeof STREAM_EVENT_TYPES)[number];
@@ -300,6 +301,15 @@ export interface GuidanceEventContent {
     browser_url?: string;
     preview_url?: string;
     artifact_path?: string;
+}
+
+// Live app preview surfaced to the chat artifact viewer.
+// Agents emit this (via sse_forward) when they start a dev server inside the
+// sandbox. The router resolves a Daytona preview URL when only port is given.
+export interface PreviewEventContent {
+    port: number;
+    url: string;
+    label?: string;
 }
 
 export interface TokenEventContent {

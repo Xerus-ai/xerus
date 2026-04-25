@@ -3,8 +3,8 @@
 // Source of truth: filesystem (config.json) + agent_registry (ID/slug mapping).
 //
 // Tool operations: agent-tools.service.ts
-// KB operations: agent-kb.service.ts
 // Marketplace operations: agent-marketplace.service.ts
+// Knowledge base assignment: workspace.connections (file_connections table).
 
 import { AgentRegistryRepository, agentRegistryRepository } from './agent-registry.repository';
 import { AgentFilesystemRepository, AgentConfigFile } from './agent-filesystem.repository';
@@ -18,7 +18,6 @@ import {
     PaginatedAgents,
     PaginatedAgentsWithTools,
     AgentWithEnrichedTools,
-    AgentKnowledgeBase,
     EnrichedTool,
     DEFAULT_MODEL,
 } from './types';
@@ -35,7 +34,6 @@ import { configToAgent, canUserView, canUserModify } from './agent-helpers';
 
 // Re-export extracted services for convenience
 export { agentToolsService, AgentToolsService } from './agent-tools.service';
-export { agentKBService, AgentKBService } from './agent-kb.service';
 export { agentMarketplaceService, AgentMarketplaceService } from './agent-marketplace.service';
 
 // Agent limits
@@ -120,7 +118,6 @@ export class AgentService {
             success_rate: 0,
             last_used_at: null,
             tools: [],
-            knowledge_bases: [],
             domain: '',
             primary_channel: '',
             channels: [],
@@ -161,23 +158,11 @@ export class AgentService {
             throw new AgentAccessDeniedError(id);
         }
 
-        // Build KB details
-        const kbs: AgentKnowledgeBase[] = (config.knowledge_bases || []).map((kb, idx) => ({
-            id: idx + 1,
-            agent_id: id,
-            knowledge_base_id: kb.knowledge_base_id,
-            kb_name: kb.kb_name,
-            access_mode: kb.access_mode,
-            created_at: new Date(config.created_at),
-        }));
-
         return {
             ...agent,
             tool_count: (config.tools || []).length,
-            kb_count: (config.knowledge_bases || []).length,
             source_agent_name: null,
             tools: config.tools || [],
-            knowledge_bases: kbs,
         };
     }
 

@@ -7,10 +7,20 @@ import {
     SANDBOX_CONFIG,
     createWorkspaceTar,
     restoreWorkspaceTar,
+    syncWorkspaceTemplate,
+    listPlatformOverlayPaths,
 } from '../sandbox-infra';
-import type { DaytonaProvider } from '../sandbox-infra';
+import type { DaytonaProvider, WorkspaceTemplateSyncResult } from '../sandbox-infra';
+import { personalizeWorkspace } from '../sandbox-infra/workspace/workspace-personalizer.service';
 import { isHidden } from './editability';
 import { buildWorkspaceOverview } from './workspace-overview';
+import {
+    loadProjectMap,
+    loadDeliverablesDeep,
+    injectDeliverablesProjection,
+    resolveVirtualDeliverablePath,
+    type ProjectMap,
+} from './deliverables-projection';
 import type { FileNode, TreeResponse, WorkspaceStatus, WorkspaceOverview } from './types';
 import type { SandboxOperationResult, SandboxSession } from '../sandbox-infra';
 import type { S3BackupService, BackupResult } from '../sandbox-infra/storage/s3-backup.service';
@@ -40,12 +50,47 @@ export class DriveService {
         const files = await provider.listFilesRecursive(sandboxId, rootPath, depth);
         const root = this.buildTreeFromDaytona(files, rootPath, depth);
 
+        // Surface agent deliverables under drive/<Project Name>/ so users see one unified view.
+        // Real files stay at projects/<slug>/channels/<slug>/output/deliverables/ — projection is
+        // read-only; writes go to the real filesystem (per-channel organization is preserved for agents).
+        await this.projectDeliverablesIntoTree(root, sandboxId, provider);
+
         if (!skipPreviews) {
             // Populate previews for text files (first 500 bytes)
             await this.populatePreviewsDaytona(root, sandboxId, provider);
         }
 
         return { root, source: 'daytona', depth };
+    }
+
+    // Cache the project map per sandbox for a short window — a single /workspace/tree call
+    // can trigger downstream getFile calls that need to reverse-resolve virtual paths.
+    private projectMapCache = new Map<string, { map: ProjectMap; expiresAt: number }>();
+    private static readonly PROJECT_MAP_TTL_MS = 10_000;
+
+    private async getProjectMap(sandboxId: string, provider: DaytonaProvider): Promise<ProjectMap> {
+        const now = Date.now();
+        const cached = this.projectMapCache.get(sandboxId);
+        if (cached && cached.expiresAt > now) return cached.map;
+        const map = await loadProjectMap(provider, sandboxId);
+        this.projectMapCache.set(sandboxId, { map, expiresAt: now + DriveService.PROJECT_MAP_TTL_MS });
+        return map;
+    }
+
+    private async projectDeliverablesIntoTree(
+        root: FileNode,
+        sandboxId: string,
+        provider: DaytonaProvider,
+    ): Promise<void> {
+        const map = await this.getProjectMap(sandboxId, provider);
+        if (map.size === 0) return;
+
+        // Deliverables live 6 levels deep under workspace root; the default tree depth (5)
+        // usually cuts them off, so fetch them directly from the projects/ subtree.
+        const deliverables = await loadDeliverablesDeep(provider, sandboxId);
+        if (deliverables.length === 0) return;
+
+        injectDeliverablesProjection(root, deliverables, map);
     }
 
     // GET /workspace/overview — semantic workspace view for sidebar
@@ -113,7 +158,8 @@ export class DriveService {
     async readFile(userId: string, filePath: string): Promise<{ content: string; source: 'daytona' }> {
         const sandboxId = await this.resolveSandboxId(userId);
         const provider = this.getDaytonaProvider();
-        const fullPath = `${SANDBOX_CONFIG.workspacePath}/${filePath}`;
+        const realPath = await this.resolveRealPath(filePath, sandboxId, provider);
+        const fullPath = `${SANDBOX_CONFIG.workspacePath}/${realPath}`;
         const content = await provider.readFile(sandboxId, fullPath);
         return { content, source: 'daytona' };
     }
@@ -122,17 +168,36 @@ export class DriveService {
     async readFileBuffer(userId: string, filePath: string): Promise<{ content: Buffer; source: 'daytona' }> {
         const sandboxId = await this.resolveSandboxId(userId);
         const provider = this.getDaytonaProvider();
-        const fullPath = `${SANDBOX_CONFIG.workspacePath}/${filePath}`;
+        const realPath = await this.resolveRealPath(filePath, sandboxId, provider);
+        const fullPath = `${SANDBOX_CONFIG.workspacePath}/${realPath}`;
         const content = await provider.downloadFile(sandboxId, fullPath);
         return { content, source: 'daytona' };
     }
 
     // PUT /workspace/files/*path - write file to Daytona sandbox
+    // Edits to virtual deliverable paths (drive/<Project>/<file>) flow through to the
+    // real projects/<slug>/channels/<slug>/output/deliverables/<file> so user refinements
+    // land on the agent's source of truth — no shadow copy, no divergence.
     async writeFile(userId: string, filePath: string, content: string): Promise<void> {
         const sandboxId = await this.resolveSandboxId(userId);
         const provider = this.getDaytonaProvider();
-        const fullPath = `${SANDBOX_CONFIG.workspacePath}/${filePath}`;
+        const realPath = await this.resolveRealPath(filePath, sandboxId, provider);
+        const fullPath = `${SANDBOX_CONFIG.workspacePath}/${realPath}`;
         await provider.writeFile(sandboxId, fullPath, content);
+    }
+
+    // Translate a virtual drive/<Project>/... path to its real projects/<slug>/channels/<slug>/...
+    // path. Returns the input unchanged if it's not a virtual projection. Shared by read and
+    // write paths so user operations on the virtual tree affect the real file.
+    private async resolveRealPath(
+        filePath: string,
+        sandboxId: string,
+        provider: DaytonaProvider,
+    ): Promise<string> {
+        if (!filePath.startsWith('drive/')) return filePath;
+        const map = await this.getProjectMap(sandboxId, provider);
+        const virtual = resolveVirtualDeliverablePath(filePath, map);
+        return virtual ?? filePath;
     }
 
     // POST /workspace/upload - upload file to Daytona sandbox
@@ -181,11 +246,14 @@ export class DriveService {
     }
 
     // DELETE directory recursively (for agent delete)
+    // Deletes through the virtual deliverable projection reach the real file so the
+    // user can remove an agent's output without leaving a phantom at drive/<Project>/.
     async deleteDirectory(userId: string, dirPath: string): Promise<void> {
         this.validatePath(dirPath);
         const sandboxId = await this.resolveSandboxId(userId);
         const provider = this.getDaytonaProvider();
-        const fullPath = `${SANDBOX_CONFIG.workspacePath}/${dirPath}`;
+        const realPath = await this.resolveRealPath(dirPath, sandboxId, provider);
+        const fullPath = `${SANDBOX_CONFIG.workspacePath}/${realPath}`;
         await provider.executeCommand(sandboxId, `rm -rf ${shellEscapePath(fullPath)}`);
     }
 
@@ -225,6 +293,18 @@ export class DriveService {
         await this.resolveSandboxId(userId);
         const terminalUrl = await this.sandboxService.ensureTerminalReady(userId);
         return { terminal_url: terminalUrl };
+    }
+
+    // POST /workspace/preview — resolve a Daytona preview URL for a port the agent is serving on.
+    // Used by the chat artifact viewer to render live app previews (Lovable/Replit-style).
+    async getPreviewUrl(userId: string, port: number): Promise<{ port: number; previewUrl: string }> {
+        if (!Number.isInteger(port) || port < 1 || port > 65535) {
+            throw new Error(`Invalid port: ${port}`);
+        }
+        const sandboxId = await this.resolveSandboxId(userId);
+        const provider = this.getDaytonaProvider();
+        const previewUrl = await provider.getPreviewUrl(sandboxId, port);
+        return { port, previewUrl };
     }
 
     // Workspace lifecycle controls
@@ -280,6 +360,40 @@ export class DriveService {
         }
         const result = await this.backupService.restoreSnapshot(snapshotKey);
         await this.importWorkspace(userId, result.content);
+    }
+
+    async deleteSnapshot(userId: string, snapshotKey: string): Promise<void> {
+        if (!this.backupService) {
+            throw new Error('Backup service not configured');
+        }
+        const expectedPrefix = `${userId}/snapshots/`;
+        if (!snapshotKey.startsWith(expectedPrefix)) {
+            throw new Error(`Unauthorized snapshot key: does not belong to user ${userId}`);
+        }
+        await this.backupService.deleteSnapshot(snapshotKey);
+    }
+
+    // POST /workspace/sync-template — selectively overlay the latest xerus-workspace
+    // template onto the user's existing sandbox. Only platform-owned paths
+    // (.claude/, .xerus/, marketplace/, root CLAUDE.md, agents/index.json,
+    // agents/xerus-master, agents/xerus-cto) are touched; user content is preserved.
+    // After a real sync, personalizeWorkspace re-applies user env vars in case
+    // the template overlay missed any platform-defined hooks/permissions.
+    async syncTemplate(userId: string, dryRun = false): Promise<WorkspaceTemplateSyncResult> {
+        const sandboxId = await this.resolveSandboxId(userId);
+        const provider = this.getDaytonaProvider();
+        const result = await syncWorkspaceTemplate(provider, sandboxId, { dryRun });
+
+        if (!dryRun && result.synced) {
+            const sandboxFs = await this.sandboxService.getSandboxFs(sandboxId);
+            await personalizeWorkspace(sandboxFs, { userId });
+        }
+
+        return result;
+    }
+
+    listSyncTemplatePaths(): ReadonlyArray<string> {
+        return listPlatformOverlayPaths();
     }
 
     private getDaytonaProvider(): DaytonaProvider {

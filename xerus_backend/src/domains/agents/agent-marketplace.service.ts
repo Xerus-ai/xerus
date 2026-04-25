@@ -350,10 +350,8 @@ export class AgentMarketplaceService {
             ...configToAgent(normalizedConfig, syntheticId, null, 'public'),
             system_prompt: systemPrompt,
             tool_count: (config.tools || []).length,
-            kb_count: 0,
             source_agent_name: null,
             tools: config.tools || [],
-            knowledge_bases: [],
         };
     }
 

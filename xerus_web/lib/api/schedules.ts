@@ -21,6 +21,7 @@ export interface ScheduleEntry {
     max_budget_usd: number | null;
     allowed_tools: string | null;
     system_prompt: string | null;
+    config: string | null;  // JSON blob for UI-only metadata (timezone, activeHours, etc.)
     next_run_at: number | null;
     last_run_at: number | null;
     created_at: number;
@@ -56,6 +57,7 @@ export interface CreateScheduleInput {
     max_budget_usd?: number;
     allowed_tools?: string[];
     system_prompt?: string;
+    config?: string;
 }
 
 export interface UpdateScheduleInput {
@@ -67,6 +69,7 @@ export interface UpdateScheduleInput {
     max_budget_usd?: number;
     allowed_tools?: string[];
     system_prompt?: string;
+    config?: string;
 }
 
 // -----------------------------------------------------------------------------

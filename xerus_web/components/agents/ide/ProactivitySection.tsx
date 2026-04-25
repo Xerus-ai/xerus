@@ -49,14 +49,104 @@ interface ProactivitySectionProps {
   onDelete: () => void
 }
 
+// Normalize RRULE equivalents of our cron presets back into the preset's
+// cron form so the radio selection highlights correctly even when the
+// schedule was created through the RRULE-producing path (Schedules tab).
+function toCronPreset(expr: string): string {
+  if (!expr.includes('FREQ=')) return expr
+  const parts: Record<string, string> = {}
+  for (const seg of expr.split(';')) {
+    const [k, v] = seg.split('=')
+    if (k) parts[k] = v ?? ''
+  }
+  const hour = parts.BYHOUR
+  const minute = parts.BYMINUTE ?? '0'
+  if (parts.FREQ === 'DAILY' && hour === '9' && minute === '0') return '0 9 * * *'
+  // No lossless cron equivalent for weekly/monthly/custom times in our preset list.
+  return expr
+}
+
 function cronToPreset(cron: string): string {
-  const match = INTERVAL_PRESETS.find((p) => p.cron === cron)
-  return match ? cron : 'custom'
+  const normalized = toCronPreset(cron)
+  const match = INTERVAL_PRESETS.find((p) => p.cron === normalized)
+  return match ? normalized : 'custom'
+}
+
+// Turn an RRULE (FREQ=DAILY;BYHOUR=9;...) or a cron expression
+// (0 9 * * *, */30 * * * *) into a human-readable phrase.
+// Falls back to the raw expression if nothing parses.
+function describeRecurrence(expr: string): string {
+  if (!expr) return ''
+
+  if (expr.includes('FREQ=')) {
+    const parts: Record<string, string> = {}
+    for (const seg of expr.split(';')) {
+      const [k, v] = seg.split('=')
+      if (k) parts[k] = v ?? ''
+    }
+    const hour = parseInt(parts.BYHOUR ?? '', 10)
+    const minute = parseInt(parts.BYMINUTE ?? '0', 10)
+    const hasTime = Number.isFinite(hour)
+    const time = hasTime
+      ? `${(hour % 12) || 12}:${(Number.isFinite(minute) ? minute : 0).toString().padStart(2, '0')} ${hour >= 12 ? 'PM' : 'AM'}`
+      : ''
+    const interval = parseInt(parts.INTERVAL ?? '', 10)
+
+    if (parts.FREQ === 'MINUTELY') {
+      return Number.isFinite(interval) && interval > 1 ? `Every ${interval} minutes` : 'Every minute'
+    }
+    if (parts.FREQ === 'HOURLY') {
+      return Number.isFinite(interval) && interval > 1 ? `Every ${interval} hours` : 'Every hour'
+    }
+    if (parts.FREQ === 'DAILY') {
+      return hasTime ? `Every day at ${time}` : 'Daily'
+    }
+    if (parts.FREQ === 'WEEKLY') {
+      const dayMap: Record<string, string> = { SU: 'Sun', MO: 'Mon', TU: 'Tue', WE: 'Wed', TH: 'Thu', FR: 'Fri', SA: 'Sat' }
+      const days = (parts.BYDAY ?? '').split(',').map((d) => dayMap[d]).filter(Boolean)
+      const dayPart = days.length > 0 ? days.join(', ') : 'week'
+      return hasTime ? `Every ${dayPart} at ${time}` : `Every ${dayPart}`
+    }
+    if (parts.FREQ === 'MONTHLY') {
+      const day = parts.BYMONTHDAY ?? '1'
+      return hasTime ? `Day ${day} of each month at ${time}` : `Day ${day} of each month`
+    }
+    return parts.FREQ ? parts.FREQ[0] + parts.FREQ.slice(1).toLowerCase() : expr
+  }
+
+  const cronParts = expr.split(' ')
+  if (cronParts.length >= 5) {
+    const [minute, hour, dayOfMonth, month, dayOfWeek] = cronParts
+    const everyMin = /^\*\/(\d+)$/.exec(minute)
+    if (everyMin && hour === '*' && dayOfMonth === '*' && month === '*' && dayOfWeek === '*') {
+      return `Every ${everyMin[1]} minutes`
+    }
+    const everyHour = /^\*\/(\d+)$/.exec(hour)
+    if (minute === '0' && everyHour && dayOfMonth === '*' && month === '*' && dayOfWeek === '*') {
+      const n = parseInt(everyHour[1], 10)
+      return n === 1 ? 'Every hour' : `Every ${n} hours`
+    }
+    if (minute === '0' && hour === '*' && dayOfMonth === '*' && month === '*' && dayOfWeek === '*') {
+      return 'Every hour'
+    }
+    if (dayOfMonth === '*' && month === '*' && dayOfWeek === '*' && hour !== '*' && minute !== '*') {
+      const h = parseInt(hour, 10)
+      const m = parseInt(minute, 10)
+      if (Number.isFinite(h) && Number.isFinite(m)) {
+        const t = `${(h % 12) || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
+        return `Every day at ${t}`
+      }
+    }
+  }
+
+  return expr
 }
 
 function cronToLabel(cron: string): string {
-  const match = INTERVAL_PRESETS.find((p) => p.cron === cron)
-  return match ? match.description : cron
+  const normalized = toCronPreset(cron)
+  const match = INTERVAL_PRESETS.find((p) => p.cron === normalized)
+  if (match && match.cron !== 'custom') return match.description
+  return describeRecurrence(cron)
 }
 
 export function ProactivitySection({
@@ -150,7 +240,7 @@ export function ProactivitySection({
     const preset = INTERVAL_PRESETS.find(p => p.cron === selectedPreset)
     let text = preset && preset.cron !== 'custom'
       ? preset.description
-      : `Custom: ${cronExpression}`
+      : describeRecurrence(cronExpression)
 
     if (activeHoursEnabled) {
       text += `, ${activeHoursStart} – ${activeHoursEnd}`

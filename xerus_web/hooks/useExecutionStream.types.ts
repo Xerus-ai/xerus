@@ -30,6 +30,8 @@ export const STREAM_EVENT_TYPES = [
   'subagent_start',
   'subagent_stop',
   'delegation',
+  // Live app preview from agent dev server (Lovable/Replit-style)
+  'preview',
 ] as const;
 
 export type StreamEventType = (typeof STREAM_EVENT_TYPES)[number];
@@ -159,6 +161,15 @@ export interface NotificationEventContent {
   agent_slug: string;
 }
 
+// Live app preview surfaced to the chat artifact viewer.
+// Emitted by agents when they start a dev server (e.g., npm run dev on port 3000).
+// Backend resolves the Daytona preview URL when only port is given.
+export interface PreviewEventContent {
+  port: number;
+  url: string;
+  label?: string;
+}
+
 export type UIHint = 'browser' | 'approval' | 'form' | 'preview' | 'terminal';
 
 export interface GuidanceEventContent {
@@ -197,6 +208,7 @@ export interface StreamEventContentMap {
   subagent_stop: SubagentStopEventContent;
   delegation: DelegationEventContent;
   notification: NotificationEventContent;
+  preview: PreviewEventContent;
 }
 
 export interface StreamEvent<T extends StreamEventType = StreamEventType> {
@@ -238,6 +250,7 @@ export interface UseExecutionStreamOptions {
   onSubagentStop?: StreamEventCallback<'subagent_stop'>;
   onDelegation?: StreamEventCallback<'delegation'>;
   onNotification?: StreamEventCallback<'notification'>;
+  onPreview?: StreamEventCallback<'preview'>;
   onError?: (error: Error) => void;
   onConnectionChange?: (connected: boolean) => void;
 }

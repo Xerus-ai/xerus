@@ -57,14 +57,14 @@ export const addToolToAgent = async (
   agentId: number,
   toolName: string,
   toolConfig: Record<string, unknown> = {}
-): Promise<{ tool_name: string; tool_config: Record<string, unknown>; added_at: string }> => {
+): Promise<{ tools: string[]; added: string }> => {
   const response = await apiCall(`/agents/${agentId}/tools`, {
     method: 'POST',
     body: JSON.stringify({ tool_name: toolName, tool_config: toolConfig }),
   });
   const result = await response.json();
-  const data = result.data || result;
-  return data.tool || data;
+  const data = result.data ?? result;
+  return { tools: data.tools ?? [], added: data.added ?? toolName };
 };
 
 /**

@@ -58,6 +58,10 @@ export { createSessionDispatcher } from './session-dispatcher';
 // Snapshot helpers
 export { createWorkspaceTar, restoreWorkspaceTar } from './snapshot-helpers';
 
+// Workspace template sync (selective platform overlay)
+export { syncWorkspaceTemplate, listPlatformOverlayPaths } from './workspace-template-sync';
+export type { WorkspaceTemplateSyncOptions, WorkspaceTemplateSyncResult } from './workspace-template-sync';
+
 // Route helpers (shared across 7+ route files)
 export { requireRunningSandbox, getDaytonaProvider } from './sandbox-route-helpers';
 

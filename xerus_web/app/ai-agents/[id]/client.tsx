@@ -12,8 +12,9 @@ import {
 } from "@/lib/api/agents"
 import type { ScheduledExecution } from "@/lib/api/types"
 import { listSchedules, type ScheduleEntry } from "@/lib/api/schedules"
-import { getAgentKnowledgeBases } from "@/lib/api/agent-kb"
-import { getTree, type FileNode } from "@/lib/api/workspace"
+import { listAgentConnections } from "@/lib/api/connections"
+import { getTree } from "@/lib/api/workspace"
+import { flattenDriveDocuments } from "@/lib/drive-documents"
 import { canEditAgent, isSystemTemplate } from "@/utils/agentLabels"
 import {
   ArrowLeft,
@@ -43,26 +44,6 @@ import { XerusLoader } from "@/components/common/XerusLoader"
 
 interface AgentDetailsClientProps {
   agentId: string
-}
-
-function flattenKnowledgeDocuments(node: FileNode): Array<{ id: string; name: string; title: string; content_type: string }> {
-  const docs: Array<{ id: string; name: string; title: string; content_type: string }> = []
-
-  const visit = (current: FileNode) => {
-    if (current.type === 'file' && /(^|\/)knowledge\/.+/.test(current.path)) {
-      const ext = current.name.includes('.') ? current.name.split('.').pop() || 'document' : 'document'
-      docs.push({
-        id: current.path,
-        name: current.name,
-        title: current.name,
-        content_type: ext,
-      })
-    }
-    current.children?.forEach(visit)
-  }
-
-  visit(node)
-  return docs
 }
 
 export default function AgentDetailsClient({ agentId }: AgentDetailsClientProps) {
@@ -106,17 +87,18 @@ export default function AgentDetailsClient({ agentId }: AgentDetailsClientProps)
     isAuthReady ? 'all-agents' : null,
     () => getAssistants()
   )
-  const { data: availableDocuments = [] } = useSWR(
-    isAuthReady ? 'agent-kb-documents' : null,
+  const { data: driveDocuments = [] } = useSWR(
+    isAuthReady ? 'drive-documents' : null,
     async () => {
       const tree = await getTree(6, false)
-      return flattenKnowledgeDocuments(tree.root)
+      return flattenDriveDocuments(tree.root)
     }
   )
-  // KB docs — skip for marketplace (no DB record to query)
-  const { data: agentKbDocs = [] } = useSWR(
-    isAuthReady && agent && !isMarketplace ? ['agent-kb', agent.id] : null,
-    () => agent ? getAgentKnowledgeBases(Number(agent.id)) : Promise.resolve([])
+  // Agent's connected knowledge sources — skip for marketplace (no sandbox state).
+  // Single source of truth: workspace.connections filtered by target_type='agent'.
+  const { data: agentConnections = [] } = useSWR(
+    isAuthReady && agent?.slug && !isMarketplace ? ['agent-connections', agent.slug] : null,
+    () => agent?.slug ? listAgentConnections(agent.slug) : Promise.resolve([])
   )
 
   // Derived state
@@ -131,11 +113,13 @@ export default function AgentDetailsClient({ agentId }: AgentDetailsClientProps)
   // --- Extracted hooks ---
   const {
     handleScheduleCreate,
+    handleScheduleUpdate,
     handleScheduleToggle,
     handleScheduleDelete,
   } = useScheduleHandlers({
     agentId: agent?.id ?? 0,
     agentSlug: agent?.slug ?? '',
+    schedules: effectiveSchedules,
     setSchedules: setLocalSchedules,
   })
 
@@ -147,7 +131,7 @@ export default function AgentDetailsClient({ agentId }: AgentDetailsClientProps)
     handlePublish,
     handleUnpublish,
     handleDelete,
-  } = useAgentActions({ agent, setAgent: () => mutateAgent() })
+  } = useAgentActions({ agent, setAgent: (next) => mutateAgent(next, false) })
 
   // --- Handlers ---
   const handleUpdateAgent = async (updates: any) => {
@@ -163,7 +147,7 @@ export default function AgentDetailsClient({ agentId }: AgentDetailsClientProps)
 
   const handleRefreshAgent = async () => {
     mutateAgent()
-    mutate(agent ? ['agent-kb', agent.id] : null)
+    if (agent?.slug) mutate(['agent-connections', agent.slug])
   }
 
   // Permissions
@@ -289,8 +273,8 @@ export default function AgentDetailsClient({ agentId }: AgentDetailsClientProps)
                 agent={agent}
                 isEditable={isEditable}
                 isMarketplace={isMarketplace}
-                availableDocuments={availableDocuments}
-                agentKbDocs={agentKbDocs}
+                driveDocuments={driveDocuments}
+                agentConnections={agentConnections}
                 onUpdate={handleUpdateAgent}
                 onRefresh={handleRefreshAgent}
                 schedules={effectiveSchedules}
@@ -317,6 +301,7 @@ export default function AgentDetailsClient({ agentId }: AgentDetailsClientProps)
                 schedules={effectiveSchedules}
                 workflowConfig={workflowConfig}
                 onCreate={handleScheduleCreate}
+                onUpdate={handleScheduleUpdate}
                 onToggle={handleScheduleToggle}
                 onDelete={handleScheduleDelete}
                 isLoading={isLoadingAgent}

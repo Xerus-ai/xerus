@@ -4,22 +4,38 @@
 
 import { EditabilityStatus } from './types';
 
-// Hidden paths - never exposed to the user
+// Hidden paths - never exposed to the user.
+// These are platform plumbing (memory, beads, context), version control
+// artifacts (.git, .gitignore), SQLite state (data/), or build output that
+// has no reason to appear in the user's drive browser. Anything the user
+// interacts with has its own dedicated UI — memory via the agent Memory tab,
+// tasks via the Kanban board, context via agent execution history.
 const HIDDEN_PATTERNS: RegExp[] = [
     /^\.xerus\//,
-    /^data\/company\.db$/,
+    /(^|\/)\.git(\/|$)/,
+    /(^|\/)\.gitignore$/,
+    /(^|\/)\.gitattributes$/,
+    /(^|\/)\.gitmodules$/,
+    /(^|\/)\.beads(\/|$)/,
+    /^\.memory\//,
+    /^context\//,
+    /^\.mcp\.json$/,
+    /^\.env(\..+)?$/,
+    /^data\//,
+    /^node_modules\//,
+    /^\.next\//,
+    /^drive\/mood-board\.md$/,
 ];
 
-// Read-only paths - visible but not writable
+// Read-only paths - visible but not writable.
+// These are platform-owned surfaces the user should see but not edit:
+// catalog content, generated CLAUDE.md files, and channel output.
 const READ_ONLY_PATTERNS: RegExp[] = [
     /^agents\/[^/]+\/CLAUDE\.md$/,
     /^projects\/[^/]+\/channels\/[^/]+\/output\//,
-    /^\.memory\//,
     /^\.claude\//,
     /^marketplace\//,
     /^CLAUDE\.md$/,
-    /^\.beads\//,
-    /^context\//,
 ];
 
 // Editable paths - writable by users via Drive

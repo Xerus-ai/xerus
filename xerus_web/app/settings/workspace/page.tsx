@@ -16,6 +16,7 @@ import { motion } from 'framer-motion'
 import { toast } from '@/lib/toast'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
+import { SyncTemplateAction } from './SyncTemplateAction'
 
 const PLAN_CREDITS: Record<string, number> = {
   free: 10,
@@ -322,6 +323,11 @@ export default function WorkspaceOverviewPage() {
             </div>
             <ChevronRight className="w-4 h-4 text-text-secondary/50 group-hover:text-text-secondary transition-colors shrink-0" />
           </button>
+
+          <div className="border-t border-surface-active/40 mx-5" />
+
+          {/* Sync from Template */}
+          <SyncTemplateAction disabled={workspaceAction !== null} />
 
           <div className="border-t border-surface-active/40 mx-5" />
 

@@ -21,7 +21,6 @@ export type {
 } from '../../shared/types/agent-shared.types';
 
 export type AgentType = 'internal' | 'public' | 'private';
-type KBAccessMode = 'read' | 'write' | 'admin';
 
 // Public Metadata Structure
 export interface PublicMetadata {
@@ -77,20 +76,8 @@ export interface Agent {
 // Agent with enriched data (for detail endpoint)
 export interface AgentDetail extends Agent {
     tool_count: number;
-    kb_count: number;
     source_agent_name: string | null;
     tools?: string[]; // Tool slugs from config.json
-    knowledge_bases?: AgentKnowledgeBase[];
-}
-
-// Knowledge base entry (from config.json knowledge_bases array)
-export interface AgentKnowledgeBase {
-    id: number;
-    agent_id: number;
-    knowledge_base_id: string;
-    kb_name: string | null;
-    access_mode: KBAccessMode;
-    created_at: Date;
 }
 
 // Adapter type for CLI execution (claudecode or codex)

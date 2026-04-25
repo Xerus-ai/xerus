@@ -4,25 +4,28 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { MessageList } from './MessageList'
 import { ChatInput } from './ChatInput'
-import { ChatRightPanel } from './ChatRightPanel'
-import type { ViewerContent, ViewerContentType } from './ArtifactViewerPanel'
+import { DeliverableChips } from './DeliverableChips'
 import type { SandboxTab } from './SandboxPanel'
 
 // Heavy panels loaded only when user opens them (bundle-dynamic-imports + bundle-conditional rules)
-const ArtifactViewerPanel = dynamic(() => import('./ArtifactViewerPanel').then(m => ({ default: m.ArtifactViewerPanel })))
-const SandboxPanel = dynamic(() => import('./SandboxPanel').then(m => ({ default: m.SandboxPanel })))
+const ArtifactViewerPanel = dynamic(() =>
+  import('./ArtifactViewerPanel').then((m) => ({ default: m.ArtifactViewerPanel })),
+)
+const SandboxPanel = dynamic(() =>
+  import('./SandboxPanel').then((m) => ({ default: m.SandboxPanel })),
+)
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from 'react-resizable-panels'
 import { GuidanceInterventionCard } from './GuidanceInterventionCard'
 import { ConversationSidebar } from './ConversationSidebar'
 import { useSidebarSlotRegister } from '@/components/layout/SidebarSlotContext'
 import { useLayout } from '@/components/layout/LayoutContext'
 import { cn } from '@/lib/utils'
-import type { WorkspaceFile } from './WorkspaceTree'
 import type { WorkspacePayload } from './MessageBubble'
 import type { ChatMessageExtended } from './chat-message.types'
 import { mapStreamEventsToExecution } from './mapStreamToExecutionEvents'
+import { useArtifactTabs } from '@/hooks/useArtifactTabs'
 
-const ExecutionDetail = dynamic(() => import('@/components/execution').then(m => ({ default: m.ExecutionDetail })))
+const ExecutionDetail = dynamic(() => import('@/components/execution').then((m) => ({ default: m.ExecutionDetail })))
 import { toast } from '@/lib/toast'
 import { XerusLoader } from '@/components/common/XerusLoader'
 import { startBrowser, startTerminal } from '@/lib/api/workspace'
@@ -30,24 +33,7 @@ import { getSharedPipedreamClient } from '@/lib/pipedream-client'
 import { respondToGuidance } from '@/lib/api/execute'
 import { useChatState } from './useChatState'
 
-// Map file extension to viewer content type (hoisted to module scope)
-const EXT_TO_VIEWER: Record<string, ViewerContentType> = {
-  html: 'html', htm: 'html',
-  pdf: 'pdf',
-  md: 'markdown', mdx: 'markdown',
-  png: 'image', jpg: 'image', jpeg: 'image', gif: 'image', svg: 'image', webp: 'image',
-  csv: 'csv',
-  ts: 'code', tsx: 'code', js: 'code', jsx: 'code', py: 'code', rb: 'code',
-  go: 'code', rs: 'code', java: 'code', css: 'code', scss: 'code',
-  json: 'code', yaml: 'code', yml: 'code', sql: 'code', sh: 'code',
-}
-function extToViewerType(ext: string): ViewerContentType {
-  return EXT_TO_VIEWER[ext] ?? 'text'
-}
-
 // Top-level component rendered inside AppSidebar via the slot system.
-// Reads from a ref (latest data) and uses useState for forceUpdate.
-// Defined at module scope so React treats it as a proper component (hooks are legal).
 interface SidebarPropsRef {
   projects: import('./types').ProjectGroup[]
   conversationId: string | null
@@ -65,7 +51,7 @@ function ChatSidebarSlotComponent({ propsRef, forceUpdateRef }: {
   forceUpdateRef: React.MutableRefObject<() => void>
 }) {
   const [, setTick] = useState(0)
-  forceUpdateRef.current = () => setTick(t => t + 1)
+  forceUpdateRef.current = () => setTick((t) => t + 1)
   const p = propsRef.current!
   return (
     <ConversationSidebar
@@ -97,18 +83,19 @@ export function ChatContainer({
   className,
 }: ChatContainerProps) {
   const chat = useChatState({ initialAgentId, conversationId, initialMessage })
-  const { state, agents, user, isAuthReady, executionStream, workspaceFiles } = chat
+  const { state, agents, user, isAuthReady, executionStream } = chat
   const { isMobile } = useLayout()
 
-  // ---- Local UI state (sandbox, viewer, panels) ----
-  const [viewerContent, setViewerContent] = useState<ViewerContent | null>(null)
+  // ---- Artifact tabs (multi-tab viewer) ----
+  const artifacts = useArtifactTabs()
+
+  // ---- Sandbox panel (terminal + browser) ----
   const [showExecution, setShowExecution] = useState<string | null>(null)
   const [browserUrl, setBrowserUrl] = useState<string | null>(null)
   const [isBrowserLoading, setIsBrowserLoading] = useState(false)
   const [terminalUrl, setTerminalUrl] = useState<string | null>(null)
   const [isTerminalLoading, setIsTerminalLoading] = useState(false)
   const [sandboxTab, setSandboxTab] = useState<SandboxTab>('terminal')
-  const [isWorkspaceCollapsed, setIsWorkspaceCollapsed] = useState(true)
 
   // ---- Tool auth (Pipedream OAuth) ----
   const handleToolAuthConnect = useCallback((appSlug: string) => {
@@ -119,17 +106,17 @@ export function ChatContainer({
         onSuccess: () => {
           chat.handleDismissToolAuth()
           toast.success('App connected', { description: 'Your agent can now use this app.' })
-          document.querySelectorAll('iframe[id^="pipedream-connect-iframe-"]').forEach(el => el.remove())
+          document.querySelectorAll('iframe[id^="pipedream-connect-iframe-"]').forEach((el) => el.remove())
         },
-        onError: (err) => {
+        onError: () => {
           toast.error("Connection failed", { description: 'Please close and try again.' })
-          document.querySelectorAll('iframe[id^="pipedream-connect-iframe-"]').forEach(el => el.remove())
+          document.querySelectorAll('iframe[id^="pipedream-connect-iframe-"]').forEach((el) => el.remove())
         },
         onClose: () => {
-          document.querySelectorAll('iframe[id^="pipedream-connect-iframe-"]').forEach(el => el.remove())
+          document.querySelectorAll('iframe[id^="pipedream-connect-iframe-"]').forEach((el) => el.remove())
         },
       })
-    } catch (err) {
+    } catch {
       toast.error("Couldn't connect the app", { description: 'Please try again or check your permissions.' })
     }
   }, [chat])
@@ -148,37 +135,56 @@ export function ChatContainer({
         response_value: feedback,
       })
       chat.setState((prev) => ({ ...prev, pendingGuidance: null }))
-    } catch (err) {
+    } catch {
       toast.error("Your response wasn't sent", { description: 'The agent may have moved on. Try sending a new message.' })
     } finally {
       guidanceSubmittingRef.current = false
     }
   }, [state.pendingGuidance, chat])
 
-  // ---- Viewer / Workspace ----
-  const handleOpenViewer = useCallback((payload: WorkspacePayload) => {
-    if (payload.type === 'plan') {
-      setViewerContent({ type: 'plan', title: payload.title, content: payload.content })
-    } else {
-      const ext = payload.artifact.filename.split('.').pop()?.toLowerCase() ?? ''
-      setViewerContent({
-        type: extToViewerType(ext),
-        title: payload.artifact.filename,
-        subtitle: `${payload.artifact.lineCount} lines \u00b7 ${payload.artifact.description}`,
-        content: payload.artifact.preview,
-        language: ext,
-      })
-    }
-  }, [])
+  // ---- Promote agent-emitted preview URLs into a Preview artifact tab.
+  // Two channels feed this:
+  //   - HITL guidance with preview_url (transient, only while paused).
+  //   - Standalone 'preview' SSE events from the runner (persistent dev server signal).
+  // Either path opens or refreshes the relevant tab without disturbing other artifacts.
+  const lastHitlPreviewRef = useRef<string | null>(null)
+  useEffect(() => {
+    const url = state.pendingGuidance?.preview_url
+    if (!url || url === lastHitlPreviewRef.current) return
+    lastHitlPreviewRef.current = url
+    artifacts.openPreview(url)
+  }, [state.pendingGuidance?.preview_url, artifacts])
 
-  const handleFileSelect = useCallback((file: WorkspaceFile) => {
-    if (file.type === 'directory') return
-    const ext = file.extension ?? file.name.split('.').pop()?.toLowerCase() ?? ''
-    setViewerContent({
-      type: extToViewerType(ext),
-      title: file.name,
-      subtitle: ext.toUpperCase(),
-      language: ext,
+  const lastSsePreviewTsRef = useRef<number | null>(null)
+  useEffect(() => {
+    const preview = state.pendingPreview
+    if (!preview || preview.ts === lastSsePreviewTsRef.current) return
+    lastSsePreviewTsRef.current = preview.ts
+    artifacts.openPreview(preview.url, preview.label, preview.port)
+  }, [state.pendingPreview, artifacts])
+
+  // ---- Artifact open handlers ----
+  const handleOpenWorkspacePayload = useCallback(
+    (payload: WorkspacePayload) => {
+      if (payload.type === 'plan') {
+        artifacts.openPlan({ title: payload.title, content: payload.content })
+      } else {
+        artifacts.openArtifact(payload.artifact)
+      }
+    },
+    [artifacts],
+  )
+
+  const handleOpenDeliverable = useCallback(
+    (input: { name: string; path: string; extension?: string }) => {
+      void artifacts.openFile(input)
+    },
+    [artifacts],
+  )
+
+  const handlePublish = useCallback(() => {
+    toast.success('Publish coming soon', {
+      description: 'Sharing artifacts externally will be available in a future release.',
     })
   }, [])
 
@@ -190,7 +196,7 @@ export function ChatContainer({
     try {
       const result = await startBrowser()
       setBrowserUrl(result.novnc_url)
-    } catch (err) {
+    } catch {
       toast.error("Couldn't open the browser preview", { description: 'Your workspace may still be starting up.' })
     } finally {
       setIsBrowserLoading(false)
@@ -204,7 +210,7 @@ export function ChatContainer({
     try {
       const result = await startTerminal()
       setTerminalUrl(result.terminal_url)
-    } catch (err) {
+    } catch {
       toast.error("Couldn't open the terminal", { description: 'Your workspace may still be starting up.' })
     } finally {
       setIsTerminalLoading(false)
@@ -216,11 +222,7 @@ export function ChatContainer({
     setTerminalUrl(null)
   }, [])
 
-  // ---- Sidebar slot ----
-  // The slot system renders a stable component ref inside AppSidebar.
-  // To avoid infinite re-render loops, the slot component is stable (useCallback []).
-  // Data is passed via ref + a forceUpdate callback so the sidebar re-renders
-  // when conversations load WITHOUT triggering context cascades.
+  // ---- Sidebar slot registration ----
   const sidebarPropsRef = useRef({
     projects: chat.projects,
     conversationId: state.conversationId,
@@ -244,35 +246,30 @@ export function ChatContainer({
     handleClearChannel: chat.handleClearChannel,
   }
 
-  // forceUpdate ref: ChatSidebarSlotComponent stores its updater here on mount.
-  // ChatContainer calls it when sidebar-relevant data changes.
   const sidebarForceUpdateRef = useRef<() => void>(() => {})
-
-  // Stable slot component — registered once, re-renders via forceUpdate ref
   const ChatSidebarSlot = useRef(() => (
     <ChatSidebarSlotComponent propsRef={sidebarPropsRef} forceUpdateRef={sidebarForceUpdateRef} />
   )).current
 
-  // Poke sidebar to re-render when data changes (ref was updated above)
   useEffect(() => {
     sidebarForceUpdateRef.current()
   }, [chat.projects, state.conversationId, state.selectedChannel, chat.isLoadingAgents])
 
   useSidebarSlotRegister('chat-sidebar', ChatSidebarSlot)
 
-  // ---- Auth gate ----
   if (!isAuthReady) {
     return <XerusLoader variant="inline" className="h-full bg-surface" />
   }
 
   const isSandboxOpen = !!(terminalUrl || browserUrl)
-  const agentSlug = state.currentAgent?.slug ?? null
+  const hasArtifacts = artifacts.tabs.length > 0
+  const showArtifactPanel = hasArtifacts && !isSandboxOpen
 
   return (
     <div className={cn('flex w-full relative h-screen overflow-hidden', className)}>
       <PanelGroup orientation="horizontal" className="flex-1 min-w-0">
         {/* Chat column */}
-        <Panel defaultSize={isSandboxOpen ? 50 : viewerContent ? 55 : 100} minSize={30}>
+        <Panel defaultSize={isSandboxOpen ? 50 : showArtifactPanel ? 55 : 100} minSize={30}>
           <div className="flex flex-col h-full relative overflow-hidden">
             <MessageList
               messages={state.messages as ChatMessageExtended[]}
@@ -283,7 +280,7 @@ export function ChatContainer({
               className="flex-1"
               onViewExecution={setShowExecution}
               onSuggestionClick={chat.sendMessage}
-              onOpenWorkspace={handleOpenViewer}
+              onOpenWorkspace={handleOpenWorkspacePayload}
               userName={user?.display_name}
               agents={agents}
             />
@@ -323,6 +320,11 @@ export function ChatContainer({
               />
             )}
 
+            <DeliverableChips
+              currentAgent={state.currentAgent}
+              onSelect={handleOpenDeliverable}
+            />
+
             <ChatInput
               onSendMessage={chat.sendMessage}
               disabled={state.isLoading}
@@ -344,7 +346,7 @@ export function ChatContainer({
           </div>
         </Panel>
 
-        {/* Sandbox panel — side-by-side on md+, full-screen sheet on mobile */}
+        {/* Sandbox panel — terminal/browser, side-by-side on md+ */}
         {isSandboxOpen && !isMobile && (
           <>
             <PanelResizeHandle className="w-2 flex items-center justify-center cursor-col-resize group shrink-0">
@@ -366,34 +368,27 @@ export function ChatContainer({
           </>
         )}
 
-        {/* Artifact viewer — side-by-side on md+, full-screen sheet on mobile */}
-        {!isSandboxOpen && viewerContent && !isMobile && (
+        {/* Artifact viewer — multi-tab; hidden when sandbox is open */}
+        {showArtifactPanel && !isMobile && (
           <>
             <PanelResizeHandle className="w-2 flex items-center justify-center cursor-col-resize group shrink-0">
               <div className="w-px h-8 rounded-full bg-[#E5E5E5] group-hover:bg-primary/50 group-hover:h-16 transition-all" />
             </PanelResizeHandle>
             <Panel defaultSize={45} minSize={20}>
               <ArtifactViewerPanel
-                content={viewerContent}
-                onClose={() => setViewerContent(null)}
+                tabs={artifacts.tabs}
+                activeTabId={artifacts.activeTabId}
+                onSelectTab={artifacts.setActiveTabId}
+                onCloseTab={artifacts.closeTab}
+                onClosePanel={artifacts.closeAll}
+                onPublish={handlePublish}
               />
             </Panel>
           </>
         )}
-
-        {/* Right panel (workspace + agent info) */}
-        {!isSandboxOpen && !viewerContent && (
-          <ChatRightPanel
-            agentSlug={agentSlug}
-            workspaceFiles={workspaceFiles}
-            onFileSelect={handleFileSelect}
-            isWorkspaceCollapsed={isWorkspaceCollapsed}
-            onToggleWorkspace={() => setIsWorkspaceCollapsed((prev) => !prev)}
-          />
-        )}
       </PanelGroup>
 
-      {/* Mobile full-screen overlays — sandbox / artifact viewer */}
+      {/* Mobile full-screen overlays */}
       {isMobile && isSandboxOpen && (
         <div className="fixed inset-0 z-50 bg-surface flex flex-col" role="dialog" aria-label="Sandbox">
           <SandboxPanel
@@ -410,11 +405,15 @@ export function ChatContainer({
         </div>
       )}
 
-      {isMobile && !isSandboxOpen && viewerContent && (
+      {isMobile && !isSandboxOpen && hasArtifacts && (
         <div className="fixed inset-0 z-50 bg-surface flex flex-col" role="dialog" aria-label="Artifact viewer">
           <ArtifactViewerPanel
-            content={viewerContent}
-            onClose={() => setViewerContent(null)}
+            tabs={artifacts.tabs}
+            activeTabId={artifacts.activeTabId}
+            onSelectTab={artifacts.setActiveTabId}
+            onCloseTab={artifacts.closeTab}
+            onClosePanel={artifacts.closeAll}
+            onPublish={handlePublish}
           />
         </div>
       )}

@@ -7,18 +7,21 @@ type FileReader = (path: string) => Promise<string>;
 
 export async function buildWorkspaceOverview(root: FileNode, readFile?: FileReader): Promise<WorkspaceOverview> {
     const projects = await extractProjects(root, readFile);
-    const documents = extractDocuments(root);
+    const documents = extractDriveChildren(root, 'file');
+    const folders = extractDriveChildren(root, 'directory');
     const agentCount = countChildren(root, 'agents');
     const activity = extractRecentActivity(projects);
 
     return {
         projects,
         documents,
+        folders,
         activity,
         stats: {
             agentCount,
             projectCount: projects.length,
             documentCount: documents.length,
+            folderCount: folders.length,
         },
     };
 }
@@ -73,13 +76,13 @@ async function extractAgentsFromChannel(channel: FileNode, readFile?: FileReader
     return [...new Set(matches.map(m => m[1]))];
 }
 
-function extractDocuments(root: FileNode): DocumentOverview[] {
+function extractDriveChildren(root: FileNode, type: 'file' | 'directory'): DocumentOverview[] {
     const driveDir = root.children?.find(c => c.name === 'drive' && c.type === 'directory');
     if (!driveDir?.children) return [];
 
     return driveDir.children
-        .filter(c => c.type === 'file' && c.name !== '.gitkeep')
-        .map(f => ({ name: f.name, path: f.path }));
+        .filter(c => c.type === type && c.name !== '.gitkeep')
+        .map(c => ({ name: c.name, path: c.path }));
 }
 
 function countChildren(root: FileNode, dirName: string): number {

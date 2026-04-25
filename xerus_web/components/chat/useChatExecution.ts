@@ -25,6 +25,7 @@ import type {
   ToolAuthRequiredEventContent,
   GuidanceEventContent,
   StopEventContent,
+  PreviewEventContent,
 } from '@/hooks/useExecutionStream'
 import type { ChatState } from './types'
 import type { ChatMessageExtended } from './chat-message.types'
@@ -306,6 +307,19 @@ export function useChatExecution({ setState }: UseChatExecutionOptions) {
           },
         }))
       }
+    }, [setState]),
+    onPreview: useCallback((event: StreamEvent<'preview'>) => {
+      const content = event.content as PreviewEventContent | undefined
+      if (!content || !content.url) return
+      setState(prev => ({
+        ...prev,
+        pendingPreview: {
+          port: content.port,
+          url: content.url,
+          label: content.label,
+          ts: Date.now(),
+        },
+      }))
     }, [setState]),
     onDone: useCallback((event: StreamEvent<'done'>) => {
       if (doneReceivedRef.current) return

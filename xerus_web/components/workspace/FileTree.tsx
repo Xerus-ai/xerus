@@ -13,8 +13,11 @@ import {
 import { cn } from '@/lib/utils'
 import type { FileNode } from '@/lib/api/workspace'
 
-// Directories that are read-only (shown with lock icon)
-const READ_ONLY_DIRS = ['.memory', '.claude', 'marketplace', '.beads', 'context']
+// Directories that are read-only (shown with lock icon).
+// .memory, .beads, and context are hidden by the backend and never reach
+// the tree; they're not listed here. .claude and marketplace stay visible
+// because users benefit from browsing installed skills and the catalog.
+const READ_ONLY_DIRS = ['.claude', 'marketplace']
 
 // Directories that support uploading (shown with + button)
 const UPLOAD_DIRS = ['drive', /^agents\/[^/]+\/knowledge$/, /^projects\/[^/]+\/knowledge$/]

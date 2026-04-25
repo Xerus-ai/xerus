@@ -8,8 +8,9 @@ import { useAuth } from '@/utils/AuthContext'
 import { getAssistant, updateAgent, getAssistants } from '@/lib/api/agents'
 import type { ScheduledExecution } from '@/lib/api/types'
 import { listSchedules, type ScheduleEntry } from '@/lib/api/schedules'
-import { getAgentKnowledgeBases } from '@/lib/api/agent-kb'
-import { getTree, type FileNode } from '@/lib/api/workspace'
+import { listAgentConnections } from '@/lib/api/connections'
+import { getTree } from '@/lib/api/workspace'
+import { flattenDriveDocuments } from '@/lib/drive-documents'
 import { canEditAgent, isSystemTemplate } from '@/utils/agentLabels'
 import { ArrowLeft, Loader2, Copy, Upload, Lock, Trash2 } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -23,19 +24,6 @@ import { IdentityTab } from '@/components/agents/ide/IdentityTab'
 import { useScheduleHandlers } from '@/hooks/useScheduleHandlers'
 import { useAgentActions } from '@/hooks/useAgentActions'
 import { XerusLoader } from '@/components/common/XerusLoader'
-
-function flattenKnowledgeDocuments(node: FileNode): Array<{ id: string; name: string; title: string; content_type: string }> {
-  const docs: Array<{ id: string; name: string; title: string; content_type: string }> = []
-  const visit = (current: FileNode) => {
-    if (current.type === 'file' && /(^|\/)knowledge\/.+/.test(current.path)) {
-      const ext = current.name.includes('.') ? current.name.split('.').pop() || 'document' : 'document'
-      docs.push({ id: current.path, name: current.name, title: current.name, content_type: ext })
-    }
-    current.children?.forEach(visit)
-  }
-  visit(node)
-  return docs
-}
 
 interface AgentDetailViewProps {
   agentId: string | number
@@ -79,17 +67,17 @@ export function AgentDetailView({ agentId, onBack }: AgentDetailViewProps) {
     () => getAssistants()
   )
 
-  const { data: availableDocuments = [] } = useSWR(
-    isAuthReady ? 'agent-kb-documents' : null,
+  const { data: driveDocuments = [] } = useSWR(
+    isAuthReady ? 'drive-documents' : null,
     async () => {
       const tree = await getTree(6, false)
-      return flattenKnowledgeDocuments(tree.root)
+      return flattenDriveDocuments(tree.root)
     }
   )
 
-  const { data: agentKbDocs = [] } = useSWR(
-    isAuthReady && agent && !isMarketplace ? ['agent-kb', agent.id] : null,
-    () => (agent ? getAgentKnowledgeBases(Number(agent.id)) : Promise.resolve([]))
+  const { data: agentConnections = [] } = useSWR(
+    isAuthReady && agent?.slug && !isMarketplace ? ['agent-connections', agent.slug] : null,
+    () => (agent?.slug ? listAgentConnections(agent.slug) : Promise.resolve([]))
   )
 
   const schedules = schedulesData ?? []
@@ -99,14 +87,15 @@ export function AgentDetailView({ agentId, onBack }: AgentDetailViewProps) {
   const [localSchedules, setLocalSchedules] = useState<typeof schedules | null>(null)
   const effectiveSchedules = localSchedules ?? schedules
 
-  const { handleScheduleCreate, handleScheduleToggle, handleScheduleDelete } = useScheduleHandlers({
+  const { handleScheduleCreate, handleScheduleUpdate, handleScheduleToggle, handleScheduleDelete } = useScheduleHandlers({
     agentId: agent?.id ?? 0,
     agentSlug: agent?.slug ?? '',
+    schedules: effectiveSchedules,
     setSchedules: setLocalSchedules,
   })
 
   const { isCloning, isPublishing, isDeleting, handleClone, handlePublish, handleUnpublish, handleDelete } =
-    useAgentActions({ agent, setAgent: () => mutateAgent() })
+    useAgentActions({ agent, setAgent: (next) => mutateAgent(next, false) })
 
   const handleUpdateAgent = async (updates: any) => {
     if (!agent) return
@@ -121,7 +110,7 @@ export function AgentDetailView({ agentId, onBack }: AgentDetailViewProps) {
 
   const handleRefreshAgent = async () => {
     mutateAgent()
-    mutate(agent ? ['agent-kb', agent.id] : null)
+    if (agent?.slug) mutate(['agent-connections', agent.slug])
   }
 
   const isEditable = agent ? canEditAgent(agent.userId, user?.uid, agent.agentType) : false
@@ -207,7 +196,7 @@ export function AgentDetailView({ agentId, onBack }: AgentDetailViewProps) {
 
           <TabsContent value="identity" className="mt-0 animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out">
             <FloatingPanelProvider>
-              <IdentityTab agent={agent} isEditable={isEditable} isMarketplace={isMarketplace} availableDocuments={availableDocuments} agentKbDocs={agentKbDocs} onUpdate={handleUpdateAgent} onRefresh={handleRefreshAgent} schedules={effectiveSchedules} onNavigateToSchedules={() => setActiveTab('schedules')} />
+              <IdentityTab agent={agent} isEditable={isEditable} isMarketplace={isMarketplace} driveDocuments={driveDocuments} agentConnections={agentConnections} onUpdate={handleUpdateAgent} onRefresh={handleRefreshAgent} schedules={effectiveSchedules} onNavigateToSchedules={() => setActiveTab('schedules')} />
             </FloatingPanelProvider>
           </TabsContent>
 
@@ -219,7 +208,7 @@ export function AgentDetailView({ agentId, onBack }: AgentDetailViewProps) {
 
           <TabsContent value="schedules" className="mt-0 animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out">
             <FloatingPanelProvider>
-              <SchedulesTab agent={agent} schedules={effectiveSchedules} workflowConfig={workflowConfig} onCreate={handleScheduleCreate} onToggle={handleScheduleToggle} onDelete={handleScheduleDelete} isLoading={isLoadingAgent} />
+              <SchedulesTab agent={agent} schedules={effectiveSchedules} workflowConfig={workflowConfig} onCreate={handleScheduleCreate} onUpdate={handleScheduleUpdate} onToggle={handleScheduleToggle} onDelete={handleScheduleDelete} isLoading={isLoadingAgent} />
             </FloatingPanelProvider>
           </TabsContent>
 

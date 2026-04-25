@@ -29,6 +29,7 @@ interface ScheduleRow {
     max_budget_usd: number | null;
     allowed_tools: string | null;
     system_prompt: string | null;
+    config: string | null;
     next_run_at: number | null;
     last_run_at: number | null;
     created_at: number;
@@ -117,7 +118,7 @@ router.post('/', auth, async (req: AuthenticatedRequest, res: Response, next: Ne
     try {
         if (!req.user) throw new UnauthorizedError();
 
-        const { agent_slug, name, prompt, rrule, adapter_type, model, max_budget_usd, allowed_tools, system_prompt } = req.body;
+        const { agent_slug, name, prompt, rrule, adapter_type, model, max_budget_usd, allowed_tools, system_prompt, config } = req.body;
 
         if (!agent_slug || typeof agent_slug !== 'string') {
             throw new BadRequestError('agent_slug is required');
@@ -140,7 +141,7 @@ router.post('/', auth, async (req: AuthenticatedRequest, res: Response, next: Ne
         const scheduleService = new ScheduleService(provider);
         const result = await scheduleService.createSchedule(sandboxId, {
             agent_slug, name, prompt, rrule, adapter_type, model,
-            max_budget_usd, allowed_tools, system_prompt,
+            max_budget_usd, allowed_tools, system_prompt, config,
         });
 
         sendResponse(res, 201, result, startTime);
@@ -160,7 +161,7 @@ router.patch('/:id', auth, async (req: AuthenticatedRequest, res: Response, next
             throw new BadRequestError('schedule_id is required');
         }
 
-        const { name, prompt, rrule, status, model, max_budget_usd, allowed_tools, system_prompt } = req.body;
+        const { name, prompt, rrule, status, model, max_budget_usd, allowed_tools, system_prompt, config } = req.body;
 
         const { sandboxService } = getDeps();
         const sandboxId = await requireRunningSandbox(sandboxService, req.user.uid);
@@ -170,7 +171,7 @@ router.patch('/:id', auth, async (req: AuthenticatedRequest, res: Response, next
         const scheduleService = new ScheduleService(provider);
         const result = await scheduleService.updateSchedule(sandboxId, {
             schedule_id: scheduleId, name, prompt, rrule, status, model,
-            max_budget_usd, allowed_tools, system_prompt,
+            max_budget_usd, allowed_tools, system_prompt, config,
         });
 
         sendResponse(res, 200, result, startTime);

@@ -65,6 +65,7 @@ export interface DocumentOverview {
 export interface WorkspaceOverview {
     projects: ProjectOverview[];
     documents: DocumentOverview[];
+    folders: DocumentOverview[];
     activity: { agent: string; file: string; channel: string; date: string }[];
-    stats: { agentCount: number; projectCount: number; documentCount: number };
+    stats: { agentCount: number; projectCount: number; documentCount: number; folderCount: number };
 }
