@@ -31,7 +31,12 @@ import type {
 } from './types';
 
 export class ToolsService {
-    private pipedream = getPipedreamClient();
+    // Lazy accessor — Pipedream is optional infrastructure, so we don't want
+    // a missing PIPEDREAM_* env var to prevent the entire API from booting.
+    // The error surfaces on first connector-tool call instead.
+    private get pipedream() {
+        return getPipedreamClient();
+    }
 
     async listApps(input?: ListAppsInput): Promise<ListAppsResponse> {
         const validated = input ? toolValidator.validateListApps(input) : {};
