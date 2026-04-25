@@ -84,19 +84,30 @@ export class DaytonaProvider implements SandboxProvider {
         const autoStopInterval = options.autoStopInterval || SANDBOX_CONFIG.autoStopIntervalMinutes;
         const autoArchiveInterval = options.autoArchiveInterval || SANDBOX_CONFIG.autoArchiveIntervalMinutes;
 
-        const sandbox = await withRetry(
-            async () => {
-                return await this.client.create({
-                    snapshot,
-                    envVars: options.envVars,
-                    autoStopInterval,
-                    autoArchiveInterval,
-                    autoDeleteInterval: options.autoDeleteInterval,
-                    labels: options.metadata,
-                });
-            },
-            'create'
-        );
+        const doCreate = async () => this.client.create({
+            snapshot,
+            envVars: options.envVars,
+            autoStopInterval,
+            autoArchiveInterval,
+            autoDeleteInterval: options.autoDeleteInterval,
+            labels: options.metadata,
+        });
+
+        let sandbox: Sandbox;
+        try {
+            sandbox = await withRetry(doCreate, 'create');
+        } catch (err) {
+            // Self-heal Daytona's idle-GC: if the snapshot was auto-deactivated
+            // after ~14 days of disuse, transparently reactivate and retry once
+            // so the user never sees the failure.
+            if (snapshot && this.isSnapshotInactiveError(err)) {
+                log.warn('Sandbox create failed: snapshot inactive — auto-recovering', { snapshot });
+                await this.ensureSnapshotActive(snapshot);
+                sandbox = await withRetry(doCreate, 'create');
+            } else {
+                throw err;
+            }
+        }
 
         // Cache the sandbox instance for later operations (with TTL tracking)
         this.sandboxInstances.set(sandbox.id, { sandbox, cachedAt: Date.now() });
@@ -109,6 +120,39 @@ export class DaytonaProvider implements SandboxProvider {
                 previewUrlBase: await this.getPreviewUrlBase(sandbox),
             },
         };
+    }
+
+    private isSnapshotInactiveError(err: unknown): boolean {
+        const msg = (err as Error)?.message ?? '';
+        return /snapshot\s+\S+\s+is\s+inactive/i.test(msg);
+    }
+
+    // Activates a snapshot that Daytona's idle GC has marked inactive, then
+    // polls until it reaches the 'active' state. Throws on terminal error or
+    // if activation does not complete within the budget.
+    async ensureSnapshotActive(name: string): Promise<void> {
+        const initial = await this.client.snapshot.get(name);
+        if (initial.state === 'active') return;
+
+        log.info('Activating snapshot', { name, currentState: initial.state });
+        if (initial.state === 'inactive') {
+            await this.client.snapshot.activate(initial);
+        }
+
+        const pollIntervalMs = 3000;
+        const deadline = Date.now() + 120_000;
+        while (Date.now() < deadline) {
+            await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+            const current = await this.client.snapshot.get(name);
+            if (current.state === 'active') {
+                log.info('Snapshot activated', { name });
+                return;
+            }
+            if (current.state === 'error') {
+                throw new Error(`Snapshot ${name} entered error state: ${current.errorReason ?? 'unknown'}`);
+            }
+        }
+        throw new Error(`Snapshot ${name} did not reach 'active' within 120s`);
     }
 
     async connect(sandboxId: string): Promise<ProviderSandbox> {
