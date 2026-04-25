@@ -686,13 +686,13 @@ async function resolvePreviewPayload(
     payload: Record<string, unknown> | undefined,
     ctx: PipelineContext,
     deps: ResolvedExecutionDeps,
-): Promise<Record<string, unknown> | null> {
-    if (!payload || typeof payload !== 'object') return null;
+): Promise<Record<string, unknown> | undefined> {
+    if (!payload || typeof payload !== 'object') return undefined;
 
     const port = typeof payload.port === 'number' ? payload.port : Number(payload.port);
     if (!Number.isInteger(port) || port < 1 || port > 65535) {
         log.warn('preview event: invalid port', { port: payload.port });
-        return null;
+        return undefined;
     }
 
     if (typeof payload.url === 'string' && payload.url.length > 0) {
@@ -701,7 +701,7 @@ async function resolvePreviewPayload(
 
     if (!ctx.sandboxId) {
         log.warn('preview event: no sandboxId on context, cannot resolve URL');
-        return null;
+        return undefined;
     }
 
     try {
@@ -713,7 +713,7 @@ async function resolvePreviewPayload(
             port,
             error: (err as Error).message,
         });
-        return null;
+        return undefined;
     }
 }
 
