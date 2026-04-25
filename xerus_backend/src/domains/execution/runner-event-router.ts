@@ -114,7 +114,7 @@ export async function routeEventToBackend(
             log.warn('update_agent_run: deprecated event still being emitted');
             break;
         case 'sse_forward':
-            handleSseForward(d, ctx);
+            await handleSseForward(d, ctx, deps);
             break;
         case 'metadata_sync':
             await handleMetadataSync(d, ctx, deps);
@@ -480,11 +480,24 @@ function handleCreditUsage(d: Record<string, unknown>, ctx: PipelineContext): vo
     }
 }
 
-function handleSseForward(d: Record<string, unknown>, ctx: PipelineContext): void {
+async function handleSseForward(
+    d: Record<string, unknown>,
+    ctx: PipelineContext,
+    deps: ResolvedExecutionDeps,
+): Promise<void> {
     const fwd = assertSseForwardData(d);
     if (!VALID_SSE_FORWARD_EVENTS.has(fwd.sse_event)) return;
 
-    ctx.stream.send(fwd.sse_event as StreamEventType, fwd.payload, fwd.meta);
+    // Live preview events: agent supplies port (and optionally url + label).
+    // When only port is given, resolve the Daytona preview URL on the backend
+    // so the agent doesn't have to hardcode the sandbox URL pattern.
+    let payloadToForward: Record<string, unknown> | undefined = fwd.payload;
+    if (fwd.sse_event === 'preview') {
+        payloadToForward = await resolvePreviewPayload(fwd.payload, ctx, deps);
+        if (!payloadToForward) return;
+    }
+
+    ctx.stream.send(fwd.sse_event as StreamEventType, payloadToForward, fwd.meta);
     const payload = fwd.payload;
 
     if (fwd.sse_event === 'token' && payload) {
@@ -667,6 +680,41 @@ function handleDelegationForward(d: Record<string, unknown>, ctx: PipelineContex
         task: data.task || '',
     });
     logEvent('delegation_record', d);
+}
+
+async function resolvePreviewPayload(
+    payload: Record<string, unknown> | undefined,
+    ctx: PipelineContext,
+    deps: ResolvedExecutionDeps,
+): Promise<Record<string, unknown> | null> {
+    if (!payload || typeof payload !== 'object') return null;
+
+    const port = typeof payload.port === 'number' ? payload.port : Number(payload.port);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+        log.warn('preview event: invalid port', { port: payload.port });
+        return null;
+    }
+
+    if (typeof payload.url === 'string' && payload.url.length > 0) {
+        return { ...payload, port };
+    }
+
+    if (!ctx.sandboxId) {
+        log.warn('preview event: no sandboxId on context, cannot resolve URL');
+        return null;
+    }
+
+    try {
+        const provider = deps.sandboxService.getDaytonaProvider();
+        const url = await provider.getPreviewUrl(ctx.sandboxId, port);
+        return { ...payload, port, url };
+    } catch (err) {
+        log.warn('preview event: failed to resolve Daytona URL', {
+            port,
+            error: (err as Error).message,
+        });
+        return null;
+    }
 }
 
 async function handleHitlRequest(

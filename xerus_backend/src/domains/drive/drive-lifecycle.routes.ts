@@ -269,5 +269,70 @@ export function createLifecycleRouter(deps: LifecycleRouteDeps): Router {
         },
     );
 
+    // POST /sync-template - selectively overlay platform-owned paths from the
+    // xerus-workspace template repo onto the user's sandbox.
+    // Body: { dryRun?: boolean } — when true, returns the list of paths that
+    // would change without applying any filesystem mutations.
+    router.post(
+        '/sync-template',
+        auth,
+        async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+            const startTime = res.locals.startTime || Date.now();
+            try {
+                if (!req.user) throw new UnauthorizedError();
+
+                const dryRunRaw = req.body?.dryRun;
+                if (dryRunRaw !== undefined && typeof dryRunRaw !== 'boolean') {
+                    throw new BadRequestError('dryRun must be a boolean when provided');
+                }
+                const dryRun = dryRunRaw === true;
+
+                const service = deps.getDriveService();
+                const result = await service.syncTemplate(req.user.uid, dryRun);
+
+                sendResponse(
+                    res,
+                    200,
+                    {
+                        ...result,
+                        platformPaths: service.listSyncTemplatePaths(),
+                    },
+                    startTime,
+                );
+            } catch (err) {
+                next(err);
+            }
+        },
+    );
+
+    // DELETE /snapshots - remove an S3 snapshot owned by the user
+    router.delete(
+        '/snapshots',
+        auth,
+        async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+            const startTime = res.locals.startTime || Date.now();
+            try {
+                if (!req.user) throw new UnauthorizedError();
+
+                const { snapshotKey } = req.body;
+                if (typeof snapshotKey !== 'string' || !snapshotKey.trim()) {
+                    throw new BadRequestError('snapshotKey is required and must be a non-empty string');
+                }
+
+                const SNAPSHOT_KEY_PATTERN = /^[A-Za-z0-9_-]+\/snapshots\/[^/]+\.tar\.gz$/;
+                if (!snapshotKey.startsWith(`${req.user.uid}/`) || !SNAPSHOT_KEY_PATTERN.test(snapshotKey)) {
+                    throw new BadRequestError('Access denied: invalid or unauthorized snapshot key');
+                }
+
+                const service = deps.getDriveService();
+                await service.deleteSnapshot(req.user.uid, snapshotKey);
+
+                sendResponse(res, 200, { deleted: true, snapshotKey }, startTime);
+            } catch (err) {
+                next(err);
+            }
+        },
+    );
+
     return router;
 }

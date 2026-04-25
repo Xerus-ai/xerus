@@ -205,6 +205,19 @@ export async function startBrowser(): Promise<{ novnc_url: string }> {
 }
 
 /**
+ * Resolve a Daytona preview URL for a port served from the user's sandbox.
+ * Used by the chat artifact viewer to render live app previews.
+ */
+export async function getPreviewUrl(port: number): Promise<{ port: number; previewUrl: string }> {
+  const response = await apiCall('/workspace/preview', {
+    method: 'POST',
+    body: JSON.stringify({ port }),
+  });
+  const data = await response.json();
+  return data.data ?? data;
+}
+
+/**
  * Ensure sandbox is running (idempotent - resumes/reconnects/creates as needed)
  */
 export async function ensureSandbox(): Promise<WorkspaceStatus> {
@@ -322,6 +335,44 @@ export async function restoreFromSnapshot(snapshotKey: string): Promise<{ restor
   const response = await apiCall('/workspace/restore', {
     method: 'POST',
     body: JSON.stringify({ snapshotKey }),
+  });
+  const data = await response.json();
+  return data.data ?? data;
+}
+
+/**
+ * Permanently delete a workspace backup
+ */
+export async function deleteSnapshot(snapshotKey: string): Promise<{ deleted: boolean; snapshotKey: string }> {
+  const response = await apiCall('/workspace/snapshots', {
+    method: 'DELETE',
+    body: JSON.stringify({ snapshotKey }),
+  });
+  const data = await response.json();
+  return data.data ?? data;
+}
+
+// ---------- Template Sync ----------
+
+export interface TemplateSyncResult {
+  synced: boolean;
+  dryRun: boolean;
+  updatedPaths: string[];
+  skippedPaths: string[];
+  durationMs: number;
+  branch?: string;
+  platformPaths: string[];
+}
+
+/**
+ * Pull the latest xerus-workspace template into the user's sandbox, overlaying
+ * only platform-owned paths. User content (drive/, projects/, .memory/, etc.)
+ * is preserved. Pass dryRun=true to preview which paths would change.
+ */
+export async function syncTemplate(dryRun = false): Promise<TemplateSyncResult> {
+  const response = await apiCall('/workspace/sync-template', {
+    method: 'POST',
+    body: JSON.stringify({ dryRun }),
   });
   const data = await response.json();
   return data.data ?? data;

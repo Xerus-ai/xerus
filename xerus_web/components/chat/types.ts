@@ -93,6 +93,14 @@ export interface ChatState {
     preview_url?: string;
     artifact_path?: string;
   } | null
+  // Latest live-preview event from the agent's dev server. ChatContainer
+  // watches this and opens an artifact tab when it changes.
+  pendingPreview?: {
+    port: number;
+    url: string;
+    label?: string;
+    ts: number;
+  } | null
 }
 
 // Orchestration types

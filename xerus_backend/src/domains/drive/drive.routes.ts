@@ -296,4 +296,29 @@ router.post(
     },
 );
 
+// POST /preview { port } - resolve a Daytona preview URL for a port served from the user's sandbox.
+// Returns { port, previewUrl } so the frontend can iframe it as a live app preview tab.
+router.post(
+    '/preview',
+    auth,
+    async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+        const startTime = res.locals.startTime || Date.now();
+        try {
+            if (!req.user) throw new UnauthorizedError();
+
+            const port = Number(req.body?.port);
+            if (!Number.isInteger(port) || port < 1 || port > 65535) {
+                throw new BadRequestError('port is required and must be an integer between 1 and 65535');
+            }
+
+            const service = getDriveService();
+            const result = await service.getPreviewUrl(req.user.uid, port);
+
+            sendResponse(res, 200, result, startTime);
+        } catch (err) {
+            next(err);
+        }
+    },
+);
+
 export default router;

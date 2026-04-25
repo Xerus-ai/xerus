@@ -17,6 +17,7 @@ export type {
   ContextWarningEventContent, ExecutionSummary, ExecutionErrorInfo, DoneEventContent,
   StopEventContent, ToolAuthRequiredEventContent, GuidanceEventContent,
   SubagentStartEventContent, SubagentStopEventContent, DelegationEventContent, NotificationEventContent,
+  PreviewEventContent,
   StreamEventContentMap, StreamEvent, StreamEventCallback,
   UseExecutionStreamOptions, UseExecutionStreamReturn, ConnectionState,
 } from './useExecutionStream.types';
@@ -51,6 +52,7 @@ export interface UseExecutionStreamCallbacks {
   onSubagentStop?: (event: StreamEvent<'subagent_stop'>) => void;
   onDelegation?: (event: StreamEvent<'delegation'>) => void;
   onNotification?: (event: StreamEvent<'notification'>) => void;
+  onPreview?: (event: StreamEvent<'preview'>) => void;
   onError?: (error: Error) => void;
   onConnectionChange?: (connected: boolean) => void;
 }
@@ -141,6 +143,9 @@ export function useExecutionStream(
         break;
       case 'notification':
         cbs.onNotification?.(event as StreamEvent<'notification'>);
+        break;
+      case 'preview':
+        cbs.onPreview?.(event as StreamEvent<'preview'>);
         break;
     }
   }, []);

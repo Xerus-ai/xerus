@@ -7,11 +7,28 @@ import {
   importWorkspace,
   listSnapshots,
   restoreFromSnapshot,
+  deleteSnapshot,
 } from '@/lib/api/workspace'
 import type { SnapshotFile } from '@/lib/api/workspace'
-import { Download, Upload, History, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react'
+import {
+  Download,
+  Upload,
+  History,
+  RotateCcw,
+  ChevronDown,
+  ChevronUp,
+  MoreVertical,
+  Trash2,
+} from 'lucide-react'
 import { motion } from 'framer-motion'
 import { toast } from '@/lib/toast'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { cn } from '@/lib/utils'
 
 export default function DataPage() {
   useRedirectIfNotAuth()
@@ -19,6 +36,7 @@ export default function DataPage() {
   const [snapshots, setSnapshots] = useState<SnapshotFile[]>([])
   const [snapshotsOpen, setSnapshotsOpen] = useState(false)
   const [snapshotsLoading, setSnapshotsLoading] = useState(false)
+  const [pendingDeleteKey, setPendingDeleteKey] = useState<string | null>(null)
   const importFileRef = useRef<HTMLInputElement>(null)
 
   const formatBytes = (bytes: number): string => {
@@ -77,6 +95,20 @@ export default function DataPage() {
       toast.error("Couldn't restore the workspace", { description: 'Please try again.' })
     } finally {
       setActionInProgress(null)
+    }
+  }
+
+  const handleConfirmDelete = async (snapshot: SnapshotFile) => {
+    setActionInProgress('delete')
+    try {
+      await deleteSnapshot(snapshot.key)
+      setSnapshots((prev) => prev.filter((s) => s.key !== snapshot.key))
+      toast.success('Backup deleted', { description: 'The backup has been permanently removed.' })
+    } catch {
+      toast.error("Couldn't delete the backup", { description: 'Please try again.' })
+    } finally {
+      setActionInProgress(null)
+      setPendingDeleteKey(null)
     }
   }
 
@@ -219,25 +251,18 @@ export default function DataPage() {
             ) : (
               <div className="space-y-2">
                 {snapshots.map((snapshot) => (
-                  <div
+                  <SnapshotRow
                     key={snapshot.key}
-                    className="flex items-center justify-between p-3 bg-surface-hover/50 rounded-xl"
-                  >
-                    <div>
-                      <p className="text-sm text-text">
-                        {formatSnapshotDate(snapshot.lastModified)}
-                      </p>
-                      <p className="text-xs text-text-secondary">{formatBytes(snapshot.size)}</p>
-                    </div>
-                    <button
-                      onClick={() => handleRestore(snapshot)}
-                      disabled={actionInProgress !== null}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-text-secondary border border-surface-active rounded-lg hover:bg-surface-hover transition-colors disabled:opacity-40"
-                    >
-                      <RotateCcw className="w-3 h-3" />
-                      Restore
-                    </button>
-                  </div>
+                    snapshot={snapshot}
+                    isPendingDelete={pendingDeleteKey === snapshot.key}
+                    actionInProgress={actionInProgress}
+                    onRestore={() => handleRestore(snapshot)}
+                    onRequestDelete={() => setPendingDeleteKey(snapshot.key)}
+                    onCancelDelete={() => setPendingDeleteKey(null)}
+                    onConfirmDelete={() => handleConfirmDelete(snapshot)}
+                    formatDate={formatSnapshotDate}
+                    formatSize={formatBytes}
+                  />
                 ))}
               </div>
             )}
@@ -247,6 +272,113 @@ export default function DataPage() {
           </div>
         )}
       </motion.div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// SnapshotRow — single row with actions dropdown and inline delete confirmation
+// ---------------------------------------------------------------------------
+
+interface SnapshotRowProps {
+  snapshot: SnapshotFile
+  isPendingDelete: boolean
+  actionInProgress: string | null
+  onRestore: () => void
+  onRequestDelete: () => void
+  onCancelDelete: () => void
+  onConfirmDelete: () => void
+  formatDate: (iso: string) => string
+  formatSize: (bytes: number) => string
+}
+
+function SnapshotRow({
+  snapshot,
+  isPendingDelete,
+  actionInProgress,
+  onRestore,
+  onRequestDelete,
+  onCancelDelete,
+  onConfirmDelete,
+  formatDate,
+  formatSize,
+}: SnapshotRowProps) {
+  const isDisabled = actionInProgress !== null
+
+  if (isPendingDelete) {
+    return (
+      <div
+        className="flex items-center justify-between p-3 bg-rose-500/5 border border-rose-500/30 rounded-xl"
+        role="alertdialog"
+        aria-label="Confirm delete backup"
+      >
+        <div>
+          <p className="text-sm font-medium text-text">Delete this backup?</p>
+          <p className="text-xs text-text-secondary mt-0.5">
+            {formatDate(snapshot.lastModified)} {'\u00b7'} {formatSize(snapshot.size)} {'\u00b7'} cannot be undone
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={onCancelDelete}
+            disabled={actionInProgress === 'delete'}
+            className="px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-text transition-colors disabled:opacity-40"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirmDelete}
+            disabled={actionInProgress === 'delete'}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-rose-500 text-white hover:bg-rose-600 active:scale-[0.97] transition-all disabled:opacity-50"
+          >
+            <Trash2 className="w-3 h-3" />
+            {actionInProgress === 'delete' ? 'Deleting...' : 'Delete'}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-center justify-between p-3 bg-surface-hover/50 rounded-xl">
+      <div>
+        <p className="text-sm text-text">{formatDate(snapshot.lastModified)}</p>
+        <p className="text-xs text-text-secondary">{formatSize(snapshot.size)}</p>
+      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            disabled={isDisabled}
+            aria-label="Snapshot actions"
+            className={cn(
+              'flex items-center justify-center w-8 h-8 rounded-lg',
+              'text-text-secondary hover:text-text hover:bg-surface-hover',
+              'transition-colors disabled:opacity-40',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+            )}
+          >
+            <MoreVertical className="w-4 h-4" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-44">
+          <DropdownMenuItem
+            onSelect={onRestore}
+            disabled={isDisabled}
+            className="cursor-pointer"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            Restore backup
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={onRequestDelete}
+            disabled={isDisabled}
+            className="cursor-pointer text-rose-600 focus:text-rose-600 focus:bg-rose-500/10"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Delete snapshot
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   )
 }
