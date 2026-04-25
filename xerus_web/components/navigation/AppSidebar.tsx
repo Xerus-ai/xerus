@@ -7,7 +7,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import useSWR from 'swr'
 import {
   MessageSquare, Inbox, Home,
-  Bot, Puzzle, Unplug, FileText, Files, Settings,
+  Bot, Puzzle, Unplug, FileText, Files, Folder, Settings,
   PanelLeftClose, PanelLeftOpen,
   Plus,
 } from 'lucide-react'
@@ -203,17 +203,29 @@ function HomeSidebarBody({ activeSection, isOnWorkspace, onSectionClick, onPathC
       <div>
         <p className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-2 px-3">Workspace</p>
         <div className="space-y-0.5">
-          {overview?.documents && overview.documents.length > 0 ? (
-            overview.documents.map(doc => (
-              <button
-                key={doc.path}
-                onClick={() => onPathClick(doc.path)}
-                className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm text-text-secondary hover:bg-surface-hover hover:text-text transition-colors"
-              >
-                <FileText className="w-[18px] h-[18px] shrink-0" />
-                <span className="flex-1 text-left truncate">{doc.name.replace(/\.md$/, '')}</span>
-              </button>
-            ))
+          {(overview?.folders?.length ?? 0) + (overview?.documents?.length ?? 0) > 0 ? (
+            <>
+              {overview?.folders?.map(folder => (
+                <button
+                  key={folder.path}
+                  onClick={() => onPathClick(folder.path)}
+                  className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm text-text-secondary hover:bg-surface-hover hover:text-text transition-colors"
+                >
+                  <Folder className="w-[18px] h-[18px] shrink-0" />
+                  <span className="flex-1 text-left truncate">{folder.name}</span>
+                </button>
+              ))}
+              {overview?.documents?.map(doc => (
+                <button
+                  key={doc.path}
+                  onClick={() => onPathClick(doc.path)}
+                  className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm text-text-secondary hover:bg-surface-hover hover:text-text transition-colors"
+                >
+                  <FileText className="w-[18px] h-[18px] shrink-0" />
+                  <span className="flex-1 text-left truncate">{doc.name.replace(/\.md$/, '')}</span>
+                </button>
+              ))}
+            </>
           ) : (
             <p className="px-3 py-2 text-sm text-text-muted">No files yet</p>
           )}
