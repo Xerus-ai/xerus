@@ -135,6 +135,8 @@ export interface SetupReport {
     databases_initialized: boolean;
     node_verified: boolean;
     node_version: string;
+    bun_verified: boolean;
+    bun_version: string;
     duration_ms: number;
 }
 
@@ -153,6 +155,8 @@ export async function runFullWorkspaceSetup(
         databases_initialized: false,
         node_verified: false,
         node_version: '',
+        bun_verified: false,
+        bun_version: '',
         duration_ms: 0,
     };
 
@@ -267,6 +271,40 @@ export async function runFullWorkspaceSetup(
         report.node_version = versionMatch ? versionMatch[0] : 'unknown';
         report.node_verified = true;
         log.info('Node.js verified', { node_version: report.node_version, sandbox_id: sandboxId });
+    }
+
+    // 5b. Verify Bun is available (required by scheduler daemon at step 8).
+    // Mirrors the Node.js fallback above — base devcontainer image (Microsoft
+    // python:3.14) ships with neither runtime, and the scheduler daemon hard-fails
+    // if Bun is missing, so install it at runtime when absent.
+    const bunCheck = await provider.executeCommand(
+        sandboxId,
+        `which bun 2>/dev/null && bun --version && echo FOUND || echo MISSING`,
+    );
+    const bunOutput = (bunCheck.result || '').trim();
+    if (bunOutput.endsWith('MISSING')) {
+        log.warn('Bun not found, installing via bun.sh', { sandbox_id: sandboxId });
+        // Install to /usr/local so 'which bun' resolves without PATH munging
+        const installResult = await provider.executeCommand(
+            sandboxId,
+            `curl -fsSL https://bun.sh/install | BUN_INSTALL=/usr/local bash 2>&1 | tail -5`,
+        );
+        const verifyResult = await provider.executeCommand(sandboxId, 'bun --version 2>/dev/null');
+        const verifyOutput = (verifyResult.result || '').trim();
+        if (verifyResult.exitCode !== 0 || !/^\d/.test(verifyOutput)) {
+            throw new Error(
+                `Bun installation failed in sandbox ${sandboxId}. `
+                + `Install output: ${(installResult.result || '').slice(-200)}`,
+            );
+        }
+        report.bun_version = verifyOutput;
+        report.bun_verified = true;
+        log.info('Installed Bun', { bun_version: report.bun_version, sandbox_id: sandboxId });
+    } else {
+        const versionMatch = bunOutput.match(/[\d.]+/);
+        report.bun_version = versionMatch ? versionMatch[0] : 'unknown';
+        report.bun_verified = true;
+        log.info('Bun verified', { bun_version: report.bun_version, sandbox_id: sandboxId });
     }
 
     // 6. Sync DB agents into workspace (scaffold missing ones + update index.json)
