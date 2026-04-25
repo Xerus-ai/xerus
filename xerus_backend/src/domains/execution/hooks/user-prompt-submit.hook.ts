@@ -137,10 +137,13 @@ export interface UserPromptSubmitHandlerDeps {
  * a file-based approach (cheap, fast).
  *
  * Context files written:
- * - context/knowledge/*.md - KB docs synced from S3
  * - context/ace/playbook.md - ACE behavioral guidance
  * - context/trigger/*.md - Trigger-specific context
  * - context/index.md - Summary of all available files
+ *
+ * Knowledge sources (files the user connected to this agent via
+ * /workspace/connections) are read directly from drive/ by the agent at
+ * runtime — no copy step, no mediated sync.
  *
  * Memory files (in .memory/) are managed by GitMemoryRepository:
  * - .memory/agents/{slug}/working.md - Current session state

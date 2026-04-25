@@ -448,72 +448,8 @@ Successfully test all agent API endpoints.
     });
   });
 
-  describe('Knowledge Base Management Routes', () => {
-    let kbAgentId: number;
-
-    beforeAll(async () => {
-      const createResponse = await request(app)
-        .post('/api/v1/agents')
-        .set(authHeaders(testUserId))
-        .send({ ...validAgentPayload, name: 'Test KB Routes Agent ' + Date.now() });
-
-      kbAgentId = createResponse.body.data.agent.id;
-    });
-
-    describe('POST /api/v1/agents/:id/knowledge-bases', () => {
-      it('should add knowledge base to agent', async () => {
-        const response = await request(app)
-          .post(`/api/v1/agents/${kbAgentId}/knowledge-bases`)
-          .set(authHeaders(testUserId))
-          .send({
-            knowledge_base_id: 'kb-route-test',
-            kb_name: 'Route Test KB',
-            access_mode: 'read'
-          })
-          .expect(201);
-
-        expect(response.body.success).toBe(true);
-        expect(response.body.data.knowledge_base.knowledge_base_id).toBe('kb-route-test');
-      });
-
-      it('should return 400 without knowledge_base_id', async () => {
-        await request(app)
-          .post(`/api/v1/agents/${kbAgentId}/knowledge-bases`)
-          .set(authHeaders(testUserId))
-          .send({})
-          .expect(400);
-      });
-    });
-
-    describe('GET /api/v1/agents/:id/knowledge-bases', () => {
-      it('should return agent knowledge bases', async () => {
-        const response = await request(app)
-          .get(`/api/v1/agents/${kbAgentId}/knowledge-bases`)
-          .set(authHeaders(testUserId))
-          .expect(200);
-
-        expect(response.body.success).toBe(true);
-        expect(response.body.data.knowledge_bases).toBeDefined();
-      });
-    });
-
-    describe('DELETE /api/v1/agents/:id/knowledge-bases/:kbId', () => {
-      it('should remove knowledge base from agent', async () => {
-        await request(app)
-          .post(`/api/v1/agents/${kbAgentId}/knowledge-bases`)
-          .set(authHeaders(testUserId))
-          .send({ knowledge_base_id: 'kb-remove-route', kb_name: 'Remove KB' });
-
-        const response = await request(app)
-          .delete(`/api/v1/agents/${kbAgentId}/knowledge-bases/kb-remove-route`)
-          .set(authHeaders(testUserId))
-          .expect(200);
-
-        expect(response.body.success).toBe(true);
-        expect(response.body.data.removed).toBe(true);
-      });
-    });
-  });
+  // Knowledge base assignment moved to /workspace/connections. See
+  // drive/connections.routes.ts tests for the replacement surface.
 
   describe('Response Envelope Format', () => {
     it('should return proper success envelope', async () => {

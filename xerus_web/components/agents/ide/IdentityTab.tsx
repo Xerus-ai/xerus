@@ -6,7 +6,12 @@ import { apiCall } from '@/lib/api/client'
 import { batchReadAgentFiles } from '@/lib/api/workspace'
 import { formatPrompt, cloneAgent } from '@/lib/api/agents'
 import { addToolToAgent, removeToolFromAgent } from '@/lib/api/tools'
-import { addAgentKnowledgeBase, removeAgentKnowledgeBase } from '@/lib/api/agent-kb'
+import {
+  connectFileToAgent,
+  disconnectFileFromAgent,
+  type FileConnection,
+} from '@/lib/api/connections'
+import type { DriveDocument } from '@/lib/drive-documents'
 import { slugify } from "@/utils/slugify"
 import { useAuth } from "@/utils/AuthContext"
 import { useSearchableTools, useToolLookup } from "@/hooks/useTools"
@@ -72,19 +77,12 @@ interface FileData {
   isTemplate: boolean
 }
 
-interface AgentKbDoc {
-  knowledge_base_id: string
-  kb_name: string
-  access_mode: string
-  added_at: string
-}
-
 interface IdentityTabProps {
   agent: any
   isEditable: boolean
   isMarketplace?: boolean
-  availableDocuments: any[]
-  agentKbDocs?: AgentKbDoc[]
+  driveDocuments: DriveDocument[]
+  agentConnections?: FileConnection[]
   onUpdate: (updates: any) => void
   onRefresh?: () => Promise<void>
   schedules: any[]
@@ -95,8 +93,8 @@ export function IdentityTab({
   agent,
   isEditable,
   isMarketplace = false,
-  availableDocuments,
-  agentKbDocs = [],
+  driveDocuments,
+  agentConnections = [],
   onUpdate,
   onRefresh,
   schedules,
@@ -306,23 +304,37 @@ export function IdentityTab({
   }
 
   // --- KB Handlers ---
-  const handleAddKb = async (docId: string, docTitle: string) => {
-    await addAgentKnowledgeBase(Number(agent.id), docId, docTitle)
+  // Writes flow through workspace.connections — the same table the /workspace PropertyBar
+  // uses — so attaching a file here and connecting it from drive stay in sync.
+  const handleConnectFile = async (filePath: string) => {
+    if (!agent?.slug) return
+    await connectFileToAgent(filePath, agent.slug)
     if (onRefresh) await onRefresh()
   }
 
-  const handleRemoveKb = async (docId: string) => {
-    await removeAgentKnowledgeBase(Number(agent.id), docId)
+  const handleDisconnectFile = async (connectionId: number) => {
+    await disconnectFileFromAgent(connectionId)
     if (onRefresh) await onRefresh()
   }
 
   // --- Derived Data ---
-  const agentDocs = agentKbDocs.map(kb => ({
-    id: kb.knowledge_base_id,
-    name: kb.kb_name || 'Untitled',
-    title: kb.kb_name || 'Untitled',
-    content_type: 'document',
-  }))
+  // Resolve each connection back to its drive file metadata. If the drive file
+  // was deleted under us, fall back to the path basename so the user can still
+  // see and disconnect the stale entry.
+  const connectedDocs = agentConnections.map(conn => {
+    const drive = driveDocuments.find(d => d.path === conn.file_path)
+    const name = drive?.name || conn.file_path.split('/').pop() || conn.file_path
+    const ext = name.includes('.') ? name.split('.').pop()!.toLowerCase() : 'document'
+    return {
+      connectionId: conn.id,
+      path: conn.file_path,
+      name,
+      title: name,
+      subtitle: conn.file_path.startsWith('drive/') ? conn.file_path.slice('drive/'.length) : conn.file_path,
+      content_type: drive?.content_type || ext,
+      missing: !drive,
+    }
+  })
 
   const availableToolsList = useMemo(() => {
     return availableToolResults.filter(t => {
@@ -417,13 +429,12 @@ export function IdentityTab({
         />
 
         <KnowledgeBaseSection
-          agentId={Number(agent.id)}
-          agentDocs={agentDocs}
-          availableDocuments={availableDocuments}
+          connectedDocs={connectedDocs}
+          driveDocuments={driveDocuments}
           isEditable={isEditable}
           isMarketplace={isMarketplace}
-          onAddKb={handleAddKb}
-          onRemoveKb={handleRemoveKb}
+          onConnect={handleConnectFile}
+          onDisconnect={handleDisconnectFile}
         />
 
         <ConnectorsSection

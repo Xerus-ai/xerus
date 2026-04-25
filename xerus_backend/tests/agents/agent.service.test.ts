@@ -93,7 +93,6 @@ Execute service tests correctly.
 
       expect(detail.id).toBe(created.id);
       expect(detail.tools).toBeDefined();
-      expect(detail.knowledge_bases).toBeDefined();
     });
 
     it('should throw AgentNotFoundError for non-existent ID', async () => {
@@ -244,7 +243,7 @@ Test that system_prompt updates correctly.`;
 
   // Note: clone, publish, unpublish, setDefault, unsetDefault, getSystemAgents,
   // getUserAgents, searchMarketplace have been extracted to AgentMarketplaceService.
-  // Tool/KB operations extracted to AgentToolsService / AgentKBService.
+  // Tool operations extracted to AgentToolsService.
+  // Knowledge base assignment lives in workspace.connections (see drive/).
   // getUsageAnalytics has been removed.
-  // See: agent-marketplace.service.ts, agent-tools.service.ts, agent-kb.service.ts
 });

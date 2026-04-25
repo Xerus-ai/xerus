@@ -117,11 +117,10 @@ export const getUserAgents = async (): Promise<Assistant[]> => {
 export const getAssistant = async (id: number | string): Promise<Assistant | null> => {
   const isMarketplaceId = typeof id === 'string' && isNaN(Number(id));
 
-  // Marketplace agents don't have DB records for KB/tools sub-routes.
-  // Only fetch the main agent; use resolved-null sentinels to keep array length stable.
-  const [agentResponse, kbResponse, toolsResponse] = await Promise.allSettled([
+  // Marketplace agents don't have user-scoped sub-routes. Skip the tools sub-call for them.
+  // Knowledge assignments live in workspace.connections now — queried separately when needed.
+  const [agentResponse, toolsResponse] = await Promise.allSettled([
     apiCall(`/agents/${id}`, { method: 'GET' }, false),
-    isMarketplaceId ? Promise.resolve(null) : apiCall(`/agents/${id}/knowledge-bases`, { method: 'GET' }, false),
     isMarketplaceId ? Promise.resolve(null) : apiCall(`/agents/${id}/tools`, { method: 'GET' }, false),
   ]);
 
@@ -137,20 +136,10 @@ export const getAssistant = async (id: number | string): Promise<Assistant | nul
   const rawAgent = agentData.agent || agentData;
   const agent: BackendAgent = rawAgent;
 
-  // Determine knowledgeBase
-  let knowledgeBase: string[] = [];
-  if (agent.search_all_knowledge) {
-    knowledgeBase = ['all'];
-  } else if (kbResponse.status === 'fulfilled' && kbResponse.value && kbResponse.value.ok) {
-    try {
-      const kbResult = await kbResponse.value.json();
-      const kbData = kbResult.data || kbResult;
-      const kbs = kbData.knowledge_bases || [];
-      knowledgeBase = kbs.map((kb: { knowledge_base_id: string }) => kb.knowledge_base_id);
-    } catch (err) {
-      console.error('Failed to parse knowledge bases:', err);
-    }
-  }
+  // The "search all drive" toggle lives on the agent itself; per-file knowledge
+  // sources are now queried via /workspace/connections and rendered directly by
+  // the KB card, so we don't hydrate them here.
+  const knowledgeBase: string[] = agent.search_all_knowledge ? ['all'] : [];
 
   // Get assigned tools — from sub-call for user agents, from main response for marketplace
   type ToolEntry = { name_slug: string; name: string; description: string | null; img_src: string | null; auth_type: string | null; categories: string[] | null };
@@ -227,21 +216,6 @@ export const updateAgent = async (id: number, updates: AgentUpdateInput): Promis
     throw new Error(validationError);
   }
 
-  // Fetch current agent to get knowledge base status
-  let knowledgeBase: string[] = [];
-
-  try {
-    const currentAgent = await getAssistant(id);
-    if (currentAgent?.knowledgeBase) {
-      knowledgeBase = currentAgent.knowledgeBase;
-    }
-  } catch (err) {
-    // KB fetch is non-critical for the update operation itself.
-    // The update will succeed without it; we just lose the ability to
-    // return the current KB state in the response object.
-    console.warn('Failed to fetch current KB for agent update, proceeding without:', err);
-  }
-
   const response = await apiCall(`/agents/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(updates),
@@ -252,11 +226,7 @@ export const updateAgent = async (id: number, updates: AgentUpdateInput): Promis
   const agent: BackendAgent = agentData.agent || agentData;
   toast.success('Changes saved', { description: 'Your agent has been updated.' });
 
-  const assistant = mapAgentToAssistant(agent);
-  return {
-    ...assistant,
-    knowledgeBase,
-  };
+  return mapAgentToAssistant(agent);
 };
 
 /**

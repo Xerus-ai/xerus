@@ -337,7 +337,7 @@ export default function WorkspacePage() {
                         }}
                         onUploadClick={(path) => { setUploadTargetPath(path); setUploadPanelOpen(true) }}
                         onNewFolder={confirmNewFolder}
-                        showPropertyBar={isBrowseMode && currentDirPath?.startsWith('drive')}
+                        showPropertyBar={currentDirPath?.startsWith('drive') ?? false}
                       />
                     </div>
                   </Panel>
