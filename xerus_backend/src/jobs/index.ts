@@ -6,6 +6,7 @@ import { startSandboxSchedulerJob, startSandboxCleanupJob } from './sandbox-life
 import { startDigestSchedulerJob } from './digest-scheduler';
 import { startBackupSchedulerJob } from './s3-backup-job';
 import { startSnapshotWarmKeepJob } from './snapshot-warm-keep';
+import { startExecutionWatchdogJob } from './execution-watchdog';
 import type { SandboxProvider } from '../domains/sandbox-infra/sandbox/providers';
 import type { SandboxService } from '../domains/sandbox-infra/sandbox/sandbox.service';
 import type { S3BackupService } from '../domains/sandbox-infra/storage/s3-backup.service';
@@ -36,6 +37,7 @@ export function startAllJobs(deps: JobDependencies = {}): void {
         startSandboxSchedulerJob(deps.provider, deps.sandboxService);
         startSandboxCleanupJob(deps.provider, deps.sandboxService);
         startSnapshotWarmKeepJob(deps.provider);
+        startExecutionWatchdogJob();
         startDigestSchedulerJob(deps.db);
 
         if (deps.sandboxService && deps.backupService) {
