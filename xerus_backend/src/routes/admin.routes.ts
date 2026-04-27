@@ -86,7 +86,7 @@ router.patch('/users/:id', auth, requireAdmin, async (req: AuthenticatedRequest,
         const { id } = req.params;
 
         const updateSchema = Joi.object({
-            plan_type: Joi.string().valid('free', 'starter', 'advanced', 'prodigy'),
+            plan_type: Joi.string().valid('pro', 'max', 'ultra'),
             credits_add: Joi.number().integer(),
             platform_key_access: Joi.boolean(),
         }).min(1);

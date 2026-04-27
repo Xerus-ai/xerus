@@ -9,6 +9,8 @@ import { AgentSelectRow } from './ui/AgentSelectRow'
 import { SchedulePicker } from './ui/SchedulePicker'
 import { SummaryCard } from './ui/SummaryCard'
 import { CollapsedConfirm } from './ui/CollapsedConfirm'
+import { PlanSelectionCard } from './cards/PlanSelectionCard'
+import { ActivateWorkforceCard } from './cards/ActivateWorkforceCard'
 import type { OnboardingMessage } from './types'
 
 interface QuickReply {
@@ -32,6 +34,8 @@ const UI_COMPONENTS: Record<string, React.ComponentType<any>> = {
   'agent-select': AgentSelectRow,
   'schedule-picker': SchedulePicker,
   'summary': SummaryCard,
+  'plan-selection': PlanSelectionCard,
+  'activate-workforce': ActivateWorkforceCard,
 }
 
 const ICON_MAP: Record<string, React.ComponentType<any>> = {

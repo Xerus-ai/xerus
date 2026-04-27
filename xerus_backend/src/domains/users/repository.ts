@@ -13,6 +13,7 @@ import type {
     UserApiKeyRow,
     PlanType,
     ApiProvider,
+    SubscriptionStatus,
 } from './types';
 import { PLAN_CREDITS } from './types';
 import { UserNotFoundError } from './errors';
@@ -36,6 +37,11 @@ function mapUserRow(row: UserRow): User {
         credits_reset_date: row.credits_reset_date,
         plan_type: row.plan_type as PlanType,
         platform_key_access: row.platform_key_access,
+        polar_customer_id: row.polar_customer_id ?? null,
+        polar_subscription_id: row.polar_subscription_id ?? null,
+        subscription_status: (row.subscription_status as SubscriptionStatus) ?? 'pending',
+        subscription_current_period_end: row.subscription_current_period_end ?? null,
+        billing_email: row.billing_email ?? null,
     };
 }
 
@@ -82,7 +88,7 @@ export class UserRepository {
     }
 
     async create(data: UserCreateInput, isActive = true): Promise<User> {
-        const planCredits = PLAN_CREDITS.starter;
+        const planCredits = PLAN_CREDITS.pro;
 
         const result = await query<UserRow>(
             `INSERT INTO users (
@@ -90,8 +96,9 @@ export class UserRepository {
         role, plan_type, is_active,
         credits_available, credits_used,
         credits_reset_date, platform_key_access,
+        subscription_status,
         created_at, updated_at, last_login
-      ) VALUES ($1, $2, $3, $4, 'user', 'starter', $6, $5, 0, NOW(), true, NOW(), NOW(), NOW())
+      ) VALUES ($1, $2, $3, $4, 'user', 'pro', $6, $5, 0, NOW() + INTERVAL '30 days', true, 'pending', NOW(), NOW(), NOW())
       RETURNING *`,
             [data.firebase_uid, data.email, data.display_name || null, data.avatar_url || null, planCredits, isActive]
         );
@@ -213,6 +220,80 @@ export class UserRepository {
         };
     }
 
+    // ===== POLAR / SUBSCRIPTION OPERATIONS =====
+
+    async findByPolarCustomerId(customerId: string): Promise<User | null> {
+        const result = await query<UserRow>('SELECT * FROM users WHERE polar_customer_id = $1', [customerId]);
+        return result.rows[0] ? mapUserRow(result.rows[0]) : null;
+    }
+
+    async findByPolarSubscriptionId(subscriptionId: string): Promise<User | null> {
+        const result = await query<UserRow>('SELECT * FROM users WHERE polar_subscription_id = $1', [subscriptionId]);
+        return result.rows[0] ? mapUserRow(result.rows[0]) : null;
+    }
+
+    async updateSubscription(userId: string, data: {
+        polar_customer_id?: string;
+        polar_subscription_id?: string;
+        subscription_status?: SubscriptionStatus;
+        subscription_current_period_end?: Date | null;
+        plan_type?: PlanType;
+        billing_email?: string;
+    }): Promise<User> {
+        const setClauses: string[] = [];
+        const values: unknown[] = [];
+        let paramIndex = 1;
+
+        if (data.polar_customer_id !== undefined) {
+            setClauses.push(`polar_customer_id = $${paramIndex}`);
+            values.push(data.polar_customer_id);
+            paramIndex++;
+        }
+        if (data.polar_subscription_id !== undefined) {
+            setClauses.push(`polar_subscription_id = $${paramIndex}`);
+            values.push(data.polar_subscription_id);
+            paramIndex++;
+        }
+        if (data.subscription_status !== undefined) {
+            setClauses.push(`subscription_status = $${paramIndex}`);
+            values.push(data.subscription_status);
+            paramIndex++;
+        }
+        if (data.subscription_current_period_end !== undefined) {
+            setClauses.push(`subscription_current_period_end = $${paramIndex}`);
+            values.push(data.subscription_current_period_end);
+            paramIndex++;
+        }
+        if (data.plan_type !== undefined) {
+            setClauses.push(`plan_type = $${paramIndex}`);
+            values.push(data.plan_type);
+            paramIndex++;
+        }
+        if (data.billing_email !== undefined) {
+            setClauses.push(`billing_email = $${paramIndex}`);
+            values.push(data.billing_email);
+            paramIndex++;
+        }
+
+        if (setClauses.length === 0) {
+            const user = await this.findById(userId);
+            if (!user) throw new UserNotFoundError(userId);
+            return user;
+        }
+
+        setClauses.push('updated_at = NOW()');
+        values.push(userId);
+
+        const result = await query<UserRow>(
+            `UPDATE users SET ${setClauses.join(', ')} WHERE user_id = $${paramIndex} RETURNING *`,
+            values,
+        );
+        if (result.rows.length === 0) {
+            throw new UserNotFoundError(userId);
+        }
+        return mapUserRow(result.rows[0]);
+    }
+
     // ===== CREDIT OPERATIONS =====
 
     async getCreditBalance(userId: string): Promise<CreditBalance | null> {
@@ -288,7 +369,7 @@ export class UserRepository {
             `UPDATE users SET
         credits_available = $2,
         credits_used = 0,
-        credits_reset_date = NOW(),
+        credits_reset_date = NOW() + INTERVAL '30 days',
         updated_at = NOW()
        WHERE user_id = $1 RETURNING *`,
             [userId, newBalance]
@@ -302,7 +383,7 @@ export class UserRepository {
             `UPDATE users SET
         credits_available = $1,
         credits_used = 0,
-        credits_reset_date = NOW(),
+        credits_reset_date = NOW() + INTERVAL '30 days',
         updated_at = NOW()
        WHERE plan_type = $2
          AND credits_reset_date <= NOW()

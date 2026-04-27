@@ -3,15 +3,15 @@
 
 // ===== ENUMS & CONSTANTS =====
 
-export type PlanType = 'free' | 'starter' | 'advanced' | 'prodigy';
+export type PlanType = 'pro' | 'max' | 'ultra';
 export type UserRole = 'admin' | 'user';
 export type ApiProvider = 'openrouter' | 'daytona' | 'anthropic' | 'openai';
+export type SubscriptionStatus = 'active' | 'canceled' | 'past_due' | 'revoked' | 'pending';
 
 export const PLAN_CREDITS: Record<PlanType, number> = {
-    free: 0,
-    starter: 2500,
-    advanced: 10000,
-    prodigy: 100000,
+    pro: 500,
+    max: 2000,
+    ultra: 10000,
 };
 
 export const VALID_API_PROVIDERS: ApiProvider[] = ['openrouter', 'daytona', 'anthropic', 'openai'];
@@ -36,6 +36,11 @@ export interface User {
     credits_reset_date: Date | null;
     plan_type: PlanType;
     platform_key_access: boolean;
+    polar_customer_id: string | null;
+    polar_subscription_id: string | null;
+    subscription_status: SubscriptionStatus;
+    subscription_current_period_end: Date | null;
+    billing_email: string | null;
 }
 
 export interface UserPreferences {
@@ -164,6 +169,11 @@ export interface UserRow {
     credits_reset_date: Date | null;
     plan_type: string;
     platform_key_access: boolean;
+    polar_customer_id: string | null;
+    polar_subscription_id: string | null;
+    subscription_status: string | null;
+    subscription_current_period_end: Date | null;
+    billing_email: string | null;
 }
 
 export interface UserApiKeyRow {

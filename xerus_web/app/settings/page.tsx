@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { Mail, Crown, Trash2, AlertTriangle } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { toast } from '@/lib/toast'
+import { PLANS } from '@/lib/plans'
 import Link from 'next/link'
 
 interface ProfileData {
@@ -18,12 +19,9 @@ interface ProfileData {
   created_at?: string
 }
 
-const PLAN_LABELS: Record<string, string> = {
-  free: 'Free',
-  starter: 'Starter',
-  advanced: 'Advanced',
-  prodigy: 'Prodigy',
-}
+const PLAN_LABELS: Record<string, string> = Object.fromEntries(
+  Object.entries(PLANS).map(([key, plan]) => [key, plan.label])
+)
 
 export default function ProfilePage() {
   const user = useRedirectIfNotAuth()
@@ -84,8 +82,8 @@ export default function ProfilePage() {
     }
   }
 
-  const planType = profile?.plan_type || 'free'
-  const planLabel = PLAN_LABELS[planType] || 'Free'
+  const planType = profile?.plan_type || 'pro'
+  const planLabel = PLAN_LABELS[planType] || 'Pro'
   const initials = profile?.display_name?.charAt(0)?.toUpperCase() || 'U'
 
   if (isLoading) {
@@ -157,7 +155,7 @@ export default function ProfilePage() {
               <Crown className="w-3 h-3 text-text-secondary" />
               {planLabel}
             </span>
-            {planType === 'free' && (
+            {planType !== 'ultra' && (
               <Link
                 href="/settings/billing"
                 className="text-xs font-medium text-primary hover:text-primary/90 transition-colors"

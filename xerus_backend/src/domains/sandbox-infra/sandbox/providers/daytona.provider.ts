@@ -409,6 +409,11 @@ cat /tmp/chromium.log 2>/dev/null | head -20`;
         }
     }
 
+    async resizeSandbox(sandboxId: string, resources: { cpu?: number; memory?: number; disk?: number }): Promise<void> {
+        const sandbox = await this.getSandboxInstance(sandboxId);
+        await sandbox.resize(resources);
+    }
+
     // Run an agent in the sandbox via Sessions API
     // Returns async generator of events (backward-compatible one-shot interface)
     async *runAgent(options: RunAgentOptions): AsyncGenerator<RunnerEvent> {

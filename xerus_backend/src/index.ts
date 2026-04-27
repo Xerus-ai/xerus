@@ -42,6 +42,7 @@ import { driveRouter, setDriveDeps, DriveService } from './domains/drive';
 import skillRoutes, { setSkillRoutesDeps, agentSkillsRouter } from './domains/skills/routes';
 import { agentChannelsRouter, setAgentChannelsDeps } from './domains/agents/agent-channels.routes';
 import inviteCodeRoutes from './domains/invite-codes/routes';
+import { billingRoutes } from './domains/billing';
 import { createMessageBridgeService } from './domains/inbox/messaging/message-bridge.service';
 import { HITLHandler } from './domains/execution/hitl/hitl.handler';
 import { HITLPauseRepositoryImpl } from './domains/execution/hitl/hitl-pause.repository';
@@ -78,6 +79,9 @@ app.use((req, res, next) => {
 });
 
 app.use(helmet());
+// Webhook route needs raw body as Buffer for HMAC signature verification.
+// Must come BEFORE express.json() which would parse the body into an object.
+app.use('/api/v1/billing/webhooks/polar', express.raw({ type: 'application/json' }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(requestMeta);
@@ -112,6 +116,7 @@ app.use('/api/v1/models', modelsRoutes);
 app.use('/api/v1/workspace', driveRouter);
 app.use('/api/v1/skills', skillRoutes);
 app.use('/api/v1/invite-codes', inviteCodeRoutes);
+app.use('/api/v1/billing', billingRoutes);
 app.use('/api/v1/internal/mcp', internalMcpRouter);
 
 app.use(notFoundHandler);

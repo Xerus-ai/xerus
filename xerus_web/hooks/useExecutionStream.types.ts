@@ -32,6 +32,10 @@ export const STREAM_EVENT_TYPES = [
   'delegation',
   // Live app preview from agent dev server (Lovable/Replit-style)
   'preview',
+  // Billing/credit events
+  'credit_warning',
+  'insufficient_credits',
+  'provider_unavailable',
 ] as const;
 
 export type StreamEventType = (typeof STREAM_EVENT_TYPES)[number];
@@ -188,6 +192,20 @@ export interface GuidanceEventContent {
   artifact_path?: string;
 }
 
+export interface CreditWarningEventContent {
+  credits_available: number;
+  credits_total: number;
+  message: string;
+}
+
+export interface InsufficientCreditsEventContent {
+  message: string;
+}
+
+export interface ProviderUnavailableEventContent {
+  message: string;
+}
+
 // Map from event type string to its content type
 export interface StreamEventContentMap {
   meta: MetaEventContent;
@@ -209,6 +227,9 @@ export interface StreamEventContentMap {
   delegation: DelegationEventContent;
   notification: NotificationEventContent;
   preview: PreviewEventContent;
+  credit_warning: CreditWarningEventContent;
+  insufficient_credits: InsufficientCreditsEventContent;
+  provider_unavailable: ProviderUnavailableEventContent;
 }
 
 export interface StreamEvent<T extends StreamEventType = StreamEventType> {

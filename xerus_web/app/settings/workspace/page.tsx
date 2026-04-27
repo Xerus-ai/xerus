@@ -17,28 +17,12 @@ import { toast } from '@/lib/toast'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { SyncTemplateAction } from './SyncTemplateAction'
+import { PLANS } from '@/lib/plans'
 
-const PLAN_CREDITS: Record<string, number> = {
-  free: 10,
-  starter: 2500,
-  advanced: 10000,
-  prodigy: 100000,
-}
-
-const PLAN_LABELS: Record<string, string> = {
-  free: 'Free',
-  starter: 'Starter',
-  advanced: 'Advanced',
-  prodigy: 'Prodigy',
-}
-
-// Per-pod resource allocation by plan tier
-const PLAN_RESOURCES: Record<string, { vcpus: number; memoryGb: number; storageGb: number }> = {
-  free:     { vcpus: 1, memoryGb: 1, storageGb: 5 },
-  starter:  { vcpus: 1, memoryGb: 2, storageGb: 10 },
-  advanced: { vcpus: 2, memoryGb: 4, storageGb: 25 },
-  prodigy:  { vcpus: 4, memoryGb: 8, storageGb: 50 },
-}
+// Per-pod resource allocation derived from centralized plan definitions
+const PLAN_RESOURCES: Record<string, { vcpus: number; memoryGb: number; storageGb: number }> = Object.fromEntries(
+  Object.entries(PLANS).map(([key, plan]) => [key, { vcpus: plan.vcpu, memoryGb: plan.ram, storageGb: plan.disk }])
+)
 
 const POD_ENV = {
   os: 'Ubuntu 24.04',
@@ -87,9 +71,9 @@ export default function WorkspaceOverviewPage() {
   }
 
   const isRunning = workspaceStatus?.sandbox_running
-  const planType = credits?.plan_type || 'free'
-  const podResources = PLAN_RESOURCES[planType] || PLAN_RESOURCES.free
-  const totalCredits = credits ? PLAN_CREDITS[credits.plan_type] || 10 : 10
+  const planType = credits?.plan_type || 'pro'
+  const podResources = PLAN_RESOURCES[planType] || PLAN_RESOURCES.pro
+  const totalCredits = credits ? (PLANS[credits.plan_type as keyof typeof PLANS]?.credits || 500) : 500
   const creditsPercent = credits ? Math.min(100, (credits.credits_available / totalCredits) * 100) : 0
 
   const formatResetDate = (iso: string): string => {

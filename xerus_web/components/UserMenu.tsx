@@ -7,18 +7,11 @@ import { ChevronDown, User, Settings, LogOut, Users, Sun, Moon } from 'lucide-re
 import { toast } from '@/lib/toast'
 import { useAuth } from '@/utils/AuthContext'
 import { logout, getCreditBalance, type CreditBalance } from '@/lib/api/user'
+import { PLANS, type PlanType } from '@/lib/plans'
 import type { UserProfile } from '@/lib/api/types'
 
 interface UserMenuProps {
   className?: string
-}
-
-// Plan credit limits (must match backend PLAN_CREDITS)
-const PLAN_CREDITS: Record<string, number> = {
-  free: 10,
-  starter: 2500,
-  advanced: 10000,
-  prodigy: 100000
 }
 
 export function UserMenu({ className }: UserMenuProps) {
@@ -99,8 +92,8 @@ export function UserMenu({ className }: UserMenuProps) {
 
   // Get total credits for plan
   const getTotalCredits = useCallback((): number => {
-    if (!credits?.plan_type) return 10
-    return PLAN_CREDITS[credits.plan_type] || 10
+    if (!credits?.plan_type) return 500
+    return PLANS[credits.plan_type as PlanType]?.credits ?? 500
   }, [credits])
 
   // Calculate progress percentage
@@ -156,7 +149,7 @@ export function UserMenu({ className }: UserMenuProps) {
         </div>
         <div className="flex-1 min-w-0 text-left">
           <p className="text-[14px] font-medium text-text truncate leading-tight">{getUserDisplayName()}</p>
-          <p className="text-[11px] text-text-secondary leading-tight">{credits?.plan_type ? credits.plan_type.charAt(0).toUpperCase() + credits.plan_type.slice(1) + ' plan' : 'Free plan'}</p>
+          <p className="text-[11px] text-text-secondary leading-tight">{credits?.plan_type ? (PLANS[credits.plan_type as PlanType]?.label ?? 'Pro') + ' plan' : 'Pro plan'}</p>
         </div>
         <ChevronDown className={`w-4 h-4 text-text-muted transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
       </button>
@@ -201,12 +194,12 @@ export function UserMenu({ className }: UserMenuProps) {
 
             <div className="flex items-center justify-between text-[11px]">
               <span className="text-text-muted">
-                {credits?.plan_type === 'prodigy'
-                  ? 'Prodigy plan'
+                {credits?.plan_type === 'ultra'
+                  ? 'Ultra plan'
                   : `Resets in ${getDaysUntilReset()} day${getDaysUntilReset() !== 1 ? 's' : ''}`
                 }
               </span>
-              {credits?.plan_type !== 'prodigy' && (
+              {credits?.plan_type !== 'ultra' && (
                 <button
                   onClick={() => router.push('/settings/billing')}
                   className="text-secondary font-medium hover:text-secondary/90 transition-colors hover:underline"

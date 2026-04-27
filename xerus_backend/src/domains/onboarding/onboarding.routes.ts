@@ -76,6 +76,16 @@ router.post('/handoff', auth, async (req: AuthenticatedRequest, res: Response, n
             throw new UnauthorizedError('Authentication required');
         }
 
+        // Block handoff until payment confirmed
+        const userCheck = await query<{ subscription_status: string | null }>(
+            'SELECT subscription_status FROM users WHERE user_id = $1',
+            [userId],
+        );
+        const subStatus = userCheck.rows[0]?.subscription_status;
+        if (subStatus !== 'active') {
+            throw new BadRequestError('Payment required before workspace provisioning');
+        }
+
         const workspaceName = (req.body.workspace as string || '').trim();
         const projectName = (req.body.project as string || '').trim();
 

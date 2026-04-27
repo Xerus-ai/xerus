@@ -15,6 +15,7 @@ import { logger } from '../../utils/logger';
 import { BillingType, ExecutionSummary, STREAM_EVENT_TYPES, StreamEventType, type AdapterType } from './types';
 import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
 import { DEFAULT_MODEL } from '../agents/types';
+import { PLAN_CREDITS, type PlanType } from '../users/types';
 import type { TriggerType } from './queue/execution-lane.types';
 import {
     SDKExecutionError,
@@ -333,17 +334,37 @@ export async function reserveCredits(
     deps: ResolvedExecutionDeps,
     ctx: PipelineContext,
 ): Promise<void> {
+    // Check subscription status before allowing execution
+    const user = await deps.db.query<{
+        subscription_status: string | null;
+        subscription_current_period_end: Date | null;
+    }>(
+        'SELECT subscription_status, subscription_current_period_end FROM users WHERE user_id = $1',
+        [ctx.request.userId],
+    );
+    const userRow = user.rows[0];
+    if (userRow) {
+        const status = userRow.subscription_status;
+        const periodEnd = userRow.subscription_current_period_end;
+        const now = new Date();
+
+        if (status === 'revoked') {
+            throw new SDKExecutionError('Subscription revoked — update your payment method');
+        }
+        if (status === 'canceled' && periodEnd && periodEnd < now) {
+            throw new SDKExecutionError('Subscription expired — renew to continue');
+        }
+        if (status === 'past_due') {
+            throw new SDKExecutionError('Payment past due — update your payment method');
+        }
+    }
+
     // BYOK users use their own API key — skip credit reservation
     if (ctx.keySource === 'byok') {
         return;
     }
 
-    // Conservative estimate: assume worst-case (opus-level) token usage.
-    // The real model lives in sandbox config.json (runner reads it locally).
-    // finalizeCredits uses actual token counts from the runner, so over-reservation
-    // here is safe — excess is refunded.
     const estimatedTokens = estimateExecutionTokens(ctx.request.task);
-
     const estimate = deps.sdkService.estimateCreditsConservative(estimatedTokens);
 
     const hasCredits = await deps.creditTracker.checkCredits(
@@ -553,12 +574,61 @@ export async function finalizeCredits(
     }
 
     // Platform key users: deduct credits as usual
-    const result = await deps.creditTracker.finalizeSession(
-        ctx.request.userId,
-        ctx.sessionId,
-    );
+    try {
+        const result = await deps.creditTracker.finalizeSession(
+            ctx.request.userId,
+            ctx.sessionId,
+        );
 
-    return { total_credits_deducted: result.total_credits_deducted };
+        // Emit credit_warning if balance dropped below 20% of plan allocation
+        try {
+            const balanceCheck = await deps.db.query<{ credits_available: number; plan_type: string }>(
+                'SELECT credits_available, plan_type FROM users WHERE user_id = $1',
+                [ctx.request.userId],
+            );
+            const row = balanceCheck.rows[0];
+            if (row) {
+                const total = PLAN_CREDITS[row.plan_type as PlanType] ?? 500;
+                if (row.credits_available < total * 0.2) {
+                    ctx.stream.send('credit_warning', {
+                        credits_available: row.credits_available,
+                        credits_total: total,
+                        message: 'Credits running low — connect your own API key for unlimited usage',
+                    });
+                }
+            }
+        } catch (warnErr) {
+            log.warn('Failed to emit credit warning', { error: warnErr instanceof Error ? warnErr.message : String(warnErr) });
+        }
+
+        return { total_credits_deducted: result.total_credits_deducted };
+    } catch (error: unknown) {
+        const errMsg = error instanceof Error ? error.message : String(error);
+        const isConstraintViolation = errMsg.includes('check') || errMsg.includes('constraint') || errMsg.includes('credits_available');
+        if (isConstraintViolation) {
+            log.warn('Mid-execution credit exhaustion — deducting remaining balance to zero', {
+                execution_id: ctx.executionId,
+                user_id: ctx.request.userId,
+                error: errMsg,
+            });
+            try {
+                const balanceResult = await deps.db.query<{ credits_available: number }>(
+                    'SELECT credits_available FROM users WHERE user_id = $1',
+                    [ctx.request.userId],
+                );
+                const remainingBalance = balanceResult.rows[0]?.credits_available ?? 0;
+                await deps.db.query(
+                    'UPDATE users SET credits_available = 0, updated_at = NOW() WHERE user_id = $1',
+                    [ctx.request.userId],
+                );
+                return { total_credits_deducted: remainingBalance };
+            } catch (innerErr) {
+                log.error('Failed to zero out credits after exhaustion', innerErr instanceof Error ? innerErr : new Error(String(innerErr)));
+                throw innerErr;
+            }
+        }
+        throw error;
+    }
 }
 
 export async function updateSessionRecord(

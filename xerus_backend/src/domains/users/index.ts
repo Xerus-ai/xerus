@@ -11,6 +11,7 @@ export type {
     PlanType,
     UserRole,
     ApiProvider,
+    SubscriptionStatus,
 
     // Input/Output types
     UserCreateInput,

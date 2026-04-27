@@ -12,6 +12,7 @@ import { SandboxProvider, getDefaultProvider } from './providers';
 import type { SessionHandle } from './providers';
 import type { SandboxFileSystem } from '../workspace/workspace.manager';
 import type { DaytonaProvider } from './providers/daytona.provider';
+import type { PlanType } from '../../users/types';
 import { SandboxRegistry } from './sandbox-registry';
 import { createWorkspaceTar, restoreWorkspaceTar } from './snapshot-helpers';
 import { getOrCreateRunnerSession } from './runner-session';
@@ -26,6 +27,12 @@ import {
 import type { S3BackupService } from '../storage/s3-backup.service';
 
 const log = logger('SandboxService');
+
+const PLAN_RESOURCES: Record<PlanType, { cpu: number; memory: number; disk: number }> = {
+    pro:   { cpu: 1, memory: 2, disk: 10 },
+    max:   { cpu: 2, memory: 4, disk: 25 },
+    ultra: { cpu: 4, memory: 8, disk: 50 },
+};
 
 // Database interface (injected dependency)
 export interface SandboxDatabase {
@@ -148,6 +155,26 @@ export class SandboxService {
 
         // Browser setup is LAZY — only runs on first browser_* HITL scenario
         // via ensureBrowserReady(). Avoids ~300MB Chromium download for non-browser agents.
+
+        // Resize sandbox to plan-based resource limits
+        try {
+            const userPlan = await this.db?.query<{ plan_type: string }>(
+                'SELECT plan_type FROM users WHERE user_id = $1',
+                [userId],
+            );
+            const planType = (userPlan?.rows[0]?.plan_type as PlanType) || 'pro';
+            const resources = PLAN_RESOURCES[planType];
+            const daytonaProvider = this.provider as DaytonaProvider;
+            if (daytonaProvider.resizeSandbox) {
+                await daytonaProvider.resizeSandbox(sandbox.sandboxId, resources);
+                log.info('Sandbox resized for plan', { sandbox_id: sandbox.sandboxId, plan: planType, resources });
+            }
+        } catch (resizeErr) {
+            log.warn('Sandbox resize failed (continuing with defaults)', {
+                sandbox_id: sandbox.sandboxId,
+                error: (resizeErr as Error).message,
+            });
+        }
 
         const session: SandboxSession = {
             sandboxId: sandbox.sandboxId,
