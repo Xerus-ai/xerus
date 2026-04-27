@@ -205,6 +205,14 @@ export const TOOL_METADATA: ReadonlyMap<string, ToolMetadata> = new Map<string, 
         delegatesTo: 'OutputService.searchOutputs()',
         isDestructive: false,
     }],
+    // Billing
+    [PLATFORM_TOOLS.GET_BILLING_STATUS, {
+        name: PLATFORM_TOOLS.GET_BILLING_STATUS,
+        category: 'billing' as ToolCategory,
+        description: 'Get billing status including plan, credits, and subscription',
+        delegatesTo: 'BillingToolService.getBillingStatus()',
+        isDestructive: false,
+    }],
     // Session Completion
     [PLATFORM_TOOLS.COMPLETE_SESSION, {
         name: PLATFORM_TOOLS.COMPLETE_SESSION,

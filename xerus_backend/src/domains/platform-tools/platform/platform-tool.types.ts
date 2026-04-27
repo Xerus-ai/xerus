@@ -31,6 +31,7 @@ import type {
     ListTriggersInput,
     DeregisterTriggerInput,
     SearchOutputsInput,
+    GetBillingStatusInput,
 } from './platform-tool.inlined-types';
 
 // -----------------------------------------------------------------------------
@@ -51,6 +52,7 @@ export const TOOL_CATEGORIES = [
     'memory',
     'triggers',
     'outputs',
+    'billing',
 ] as const;
 
 export type ToolCategory = (typeof TOOL_CATEGORIES)[number];
@@ -150,6 +152,10 @@ export interface OutputServicePort {
     searchOutputs(userId: string, input: SearchOutputsInput): Promise<unknown>;
 }
 
+export interface BillingServicePort {
+    getBillingStatus(userId: string, input: GetBillingStatusInput): Promise<unknown>;
+}
+
 // -----------------------------------------------------------------------------
 // Service Dependencies Bundle
 // -----------------------------------------------------------------------------
@@ -166,6 +172,7 @@ export interface PlatformToolServices {
     memoryService: MemoryServicePort;
     triggerService: TriggerServicePort;
     outputService: OutputServicePort;
+    billingService: BillingServicePort;
 }
 
 // -----------------------------------------------------------------------------

@@ -446,6 +446,18 @@ export const SEARCH_OUTPUTS_SCHEMA: ToolSchema = {
     },
 };
 
+// -- Billing (1) ---------------------------------------------------------------
+
+export const GET_BILLING_STATUS_SCHEMA: ToolSchema = {
+    name: PLATFORM_TOOLS.GET_BILLING_STATUS,
+    description: 'Get billing status for the current user including plan, credits, and subscription details.',
+    inputSchema: {
+        type: 'object',
+        properties: {},
+        required: [],
+    },
+};
+
 // -- Session Completion (1) ----------------------------------------------------
 
 export const COMPLETE_SESSION_SCHEMA: ToolSchema = {
@@ -554,6 +566,8 @@ export const PLATFORM_TOOL_SCHEMAS: readonly ToolSchema[] = [
     REGISTER_TRIGGER_SCHEMA, LIST_TRIGGERS_SCHEMA, DEREGISTER_TRIGGER_SCHEMA,
     // Output Registry (1)
     SEARCH_OUTPUTS_SCHEMA,
+    // Billing (1)
+    GET_BILLING_STATUS_SCHEMA,
     // Session Completion (1)
     COMPLETE_SESSION_SCHEMA,
     // Schedule Management (4)

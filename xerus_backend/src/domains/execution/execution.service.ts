@@ -139,6 +139,8 @@ export class ExecutionService {
             responseChunks: [],
             creditsUsed: 0,
             keySource: null,
+            subscriptionStatus: null,
+            subscriptionPeriodEnd: null,
             agentSessionCount: 0,
             announceQueue: null,
             thinkingChunks: [],
@@ -175,7 +177,10 @@ export class ExecutionService {
             // -----------------------------------------------------------------
             // Await agent first — needed for lane acquisition
             // -----------------------------------------------------------------
-            ctx.agent = await preAgent;
+            const agentResult = await preAgent;
+            ctx.agent = agentResult.agent;
+            ctx.subscriptionStatus = agentResult.subscriptionStatus;
+            ctx.subscriptionPeriodEnd = agentResult.subscriptionPeriodEnd;
             log.debug('preAgent resolved', { execution_id: executionId, duration_ms: Date.now() - startedAt });
 
             // Acquire execution lane (stale lanes cleaned periodically, not per-execution)

@@ -51,7 +51,8 @@ export {
 export { userValidator } from './validators';
 
 // Repository
-export { userRepository, UserRepository } from './repository';
+export { userRepository, UserRepository, mapUserRow } from './repository';
+export { subscriptionRepository, SubscriptionRepository } from './subscription.repository';
 
 // Services
 export { userService, UserService } from './service';

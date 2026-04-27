@@ -54,7 +54,7 @@ export function PlanSelectionCard({ onAction }: PlanSelectionCardProps) {
               className={cn(
                 'px-3 py-1 rounded-md text-xs font-medium transition-all duration-200',
                 interval === 'monthly'
-                  ? 'bg-[#261E1B] text-white shadow-sm'
+                  ? 'bg-plan-highlight text-white shadow-sm'
                   : 'text-text-secondary hover:text-text'
               )}
             >
@@ -65,7 +65,7 @@ export function PlanSelectionCard({ onAction }: PlanSelectionCardProps) {
               className={cn(
                 'px-3 py-1 rounded-md text-xs font-medium transition-all duration-200',
                 interval === 'annual'
-                  ? 'bg-[#261E1B] text-white shadow-sm'
+                  ? 'bg-plan-highlight text-white shadow-sm'
                   : 'text-text-secondary hover:text-text'
               )}
             >
@@ -105,7 +105,7 @@ export function PlanSelectionCard({ onAction }: PlanSelectionCardProps) {
               className={cn(
                 'relative rounded-xl border text-left transition-all duration-200',
                 entry.highlighted
-                  ? 'bg-[#261E1B] border-[#261E1B] p-5'
+                  ? 'bg-plan-highlight border-plan-highlight p-5'
                   : 'border-surface-active/60 p-4',
                 isSelected && !entry.highlighted && 'ring-2 ring-primary/25 bg-surface/80',
                 isSelected && entry.highlighted && 'ring-2 ring-white/20',
@@ -129,32 +129,32 @@ export function PlanSelectionCard({ onAction }: PlanSelectionCardProps) {
                 )}>${price}</span>
                 <span className={cn(
                   'text-[10px]',
-                  entry.highlighted ? 'text-white/55' : 'text-text-secondary'
+                  entry.highlighted ? 'text-white/70' : 'text-text-secondary'
                 )}>/mo</span>
               </div>
 
               <p className={cn(
                 'text-[10px] leading-relaxed mt-2 mb-3',
-                entry.highlighted ? 'text-white/55' : 'text-text-secondary'
+                entry.highlighted ? 'text-white/70' : 'text-text-secondary'
               )}>
                 {entry.description}
               </p>
 
               <div className="space-y-1.5">
                 <div className="flex items-center gap-1.5">
-                  <Cpu className={cn('w-3 h-3 shrink-0', entry.highlighted ? 'text-white/40' : 'text-text-muted')} />
+                  <Cpu className={cn('w-3 h-3 shrink-0', entry.highlighted ? 'text-white/60' : 'text-text-muted')} />
                   <span className={cn('text-[10px]', entry.highlighted ? 'text-white/65' : 'text-text-secondary')}>{plan.vcpu} vCPU</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <MemoryStick className={cn('w-3 h-3 shrink-0', entry.highlighted ? 'text-white/40' : 'text-text-muted')} />
+                  <MemoryStick className={cn('w-3 h-3 shrink-0', entry.highlighted ? 'text-white/60' : 'text-text-muted')} />
                   <span className={cn('text-[10px]', entry.highlighted ? 'text-white/65' : 'text-text-secondary')}>{plan.ram} GB RAM</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <HardDrive className={cn('w-3 h-3 shrink-0', entry.highlighted ? 'text-white/40' : 'text-text-muted')} />
+                  <HardDrive className={cn('w-3 h-3 shrink-0', entry.highlighted ? 'text-white/60' : 'text-text-muted')} />
                   <span className={cn('text-[10px]', entry.highlighted ? 'text-white/65' : 'text-text-secondary')}>{plan.disk} GB disk</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <Sparkles className={cn('w-3 h-3 shrink-0', entry.highlighted ? 'text-white/40' : 'text-text-muted')} />
+                  <Sparkles className={cn('w-3 h-3 shrink-0', entry.highlighted ? 'text-white/60' : 'text-text-muted')} />
                   <span className={cn('text-[10px]', entry.highlighted ? 'text-white/65' : 'text-text-secondary')}>{plan.credits.toLocaleString()} bonus credits</span>
                 </div>
               </div>
@@ -173,7 +173,7 @@ export function PlanSelectionCard({ onAction }: PlanSelectionCardProps) {
                   >
                     <Check className={cn(
                       'w-3 h-3',
-                      entry.highlighted ? 'text-[#261E1B]' : 'text-white'
+                      entry.highlighted ? 'text-plan-highlight' : 'text-white'
                     )} />
                   </motion.div>
                 )}

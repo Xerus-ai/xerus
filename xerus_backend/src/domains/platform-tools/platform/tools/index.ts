@@ -40,3 +40,10 @@ export {
     ScheduleNotFoundError,
     ScheduleConflictError,
 } from './schedule.tools';
+
+export {
+    BillingToolService,
+    getBillingToolService,
+    resetBillingToolService,
+    BillingUserNotFoundError,
+} from './billing.tools';

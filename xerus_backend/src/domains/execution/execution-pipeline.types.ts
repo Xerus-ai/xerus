@@ -126,6 +126,10 @@ export interface PipelineContext {
     creditsUsed: number;
     /** Whether the resolved API key is user-provided (byok) or platform-owned */
     keySource: KeySource | null;
+    /** User subscription status fetched during loadAgent (avoids redundant SELECT in reserveCredits) */
+    subscriptionStatus: string | null;
+    /** User subscription period end fetched during loadAgent */
+    subscriptionPeriodEnd: Date | null;
     /** Number of agent sessions that completed (incremented on each session_ended event) */
     agentSessionCount: number;
     /** Batches subagent completion notifications for user inbox */

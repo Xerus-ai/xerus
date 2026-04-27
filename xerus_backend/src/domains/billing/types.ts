@@ -40,27 +40,3 @@ export type PolarWebhookEventType =
     | 'subscription.canceled'
     | 'subscription.revoked';
 
-export interface PolarWebhookEvent {
-    id: string;
-    event_id: string;
-    event_type: PolarWebhookEventType;
-    polar_customer_id: string | null;
-    polar_subscription_id: string | null;
-    payload: Record<string, unknown>;
-    processed_at: Date;
-    created_at: Date;
-}
-
-export interface CheckoutRequest {
-    plan: PlanType;
-    interval: BillingInterval;
-}
-
-export interface CreditCheckoutRequest {
-    product_id: string;
-}
-
-export interface CheckoutResponse {
-    checkout_url: string;
-    checkout_id: string;
-}

@@ -3,7 +3,8 @@ import Joi from 'joi';
 import { AuthenticatedRequest } from '../../types';
 import { sendResponse } from '../../utils/response';
 import { authenticateFirebaseToken } from '../../middleware/auth';
-import { BadRequestError } from '../../utils/errors';
+import { BadRequestError, UnauthorizedError } from '../../utils/errors';
+import { InvalidPlanError, NoBillingAccountError, NoActiveSubscriptionError } from './errors';
 import { query } from '../../database/connection';
 import { userRepository } from '../users/repository';
 import { handlePolarWebhook } from './webhook.handler';
@@ -51,7 +52,7 @@ router.post('/checkout', auth, async (req: AuthenticatedRequest, res: Response, 
     const startTime = res.locals.startTime || Date.now();
     try {
         const userId = req.user?.uid;
-        if (!userId) throw new BadRequestError('Authentication required');
+        if (!userId) throw new UnauthorizedError('Authentication required');
 
         const { error, value } = checkoutSchema.validate(req.body);
         if (error) throw new BadRequestError(error.details[0].message);
@@ -59,7 +60,7 @@ router.post('/checkout', auth, async (req: AuthenticatedRequest, res: Response, 
         const { plan, interval } = value as { plan: PlanType; interval: BillingInterval };
         const productKey = `${plan}-${interval}`;
         const productId = PLAN_PRODUCT_MAP[productKey];
-        if (!productId) throw new BadRequestError(`Invalid plan/interval: ${productKey}`);
+        if (!productId) throw new InvalidPlanError(productKey);
 
         const user = await userRepository.findById(userId);
         const successUrl = `${process.env.FRONTEND_URL || 'http://localhost:3002'}/onboarding?checkout=success`;
@@ -84,14 +85,14 @@ router.post('/checkout/credits', auth, async (req: AuthenticatedRequest, res: Re
     const startTime = res.locals.startTime || Date.now();
     try {
         const userId = req.user?.uid;
-        if (!userId) throw new BadRequestError('Authentication required');
+        if (!userId) throw new UnauthorizedError('Authentication required');
 
         const { error, value } = creditCheckoutSchema.validate(req.body);
         if (error) throw new BadRequestError(error.details[0].message);
 
         const { credits } = value as { credits: number };
         const productId = CREDIT_PRODUCT_MAP[String(credits)];
-        if (!productId) throw new BadRequestError(`Invalid credit amount: ${credits}`);
+        if (!productId) throw new InvalidPlanError(String(credits));
 
         const user = await userRepository.findById(userId);
         const successUrl = `${process.env.FRONTEND_URL || 'http://localhost:3002'}/settings/billing?topup=success`;
@@ -116,11 +117,11 @@ router.get('/portal', auth, async (req: AuthenticatedRequest, res: Response, nex
     const startTime = res.locals.startTime || Date.now();
     try {
         const userId = req.user?.uid;
-        if (!userId) throw new BadRequestError('Authentication required');
+        if (!userId) throw new UnauthorizedError('Authentication required');
 
         const user = await userRepository.findById(userId);
         if (!user?.polar_customer_id) {
-            throw new BadRequestError('No billing account found — subscribe to a plan first');
+            throw new NoBillingAccountError();
         }
 
         const portalUrl = await getCustomerPortalUrl(user.polar_customer_id);
@@ -134,7 +135,7 @@ router.get('/subscription', auth, async (req: AuthenticatedRequest, res: Respons
     const startTime = res.locals.startTime || Date.now();
     try {
         const userId = req.user?.uid;
-        if (!userId) throw new BadRequestError('Authentication required');
+        if (!userId) throw new UnauthorizedError('Authentication required');
 
         const user = await userRepository.findById(userId);
         if (!user) throw new BadRequestError('User not found');
@@ -158,11 +159,11 @@ router.post('/subscription/cancel', auth, async (req: AuthenticatedRequest, res:
     const startTime = res.locals.startTime || Date.now();
     try {
         const userId = req.user?.uid;
-        if (!userId) throw new BadRequestError('Authentication required');
+        if (!userId) throw new UnauthorizedError('Authentication required');
 
         const user = await userRepository.findById(userId);
         if (!user?.polar_subscription_id) {
-            throw new BadRequestError('No active subscription found');
+            throw new NoActiveSubscriptionError();
         }
 
         await cancelSubscription(user.polar_subscription_id);
@@ -177,7 +178,7 @@ router.post('/subscription/change', auth, async (req: AuthenticatedRequest, res:
     const startTime = res.locals.startTime || Date.now();
     try {
         const userId = req.user?.uid;
-        if (!userId) throw new BadRequestError('Authentication required');
+        if (!userId) throw new UnauthorizedError('Authentication required');
 
         const { error, value } = changePlanSchema.validate(req.body);
         if (error) throw new BadRequestError(error.details[0].message);
@@ -185,12 +186,12 @@ router.post('/subscription/change', auth, async (req: AuthenticatedRequest, res:
         const { plan, interval } = value as { plan: PlanType; interval: BillingInterval };
         const user = await userRepository.findById(userId);
         if (!user?.polar_subscription_id) {
-            throw new BadRequestError('No active subscription found');
+            throw new NoActiveSubscriptionError();
         }
 
         const productKey = `${plan}-${interval}`;
         const productId = PLAN_PRODUCT_MAP[productKey];
-        if (!productId) throw new BadRequestError(`Invalid plan/interval: ${productKey}`);
+        if (!productId) throw new InvalidPlanError(productKey);
 
         await updateSubscription(user.polar_subscription_id, productId);
 
@@ -204,7 +205,7 @@ router.get('/usage', auth, async (req: AuthenticatedRequest, res: Response, next
     const startTime = res.locals.startTime || Date.now();
     try {
         const userId = req.user?.uid;
-        if (!userId) throw new BadRequestError('Authentication required');
+        if (!userId) throw new UnauthorizedError('Authentication required');
 
         const workspaceResult = await query<{ id: string }>(
             'SELECT id::text FROM workspaces WHERE user_id = $1 LIMIT 1',

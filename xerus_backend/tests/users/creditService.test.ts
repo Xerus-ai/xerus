@@ -18,8 +18,8 @@ describe('CreditService', () => {
     it('should return credit balance for existing user', async () => {
       const balance = await creditService.getBalance(testUserId);
 
-      expect(balance.plan_type).toBe('free');
-      expect(balance.balance).toBe(50);  // PLAN_CREDITS.free = 50
+      expect(balance.plan_type).toBe('pro');
+      expect(balance.balance).toBe(500);  // PLAN_CREDITS.pro = 500
     });
 
     it('should throw UserNotFoundError for nonexistent user', async () => {

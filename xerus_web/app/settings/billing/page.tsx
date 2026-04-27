@@ -134,6 +134,40 @@ export default function BillingPage() {
         <p className="text-sm text-text-secondary mb-10">Manage your plan and subscription</p>
       </motion.div>
 
+      {!credits && !billingError && (
+        <div className="space-y-4 mb-12">
+          {/* Current Plan skeleton */}
+          <div className="bg-surface/60 rounded-2xl border border-surface-active/60 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-surface-hover animate-pulse" />
+                <div className="space-y-2">
+                  <div className="h-3.5 w-24 bg-surface-hover rounded animate-pulse" />
+                  <div className="h-3 w-16 bg-surface-hover rounded animate-pulse" />
+                </div>
+              </div>
+              <div className="h-4 w-32 bg-surface-hover rounded animate-pulse" />
+            </div>
+            <div className="w-full h-1.5 bg-surface-hover rounded-full animate-pulse mb-2" />
+            <div className="h-3 w-20 bg-surface-hover rounded animate-pulse" />
+          </div>
+          {/* Subscription skeleton */}
+          <div className="bg-surface/60 rounded-2xl border border-surface-active/60 p-6">
+            <div className="flex items-center justify-between">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="h-4 w-4 bg-surface-hover rounded animate-pulse" />
+                  <div className="h-3.5 w-24 bg-surface-hover rounded animate-pulse" />
+                  <div className="h-5 w-14 bg-surface-hover rounded-full animate-pulse" />
+                </div>
+                <div className="h-3 w-40 bg-surface-hover rounded animate-pulse" />
+              </div>
+              <div className="h-9 w-40 bg-surface-hover rounded-xl animate-pulse" />
+            </div>
+          </div>
+        </div>
+      )}
+
       {billingError && (
         <motion.div
           className="bg-red-50/30 rounded-2xl border border-red-200/60 p-5 mb-6"
@@ -149,38 +183,36 @@ export default function BillingPage() {
         </motion.div>
       )}
 
-      {/* Current Plan */}
-      <motion.div
-        className="bg-surface/60 rounded-2xl border border-surface-active/60 p-6 mb-4"
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, delay: 0.05, ease: easeOutQuart }}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-surface-hover flex items-center justify-center">
-              <Crown className="w-4 h-4 text-text-secondary" />
+      {credits && (
+        <>
+          {/* Current Plan */}
+          <motion.div
+            className="bg-surface/60 rounded-2xl border border-surface-active/60 p-6 mb-4"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: 0.05, ease: easeOutQuart }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-surface-hover flex items-center justify-center">
+                  <Crown className="w-4 h-4 text-text-secondary" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-text">Current plan</p>
+                  <p className="text-xs text-text-secondary mt-0.5">
+                    {PLAN_LABELS[credits.plan_type] || 'Pro'} Plan
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-text-secondary" />
+                <span className="text-sm font-medium text-text">
+                  {credits.credits_available}
+                </span>
+                <span className="text-sm text-text-secondary">/ {totalCredits} credits</span>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-medium text-text">Current plan</p>
-              <p className="text-xs text-text-secondary mt-0.5">
-                {credits ? PLAN_LABELS[credits.plan_type] || 'Pro' : '--'} Plan
-              </p>
-            </div>
-          </div>
-          {credits && (
-            <div className="flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-text-secondary" />
-              <span className="text-sm font-medium text-text">
-                {credits.credits_available}
-              </span>
-              <span className="text-sm text-text-secondary">/ {totalCredits} credits</span>
-            </div>
-          )}
-        </div>
 
-        {credits && (
-          <>
             <div className="w-full h-1.5 bg-surface-hover rounded-full overflow-hidden mb-2">
               <motion.div
                 className="h-full rounded-full bg-primary/70"
@@ -192,56 +224,56 @@ export default function BillingPage() {
             <p className="text-[11px] text-text-secondary">
               {formatResetDate(credits.credits_reset_date)}
             </p>
-          </>
-        )}
-      </motion.div>
+          </motion.div>
 
-      {/* Subscription Status */}
-      {subscription && (
-        <motion.div
-          className="bg-surface/60 rounded-2xl border border-surface-active/60 p-6 mb-12"
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, delay: 0.08, ease: easeOutQuart }}
-        >
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <CreditCard className="w-4 h-4 text-text-secondary" />
-                <p className="text-sm font-medium text-text">Subscription</p>
-                <span className={cn(
-                  'text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full',
-                  subscription.status === 'active'
-                    ? 'text-emerald-600 bg-emerald-50'
-                    : subscription.status === 'canceled'
-                      ? 'text-amber-600 bg-amber-50'
-                      : 'text-red-600 bg-red-50'
-                )}>
-                  {subscription.status}
-                </span>
-              </div>
-              <p className="text-xs text-text-secondary">
-                {subscription.status === 'active' && !subscription.cancel_at_period_end
-                  ? `Renews ${formatDate(subscription.current_period_end)}`
-                  : subscription.cancel_at_period_end
-                    ? `Cancels ${formatDate(subscription.current_period_end)}`
-                    : `Period ends ${formatDate(subscription.current_period_end)}`
-                }
-              </p>
-            </div>
-            <button
-              onClick={handleManageSubscription}
-              disabled={portalLoading}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-hover hover:bg-surface-active/60 text-sm font-medium text-text transition-all duration-200 disabled:opacity-50"
+          {/* Subscription Status */}
+          {subscription && (
+            <motion.div
+              className="bg-surface/60 rounded-2xl border border-surface-active/60 p-6 mb-12"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, delay: 0.08, ease: easeOutQuart }}
             >
-              {portalLoading ? 'Loading...' : 'Manage Subscription'}
-              <ExternalLink className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </motion.div>
-      )}
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="w-4 h-4 text-text-secondary" />
+                    <p className="text-sm font-medium text-text">Subscription</p>
+                    <span className={cn(
+                      'text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full',
+                      subscription.status === 'active'
+                        ? 'text-emerald-600 bg-emerald-50'
+                        : subscription.status === 'canceled'
+                          ? 'text-amber-600 bg-amber-50'
+                          : 'text-red-600 bg-red-50'
+                    )}>
+                      {subscription.status}
+                    </span>
+                  </div>
+                  <p className="text-xs text-text-secondary">
+                    {subscription.status === 'active' && !subscription.cancel_at_period_end
+                      ? `Renews ${formatDate(subscription.current_period_end)}`
+                      : subscription.cancel_at_period_end
+                        ? `Cancels ${formatDate(subscription.current_period_end)}`
+                        : `Period ends ${formatDate(subscription.current_period_end)}`
+                    }
+                  </p>
+                </div>
+                <button
+                  onClick={handleManageSubscription}
+                  disabled={portalLoading}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-hover hover:bg-surface-active/60 text-sm font-medium text-text transition-all duration-200 disabled:opacity-50"
+                >
+                  {portalLoading ? 'Loading...' : 'Manage Subscription'}
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </motion.div>
+          )}
 
-      {!subscription && <div className="mb-12" />}
+          {!subscription && <div className="mb-12" />}
+        </>
+      )}
 
       {/* Plans Section */}
       <PlanComparisonGrid

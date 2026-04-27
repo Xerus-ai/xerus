@@ -102,7 +102,7 @@ export function PlanComparisonGrid({
               className={cn(
                 'px-3.5 py-1.5 rounded-md text-xs font-medium transition-all duration-200',
                 billingCycle === 'monthly'
-                  ? 'bg-[#261E1B] text-white shadow-sm'
+                  ? 'bg-plan-highlight text-white shadow-sm'
                   : 'text-text-secondary hover:text-text'
               )}
             >
@@ -115,7 +115,7 @@ export function PlanComparisonGrid({
               className={cn(
                 'px-3.5 py-1.5 rounded-md text-xs font-medium transition-all duration-200',
                 billingCycle === 'annual'
-                  ? 'bg-[#261E1B] text-white shadow-sm'
+                  ? 'bg-plan-highlight text-white shadow-sm'
                   : 'text-text-secondary hover:text-text'
               )}
             >
@@ -147,7 +147,7 @@ export function PlanComparisonGrid({
               className={cn(
                 'relative rounded-2xl border flex flex-col transition-all duration-200',
                 plan.highlighted
-                  ? 'bg-[#261E1B] border-[#261E1B] p-7 shadow-md'
+                  ? 'bg-plan-highlight border-plan-highlight p-7 shadow-md'
                   : 'bg-surface/60 border-surface-active/60 p-6',
                 isCurrentPlan && !plan.highlighted && 'ring-2 ring-primary/20'
               )}
@@ -217,8 +217,8 @@ export function PlanComparisonGrid({
                       ? 'bg-white/10 text-white/50 cursor-default'
                       : 'bg-surface-hover text-text-secondary cursor-default'
                     : plan.highlighted
-                      ? 'bg-white text-[#261E1B] hover:bg-white/90 shadow-sm'
-                      : 'bg-[#261E1B] text-white hover:bg-[#1a1412]'
+                      ? 'bg-white text-plan-highlight hover:bg-white/90 shadow-sm'
+                      : 'bg-plan-highlight text-white hover:bg-plan-highlight/80'
                 )}
               >
                 {loadingPlan === plan.id

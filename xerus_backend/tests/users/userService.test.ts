@@ -20,8 +20,8 @@ describe('UserService', () => {
       expect(result.user.email).toBe(testEmail);
       expect(result.user.display_name).toBe('Test User');
       expect(result.user.role).toBe('user');
-      expect(result.credit_balance.plan_type).toBe('free');
-      expect(result.credit_balance.balance).toBe(50);  // PLAN_CREDITS.free = 50
+      expect(result.credit_balance.plan_type).toBe('pro');
+      expect(result.credit_balance.balance).toBe(500);  // PLAN_CREDITS.pro = 500
     });
 
     it('should return existing user and update last_login', async () => {

@@ -1,6 +1,6 @@
 import { logger } from '../../utils/logger';
 import { transaction } from '../../database/connection';
-import { userRepository } from '../users/repository';
+import { subscriptionRepository } from '../users/subscription.repository';
 import { creditService } from '../users/credit-service';
 import { PLAN_CREDITS, type SubscriptionStatus } from '../users/types';
 import { webhookRepository } from './webhook.repository';
@@ -83,7 +83,7 @@ export class BillingService {
         const productMapping = productId ? POLAR_PRODUCT_IDS[productId] : undefined;
         if (productMapping) {
             const planCredits = PLAN_CREDITS[productMapping.plan];
-            await userRepository.updateSubscription(userId, {
+            await subscriptionRepository.updateSubscription(userId, {
                 polar_customer_id: customerId,
                 subscription_status: 'active',
                 plan_type: productMapping.plan,
@@ -116,7 +116,7 @@ export class BillingService {
 
         const productMapping = productId ? POLAR_PRODUCT_IDS[productId] : undefined;
 
-        await userRepository.updateSubscription(userId, {
+        await subscriptionRepository.updateSubscription(userId, {
             polar_customer_id: customerId,
             polar_subscription_id: subscriptionId,
             subscription_status: 'active',
@@ -142,7 +142,7 @@ export class BillingService {
             throw new Error('subscription.updated payload missing subscription id');
         }
 
-        const user = await userRepository.findByPolarSubscriptionId(subscriptionId);
+        const user = await subscriptionRepository.findByPolarSubscriptionId(subscriptionId);
         if (!user) {
             log.warn('Subscription updated for unknown subscription', { subscription_id: subscriptionId });
             return;
@@ -154,7 +154,7 @@ export class BillingService {
 
         const mappedStatus = POLAR_STATUS_MAP[status ?? ''] ?? user.subscription_status;
 
-        await userRepository.updateSubscription(user.user_id, {
+        await subscriptionRepository.updateSubscription(user.user_id, {
             subscription_status: mappedStatus,
             subscription_current_period_end: currentPeriodEnd ? new Date(currentPeriodEnd) : undefined,
             plan_type: newPlan,
@@ -184,13 +184,13 @@ export class BillingService {
             throw new Error('subscription.canceled payload missing subscription id');
         }
 
-        const user = await userRepository.findByPolarSubscriptionId(subscriptionId);
+        const user = await subscriptionRepository.findByPolarSubscriptionId(subscriptionId);
         if (!user) {
             log.warn('Subscription canceled for unknown subscription', { subscription_id: subscriptionId });
             return;
         }
 
-        await userRepository.updateSubscription(user.user_id, {
+        await subscriptionRepository.updateSubscription(user.user_id, {
             subscription_status: 'canceled',
             subscription_current_period_end: currentPeriodEnd ? new Date(currentPeriodEnd) : undefined,
         });
@@ -209,13 +209,13 @@ export class BillingService {
             throw new Error('subscription.revoked payload missing subscription id');
         }
 
-        const user = await userRepository.findByPolarSubscriptionId(subscriptionId);
+        const user = await subscriptionRepository.findByPolarSubscriptionId(subscriptionId);
         if (!user) {
             log.warn('Subscription revoked for unknown subscription', { subscription_id: subscriptionId });
             return;
         }
 
-        await userRepository.updateSubscription(user.user_id, {
+        await subscriptionRepository.updateSubscription(user.user_id, {
             subscription_status: 'revoked',
         });
 

@@ -4,10 +4,6 @@ export { default as billingRoutes } from './billing.routes';
 export type {
     PlanConfig,
     BillingInterval,
-    PolarWebhookEvent,
     PolarWebhookEventType,
-    CheckoutRequest,
-    CheckoutResponse,
-    CreditCheckoutRequest,
 } from './types';
 export { PLANS, POLAR_PRODUCT_IDS, CREDIT_TOPUP_PRODUCTS } from './types';

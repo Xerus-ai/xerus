@@ -120,13 +120,19 @@ const log = logger('ExecutionPipeline');
 // Step 1: Validate Agent + Auth
 // -----------------------------------------------------------------------------
 
+export interface LoadAgentResult {
+    agent: AgentRow;
+    subscriptionStatus: string | null;
+    subscriptionPeriodEnd: Date | null;
+}
+
 export async function loadAgent(
     deps: ResolvedExecutionDeps,
     agentSlug: string,
     userId: string,
-): Promise<AgentRow> {
-    // Parallel: agent_registry and workspaces lookups are independent (both need only userId/slug)
-    const [registryResult, wsResult] = await Promise.all([
+): Promise<LoadAgentResult> {
+    // Parallel: agent_registry, workspaces, and subscription lookups are independent
+    const [registryResult, wsResult, subResult] = await Promise.all([
         deps.db.query<{ id: number; slug: string; user_id: string | null; agent_type: string }>(
             `SELECT id, slug, user_id, agent_type FROM agent_registry
              WHERE slug = $1 AND (user_id = $2 OR user_id IS NULL OR agent_type = 'public')`,
@@ -134,6 +140,10 @@ export async function loadAgent(
         ),
         deps.db.query<{ id: string }>(
             `SELECT id::text FROM workspaces WHERE user_id = $1 LIMIT 1`,
+            [userId],
+        ),
+        deps.db.query<{ subscription_status: string | null; subscription_current_period_end: Date | null }>(
+            'SELECT subscription_status, subscription_current_period_end FROM users WHERE user_id = $1',
             [userId],
         ),
     ]);
@@ -147,6 +157,8 @@ export async function loadAgent(
         throw new SDKExecutionError(`Agent '${agentSlug}' not found in registry for user '${userId}'`);
     }
 
+    const subRow = subResult.rows[0];
+
     // agent_registry is a thin table (id, slug, user_id, agent_type).
     // Agent metadata (name, ai_model, etc.) lives in config.json on the workspace filesystem.
     // The runner reads config.json locally and reports the real model via session_started event,
@@ -154,17 +166,21 @@ export async function loadAgent(
     // Defaults here are overridden by the runner — they are NOT fabricated stubs.
     // adapter_type defaults to 'claudecode' — resolved from config.json by resolveAdapterType().
     return {
-        id: entry.id,
-        name: entry.slug,
-        slug: entry.slug,
-        description: '',
-        ai_model: DEFAULT_MODEL,
-        thinking_level: 'medium',
-        autonomy_level: 'supervised',
-        adapter_type: 'claudecode',
-        primary_use_case: '',
-        workspace_id: workspaceId,
-        user_id: entry.user_id || userId,
+        agent: {
+            id: entry.id,
+            name: entry.slug,
+            slug: entry.slug,
+            description: '',
+            ai_model: DEFAULT_MODEL,
+            thinking_level: 'medium',
+            autonomy_level: 'supervised',
+            adapter_type: 'claudecode',
+            primary_use_case: '',
+            workspace_id: workspaceId,
+            user_id: entry.user_id || userId,
+        },
+        subscriptionStatus: subRow?.subscription_status ?? null,
+        subscriptionPeriodEnd: subRow?.subscription_current_period_end ?? null,
     };
 }
 
@@ -334,29 +350,19 @@ export async function reserveCredits(
     deps: ResolvedExecutionDeps,
     ctx: PipelineContext,
 ): Promise<void> {
-    // Check subscription status before allowing execution
-    const user = await deps.db.query<{
-        subscription_status: string | null;
-        subscription_current_period_end: Date | null;
-    }>(
-        'SELECT subscription_status, subscription_current_period_end FROM users WHERE user_id = $1',
-        [ctx.request.userId],
-    );
-    const userRow = user.rows[0];
-    if (userRow) {
-        const status = userRow.subscription_status;
-        const periodEnd = userRow.subscription_current_period_end;
-        const now = new Date();
+    // Check subscription status (loaded during loadAgent — no extra SELECT needed)
+    const status = ctx.subscriptionStatus;
+    const periodEnd = ctx.subscriptionPeriodEnd;
+    const now = new Date();
 
-        if (status === 'revoked') {
-            throw new SDKExecutionError('Subscription revoked — update your payment method');
-        }
-        if (status === 'canceled' && periodEnd && periodEnd < now) {
-            throw new SDKExecutionError('Subscription expired — renew to continue');
-        }
-        if (status === 'past_due') {
-            throw new SDKExecutionError('Payment past due — update your payment method');
-        }
+    if (status === 'revoked') {
+        throw new SDKExecutionError('Subscription revoked — update your payment method');
+    }
+    if (status === 'canceled' && periodEnd && periodEnd < now) {
+        throw new SDKExecutionError('Subscription expired — renew to continue');
+    }
+    if (status === 'past_due') {
+        throw new SDKExecutionError('Payment past due — update your payment method');
     }
 
     // BYOK users use their own API key — skip credit reservation
