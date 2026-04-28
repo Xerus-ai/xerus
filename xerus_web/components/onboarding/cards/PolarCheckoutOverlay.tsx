@@ -25,6 +25,8 @@ export function PolarCheckoutOverlay({
 
   const handleMessage = useCallback(
     (event: MessageEvent) => {
+      if (event.origin !== 'https://checkout.polar.sh' && event.origin !== 'https://polar.sh') return;
+
       // Polar sends a postMessage on checkout completion
       if (
         event.data &&

@@ -1,7 +1,7 @@
 // Xerus Platform MCP Server
-// MCP server with 17 backend-coupled tools that CLIs access
+// MCP server with 18 backend-coupled tools that CLIs access
 //
-// 17 tools that require backend state:
+// 18 tools that require backend state:
 //  1. pause_execution          — Session control (needs backend state machine)
 //  2. resume_execution         — HITL approval (needs backend state)
 //  3. get_session_state        — Distributed state query (needs backend DB)
@@ -19,6 +19,7 @@
 // 15. list_schedules           — List schedules (workspace.db via sqlite3)
 // 16. update_schedule          — Update schedule (workspace.db via sqlite3)
 // 17. delete_schedule          — Delete schedule (workspace.db via sqlite3)
+// 18. get_billing_status       — Billing info (needs backend DB)
 //
 // Reference: Paperclip adapter pattern (agent calls MCP -> MCP calls backend API)
 
@@ -299,6 +300,16 @@ const TOOLS = [
             required: ['schedule_id'],
         },
     },
+    // Billing (1) — read-only billing status from backend DB
+    {
+        name: 'get_billing_status',
+        description: 'Check billing status including plan type, credit balance, and subscription status.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {},
+            required: [],
+        },
+    },
 ];
 
 // -----------------------------------------------------------------------------
@@ -384,7 +395,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main(): Promise<void> {
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    process.stderr.write('[mcp-server] Running with 17 backend-coupled tools\n');
+    process.stderr.write('[mcp-server] Running with 18 backend-coupled tools\n');
 }
 
 main().catch((err) => {

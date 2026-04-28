@@ -6,12 +6,6 @@ export class BillingError extends DomainError {
     }
 }
 
-export class SubscriptionNotFoundError extends BillingError {
-    constructor(identifier: string) {
-        super(`Subscription not found: ${identifier}`, 404, 'SUBSCRIPTION_NOT_FOUND');
-    }
-}
-
 export class NoActiveSubscriptionError extends BillingError {
     constructor() {
         super('No active subscription found', 400, 'NO_ACTIVE_SUBSCRIPTION');
@@ -35,3 +29,4 @@ export class WebhookProcessingError extends BillingError {
         super(message, 500, 'WEBHOOK_PROCESSING_ERROR');
     }
 }
+

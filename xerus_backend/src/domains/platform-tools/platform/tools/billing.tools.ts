@@ -8,6 +8,7 @@ import type {
     BillingStatusResult,
 } from '../platform-tool.inlined-types';
 import type { BillingServicePort } from '../platform-tool.types';
+import { PLAN_CREDITS, type PlanType } from '../../../users/types';
 
 // -----------------------------------------------------------------------------
 // Errors
@@ -61,6 +62,7 @@ export class BillingToolService implements BillingServicePort {
             plan_type: row.plan_type,
             credits_available: row.credits_available,
             credits_used: row.credits_used,
+            credits_total: PLAN_CREDITS[row.plan_type as PlanType] ?? 0,
             subscription_status: row.subscription_status,
             subscription_current_period_end: row.subscription_current_period_end?.toISOString() ?? null,
             billing_email: row.billing_email,

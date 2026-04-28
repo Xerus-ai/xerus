@@ -157,23 +157,27 @@ export class SandboxService {
         // via ensureBrowserReady(). Avoids ~300MB Chromium download for non-browser agents.
 
         // Resize sandbox to plan-based resource limits
-        try {
-            const userPlan = await this.db?.query<{ plan_type: string }>(
-                'SELECT plan_type FROM users WHERE user_id = $1',
-                [userId],
-            );
-            const planType = (userPlan?.rows[0]?.plan_type as PlanType) || 'pro';
-            const resources = PLAN_RESOURCES[planType];
-            const daytonaProvider = this.provider as DaytonaProvider;
-            if (daytonaProvider.resizeSandbox) {
+        const userPlan = await this.db.query<{ plan_type: string }>(
+            'SELECT plan_type FROM users WHERE user_id = $1',
+            [userId],
+        );
+        const planTypeRaw = userPlan.rows[0]?.plan_type;
+        if (!planTypeRaw) {
+            throw new Error(`Cannot resize sandbox: plan_type missing for user ${userId}`);
+        }
+        const planType = planTypeRaw as PlanType;
+        const resources = PLAN_RESOURCES[planType];
+        if (!resources) {
+            throw new Error(`Cannot resize sandbox: unknown plan type '${planType}' for user ${userId}`);
+        }
+        const daytonaProvider = this.provider as DaytonaProvider;
+        if (daytonaProvider.resizeSandbox) {
+            try {
                 await daytonaProvider.resizeSandbox(sandbox.sandboxId, resources);
                 log.info('Sandbox resized for plan', { sandbox_id: sandbox.sandboxId, plan: planType, resources });
+            } catch (resizeErr) {
+                throw new Error(`Sandbox resize failed for plan ${planType}: ${(resizeErr as Error).message}`);
             }
-        } catch (resizeErr) {
-            log.warn('Sandbox resize failed (continuing with defaults)', {
-                sandbox_id: sandbox.sandboxId,
-                error: (resizeErr as Error).message,
-            });
         }
 
         const session: SandboxSession = {

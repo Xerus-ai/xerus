@@ -481,6 +481,7 @@ export interface BillingStatusResult {
     plan_type: string;
     credits_available: number;
     credits_used: number;
+    credits_total: number;
     subscription_status: string | null;
     subscription_current_period_end: string | null;
     billing_email: string | null;

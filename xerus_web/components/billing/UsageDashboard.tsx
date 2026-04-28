@@ -42,9 +42,10 @@ export function UsageDashboard({ usage }: UsageDashboardProps) {
           >
             <p className="text-xs font-medium text-text-secondary mb-4">By Agent</p>
             <div className="space-y-3">
-              {usage.by_agent.map((agent, agentIndex) => {
-                const maxCredits = Math.max(...usage.by_agent.map(a => a.credits), 1)
-                const barWidth = Math.max(4, (agent.credits / maxCredits) * 100)
+              {(() => {
+                const maxAgentCredits = Math.max(...usage.by_agent.map(a => a.credits), 1)
+                return usage.by_agent.map((agent, agentIndex) => {
+                const barWidth = Math.max(4, (agent.credits / maxAgentCredits) * 100)
                 return (
                   <motion.div
                     key={agent.agent_slug}
@@ -73,7 +74,8 @@ export function UsageDashboard({ usage }: UsageDashboardProps) {
                     </div>
                   </motion.div>
                 )
-              })}
+              })
+              })()}
             </div>
           </motion.div>
         )}
@@ -86,9 +88,10 @@ export function UsageDashboard({ usage }: UsageDashboardProps) {
           >
             <p className="text-xs font-medium text-text-secondary mb-4">By Day</p>
             <div className="flex items-end gap-1.5 h-[120px]">
-              {usage.by_day.map((day, dayIndex) => {
-                const maxCredits = Math.max(...usage.by_day.map(d => d.credits), 1)
-                const barHeight = Math.max(6, (day.credits / maxCredits) * 100)
+              {(() => {
+                const maxDayCredits = Math.max(...usage.by_day.map(d => d.credits), 1)
+                return usage.by_day.map((day, dayIndex) => {
+                const barHeight = Math.max(6, (day.credits / maxDayCredits) * 100)
                 const dateLabel = new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                 return (
                   <div key={day.date} className="flex-1 flex flex-col items-center justify-end h-full group">
@@ -108,7 +111,8 @@ export function UsageDashboard({ usage }: UsageDashboardProps) {
                     </span>
                   </div>
                 )
-              })}
+              })
+              })()}
             </div>
           </motion.div>
         )}

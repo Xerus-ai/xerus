@@ -155,6 +155,9 @@ export function buildHitlReason(
         case PLATFORM_TOOLS.DELETE_SCHEDULE:
             return `Delete schedule '${toolInput.schedule_id ?? 'unknown'}' auto-approved`;
 
+        case PLATFORM_TOOLS.GET_BILLING_STATUS:
+            return `Billing status check auto-approved (read-only)`;
+
         default:
             return `${toolName} auto-approved`;
     }

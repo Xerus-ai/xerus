@@ -145,8 +145,11 @@ afterAll(async () => {
         await query("DELETE FROM credit_transactions WHERE user_id LIKE $1", [`${TEST_PREFIX}%`]);
         await query("DELETE FROM polar_webhook_events WHERE event_id LIKE $1", [`${TEST_PREFIX}%`]);
         await query("DELETE FROM users WHERE user_id LIKE $1", [`${TEST_PREFIX}%`]);
-    } catch {
-        // Pool already closed by global teardown — acceptable
+    } catch (err) {
+        // Pool may already be closed by global teardown
+        if (!(err instanceof Error && err.message.includes('pool'))) {
+            console.error('Unexpected cleanup error:', err);
+        }
     }
 });
 

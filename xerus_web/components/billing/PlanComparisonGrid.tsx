@@ -225,7 +225,7 @@ export function PlanComparisonGrid({
                   ? 'Loading...'
                   : isCurrentPlan
                     ? 'Current plan'
-                    : subscription?.status === 'active'
+                    : subscription?.subscription_status === 'active'
                       ? 'Switch plan'
                       : 'Get started'
                 }

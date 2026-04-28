@@ -11,6 +11,7 @@ import type { PlanType } from '@/lib/plans';
 
 export interface CheckoutResponse {
   checkout_url: string;
+  checkout_id: string;
 }
 
 export const createCheckout = async (
@@ -22,7 +23,7 @@ export const createCheckout = async (
     body: JSON.stringify({ plan, interval }),
   });
   const json = await response.json();
-  return json.data || json;
+  return json.data ?? json;
 };
 
 export const createCreditCheckout = async (
@@ -33,7 +34,7 @@ export const createCreditCheckout = async (
     body: JSON.stringify({ credits }),
   });
   const json = await response.json();
-  return json.data || json;
+  return json.data ?? json;
 };
 
 // ============================================================
@@ -47,7 +48,7 @@ export interface PortalResponse {
 export const getPortalUrl = async (): Promise<PortalResponse> => {
   const response = await apiCall('/billing/portal', { method: 'GET' });
   const json = await response.json();
-  return json.data || json;
+  return json.data ?? json;
 };
 
 // ============================================================
@@ -55,17 +56,20 @@ export const getPortalUrl = async (): Promise<PortalResponse> => {
 // ============================================================
 
 export interface Subscription {
-  plan_type: PlanType;
-  interval: 'monthly' | 'annual';
-  status: 'active' | 'canceled' | 'past_due' | 'revoked' | 'pending';
-  current_period_end: string;
-  cancel_at_period_end: boolean;
+  plan_type: string;
+  subscription_status: 'active' | 'canceled' | 'past_due' | 'revoked' | 'pending';
+  subscription_current_period_end: string | null;
+  polar_customer_id: string | null;
+  polar_subscription_id: string | null;
+  credits_available: number;
+  credits_used: number;
+  credits_reset_date: string | null;
 }
 
 export const getSubscription = async (): Promise<Subscription> => {
   const response = await apiCall('/billing/subscription', { method: 'GET' });
   const json = await response.json();
-  return json.data || json;
+  return json.data ?? json;
 };
 
 export const cancelSubscription = async (): Promise<void> => {
@@ -104,5 +108,5 @@ export interface UsageData {
 export const getUsage = async (): Promise<UsageData> => {
   const response = await apiCall('/billing/usage', { method: 'GET' });
   const json = await response.json();
-  return json.data || json;
+  return json.data ?? json;
 };

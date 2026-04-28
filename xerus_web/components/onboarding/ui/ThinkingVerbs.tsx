@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { easeOutQuart } from '@/lib/motion'
 
 const MESSAGES = [
   'Confirming your subscription...',
@@ -11,9 +12,6 @@ const MESSAGES = [
 ]
 
 const CYCLE_INTERVAL_MS = 2500
-
-/* Exponential easing for natural deceleration */
-const easeOutQuart = [0.25, 1, 0.5, 1] as const
 
 /**
  * Cycles through status messages with fade transitions and a pulsing dot indicator.

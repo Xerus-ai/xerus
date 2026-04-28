@@ -1,3 +1,5 @@
+BEGIN;
+
 CREATE TABLE IF NOT EXISTS polar_webhook_events (
     id SERIAL PRIMARY KEY,
     event_id VARCHAR(255) UNIQUE NOT NULL,
@@ -10,3 +12,5 @@ CREATE TABLE IF NOT EXISTS polar_webhook_events (
 );
 
 CREATE INDEX IF NOT EXISTS idx_polar_webhook_event_type ON polar_webhook_events(event_type);
+
+COMMIT;

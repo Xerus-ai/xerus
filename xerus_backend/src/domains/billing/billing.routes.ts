@@ -1,5 +1,4 @@
 import { Router, Response, NextFunction } from 'express';
-import Joi from 'joi';
 import { AuthenticatedRequest } from '../../types';
 import { sendResponse } from '../../utils/response';
 import { authenticateFirebaseToken } from '../../middleware/auth';
@@ -11,6 +10,7 @@ import { handlePolarWebhook } from './webhook.handler';
 import { createCheckoutSession, getCustomerPortalUrl, cancelSubscription, updateSubscription } from './polar.client';
 import type { PlanType } from '../users/types';
 import { POLAR_PRODUCT_IDS, CREDIT_TOPUP_PRODUCTS, type BillingInterval } from './types';
+import { checkoutSchema, creditCheckoutSchema, changePlanSchema } from './billing.validators';
 
 const router = Router();
 const auth = authenticateFirebaseToken;
@@ -25,20 +25,6 @@ const PLAN_PRODUCT_MAP: Record<string, string> = Object.fromEntries(
 const CREDIT_PRODUCT_MAP: Record<string, string> = Object.fromEntries(
     Object.entries(CREDIT_TOPUP_PRODUCTS).map(([uuid, credits]) => [String(credits), uuid]),
 );
-
-const checkoutSchema = Joi.object({
-    plan: Joi.string().valid('pro', 'max', 'ultra').required(),
-    interval: Joi.string().valid('monthly', 'annual').required(),
-});
-
-const creditCheckoutSchema = Joi.object({
-    credits: Joi.number().valid(500, 2000, 5000).required(),
-});
-
-const changePlanSchema = Joi.object({
-    plan: Joi.string().valid('pro', 'max', 'ultra').required(),
-    interval: Joi.string().valid('monthly', 'annual').required(),
-});
 
 router.post('/webhooks/polar', async (req, res, next) => {
     try {
@@ -63,7 +49,9 @@ router.post('/checkout', auth, async (req: AuthenticatedRequest, res: Response, 
         if (!productId) throw new InvalidPlanError(productKey);
 
         const user = await userRepository.findById(userId);
-        const successUrl = `${process.env.FRONTEND_URL || 'http://localhost:3002'}/onboarding?checkout=success`;
+        const frontendUrl = process.env.FRONTEND_URL;
+        if (!frontendUrl) throw new Error('FRONTEND_URL environment variable is required');
+        const successUrl = `${frontendUrl}/onboarding?checkout=success`;
 
         const checkout = await createCheckoutSession({
             productId,
@@ -95,7 +83,9 @@ router.post('/checkout/credits', auth, async (req: AuthenticatedRequest, res: Re
         if (!productId) throw new InvalidPlanError(String(credits));
 
         const user = await userRepository.findById(userId);
-        const successUrl = `${process.env.FRONTEND_URL || 'http://localhost:3002'}/settings/billing?topup=success`;
+        const frontendUrl = process.env.FRONTEND_URL;
+        if (!frontendUrl) throw new Error('FRONTEND_URL environment variable is required');
+        const successUrl = `${frontendUrl}/settings/billing?topup=success`;
 
         const checkout = await createCheckoutSession({
             productId,

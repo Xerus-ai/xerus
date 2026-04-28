@@ -23,12 +23,6 @@ import { UsageDashboard } from '@/components/billing/UsageDashboard'
 import { CreditTopupSection } from '@/components/billing/CreditTopupSection'
 import { PlanComparisonGrid } from '@/components/billing/PlanComparisonGrid'
 
-const PLAN_LABELS: Record<string, string> = {
-  pro: 'Pro',
-  max: 'Max',
-  ultra: 'Ultra',
-}
-
 export default function BillingPage() {
   const user = useRedirectIfNotAuth()
   const [credits, setCredits] = useState<CreditBalance | null>(null)
@@ -43,7 +37,10 @@ export default function BillingPage() {
   useEffect(() => {
     if (!user) return
     Promise.all([
-      getCreditBalance().then(setCredits),
+      getCreditBalance().then(setCredits).catch((err) => {
+        console.error('Failed to fetch credits:', err)
+        setBillingError(true)
+      }),
       getSubscription().then(setSubscription).catch((err) => {
         console.error('Failed to fetch subscription:', err)
       }),
@@ -59,7 +56,7 @@ export default function BillingPage() {
   const handlePlanSelect = async (planId: PlanType) => {
     setLoadingPlan(planId)
     try {
-      if (subscription && subscription.status === 'active' && subscription.plan_type !== planId) {
+      if (subscription && subscription.subscription_status === 'active' && subscription.plan_type !== planId) {
         await changePlan(planId, billingCycle)
         toast.success('Plan changed successfully')
         const updated = await getSubscription()
@@ -200,7 +197,7 @@ export default function BillingPage() {
                 <div>
                   <p className="text-sm font-medium text-text">Current plan</p>
                   <p className="text-xs text-text-secondary mt-0.5">
-                    {PLAN_LABELS[credits.plan_type] || 'Pro'} Plan
+                    {PLANS[credits.plan_type as PlanType]?.label || credits.plan_type} Plan
                   </p>
                 </div>
               </div>
@@ -241,21 +238,21 @@ export default function BillingPage() {
                     <p className="text-sm font-medium text-text">Subscription</p>
                     <span className={cn(
                       'text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full',
-                      subscription.status === 'active'
+                      subscription.subscription_status === 'active'
                         ? 'text-emerald-600 bg-emerald-50'
-                        : subscription.status === 'canceled'
+                        : subscription.subscription_status === 'canceled'
                           ? 'text-amber-600 bg-amber-50'
                           : 'text-red-600 bg-red-50'
                     )}>
-                      {subscription.status}
+                      {subscription.subscription_status}
                     </span>
                   </div>
                   <p className="text-xs text-text-secondary">
-                    {subscription.status === 'active' && !subscription.cancel_at_period_end
-                      ? `Renews ${formatDate(subscription.current_period_end)}`
-                      : subscription.cancel_at_period_end
-                        ? `Cancels ${formatDate(subscription.current_period_end)}`
-                        : `Period ends ${formatDate(subscription.current_period_end)}`
+                    {subscription.subscription_status === 'active'
+                      ? `Renews ${subscription.subscription_current_period_end ? formatDate(subscription.subscription_current_period_end) : '—'}`
+                      : subscription.subscription_status === 'canceled'
+                        ? `Cancels ${subscription.subscription_current_period_end ? formatDate(subscription.subscription_current_period_end) : '—'}`
+                        : `Period ends ${subscription.subscription_current_period_end ? formatDate(subscription.subscription_current_period_end) : '—'}`
                     }
                   </p>
                 </div>

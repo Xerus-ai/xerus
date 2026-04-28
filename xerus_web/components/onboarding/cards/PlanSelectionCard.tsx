@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Cpu, MemoryStick, HardDrive, Check, Sparkles } from 'lucide-react'
 import { PLANS, type PlanType } from '@/lib/plans'
 import { cn } from '@/lib/utils'
+import { easeOutQuart } from '@/lib/motion'
 
 interface PlanSelectionCardProps {
   onAction: (action: string, data: Record<string, unknown>) => void
@@ -29,9 +30,6 @@ const PLAN_ENTRIES: {
     description: 'For teams and professionals with demanding workloads',
   },
 ]
-
-/* Exponential easing for natural deceleration */
-const easeOutQuart = [0.25, 1, 0.5, 1] as const
 
 export function PlanSelectionCard({ onAction }: PlanSelectionCardProps) {
   const [interval, setInterval] = useState<'monthly' | 'annual'>('monthly')

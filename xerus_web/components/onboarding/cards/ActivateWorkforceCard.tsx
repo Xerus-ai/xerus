@@ -4,15 +4,13 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Key, Sparkles, ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { easeOutQuart } from '@/lib/motion'
 
 type Provider = 'claudecode' | 'codex' | 'openrouter' | 'skip'
 
 interface ActivateWorkforceCardProps {
   onAction: (action: string, data: Record<string, unknown>) => void
 }
-
-/* Exponential easing for natural deceleration */
-const easeOutQuart = [0.25, 1, 0.5, 1] as const
 
 /**
  * Activate workforce card: choose an LLM provider or skip using bonus credits.
