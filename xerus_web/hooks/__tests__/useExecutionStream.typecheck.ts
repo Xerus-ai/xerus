@@ -39,9 +39,9 @@ import { STREAM_EVENT_TYPES } from '../useExecutionStream';
 // These will cause TypeScript errors if types are wrong.
 // ---------------------------------------------------------------------------
 
-// Verify all 18 event types are present
+// Verify all 22 event types are present
 const _eventTypes: readonly string[] = STREAM_EVENT_TYPES;
-const _expectedLength: 18 = STREAM_EVENT_TYPES.length;
+const _expectedLength: 22 = STREAM_EVENT_TYPES.length;
 
 // Verify StreamEventType is a union of all event type strings
 const _metaType: StreamEventType = 'meta';
@@ -62,6 +62,10 @@ const _subagentStopType: StreamEventType = 'subagent_stop';
 const _delegationType: StreamEventType = 'delegation';
 const _notificationType: StreamEventType = 'notification';
 const _guidanceType: StreamEventType = 'guidance';
+const _previewType: StreamEventType = 'preview';
+const _creditWarningType: StreamEventType = 'credit_warning';
+const _insufficientCreditsType: StreamEventType = 'insufficient_credits';
+const _providerUnavailableType: StreamEventType = 'provider_unavailable';
 
 // Verify StreamEvent shape
 const _sampleEvent: StreamEvent = {
@@ -218,7 +222,7 @@ function assert(condition: boolean, message: string): void {
 // ---------------------------------------------------------------------------
 
 export function testStreamEventTypesArray(): void {
-  assert(STREAM_EVENT_TYPES.length === 18, 'Should have exactly 18 event types');
+  assert(STREAM_EVENT_TYPES.length === 22, 'Should have exactly 22 event types');
   assert(STREAM_EVENT_TYPES.includes('meta'), 'Should include meta');
   assert(STREAM_EVENT_TYPES.includes('progress'), 'Should include progress');
   assert(STREAM_EVENT_TYPES.includes('token'), 'Should include token');
@@ -237,6 +241,10 @@ export function testStreamEventTypesArray(): void {
   assert(STREAM_EVENT_TYPES.includes('delegation'), 'Should include delegation');
   assert(STREAM_EVENT_TYPES.includes('notification'), 'Should include notification');
   assert(STREAM_EVENT_TYPES.includes('guidance'), 'Should include guidance');
+  assert(STREAM_EVENT_TYPES.includes('preview'), 'Should include preview');
+  assert(STREAM_EVENT_TYPES.includes('credit_warning'), 'Should include credit_warning');
+  assert(STREAM_EVENT_TYPES.includes('insufficient_credits'), 'Should include insufficient_credits');
+  assert(STREAM_EVENT_TYPES.includes('provider_unavailable'), 'Should include provider_unavailable');
 }
 
 export function testStreamEventParsing(): void {
