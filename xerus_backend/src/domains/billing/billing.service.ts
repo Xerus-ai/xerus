@@ -198,9 +198,9 @@ export class BillingService {
         }, client);
 
         if (newPlan && newPlan !== oldPlan) {
-            const targetCredits = PLAN_CREDITS[newPlan];
-            const currentBalance = user.credits_available;
-            const bonus = Math.max(0, targetCredits - currentBalance);
+            const oldPlanCredits = PLAN_CREDITS[oldPlan] ?? 0;
+            const newPlanCredits = PLAN_CREDITS[newPlan];
+            const bonus = Math.max(0, newPlanCredits - oldPlanCredits);
             if (bonus > 0) {
                 await creditService.grantCreditsWithClient(client, user.user_id, bonus, `Plan upgrade: ${oldPlan} → ${newPlan}`);
             }

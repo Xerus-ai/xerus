@@ -18,8 +18,12 @@
 
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 
-dotenv.config({ path: path.join(__dirname, '..', '.env') });
+const root = path.join(__dirname, '..');
+const envLocal = path.join(root, '.env.local');
+const envDefault = path.join(root, '.env');
+dotenv.config({ path: fs.existsSync(envLocal) ? envLocal : envDefault });
 
 import { Daytona } from '@daytonaio/sdk';
 import { Image } from '@daytonaio/sdk';

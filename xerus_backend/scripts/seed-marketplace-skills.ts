@@ -13,10 +13,13 @@
  */
 
 import * as fs from 'fs/promises';
+import * as fsSync from 'fs';
 import * as path from 'path';
 import dotenv from 'dotenv';
 
-dotenv.config();
+const _root = path.join(__dirname, '..');
+const _envLocal = path.join(_root, '.env.local');
+dotenv.config({ path: fsSync.existsSync(_envLocal) ? _envLocal : path.join(_root, '.env') });
 
 // 31 curated skills across all categories. Add more slugs here to expand.
 const SEED_SLUGS: Array<{ slug: string; category: SkillCategory }> = [
