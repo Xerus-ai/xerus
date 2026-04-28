@@ -41,7 +41,7 @@ export function PlanSelectionCard({ onAction }: PlanSelectionCardProps) {
   }
 
   return (
-    <div className="rounded-2xl border border-surface-active/60 bg-surface/60 p-5 max-w-[680px] space-y-5">
+    <div className="rounded-2xl border border-surface-active/60 bg-surface/60 p-6 max-w-[720px] space-y-5">
       {/* Header + Toggle */}
       <div className="flex items-center justify-between">
         <h3 className="font-serif text-lg text-text">Choose your plan</h3>
@@ -103,8 +103,8 @@ export function PlanSelectionCard({ onAction }: PlanSelectionCardProps) {
               className={cn(
                 'relative rounded-xl border text-left transition-all duration-200',
                 entry.highlighted
-                  ? 'bg-plan-highlight border-plan-highlight p-5'
-                  : 'border-surface-active/60 p-4',
+                  ? 'bg-plan-highlight border-plan-highlight p-6'
+                  : 'border-surface-active/60 p-5',
                 isSelected && !entry.highlighted && 'ring-2 ring-primary/25 bg-surface/80',
                 isSelected && entry.highlighted && 'ring-2 ring-white/20',
                 !isSelected && !entry.highlighted && 'hover:border-primary/30'
@@ -117,43 +117,43 @@ export function PlanSelectionCard({ onAction }: PlanSelectionCardProps) {
               )}
 
               <p className={cn(
-                'font-serif text-base',
+                'font-serif text-lg',
                 entry.highlighted ? 'text-white' : 'text-text'
               )}>{plan.label}</p>
-              <div className="flex items-baseline gap-0.5 mt-1">
+              <div className="flex items-baseline gap-0.5 mt-1.5">
                 <span className={cn(
                   'font-semibold',
-                  entry.highlighted ? 'text-white text-[26px]' : 'text-text text-2xl'
+                  entry.highlighted ? 'text-white text-[30px]' : 'text-text text-[28px]'
                 )}>${price}</span>
                 <span className={cn(
-                  'text-[10px]',
+                  'text-xs',
                   entry.highlighted ? 'text-white/70' : 'text-text-secondary'
                 )}>/mo</span>
               </div>
 
               <p className={cn(
-                'text-[10px] leading-relaxed mt-2 mb-3',
+                'text-xs leading-relaxed mt-2.5 mb-4',
                 entry.highlighted ? 'text-white/70' : 'text-text-secondary'
               )}>
                 {entry.description}
               </p>
 
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-1.5">
-                  <Cpu className={cn('w-3 h-3 shrink-0', entry.highlighted ? 'text-white/60' : 'text-text-muted')} />
-                  <span className={cn('text-[10px]', entry.highlighted ? 'text-white/65' : 'text-text-secondary')}>{plan.vcpu} vCPU</span>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Cpu className={cn('w-3.5 h-3.5 shrink-0', entry.highlighted ? 'text-white/60' : 'text-text-muted')} />
+                  <span className={cn('text-xs', entry.highlighted ? 'text-white/65' : 'text-text-secondary')}>{plan.vcpu} vCPU</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <MemoryStick className={cn('w-3 h-3 shrink-0', entry.highlighted ? 'text-white/60' : 'text-text-muted')} />
-                  <span className={cn('text-[10px]', entry.highlighted ? 'text-white/65' : 'text-text-secondary')}>{plan.ram} GB RAM</span>
+                <div className="flex items-center gap-2">
+                  <MemoryStick className={cn('w-3.5 h-3.5 shrink-0', entry.highlighted ? 'text-white/60' : 'text-text-muted')} />
+                  <span className={cn('text-xs', entry.highlighted ? 'text-white/65' : 'text-text-secondary')}>{plan.ram} GB RAM</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <HardDrive className={cn('w-3 h-3 shrink-0', entry.highlighted ? 'text-white/60' : 'text-text-muted')} />
-                  <span className={cn('text-[10px]', entry.highlighted ? 'text-white/65' : 'text-text-secondary')}>{plan.disk} GB disk</span>
+                <div className="flex items-center gap-2">
+                  <HardDrive className={cn('w-3.5 h-3.5 shrink-0', entry.highlighted ? 'text-white/60' : 'text-text-muted')} />
+                  <span className={cn('text-xs', entry.highlighted ? 'text-white/65' : 'text-text-secondary')}>{plan.disk} GB disk</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Sparkles className={cn('w-3 h-3 shrink-0', entry.highlighted ? 'text-white/60' : 'text-text-muted')} />
-                  <span className={cn('text-[10px]', entry.highlighted ? 'text-white/65' : 'text-text-secondary')}>{plan.credits.toLocaleString()} bonus credits</span>
+                <div className="flex items-center gap-2">
+                  <Sparkles className={cn('w-3.5 h-3.5 shrink-0', entry.highlighted ? 'text-white/60' : 'text-text-muted')} />
+                  <span className={cn('text-xs', entry.highlighted ? 'text-white/65' : 'text-text-secondary')}>{plan.credits.toLocaleString()} bonus credits</span>
                 </div>
               </div>
 

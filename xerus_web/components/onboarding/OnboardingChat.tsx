@@ -129,7 +129,7 @@ export function OnboardingChat() {
       setMessages((prev) => [...prev, {
         id: `workspace-card`,
         role: 'assistant' as const,
-        content: 'Great choice! Let’s name your workspace and first project.',
+        content: `Great choice! Let's set up your office.\n\nYour workspace is your company's virtual HQ — all your agents, projects, and data live here. A project groups related work together (e.g. "Content Strategy" or "Q3 Launch"). Inside each project, channels keep conversations organized — like Slack channels but with AI agents participating.`,
         source: 'stream' as const,
         ui: {
           type: 'workspace-setup',
@@ -189,7 +189,7 @@ export function OnboardingChat() {
         setMessages((prev) => [...prev, {
           id: 'plan-card',
           role: 'assistant' as const,
-          content: 'Now let’s pick a plan for your workspace.',
+          content: `Now let's pick a plan for your workspace.\n\nEach plan comes with bonus credits to get you started. After that, you can bring your own API key — connect an OpenRouter key, log in with your Claude (Anthropic) subscription, or use Codex (coming soon) — and run agents with zero markup on token costs.`,
           source: 'stream' as const,
           ui: {
             type: 'plan-selection',

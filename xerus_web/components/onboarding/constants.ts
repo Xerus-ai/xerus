@@ -70,5 +70,5 @@ export function buildTemplateMessages(firstName: string): OnboardingTemplateMess
 
 export const INITIAL_QUICK_REPLIES = [
   { label: 'Start fresh', value: 'fresh', icon: 'sparkles' as const, subtitle: 'Build from scratch' },
-  { label: 'Bring my company', value: 'existing', icon: 'building' as const, subtitle: 'Import existing setup' },
+  { label: 'Bring my company', value: 'existing', icon: 'building' as const, subtitle: 'Coming soon', disabled: true },
 ]
