@@ -94,16 +94,16 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
     }
   }, [isAuthReady, user, hasWorkspace, isOnboardingPage, router])
 
+  // E2E auth page: render children directly (before auth check so signInWithCustomToken can run)
+  if (isE2EAuthPage) {
+    return <>{children}</>
+  }
+
   // Show loading screen while auth state is resolving
   if (!isAuthReady) {
     return isLoginPage
       ? <LoadingScreen />
       : <LoadingScreen title="Loading your workspace" subtitle="Verifying your session..." />
-  }
-
-  // E2E auth page: render children directly
-  if (isE2EAuthPage) {
-    return <>{children}</>
   }
 
   // Not authenticated — show loading while redirect to /login fires

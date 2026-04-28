@@ -53,10 +53,12 @@ export default function BillingPage() {
     })
   }, [user])
 
+  const hasPolarSubscription = subscription?.polar_subscription_id != null
+
   const handlePlanSelect = async (planId: PlanType) => {
     setLoadingPlan(planId)
     try {
-      if (subscription && subscription.subscription_status === 'active' && subscription.plan_type !== planId) {
+      if (hasPolarSubscription && subscription!.subscription_status === 'active' && subscription!.plan_type !== planId) {
         await changePlan(planId, billingCycle)
         toast.success('Plan changed successfully')
         const updated = await getSubscription()
@@ -223,8 +225,8 @@ export default function BillingPage() {
             </p>
           </motion.div>
 
-          {/* Subscription Status */}
-          {subscription && (
+          {/* Subscription Status — only show when a real Polar subscription exists */}
+          {subscription && hasPolarSubscription && (
             <motion.div
               className="bg-surface/60 rounded-2xl border border-surface-active/60 p-6 mb-12"
               initial={{ opacity: 0, y: 8 }}
