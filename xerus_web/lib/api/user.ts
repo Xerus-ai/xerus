@@ -110,13 +110,19 @@ export const updateUserProfile = async (updates: {
   }
 };
 
+function clearAppStorage(): void {
+  const appKeys = ['xerus_user', 'apiKeyStatus', 'xerus_onboarding_phase', 'xerus_unread_counts'];
+  appKeys.forEach((k) => localStorage.removeItem(k));
+  sessionStorage.removeItem('xerus_onboarding_phase');
+}
+
 export const deleteAccount = async (): Promise<void> => {
   await apiCall('/users/me', { method: 'DELETE' });
 
   const { signOut } = await import('firebase/auth');
   await signOut(firebaseAuth);
 
-  localStorage.removeItem('xerus_user');
+  clearAppStorage();
 
   window.location.href = '/login';
 };
@@ -146,7 +152,7 @@ export const logout = async (): Promise<void> => {
   const { signOut } = await import('firebase/auth');
   await signOut(firebaseAuth);
 
-  localStorage.removeItem('xerus_user');
+  clearAppStorage();
 
   window.location.href = '/login';
 };

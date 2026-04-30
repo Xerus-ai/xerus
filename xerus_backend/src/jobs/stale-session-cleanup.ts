@@ -9,20 +9,19 @@ const STALE_THRESHOLD_MINUTES = 30;
 export function startStaleSessionCleanupJob(): void {
     cron.schedule('*/15 * * * *', async () => {
         try {
-            const result = await query<{ session_id: string }>(
+            const result = await query<{ id: string }>(
                 `UPDATE execution_sessions
                  SET status = 'failed',
-                     ended_at = NOW(),
-                     error_message = $1
+                     completed_at = NOW()
                  WHERE status = 'running'
-                   AND started_at < NOW() - MAKE_INTERVAL(mins => $2)
-                 RETURNING session_id`,
-                [`Auto-finalized: session stuck for >${STALE_THRESHOLD_MINUTES} minutes`, STALE_THRESHOLD_MINUTES],
+                   AND started_at < NOW() - MAKE_INTERVAL(mins => $1)
+                 RETURNING id`,
+                [STALE_THRESHOLD_MINUTES],
             );
 
             const count = result.rowCount ?? 0;
             if (count > 0) {
-                log.warn('Stale sessions cleaned up', { count, sessions: result.rows.map(r => r.session_id) });
+                log.warn('Stale sessions cleaned up', { count, sessions: result.rows.map(r => r.id) });
             }
         } catch (error) {
             log.error('Stale session cleanup failed', error instanceof Error ? error : new Error(String(error)));

@@ -11,14 +11,18 @@ export function getClient(): Polar {
         if (!accessToken) {
             throw new Error('POLAR_ACCESS_TOKEN is not configured');
         }
-        polarClient = new Polar({ accessToken });
+        const isSandbox = process.env.POLAR_ENVIRONMENT === 'sandbox';
+        polarClient = new Polar({
+            accessToken,
+            server: isSandbox ? 'sandbox' : 'production',
+        });
     }
     return polarClient;
 }
 
 export async function createCheckoutSession(params: {
     productId: string;
-    successUrl: string;
+    successUrl?: string;
     customerEmail?: string;
     metadata?: Record<string, string>;
 }): Promise<{ id: string; url: string }> {
@@ -26,7 +30,7 @@ export async function createCheckoutSession(params: {
 
     const checkout = await client.checkouts.create({
         products: [params.productId],
-        successUrl: params.successUrl,
+        ...(params.successUrl ? { successUrl: params.successUrl } : {}),
         customerEmail: params.customerEmail,
         metadata: params.metadata,
     });

@@ -141,7 +141,7 @@ export function OnboardingMessages({
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="min-h-full flex flex-col justify-center px-4 sm:px-6 py-12">
-        <div className="max-w-[640px] mx-auto w-full space-y-6">
+        <div className="max-w-[860px] mx-auto w-full space-y-6">
 
           {/* Xerus intro — single avatar, sequential text blocks + inline cards */}
           {templateAssistantMsgs.length > 0 && (

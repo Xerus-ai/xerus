@@ -76,6 +76,12 @@ export const cancelSubscription = async (): Promise<void> => {
   await apiCall('/billing/subscription/cancel', { method: 'POST' });
 };
 
+export const syncSubscription = async (): Promise<{ synced: boolean; subscription_status: string; plan_type?: string }> => {
+  const response = await apiCall('/billing/subscription/sync', { method: 'POST' });
+  const json = await response.json();
+  return json.data ?? json;
+};
+
 export const changePlan = async (
   plan: PlanType,
   interval: 'monthly' | 'annual',

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Key, Sparkles, ArrowRight } from 'lucide-react'
+import Image from 'next/image'
 import { cn } from '@/lib/utils'
 import { easeOutQuart } from '@/lib/motion'
 
@@ -12,10 +13,6 @@ interface ActivateWorkforceCardProps {
   onAction: (action: string, data: Record<string, unknown>) => void
 }
 
-/**
- * Activate workforce card: choose an LLM provider or skip using bonus credits.
- * Three options: Claude (Anthropic OAuth), Codex (coming soon), OpenRouter key paste.
- */
 export function ActivateWorkforceCard({ onAction }: ActivateWorkforceCardProps) {
   const [openRouterKey, setOpenRouterKey] = useState('')
   const [showKeyInput, setShowKeyInput] = useState(false)
@@ -33,12 +30,12 @@ export function ActivateWorkforceCard({ onAction }: ActivateWorkforceCardProps) 
       <div>
         <h3 className="font-serif text-lg text-text">Connect your AI provider</h3>
         <p className="text-xs text-text-secondary mt-1.5 leading-relaxed">
-          Bring your own key for unlimited usage, or skip to use your bonus credits.
+          Bring your own key for unlimited usage, or skip to use your bonus credits. You can always configure this later in Settings &gt; API Keys.
         </p>
       </div>
 
       <div className="space-y-2">
-        {/* Claude option — primary, visually emphasized */}
+        {/* Claude Code — configure in settings */}
         <motion.button
           onClick={() => {
             setSubmitting(true)
@@ -54,12 +51,12 @@ export function ActivateWorkforceCard({ onAction }: ActivateWorkforceCardProps) 
           whileTap={{ scale: 0.98 }}
           className="w-full flex items-center gap-3.5 px-4 py-4 rounded-xl border border-[#D97757]/20 bg-[#D97757]/[0.04] hover:bg-[#D97757]/[0.07] hover:border-[#D97757]/30 transition-all duration-200 text-left group disabled:opacity-50"
         >
-          <div className="w-10 h-10 rounded-xl bg-[#D97757]/10 flex items-center justify-center shrink-0">
-            <span className="text-lg font-bold text-[#D97757]">C</span>
+          <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shrink-0 shadow-sm">
+            <Image src="/icons/claudecode-color.svg" alt="Claude Code" width={24} height={24} />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-text">Login with Claude</p>
-            <p className="text-[10px] text-text-secondary mt-0.5">Anthropic OAuth</p>
+            <p className="text-sm font-medium text-text">Use Claude Code</p>
+            <p className="text-[10px] text-text-secondary mt-0.5">Configure Anthropic key in Settings</p>
           </div>
           <motion.div
             animate={{ x: hoveredProvider === 'claude' ? 3 : 0 }}
@@ -69,28 +66,28 @@ export function ActivateWorkforceCard({ onAction }: ActivateWorkforceCardProps) 
           </motion.div>
         </motion.button>
 
-        {/* Codex option — genuinely "coming soon" with a softer presentation */}
+        {/* Codex — coming soon */}
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35, delay: 0.06, ease: easeOutQuart }}
           className="relative w-full flex items-center gap-3.5 px-4 py-3.5 rounded-xl border border-dashed border-surface-active/50 bg-surface-hover/30"
         >
-          <div className="w-10 h-10 rounded-xl bg-surface-hover flex items-center justify-center shrink-0">
-            <span className="text-lg font-bold text-text-muted/60">O</span>
+          <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shrink-0 shadow-sm opacity-50">
+            <Image src="/icons/codex-color.svg" alt="Codex" width={24} height={24} />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <p className="text-sm font-medium text-text-muted">Login with Codex</p>
+              <p className="text-sm font-medium text-text-muted">Use OpenAI Codex</p>
               <span className="text-[9px] font-semibold uppercase tracking-wider text-text-muted bg-surface-active/60 px-1.5 py-px rounded-full">
                 Soon
               </span>
             </div>
-            <p className="text-[10px] text-text-muted mt-0.5">OpenAI Codex integration</p>
+            <p className="text-[10px] text-text-muted mt-0.5">Configure OpenAI key in Settings</p>
           </div>
         </motion.div>
 
-        {/* OpenRouter key option */}
+        {/* OpenRouter key */}
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -109,12 +106,12 @@ export function ActivateWorkforceCard({ onAction }: ActivateWorkforceCardProps) 
                 exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.15 } }}
                 className="w-full flex items-center gap-3.5 px-4 py-4 rounded-xl border border-surface-active/60 bg-surface hover:border-purple-400/25 transition-all duration-200 text-left group disabled:opacity-50"
               >
-                <div className="w-10 h-10 rounded-xl bg-purple-500/8 flex items-center justify-center shrink-0">
-                  <Key className="w-4 h-4 text-purple-500/80" />
+                <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shrink-0 shadow-sm">
+                  <Image src="/icons/openrouter.svg" alt="OpenRouter" width={24} height={24} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-text">Paste OpenRouter key</p>
-                  <p className="text-[10px] text-text-secondary mt-0.5">Use your own API key</p>
+                  <p className="text-[10px] text-text-secondary mt-0.5">Use your own API key for all models</p>
                 </div>
                 <motion.div
                   animate={{ x: hoveredProvider === 'openrouter' ? 3 : 0 }}
@@ -176,7 +173,7 @@ export function ActivateWorkforceCard({ onAction }: ActivateWorkforceCardProps) 
           )}
         >
           <Sparkles className="w-3.5 h-3.5" />
-          <span>Skip — use bonus credits</span>
+          <span>Skip for now — use bonus credits</span>
         </button>
       </motion.div>
     </div>

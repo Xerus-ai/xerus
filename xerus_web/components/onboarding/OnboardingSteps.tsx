@@ -157,7 +157,7 @@ export function OnboardingSteps({ workspace, agents, onComplete }: OnboardingSte
   useEffect(() => {
     if (!firebaseAuth?.currentUser) return
     let cancelled = false
-    getSkills({ limit: 4, sort_by: 'install_count', sort_order: 'desc' })
+    getSkills({ limit: 4, sort_by: 'created_at', sort_order: 'desc' })
       .then((result) => {
         if (cancelled || result.skills.length === 0) return
         setSkills(

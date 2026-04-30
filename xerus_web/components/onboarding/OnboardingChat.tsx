@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/utils/AuthContext'
 import { useOnboardingStream } from '@/hooks/useOnboardingStream'
-import { createCheckout } from '@/lib/api/billing'
-import { getUserProfile, saveApiKey, triggerCliLogin } from '@/lib/api/user'
+import { createCheckout, syncSubscription } from '@/lib/api/billing'
+import { saveApiKey, triggerCliLogin } from '@/lib/api/user'
 import { PLANS, type PlanType } from '@/lib/plans'
 import { BlobBackground } from './BlobBackground'
 import { LogoEntrance } from './LogoEntrance'
@@ -28,15 +28,9 @@ export function OnboardingChat() {
   const firstName = user?.display_name?.split(' ')[0] || 'there'
   const userId = user?.uid || ''
 
-  const [phase, setPhaseRaw] = useState<Phase>(() => {
-    if (typeof window === 'undefined') return 'logo'
-    const saved = sessionStorage.getItem('xerus_onboarding_phase')
-    if (saved === 'template' || saved === 'plan' || saved === 'activate' || saved === 'setup') return saved as Phase
-    return 'logo'
-  })
+  const [phase, setPhaseRaw] = useState<Phase>('logo')
   const setPhase = useCallback((p: Phase) => {
     setPhaseRaw(p)
-    sessionStorage.setItem('xerus_onboarding_phase', p)
   }, [])
   const [messages, setMessages] = useState<OnboardingMessage[]>([])
   const [templateIndex, setTemplateIndex] = useState(0)
@@ -50,6 +44,7 @@ export function OnboardingChat() {
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null)
   const [showThinking, setShowThinking] = useState(false)
   const pollRef = useRef<ReturnType<typeof setTimeout>>()
+  const pendingPlanRef = useRef<{ messageId: string; label: string } | null>(null)
 
   const stream = useOnboardingStream({ userId, onWorkspaceCreated: markWorkspaceReady })
   const templateMessages = useMemo(() => buildTemplateMessages(firstName), [firstName])
@@ -148,20 +143,19 @@ export function OnboardingChat() {
     )
   }, [])
 
-  // Poll /users/me until subscription_status becomes active
+  // Poll Polar via /billing/subscription/sync until subscription is active
   const pollForSubscription = useCallback(() => {
     let attempts = 0
     const poll = () => {
       attempts++
       if (attempts > SUBSCRIPTION_POLL_MAX_ATTEMPTS) {
         setShowThinking(false)
-        // Subscription did not activate in time -- move to activate phase anyway
         setPhase('activate')
         return
       }
-      getUserProfile()
-        .then((profile) => {
-          if (profile.plan_type && profile.plan_type !== 'free') {
+      syncSubscription()
+        .then((result) => {
+          if (result.synced && result.subscription_status === 'active') {
             setShowThinking(false)
             setPhase('activate')
           } else {
@@ -206,14 +200,15 @@ export function OnboardingChat() {
       const plan = data.plan as PlanType
       const interval = data.interval as 'monthly' | 'annual'
       const planInfo = PLANS[plan]
-      collapseCard(messageId, `${planInfo.label} plan — $${interval === 'monthly' ? planInfo.monthly : planInfo.annual}/mo`)
+      pendingPlanRef.current = { messageId, label: `${planInfo.label} plan — $${interval === 'monthly' ? planInfo.monthly : planInfo.annual}/mo` }
 
-      // Create checkout session
+      // Create checkout session — card stays visible with selected state while loading
       try {
         const { checkout_url } = await createCheckout(plan, interval)
         setCheckoutUrl(checkout_url)
       } catch (err) {
         console.error('[Onboarding] Checkout creation failed:', err)
+        pendingPlanRef.current = null
       }
       return
     }
@@ -258,12 +253,17 @@ export function OnboardingChat() {
 
   // Checkout success handler
   const handleCheckoutSuccess = useCallback(() => {
+    if (pendingPlanRef.current) {
+      collapseCard(pendingPlanRef.current.messageId, pendingPlanRef.current.label)
+      pendingPlanRef.current = null
+    }
     setCheckoutUrl(null)
     setShowThinking(true)
     pollForSubscription()
-  }, [pollForSubscription])
+  }, [collapseCard, pollForSubscription])
 
   const handleCheckoutCancel = useCallback(() => {
+    pendingPlanRef.current = null
     setCheckoutUrl(null)
   }, [])
 
@@ -276,7 +276,7 @@ export function OnboardingChat() {
       return [...prev, {
         id: 'activate-card',
         role: 'assistant' as const,
-        content: 'Your subscription is active! One last step — connect your AI provider.',
+        content: 'Your subscription is active! You can connect an AI provider now or set it up later in Settings > API Keys.',
         source: 'stream' as const,
         ui: {
           type: 'activate-workforce',

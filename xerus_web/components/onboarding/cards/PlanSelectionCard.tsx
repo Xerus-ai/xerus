@@ -41,16 +41,16 @@ export function PlanSelectionCard({ onAction }: PlanSelectionCardProps) {
   }
 
   return (
-    <div className="rounded-2xl border border-surface-active/60 bg-surface/60 p-6 max-w-[720px] space-y-5">
+    <div className="rounded-2xl border border-surface-active/60 bg-surface/60 p-7 w-full space-y-6">
       {/* Header + Toggle */}
       <div className="flex items-center justify-between">
-        <h3 className="font-serif text-lg text-text">Choose your plan</h3>
-        <div className="flex items-center gap-2">
-          <div className="bg-surface-hover p-0.5 rounded-lg flex items-center">
+        <h3 className="font-serif text-xl text-text">Choose your plan</h3>
+        <div className="flex items-center gap-2.5">
+          <div className="bg-surface-hover p-1 rounded-lg flex items-center">
             <button
               onClick={() => setInterval('monthly')}
               className={cn(
-                'px-3 py-1 rounded-md text-xs font-medium transition-all duration-200',
+                'px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-200',
                 interval === 'monthly'
                   ? 'bg-plan-highlight text-white shadow-sm'
                   : 'text-text-secondary hover:text-text'
@@ -61,7 +61,7 @@ export function PlanSelectionCard({ onAction }: PlanSelectionCardProps) {
             <button
               onClick={() => setInterval('annual')}
               className={cn(
-                'px-3 py-1 rounded-md text-xs font-medium transition-all duration-200',
+                'px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-200',
                 interval === 'annual'
                   ? 'bg-plan-highlight text-white shadow-sm'
                   : 'text-text-secondary hover:text-text'
@@ -75,7 +75,7 @@ export function PlanSelectionCard({ onAction }: PlanSelectionCardProps) {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.25, ease: easeOutQuart }}
-              className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full"
+              className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full"
             >
               Save 20%
             </motion.span>
@@ -83,8 +83,8 @@ export function PlanSelectionCard({ onAction }: PlanSelectionCardProps) {
         </div>
       </div>
 
-      {/* Plan Cards — differentiated: Pro/Ultra compact, Max prominent */}
-      <div className="grid grid-cols-1 sm:grid-cols-[1fr_1.12fr_1fr] gap-3">
+      {/* Plan Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-[1fr_1.12fr_1fr] gap-4">
         {PLAN_ENTRIES.map((entry, index) => {
           const plan = PLANS[entry.id]
           const price = interval === 'monthly' ? plan.monthly : plan.annual
@@ -101,59 +101,59 @@ export function PlanSelectionCard({ onAction }: PlanSelectionCardProps) {
               whileHover={!isSelected ? { y: -2, transition: { duration: 0.2, ease: easeOutQuart } } : undefined}
               whileTap={!isSelected ? { scale: 0.97 } : undefined}
               className={cn(
-                'relative rounded-xl border text-left transition-all duration-200',
+                'relative rounded-2xl border text-left transition-all duration-200',
                 entry.highlighted
-                  ? 'bg-plan-highlight border-plan-highlight p-6'
-                  : 'border-surface-active/60 p-5',
+                  ? 'bg-plan-highlight border-plan-highlight p-7'
+                  : 'border-surface-active/60 p-6',
                 isSelected && !entry.highlighted && 'ring-2 ring-primary/25 bg-surface/80',
                 isSelected && entry.highlighted && 'ring-2 ring-white/20',
                 !isSelected && !entry.highlighted && 'hover:border-primary/30'
               )}
             >
               {entry.highlighted && !isSelected && (
-                <span className="absolute -top-2 left-3 bg-secondary text-white text-[8px] uppercase font-bold px-2 py-px rounded-full tracking-wider">
+                <span className="absolute -top-2.5 left-4 bg-secondary text-white text-[9px] uppercase font-bold px-2.5 py-0.5 rounded-full tracking-wider">
                   Popular
                 </span>
               )}
 
               <p className={cn(
-                'font-serif text-lg',
+                'font-serif text-xl',
                 entry.highlighted ? 'text-white' : 'text-text'
               )}>{plan.label}</p>
-              <div className="flex items-baseline gap-0.5 mt-1.5">
+              <div className="flex items-baseline gap-1 mt-2">
                 <span className={cn(
                   'font-semibold',
-                  entry.highlighted ? 'text-white text-[30px]' : 'text-text text-[28px]'
+                  entry.highlighted ? 'text-white text-4xl' : 'text-text text-[34px]'
                 )}>${price}</span>
                 <span className={cn(
-                  'text-xs',
+                  'text-sm',
                   entry.highlighted ? 'text-white/70' : 'text-text-secondary'
                 )}>/mo</span>
               </div>
 
               <p className={cn(
-                'text-xs leading-relaxed mt-2.5 mb-4',
+                'text-[13px] leading-relaxed mt-3 mb-5',
                 entry.highlighted ? 'text-white/70' : 'text-text-secondary'
               )}>
                 {entry.description}
               </p>
 
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Cpu className={cn('w-3.5 h-3.5 shrink-0', entry.highlighted ? 'text-white/60' : 'text-text-muted')} />
-                  <span className={cn('text-xs', entry.highlighted ? 'text-white/65' : 'text-text-secondary')}>{plan.vcpu} vCPU</span>
+              <div className="space-y-2.5">
+                <div className="flex items-center gap-2.5">
+                  <Cpu className={cn('w-4 h-4 shrink-0', entry.highlighted ? 'text-white/60' : 'text-text-muted')} />
+                  <span className={cn('text-[13px]', entry.highlighted ? 'text-white/65' : 'text-text-secondary')}>{plan.vcpu} vCPU</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <MemoryStick className={cn('w-3.5 h-3.5 shrink-0', entry.highlighted ? 'text-white/60' : 'text-text-muted')} />
-                  <span className={cn('text-xs', entry.highlighted ? 'text-white/65' : 'text-text-secondary')}>{plan.ram} GB RAM</span>
+                <div className="flex items-center gap-2.5">
+                  <MemoryStick className={cn('w-4 h-4 shrink-0', entry.highlighted ? 'text-white/60' : 'text-text-muted')} />
+                  <span className={cn('text-[13px]', entry.highlighted ? 'text-white/65' : 'text-text-secondary')}>{plan.ram} GB RAM</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <HardDrive className={cn('w-3.5 h-3.5 shrink-0', entry.highlighted ? 'text-white/60' : 'text-text-muted')} />
-                  <span className={cn('text-xs', entry.highlighted ? 'text-white/65' : 'text-text-secondary')}>{plan.disk} GB disk</span>
+                <div className="flex items-center gap-2.5">
+                  <HardDrive className={cn('w-4 h-4 shrink-0', entry.highlighted ? 'text-white/60' : 'text-text-muted')} />
+                  <span className={cn('text-[13px]', entry.highlighted ? 'text-white/65' : 'text-text-secondary')}>{plan.disk} GB disk</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Sparkles className={cn('w-3.5 h-3.5 shrink-0', entry.highlighted ? 'text-white/60' : 'text-text-muted')} />
-                  <span className={cn('text-xs', entry.highlighted ? 'text-white/65' : 'text-text-secondary')}>{plan.credits.toLocaleString()} bonus credits</span>
+                <div className="flex items-center gap-2.5">
+                  <Sparkles className={cn('w-4 h-4 shrink-0', entry.highlighted ? 'text-white/60' : 'text-text-muted')} />
+                  <span className={cn('text-[13px]', entry.highlighted ? 'text-white/65' : 'text-text-secondary')}>{plan.credits.toLocaleString()} bonus credits</span>
                 </div>
               </div>
 

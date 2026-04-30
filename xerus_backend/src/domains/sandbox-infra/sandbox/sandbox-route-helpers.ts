@@ -3,23 +3,29 @@
 // and obtain the DaytonaProvider. Extracted from 7 duplicate copies across
 // execution, conversation, company, task, and inbox route files.
 
-import { BadRequestError } from '../../../utils/errors';
+import { logger } from '../../../utils/logger';
 import type { SandboxService } from './sandbox.service';
 import type { DaytonaProvider } from './providers/daytona.provider';
 
+const log = logger('SandboxRouteHelpers');
+
 /**
- * Verify that the user has a running sandbox and return its ID.
- * Throws BadRequestError if no sandbox is running.
+ * Ensure the user has a running sandbox and return its ID.
+ * If the sandbox is paused, resumes it. If none exists, creates one.
+ * Only throws if provisioning itself fails.
  */
 export async function requireRunningSandbox(
     sandboxService: SandboxService,
     userId: string,
 ): Promise<string> {
     const status = await sandboxService.getSandboxStatus(userId);
-    if (status.status !== 'running' || !status.sandboxId) {
-        throw new BadRequestError('Sandbox not running - start a session first');
+    if (status.status === 'running' && status.sandboxId) {
+        return status.sandboxId;
     }
-    return status.sandboxId;
+
+    log.info('Auto-provisioning sandbox', { user_id: userId, current_status: status.status });
+    const session = await sandboxService.getOrCreateSandbox({ userId });
+    return session.sandboxId;
 }
 
 /**
