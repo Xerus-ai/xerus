@@ -21,6 +21,7 @@ function makeEntry(userId: string, status = 'running'): SandboxRegistryEntry {
         sandbox_total_runtime_seconds: 0,
         sandbox_resume_count: 0,
         sandbox_novnc_url: null,
+        sandbox_plan: null,
     };
 }
 

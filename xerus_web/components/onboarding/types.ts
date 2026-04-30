@@ -7,6 +7,7 @@ export interface OnboardingMessage {
   ui?: {
     type: 'quick-reply' | 'workspace-setup' | 'agent-select'
         | 'schedule-picker' | 'summary'
+        | 'plan-selection' | 'activate-workforce'
     props: Record<string, unknown>
     collapsed?: boolean
     collapsedText?: string

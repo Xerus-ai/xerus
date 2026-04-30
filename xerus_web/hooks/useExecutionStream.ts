@@ -18,6 +18,7 @@ export type {
   StopEventContent, ToolAuthRequiredEventContent, GuidanceEventContent,
   SubagentStartEventContent, SubagentStopEventContent, DelegationEventContent, NotificationEventContent,
   PreviewEventContent,
+  CreditWarningEventContent, InsufficientCreditsEventContent, ProviderUnavailableEventContent,
   StreamEventContentMap, StreamEvent, StreamEventCallback,
   UseExecutionStreamOptions, UseExecutionStreamReturn, ConnectionState,
 } from './useExecutionStream.types';
@@ -53,6 +54,9 @@ export interface UseExecutionStreamCallbacks {
   onDelegation?: (event: StreamEvent<'delegation'>) => void;
   onNotification?: (event: StreamEvent<'notification'>) => void;
   onPreview?: (event: StreamEvent<'preview'>) => void;
+  onCreditWarning?: (event: StreamEvent<'credit_warning'>) => void;
+  onInsufficientCredits?: (event: StreamEvent<'insufficient_credits'>) => void;
+  onProviderUnavailable?: (event: StreamEvent<'provider_unavailable'>) => void;
   onError?: (error: Error) => void;
   onConnectionChange?: (connected: boolean) => void;
 }
@@ -146,6 +150,15 @@ export function useExecutionStream(
         break;
       case 'preview':
         cbs.onPreview?.(event as StreamEvent<'preview'>);
+        break;
+      case 'credit_warning':
+        cbs.onCreditWarning?.(event as StreamEvent<'credit_warning'>);
+        break;
+      case 'insufficient_credits':
+        cbs.onInsufficientCredits?.(event as StreamEvent<'insufficient_credits'>);
+        break;
+      case 'provider_unavailable':
+        cbs.onProviderUnavailable?.(event as StreamEvent<'provider_unavailable'>);
         break;
     }
   }, []);

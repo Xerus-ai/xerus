@@ -22,8 +22,8 @@ describe('Users API Routes', () => {
       expect(response.body.data.user_id).toBeDefined();
       expect(response.body.data.email).toBe(testEmail);
       expect(response.body.data.display_name).toBe('Route Test User');
-      expect(response.body.data.plan_type).toBe('starter');
-      expect(response.body.data.credits_available).toBe(2500);
+      expect(response.body.data.plan_type).toBe('pro');
+      expect(response.body.data.credits_available).toBe(500);
       expect(response.body.data.is_new).toBe(true);
       expect(response.body.meta.request_id).toBeDefined();
       expect(response.body.meta.response_time_ms).toBeDefined();

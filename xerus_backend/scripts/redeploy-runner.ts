@@ -15,7 +15,9 @@ import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
 
-dotenv.config();
+const _root = path.join(__dirname, '..');
+const _envLocal = path.join(_root, '.env.local');
+dotenv.config({ path: fs.existsSync(_envLocal) ? _envLocal : path.join(_root, '.env') });
 
 const ROOT = path.join(__dirname, '..');
 const BUNDLE_DIR = path.join(ROOT, 'dist', 'runner-bundle');

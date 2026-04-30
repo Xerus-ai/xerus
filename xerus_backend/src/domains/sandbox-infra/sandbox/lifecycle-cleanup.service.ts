@@ -17,6 +17,7 @@ export interface CleanupConfig {
     idle_threshold_ms: number;
     stuck_session_threshold_ms: number;
     paused_threshold_ms: number;
+    revoked_grace_period_ms: number;
     max_sandboxes_per_user: number;
 }
 
@@ -28,6 +29,7 @@ export interface CleanupResult {
 export interface FullCleanupResult {
     stale_sandboxes: CleanupResult;
     long_paused_sandboxes: CleanupResult;
+    revoked_sandboxes: CleanupResult;
     orphaned_sandboxes: CleanupResult;
     stuck_sessions: CleanupResult;
     timestamp: string;
@@ -53,6 +55,7 @@ export interface CleanupDatabase {
     findStaleSandboxes(idleThresholdMs: number): Promise<RegistryRow[]>;
     findLongPausedSandboxes(pausedThresholdMs: number): Promise<RegistryRow[]>;
     findOrphanedSandboxes(activeUserIds: string[]): Promise<RegistryRow[]>;
+    findRevokedPausedSandboxes(gracePeriodMs: number): Promise<RegistryRow[]>;
     findStuckSessions(stuckThresholdMs: number): Promise<SessionRow[]>;
     updateSandboxStatus(sandboxId: string, status: string, userId?: string): Promise<void>;
     updateSessionStatus(sessionId: string, status: string): Promise<void>;
@@ -81,6 +84,7 @@ const DEFAULT_CONFIG: CleanupConfig = {
     idle_threshold_ms: 24 * 60 * 60 * 1000,          // 24 hours
     stuck_session_threshold_ms: 2 * 60 * 60 * 1000,  // 2 hours
     paused_threshold_ms: 30 * 24 * 60 * 60 * 1000,   // 30 days
+    revoked_grace_period_ms: 7 * 24 * 60 * 60 * 1000, // 7 days
     max_sandboxes_per_user: 1,
 };
 
@@ -182,6 +186,36 @@ export class LifecycleCleanupService {
     }
 
     // -------------------------------------------------------------------------
+    // Revoked Subscription Cleanup — KILL sandboxes for revoked users after grace period
+    // Subscription expired and user did not re-subscribe within 7 days.
+    // S3 snapshot taken before kill as safety net.
+    // -------------------------------------------------------------------------
+
+    async cleanupRevokedSandboxes(): Promise<CleanupResult> {
+        const revokedRows = await this.deps.database.findRevokedPausedSandboxes(
+            this.config.revoked_grace_period_ms
+        );
+
+        let cleaned = 0;
+        let errors = 0;
+
+        for (const row of revokedRows) {
+            try {
+                await this.deps.sandboxKiller.kill(row.sandbox_id, row.user_id);
+                await this.deps.database.updateSandboxStatus(row.sandbox_id, 'killed', row.user_id);
+                log.info('Killed sandbox for revoked subscription', { sandbox_id: row.sandbox_id, user_id: row.user_id });
+                cleaned++;
+            } catch (err) {
+                const msg = err instanceof Error ? err.message : String(err);
+                log.error('Failed to kill revoked sandbox', { sandbox_id: row.sandbox_id, error: msg });
+                errors++;
+            }
+        }
+
+        return { cleaned, errors };
+    }
+
+    // -------------------------------------------------------------------------
     // Stuck Session Cleanup
     // -------------------------------------------------------------------------
 
@@ -214,12 +248,14 @@ export class LifecycleCleanupService {
     async runFullCleanup(): Promise<FullCleanupResult> {
         const staleSandboxes = await this.cleanupStaleSandboxes();
         const longPausedSandboxes = await this.cleanupLongPausedSandboxes();
+        const revokedSandboxes = await this.cleanupRevokedSandboxes();
         const orphanedSandboxes = await this.cleanupOrphanedSandboxes();
         const stuckSessions = await this.cleanupStuckSessions();
 
         return {
             stale_sandboxes: staleSandboxes,
             long_paused_sandboxes: longPausedSandboxes,
+            revoked_sandboxes: revokedSandboxes,
             orphaned_sandboxes: orphanedSandboxes,
             stuck_sessions: stuckSessions,
             timestamp: new Date().toISOString(),

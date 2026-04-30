@@ -169,6 +169,8 @@
     /* #1e1e1e — VS Code dark */
     --clr-code-border: 50 50 48;
     /* #323230 — subtle warm border */
+    --clr-plan-highlight: 38 30 27;
+    /* #261E1B — warm dark for highlighted plan cards */
 
     /* Border Radius */
     --radius: 0.5rem;
@@ -256,6 +258,7 @@
     /* Code block theming — stays dark in both modes */
     --clr-code-bg: 30 30 30;
     --clr-code-border: 50 50 48;
+    --clr-plan-highlight: 38 30 27;
   }
 
   * {
@@ -437,6 +440,7 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

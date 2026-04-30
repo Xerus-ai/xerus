@@ -1,6 +1,6 @@
 // Internal MCP Routes
 // Backend API endpoints called by mcp-server.ts from sandbox
-// These routes handle the 13 backend-coupled tools that require platform state
+// These routes handle the 14 backend-coupled tools that require platform state
 //
 // Tools:
 //  1. pause_execution          - Session control (needs backend state machine)
@@ -16,6 +16,7 @@
 // 11. analyze_memory_patterns  - Memory analytics (needs pgvector)
 // 12. list_triggers            - List registered webhooks (needs backend DB)
 // 13. get_status               - Agent/sandbox status (needs backend DB)
+// 14. get_billing_status       - Billing info (needs backend DB)
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticateInternalMcp } from './middleware';
@@ -25,6 +26,7 @@ import { notificationRoutes } from './notification.routes';
 import { toolConnectionRoutes } from './tool-connection.routes';
 import { memoryRoutes } from './memory.routes';
 import { scheduleRoutes } from './schedule.routes';
+import { billingRoutes } from './billing.routes';
 import { McpToolResult } from './types';
 import { logger } from '../../../utils/logger';
 
@@ -42,6 +44,7 @@ router.use(notificationRoutes);
 router.use(toolConnectionRoutes);
 router.use(memoryRoutes);
 router.use(scheduleRoutes);
+router.use(billingRoutes);
 
 // Error Handler
 router.use((error: Error, _req: Request, res: Response, _next: NextFunction) => {

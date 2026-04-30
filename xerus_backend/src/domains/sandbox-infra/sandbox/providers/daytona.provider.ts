@@ -17,6 +17,14 @@ import type { SandboxFileSystem } from '../../workspace/workspace.manager';
 
 const log = logger('DaytonaProvider');
 
+// The sandbox image sets LC_ALL=en_US.UTF-8 but the locale isn't generated.
+// Bash emits "setlocale: LC_ALL: cannot change locale" on every command startup.
+// Daytona merges stdout+stderr, so this warning corrupts command output.
+const LOCALE_WARNING_RE = /^\/usr\/bin\/bash: warning: setlocale: .*\n?/gm;
+function stripLocaleWarnings(raw: string): string {
+    return raw.replace(LOCALE_WARNING_RE, '');
+}
+
 export interface DaytonaCreateOptions extends CreateProviderSandboxOptions {
     snapshot?: string;
     autoStopInterval?: number;
@@ -327,7 +335,7 @@ cat /tmp/chromium.log 2>/dev/null | head -20`;
         const sandbox = await this.getSandboxInstance(sandboxId);
         const result = await sandbox.process.executeCommand(command);
         return {
-            result: result.result || '',
+            result: stripLocaleWarnings(result.result || ''),
             exitCode: result.exitCode || 0,
         };
     }
@@ -407,6 +415,11 @@ cat /tmp/chromium.log 2>/dev/null | head -20`;
                 this.sandboxInstances.delete(sandboxId);
             }
         }
+    }
+
+    async resizeSandbox(sandboxId: string, resources: { cpu?: number; memory?: number; disk?: number }): Promise<void> {
+        const sandbox = await this.getSandboxInstance(sandboxId);
+        await sandbox.resize(resources);
     }
 
     // Run an agent in the sandbox via Sessions API

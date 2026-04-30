@@ -64,11 +64,11 @@ export function SettingsSidebar() {
                       className={cn(
                         'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150',
                         isActive
-                          ? 'bg-surface-hover/80 text-text font-medium'
+                          ? 'bg-secondary/10 text-secondary font-medium'
                           : 'text-text-secondary hover:bg-surface-hover/40 hover:text-text'
                       )}
                     >
-                      <Icon className={cn('w-[18px] h-[18px]', isActive ? 'text-text' : 'text-text-secondary')} />
+                      <Icon className={cn('w-[18px] h-[18px]', isActive ? 'text-secondary' : 'text-text-secondary')} />
                       <span className="flex flex-col">
                         <span>{item.label}</span>
                         {'note' in item && item.note && (
@@ -126,7 +126,7 @@ export function SettingsSidebar() {
                 className={cn(
                   'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all shrink-0 min-h-[36px]',
                   isActive
-                    ? 'bg-surface-hover/80 text-text'
+                    ? 'bg-secondary/10 text-secondary'
                     : 'text-text-secondary hover:bg-surface-hover/40'
                 )}
               >

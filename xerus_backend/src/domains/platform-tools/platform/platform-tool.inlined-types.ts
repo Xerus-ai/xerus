@@ -45,6 +45,8 @@ export const PLATFORM_TOOLS = {
     DEREGISTER_TRIGGER: 'deregister_trigger',
     // Outputs (1)
     SEARCH_OUTPUTS: 'search_outputs',
+    // Billing (1)
+    GET_BILLING_STATUS: 'get_billing_status',
     // Schedules (4) — sandbox-local workspace.db via sqlite3
     CREATE_SCHEDULE: 'create_schedule',
     LIST_SCHEDULES: 'list_schedules',
@@ -101,6 +103,8 @@ export const PLATFORM_TOOL_HITL: Record<PlatformTool, HITLRequirement> = {
     [PLATFORM_TOOLS.DEREGISTER_TRIGGER]: 'auto',
     // Outputs
     [PLATFORM_TOOLS.SEARCH_OUTPUTS]: 'auto',
+    // Billing
+    [PLATFORM_TOOLS.GET_BILLING_STATUS]: 'auto',
     // Schedules
     [PLATFORM_TOOLS.CREATE_SCHEDULE]: 'auto',
     [PLATFORM_TOOLS.LIST_SCHEDULES]: 'auto',
@@ -464,6 +468,23 @@ export interface OutputEntry {
 export interface SearchOutputsResult {
     outputs: OutputEntry[];
     totalCount: number;
+}
+
+// -----------------------------------------------------------------------------
+// Billing Input/Result Types
+// -----------------------------------------------------------------------------
+
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- userId comes from execution context, not tool input
+export interface GetBillingStatusInput {}
+
+export interface BillingStatusResult {
+    plan_type: string;
+    credits_available: number;
+    credits_used: number;
+    credits_total: number;
+    subscription_status: string | null;
+    subscription_current_period_end: string | null;
+    billing_email: string | null;
 }
 
 // -----------------------------------------------------------------------------

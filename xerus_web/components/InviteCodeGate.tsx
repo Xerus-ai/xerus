@@ -60,7 +60,9 @@ export function InviteCodeGate({ email }: InviteCodeGateProps) {
 
   const handleLogout = async () => {
     await signOut(firebaseAuth)
-    localStorage.removeItem('xerus_user')
+    const appKeys = ['xerus_user', 'apiKeyStatus', 'xerus_onboarding_phase', 'xerus_unread_counts']
+    appKeys.forEach((k) => localStorage.removeItem(k))
+    sessionStorage.removeItem('xerus_onboarding_phase')
     window.location.href = '/login'
   }
 

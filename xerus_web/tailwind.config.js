@@ -69,6 +69,7 @@ module.exports = {
 				gold: 'rgb(var(--clr-gold) / <alpha-value>)',
 				'code-bg': 'rgb(var(--clr-code-bg) / <alpha-value>)',
 				'code-border': 'rgb(var(--clr-code-border) / <alpha-value>)',
+				'plan-highlight': 'rgb(var(--clr-plan-highlight) / <alpha-value>)',
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
 				ring: 'hsl(var(--ring))',

@@ -27,14 +27,22 @@ import type { S3BackupService, BackupResult } from '../sandbox-infra/storage/s3-
 import type { StorageFile } from '../sandbox-infra/storage/storage.types';
 import { shellEscapePath } from '../../utils/shell-safety';
 import { logger } from '../../utils/logger';
+import { DrivePlanLifecycleService } from './drive-plan-lifecycle.service';
+import type { WorkspaceUsageResult } from './drive-plan-lifecycle.service';
 
 const log = logger('DriveService');
 
+export { WorkspaceUsageResult } from './drive-plan-lifecycle.service';
+
 export class DriveService {
+    private planLifecycle: DrivePlanLifecycleService;
+
     constructor(
         private readonly sandboxService: SandboxService,
         private readonly backupService?: S3BackupService,
-    ) {}
+    ) {
+        this.planLifecycle = new DrivePlanLifecycleService(sandboxService, sandboxService.getDatabase(), backupService);
+    }
 
     // Ensure the user's workspace sandbox is available for file operations.
     private async resolveSandboxId(userId: string): Promise<string> {
@@ -223,6 +231,7 @@ export class DriveService {
         return {
             sandbox_running: session.status === 'running',
             sandbox_id: session.sandboxId,
+            sandbox_plan: session.sandboxPlan || null,
         };
     }
 
@@ -274,9 +283,11 @@ export class DriveService {
     // GET /workspace/status
     async getStatus(userId: string): Promise<WorkspaceStatus> {
         const sandboxStatus = await this.sandboxService.getSandboxStatus(userId);
+        const sandboxPlan = await this.planLifecycle.getSandboxPlan(userId);
         return {
             sandbox_running: sandboxStatus.status === 'running',
             sandbox_id: sandboxStatus.sandboxId,
+            sandbox_plan: sandboxPlan,
         };
     }
 
@@ -394,6 +405,24 @@ export class DriveService {
 
     listSyncTemplatePaths(): ReadonlyArray<string> {
         return listPlatformOverlayPaths();
+    }
+
+    // ---- Plan Lifecycle (delegated to DrivePlanLifecycleService) ----
+
+    async getUsage(userId: string): Promise<WorkspaceUsageResult> {
+        const sandboxId = await this.resolveSandboxId(userId);
+        const provider = this.getDaytonaProvider();
+        return this.planLifecycle.getUsage(userId, sandboxId, provider);
+    }
+
+    async resizeForPlan(userId: string): Promise<{ resized: true; sandbox_plan: string }> {
+        const provider = this.getDaytonaProvider();
+        return this.planLifecycle.resizeForPlan(userId, provider);
+    }
+
+    async recreateForPlan(userId: string): Promise<{ recreated: true; sandbox_plan: string; sandbox_id: string }> {
+        const provider = this.getDaytonaProvider();
+        return this.planLifecycle.recreateForPlan(userId, provider);
     }
 
     private getDaytonaProvider(): DaytonaProvider {

@@ -110,22 +110,30 @@ export const updateUserProfile = async (updates: {
   }
 };
 
+function clearAppStorage(): void {
+  const appKeys = ['xerus_user', 'apiKeyStatus', 'xerus_onboarding_phase', 'xerus_unread_counts'];
+  appKeys.forEach((k) => localStorage.removeItem(k));
+  sessionStorage.removeItem('xerus_onboarding_phase');
+}
+
 export const deleteAccount = async (): Promise<void> => {
   await apiCall('/users/me', { method: 'DELETE' });
 
   const { signOut } = await import('firebase/auth');
   await signOut(firebaseAuth);
 
-  localStorage.removeItem('xerus_user');
+  clearAppStorage();
 
   window.location.href = '/login';
 };
 
 export interface CreditBalance {
-  plan_type: 'free' | 'starter' | 'advanced' | 'prodigy';
+  plan_type: 'pro' | 'max' | 'ultra';
   credits_available: number;
   credits_used: number;
   credits_reset_date: string;
+  subscription_status?: 'active' | 'canceled' | 'past_due' | 'revoked' | 'pending';
+  subscription_current_period_end?: string;
 }
 
 export const getCreditBalance = async (): Promise<CreditBalance> => {
@@ -144,7 +152,7 @@ export const logout = async (): Promise<void> => {
   const { signOut } = await import('firebase/auth');
   await signOut(firebaseAuth);
 
-  localStorage.removeItem('xerus_user');
+  clearAppStorage();
 
   window.location.href = '/login';
 };

@@ -74,6 +74,9 @@ export const STREAM_EVENT_TYPES = [
     'delegation',
     'file_changed',
     'preview',
+    'credit_warning',
+    'insufficient_credits',
+    'provider_unavailable',
 ] as const;
 
 export type StreamEventType = (typeof STREAM_EVENT_TYPES)[number];

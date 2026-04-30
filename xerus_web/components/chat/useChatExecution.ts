@@ -26,6 +26,9 @@ import type {
   GuidanceEventContent,
   StopEventContent,
   PreviewEventContent,
+  CreditWarningEventContent,
+  InsufficientCreditsEventContent,
+  ProviderUnavailableEventContent,
 } from '@/hooks/useExecutionStream'
 import type { ChatState } from './types'
 import type { ChatMessageExtended } from './chat-message.types'
@@ -321,6 +324,21 @@ export function useChatExecution({ setState }: UseChatExecutionOptions) {
         },
       }))
     }, [setState]),
+    onCreditWarning: useCallback((event: StreamEvent<'credit_warning'>) => {
+      const content = event.content as CreditWarningEventContent | undefined
+      if (!content) return
+      toast.warning(`Credits running low — ${content.credits_available} of ${content.credits_total} remaining`)
+    }, []),
+    onInsufficientCredits: useCallback((event: StreamEvent<'insufficient_credits'>) => {
+      const content = event.content as InsufficientCreditsEventContent | undefined
+      if (!content) return
+      toast.error('Insufficient credits — connect your own API key for unlimited usage')
+    }, []),
+    onProviderUnavailable: useCallback((event: StreamEvent<'provider_unavailable'>) => {
+      const content = event.content as ProviderUnavailableEventContent | undefined
+      if (!content) return
+      toast.error('AI provider temporarily unavailable', { description: content.message })
+    }, []),
     onDone: useCallback((event: StreamEvent<'done'>) => {
       if (doneReceivedRef.current) return
       doneReceivedRef.current = true

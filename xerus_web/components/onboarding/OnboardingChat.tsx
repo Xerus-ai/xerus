@@ -5,86 +5,22 @@ import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/utils/AuthContext'
 import { useOnboardingStream } from '@/hooks/useOnboardingStream'
+import { createCheckout, syncSubscription } from '@/lib/api/billing'
+import { saveApiKey, triggerCliLogin } from '@/lib/api/user'
+import { PLANS, type PlanType } from '@/lib/plans'
 import { BlobBackground } from './BlobBackground'
 import { LogoEntrance } from './LogoEntrance'
 import { OnboardingMessages } from './OnboardingMessages'
 import { OnboardingSteps } from './OnboardingSteps'
-import type { OnboardingMessage, OnboardingTemplateMessage } from './types'
+import { PolarCheckoutOverlay } from './cards/PolarCheckoutOverlay'
+import { ThinkingVerbs } from './ui/ThinkingVerbs'
+import type { OnboardingMessage } from './types'
+import { SETUP_AGENTS, buildTemplateMessages, INITIAL_QUICK_REPLIES } from './constants'
 
-type Phase = 'logo' | 'template' | 'setup'
+type Phase = 'logo' | 'template' | 'plan' | 'activate' | 'setup'
 
-// Preset agents shown during the onboarding setup wizard step
-const SETUP_AGENTS = [
-  {
-    id: 'research-analyst',
-    name: 'Research Analyst',
-    description: 'Deep-dives into any topic and compiles findings into structured reports.',
-    avatar_url: 'mascot:c0-2-1-30-15',
-    tools: [
-      { name: 'Google Search', name_slug: 'google-search' },
-      { name: 'Web Scraper', name_slug: 'web-scraper' },
-    ],
-  },
-  {
-    id: 'content-writer',
-    name: 'Content Writer',
-    description: 'Creates blog posts, newsletters, and marketing copy tailored to your voice.',
-    avatar_url: 'mascot:c2-1-0-25-20',
-    tools: [
-      { name: 'WordPress', name_slug: 'wordpress' },
-      { name: 'Google Docs', name_slug: 'google-docs' },
-    ],
-  },
-  {
-    id: 'social-media-mgr',
-    name: 'Social Media Manager',
-    description: 'Schedules posts, tracks engagement, and manages your social presence across platforms.',
-    avatar_url: 'mascot:c1-3-2-35-10',
-    tools: [
-      { name: 'Twitter', name_slug: 'twitter' },
-      { name: 'LinkedIn', name_slug: 'linkedin' },
-    ],
-  },
-  {
-    id: 'data-analyst',
-    name: 'Data Analyst',
-    description: 'Analyzes data from your connected apps and generates visual reports.',
-    avatar_url: 'mascot:c3-0-1-20-25',
-    tools: [
-      { name: 'Google Sheets', name_slug: 'google-sheets' },
-      { name: 'Notion', name_slug: 'notion' },
-    ],
-  },
-  {
-    id: 'email-assistant',
-    name: 'Email Assistant',
-    description: 'Drafts replies, categorizes incoming mail, and helps manage your email workflow.',
-    avatar_url: 'mascot:c4-4-3-30-15',
-    tools: [{ name: 'Gmail', name_slug: 'gmail' }],
-  },
-]
-
-function buildTemplateMessages(firstName: string): OnboardingTemplateMessage[] {
-  return [
-    {
-      role: 'assistant',
-      content: `Hey ${firstName}! I\u2019m Xerus \u2014 think of me as your co-CEO.`,
-    },
-    {
-      role: 'assistant',
-      content: `Quick intro to how this place works \u2014 you and I run a virtual office together. I manage a team of AI agents, each one like a dedicated employee. Researchers, writers, social media managers, data analysts\u2026 you pick who you need from the marketplace, connect them to apps you already use \u2014 Gmail, Slack, Notion, Sheets \u2014 and they get to work.\n\nThe best part? They don\u2019t just sit around waiting for instructions. They check in on their own, spot things that need your attention, and post updates in your channels. Your workspace keeps everything organized into projects so you always know what\u2019s happening across the board.`,
-    },
-    {
-      role: 'assistant',
-      content: `Now let\u2019s build your office. I\u2019ll walk you through it step by step \u2014 just a few questions so I can set things up right for you.\n\nAre you starting fresh, or bringing an existing company onboard?`,
-    },
-  ]
-}
-
-const INITIAL_QUICK_REPLIES = [
-  { label: 'Start fresh', value: 'fresh', icon: 'sparkles' as const, subtitle: 'Build from scratch' },
-  { label: 'Bring my company', value: 'existing', icon: 'building' as const, subtitle: 'Import existing setup' },
-]
+const SUBSCRIPTION_POLL_INTERVAL_MS = 3000
+const SUBSCRIPTION_POLL_MAX_ATTEMPTS = 40 // ~2 minutes
 
 export function OnboardingChat() {
   const router = useRouter()
@@ -92,15 +28,9 @@ export function OnboardingChat() {
   const firstName = user?.display_name?.split(' ')[0] || 'there'
   const userId = user?.uid || ''
 
-  const [phase, setPhaseRaw] = useState<Phase>(() => {
-    if (typeof window === 'undefined') return 'logo'
-    const saved = sessionStorage.getItem('xerus_onboarding_phase')
-    if (saved === 'template') return saved as Phase
-    return 'logo'
-  })
+  const [phase, setPhaseRaw] = useState<Phase>('logo')
   const setPhase = useCallback((p: Phase) => {
     setPhaseRaw(p)
-    sessionStorage.setItem('xerus_onboarding_phase', p)
   }, [])
   const [messages, setMessages] = useState<OnboardingMessage[]>([])
   const [templateIndex, setTemplateIndex] = useState(0)
@@ -109,6 +39,12 @@ export function OnboardingChat() {
   const [workspaceData, setWorkspaceData] = useState<{ workspace: string; project: string } | null>(null)
   const hasNavigatedRef = useRef(false)
   const quickReplyTimerRef = useRef<ReturnType<typeof setTimeout>>()
+
+  // Checkout overlay state
+  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null)
+  const [showThinking, setShowThinking] = useState(false)
+  const pollRef = useRef<ReturnType<typeof setTimeout>>()
+  const pendingPlanRef = useRef<{ messageId: string; label: string } | null>(null)
 
   const stream = useOnboardingStream({ userId, onWorkspaceCreated: markWorkspaceReady })
   const templateMessages = useMemo(() => buildTemplateMessages(firstName), [firstName])
@@ -167,7 +103,10 @@ export function OnboardingChat() {
 
   useEffect(() => () => clearTimeout(quickReplyTimerRef.current), [])
 
-  // User clicks "Start fresh" / "Bring my company" → add workspace setup card to chat
+  // Clean up poll timer on unmount
+  useEffect(() => () => clearTimeout(pollRef.current), [])
+
+  // User clicks "Start fresh" / "Bring my company" -> add workspace setup card to chat
   const handleQuickReply = useCallback((value: string) => {
     const reply = INITIAL_QUICK_REPLIES.find((r) => r.value === value)
     const label = reply?.label || value
@@ -180,12 +119,12 @@ export function OnboardingChat() {
     }])
     setQuickReplies([])
 
-    // Add Xerus response with the workspace setup card — same chat UI
+    // Add Xerus response with the workspace setup card -- same chat UI
     setTimeout(() => {
       setMessages((prev) => [...prev, {
         id: `workspace-card`,
         role: 'assistant' as const,
-        content: 'Great choice! Let\u2019s name your workspace and first project.',
+        content: `Great choice! Let's set up your office.\n\nYour workspace is your company's virtual HQ — all your agents, projects, and data live here. A project groups related work together (e.g. "Content Strategy" or "Q3 Launch"). Inside each project, channels keep conversations organized — like Slack channels but with AI agents participating.`,
         source: 'stream' as const,
         ui: {
           type: 'workspace-setup',
@@ -204,27 +143,148 @@ export function OnboardingChat() {
     )
   }, [])
 
-  // Handle workspace card submit → collapse card, show Screen 2, handoff in background
+  // Poll Polar via /billing/subscription/sync until subscription is active
+  const pollForSubscription = useCallback(() => {
+    let attempts = 0
+    const poll = () => {
+      attempts++
+      if (attempts > SUBSCRIPTION_POLL_MAX_ATTEMPTS) {
+        setShowThinking(false)
+        setPhase('activate')
+        return
+      }
+      syncSubscription()
+        .then((result) => {
+          if (result.synced && result.subscription_status === 'active') {
+            setShowThinking(false)
+            setPhase('activate')
+          } else {
+            pollRef.current = setTimeout(poll, SUBSCRIPTION_POLL_INTERVAL_MS)
+          }
+        })
+        .catch(() => {
+          pollRef.current = setTimeout(poll, SUBSCRIPTION_POLL_INTERVAL_MS)
+        })
+    }
+    pollRef.current = setTimeout(poll, SUBSCRIPTION_POLL_INTERVAL_MS)
+  }, [setPhase])
+
+  // Handle workspace card submit -> collapse card, go to plan phase
   const { createWorkspace } = stream
   const handleUIAction = useCallback(async (messageId: string, action: string, data: Record<string, unknown>) => {
     if (action === 'create-workspace') {
       const workspace = String(data.workspace ?? '')
       const project = String(data.project ?? '')
       setWorkspaceData({ workspace, project })
-      collapseCard(messageId, `${workspace} \u2014 ${project}`)
-      setPhase('setup')
+      collapseCard(messageId, `${workspace} — ${project}`)
 
-      // Background: POST /onboarding/handoff (creates workspace + domain + channel + sandbox)
+      // Add plan selection card inline
+      setTimeout(() => {
+        setMessages((prev) => [...prev, {
+          id: 'plan-card',
+          role: 'assistant' as const,
+          content: `Now let's pick a plan for your workspace.\n\nEach plan comes with bonus credits to get you started. After that, you can bring your own API key — connect an OpenRouter key, log in with your Claude (Anthropic) subscription, or use Codex (coming soon) — and run agents with zero markup on token costs.`,
+          source: 'stream' as const,
+          ui: {
+            type: 'plan-selection',
+            props: {},
+          },
+        }])
+      }, 600)
+
+      setPhase('plan')
+      return
+    }
+
+    if (action === 'plan-selected') {
+      const plan = data.plan as PlanType
+      const interval = data.interval as 'monthly' | 'annual'
+      const planInfo = PLANS[plan]
+      pendingPlanRef.current = { messageId, label: `${planInfo.label} plan — $${interval === 'monthly' ? planInfo.monthly : planInfo.annual}/mo` }
+
+      // Create checkout session — card stays visible with selected state while loading
       try {
-        await createWorkspace(workspace, project)
+        const { checkout_url } = await createCheckout(plan, interval)
+        setCheckoutUrl(checkout_url)
       } catch (err) {
-        console.error('[Onboarding] Workspace creation failed:', err)
+        console.error('[Onboarding] Checkout creation failed:', err)
+        pendingPlanRef.current = null
+      }
+      return
+    }
+
+    if (action === 'provider-selected') {
+      const provider = data.provider as string
+      const key = data.key as string | undefined
+      collapseCard(messageId, provider === 'skip' ? 'Using bonus credits' : `Connected: ${provider}`)
+
+      // Save API key if provided
+      if (provider === 'openrouter' && key) {
+        try {
+          await saveApiKey(key, 'openrouter')
+        } catch (err) {
+          console.error('[Onboarding] Failed to save API key:', err)
+        }
+      }
+
+      // Trigger CLI login for claudecode
+      if (provider === 'claudecode') {
+        try {
+          await triggerCliLogin('claudecode')
+        } catch (err) {
+          console.error('[Onboarding] CLI login trigger failed:', err)
+        }
+      }
+
+      // Kick off workspace handoff in background, then go to setup
+      setPhase('setup')
+      if (workspaceData) {
+        try {
+          await createWorkspace(workspaceData.workspace, workspaceData.project)
+        } catch (err) {
+          console.error('[Onboarding] Workspace creation failed:', err)
+        }
       }
       return
     }
 
     collapseCard(messageId, '')
-  }, [collapseCard, createWorkspace, setPhase])
+  }, [collapseCard, createWorkspace, setPhase, workspaceData])
+
+  // Checkout success handler
+  const handleCheckoutSuccess = useCallback(() => {
+    if (pendingPlanRef.current) {
+      collapseCard(pendingPlanRef.current.messageId, pendingPlanRef.current.label)
+      pendingPlanRef.current = null
+    }
+    setCheckoutUrl(null)
+    setShowThinking(true)
+    pollForSubscription()
+  }, [collapseCard, pollForSubscription])
+
+  const handleCheckoutCancel = useCallback(() => {
+    pendingPlanRef.current = null
+    setCheckoutUrl(null)
+  }, [])
+
+  // When activate phase starts, add the activate workforce card
+  useEffect(() => {
+    if (phase !== 'activate') return
+    // Check if card already added
+    setMessages((prev) => {
+      if (prev.some((m) => m.id === 'activate-card')) return prev
+      return [...prev, {
+        id: 'activate-card',
+        role: 'assistant' as const,
+        content: 'Your subscription is active! You can connect an AI provider now or set it up later in Settings > API Keys.',
+        source: 'stream' as const,
+        ui: {
+          type: 'activate-workforce',
+          props: {},
+        },
+      }]
+    })
+  }, [phase])
 
   const handleSetupComplete = useCallback(() => {
     stream.completeOnboarding()
@@ -239,14 +299,25 @@ export function OnboardingChat() {
     }
   }, [stream.mode, router])
 
-  const showChat = phase === 'logo' || phase === 'template'
+  const showChat = phase === 'logo' || phase === 'template' || phase === 'plan' || phase === 'activate'
 
   return (
     <div className="fixed inset-0 flex flex-col bg-surface-alt">
       <BlobBackground />
 
+      {/* Checkout overlay */}
+      <AnimatePresence>
+        {checkoutUrl && (
+          <PolarCheckoutOverlay
+            checkoutUrl={checkoutUrl}
+            onSuccess={handleCheckoutSuccess}
+            onCancel={handleCheckoutCancel}
+          />
+        )}
+      </AnimatePresence>
+
       <AnimatePresence mode="wait">
-        {/* ── Chat phases (logo + template messages + workspace card) ── */}
+        {/* -- Chat phases (logo + template messages + workspace card + plan + activate) -- */}
         {showChat && (
           <motion.div
             key="chat"
@@ -266,27 +337,33 @@ export function OnboardingChat() {
               )}
             </AnimatePresence>
 
-            {phase === 'template' && (
+            {(phase === 'template' || phase === 'plan' || phase === 'activate') && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.6 }}
                 className="flex-1 flex flex-col min-h-0"
               >
-                <OnboardingMessages
-                  messages={messages}
-                  onLogoReady={() => {}}
-                  onTypingComplete={handleTypingComplete}
-                  onUIAction={handleUIAction}
-                  quickReplies={quickReplies.length > 0 ? quickReplies : undefined}
-                  onQuickReply={handleQuickReply}
-                />
+                {showThinking ? (
+                  <div className="flex-1 flex items-center justify-center">
+                    <ThinkingVerbs />
+                  </div>
+                ) : (
+                  <OnboardingMessages
+                    messages={messages}
+                    onLogoReady={() => {}}
+                    onTypingComplete={handleTypingComplete}
+                    onUIAction={handleUIAction}
+                    quickReplies={quickReplies.length > 0 ? quickReplies : undefined}
+                    onQuickReply={handleQuickReply}
+                  />
+                )}
               </motion.div>
             )}
           </motion.div>
         )}
 
-        {/* ── Setup wizard (Screen 2 — visual progress + provisioning in background) ── */}
+        {/* -- Setup wizard (Screen 2 -- visual progress + provisioning in background) -- */}
         {phase === 'setup' && workspaceData && (
           <motion.div
             key="setup"

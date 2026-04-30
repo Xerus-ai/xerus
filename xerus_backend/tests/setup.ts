@@ -282,6 +282,10 @@ class InMemorySandboxService {
   async getSandboxFs(sandboxId: string): Promise<SandboxFileSystem> {
     return this.provider.createFileSystem(sandboxId);
   }
+
+  getDatabase() {
+    return { query: async () => ({ rows: [] }) };
+  }
 }
 
 const testSandboxService = new InMemorySandboxService();
@@ -294,11 +298,16 @@ async function ensureUsersTable(): Promise<void> {
       email VARCHAR(255) NOT NULL UNIQUE,
       display_name VARCHAR(255) NOT NULL,
       role VARCHAR(50) NOT NULL DEFAULT 'user',
-      plan_type VARCHAR(50) NOT NULL DEFAULT 'free',
+      plan_type VARCHAR(50) NOT NULL DEFAULT 'pro',
       credits_available INTEGER NOT NULL DEFAULT 10,
       credits_used INTEGER NOT NULL DEFAULT 0,
       credits_reserved INTEGER NOT NULL DEFAULT 0,
       credits_reset_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW() + INTERVAL '1 day',
+      polar_customer_id VARCHAR(255),
+      polar_subscription_id VARCHAR(255),
+      subscription_status VARCHAR(50) NOT NULL DEFAULT 'pending',
+      subscription_current_period_end TIMESTAMP WITH TIME ZONE,
+      billing_email VARCHAR(255),
       is_active BOOLEAN NOT NULL DEFAULT true,
       created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
@@ -309,6 +318,12 @@ async function ensureUsersTable(): Promise<void> {
   await query(`
     ALTER TABLE users ADD COLUMN IF NOT EXISTS credits_reserved INTEGER NOT NULL DEFAULT 0
   `);
+
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS polar_customer_id VARCHAR(255)`);
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS polar_subscription_id VARCHAR(255)`);
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status VARCHAR(50) NOT NULL DEFAULT 'pending'`);
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_current_period_end TIMESTAMP WITH TIME ZONE`);
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS billing_email VARCHAR(255)`);
 }
 
 async function cleanupTestData(): Promise<void> {

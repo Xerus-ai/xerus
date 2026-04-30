@@ -3,12 +3,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Sparkles, Building2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { LogoEntrance, XerusAvatar } from './LogoEntrance'
 import { WorkspaceSetupCard } from './ui/WorkspaceSetupCard'
 import { AgentSelectRow } from './ui/AgentSelectRow'
 import { SchedulePicker } from './ui/SchedulePicker'
 import { SummaryCard } from './ui/SummaryCard'
 import { CollapsedConfirm } from './ui/CollapsedConfirm'
+import { PlanSelectionCard } from './cards/PlanSelectionCard'
+import { ActivateWorkforceCard } from './cards/ActivateWorkforceCard'
 import type { OnboardingMessage } from './types'
 
 interface QuickReply {
@@ -16,6 +19,7 @@ interface QuickReply {
   value: string
   icon?: 'sparkles' | 'building'
   subtitle?: string
+  disabled?: boolean
 }
 
 interface OnboardingMessagesProps {
@@ -32,6 +36,8 @@ const UI_COMPONENTS: Record<string, React.ComponentType<any>> = {
   'agent-select': AgentSelectRow,
   'schedule-picker': SchedulePicker,
   'summary': SummaryCard,
+  'plan-selection': PlanSelectionCard,
+  'activate-workforce': ActivateWorkforceCard,
 }
 
 const ICON_MAP: Record<string, React.ComponentType<any>> = {
@@ -135,7 +141,7 @@ export function OnboardingMessages({
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="min-h-full flex flex-col justify-center px-4 sm:px-6 py-12">
-        <div className="max-w-[640px] mx-auto w-full space-y-6">
+        <div className="max-w-[860px] mx-auto w-full space-y-6">
 
           {/* Xerus intro — single avatar, sequential text blocks + inline cards */}
           {templateAssistantMsgs.length > 0 && (
@@ -176,11 +182,20 @@ export function OnboardingMessages({
                         return (
                           <button
                             key={reply.value}
-                            onClick={() => onQuickReply?.(reply.value)}
-                            className="flex-1 p-4 rounded-2xl bg-surface border border-surface-active text-left transition-all duration-200 hover:border-primary/30 hover:shadow-sm group"
+                            onClick={() => !reply.disabled && onQuickReply?.(reply.value)}
+                            disabled={reply.disabled}
+                            className={cn(
+                              'flex-1 p-4 rounded-2xl bg-surface border border-surface-active text-left transition-all duration-200 group',
+                              reply.disabled
+                                ? 'opacity-50 cursor-not-allowed'
+                                : 'hover:border-primary/30 hover:shadow-sm'
+                            )}
                           >
                             {Icon && (
-                              <Icon className="w-5 h-5 text-primary/70 mb-2.5 transition-transform duration-200 group-hover:scale-110 group-hover:text-primary" />
+                              <Icon className={cn(
+                                'w-5 h-5 mb-2.5 transition-transform duration-200',
+                                reply.disabled ? 'text-text-muted' : 'text-primary/70 group-hover:scale-110 group-hover:text-primary'
+                              )} />
                             )}
                             <div className="text-sm font-medium text-text">{reply.label}</div>
                             {reply.subtitle && (

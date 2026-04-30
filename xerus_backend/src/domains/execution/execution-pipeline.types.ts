@@ -17,6 +17,7 @@ import type {
 } from './types';
 import type { KeySource } from './key-resolver.service';
 import type { TriggerType } from './queue/execution-lane.types';
+import type { SubscriptionStatus } from '../users/types';
 import type { SessionHandle } from '../sandbox-infra/sandbox/providers/daytona-runner';
 import type { MemorySearchIndexService } from '../memory/git-memory/memory-search-index.service';
 import type { MessageBridgeService } from '../inbox/messaging/message-bridge.service';
@@ -126,6 +127,10 @@ export interface PipelineContext {
     creditsUsed: number;
     /** Whether the resolved API key is user-provided (byok) or platform-owned */
     keySource: KeySource | null;
+    /** User subscription status fetched during loadAgent (avoids redundant SELECT in reserveCredits) */
+    subscriptionStatus: SubscriptionStatus | null;
+    /** User subscription period end fetched during loadAgent */
+    subscriptionPeriodEnd: Date | null;
     /** Number of agent sessions that completed (incremented on each session_ended event) */
     agentSessionCount: number;
     /** Batches subagent completion notifications for user inbox */

@@ -21,6 +21,7 @@ export interface SandboxRegistryEntry {
     sandbox_total_runtime_seconds: number;
     sandbox_resume_count: number;
     sandbox_novnc_url: string | null;
+    sandbox_plan: string | null;
 }
 
 // Per-agent session handle with its env vars snapshot
@@ -51,6 +52,8 @@ export interface SandboxSession {
     terminalUrl?: string;
     // Setup report from runFullWorkspaceSetup (present on first creation, null on resume)
     setupReport?: { git_initialized: boolean; memory_git_initialized: boolean; sqlite_installed: boolean; duration_ms: number } | null;
+    // Plan tier the sandbox was sized at (source of truth for current resource allocation)
+    sandboxPlan?: string;
 }
 
 // Sandbox creation options

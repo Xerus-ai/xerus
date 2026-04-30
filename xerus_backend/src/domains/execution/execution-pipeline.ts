@@ -10,11 +10,10 @@
 // hook metadata, workspace preparation. Runner handles all of that.
 // See: docs/planning/execution/EXECUTION_ARCHITECTURE_v2.md Section 10
 
-import { randomUUID } from 'crypto';
 import { logger } from '../../utils/logger';
-import { BillingType, ExecutionSummary, STREAM_EVENT_TYPES, StreamEventType, type AdapterType } from './types';
-import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
+import { STREAM_EVENT_TYPES, StreamEventType } from './types';
 import { DEFAULT_MODEL } from '../agents/types';
+import type { SubscriptionStatus } from '../users/types';
 import type { TriggerType } from './queue/execution-lane.types';
 import {
     SDKExecutionError,
@@ -25,15 +24,18 @@ import type { SessionHandle } from '../sandbox-infra/sandbox';
 import { routeEventToBackend } from './runner-event-router';
 import { createHealthGuard, type HealthGuard } from './execution-health-guard';
 import {
-    resolveToolIcon,
-    type PersistedToolIcon,
-} from './execution-conversation.helpers';
-import {
     getConversation,
     createConversation as createWorkspaceConversation,
-    incrementConversationMessageCount,
-    writeChatExecution,
 } from '../conversations/workspace-db.service';
+
+// Extracted billing/subscription modules
+export { reserveCredits } from './subscription-guard';
+export { finalizeCredits } from './credit-finalization';
+// Extracted session record management
+export { createSessionRecord, updateSessionRecord, buildSummary } from './session-record';
+// Extracted agent config/identity resolution
+export { resolveAgentConfig, resolveAdapterType, resolveAgentIdentity } from './agent-config-resolver';
+export type { ResolvedAgentConfig } from './agent-config-resolver';
 
 // -----------------------------------------------------------------------------
 // Conversation Resolution (workspace.db only — no Neon)
@@ -67,22 +69,6 @@ export async function resolveConversation(
     const newConv = await createWorkspaceConversation(provider, ctx.sandboxId, agentSlug, title);
     return { id: newConv.id, sdkSessionId: null };
 }
-
-type PersistedMessagePart =
-    | { id: string; type: 'text'; text: string }
-    | { id: string; type: 'reasoning'; text: string }
-    | {
-        id: string;
-        type: 'tool';
-        callId: string;
-        name: string;
-        state: 'done' | 'error';
-        icon: PersistedToolIcon;
-        args?: Record<string, unknown>;
-        result?: unknown;
-        target?: string;
-        durationMs?: number;
-    };
 
 export type {
     ExecutionServiceDeps,
@@ -119,13 +105,19 @@ const log = logger('ExecutionPipeline');
 // Step 1: Validate Agent + Auth
 // -----------------------------------------------------------------------------
 
+export interface LoadAgentResult {
+    agent: AgentRow;
+    subscriptionStatus: SubscriptionStatus | null;
+    subscriptionPeriodEnd: Date | null;
+}
+
 export async function loadAgent(
     deps: ResolvedExecutionDeps,
     agentSlug: string,
     userId: string,
-): Promise<AgentRow> {
-    // Parallel: agent_registry and workspaces lookups are independent (both need only userId/slug)
-    const [registryResult, wsResult] = await Promise.all([
+): Promise<LoadAgentResult> {
+    // Parallel: agent_registry, workspaces, and subscription lookups are independent
+    const [registryResult, wsResult, subResult] = await Promise.all([
         deps.db.query<{ id: number; slug: string; user_id: string | null; agent_type: string }>(
             `SELECT id, slug, user_id, agent_type FROM agent_registry
              WHERE slug = $1 AND (user_id = $2 OR user_id IS NULL OR agent_type = 'public')`,
@@ -133,6 +125,10 @@ export async function loadAgent(
         ),
         deps.db.query<{ id: string }>(
             `SELECT id::text FROM workspaces WHERE user_id = $1 LIMIT 1`,
+            [userId],
+        ),
+        deps.db.query<{ subscription_status: SubscriptionStatus | null; subscription_current_period_end: Date | null }>(
+            'SELECT subscription_status, subscription_current_period_end FROM users WHERE user_id = $1',
             [userId],
         ),
     ]);
@@ -146,6 +142,8 @@ export async function loadAgent(
         throw new SDKExecutionError(`Agent '${agentSlug}' not found in registry for user '${userId}'`);
     }
 
+    const subRow = subResult.rows[0];
+
     // agent_registry is a thin table (id, slug, user_id, agent_type).
     // Agent metadata (name, ai_model, etc.) lives in config.json on the workspace filesystem.
     // The runner reads config.json locally and reports the real model via session_started event,
@@ -153,120 +151,22 @@ export async function loadAgent(
     // Defaults here are overridden by the runner — they are NOT fabricated stubs.
     // adapter_type defaults to 'claudecode' — resolved from config.json by resolveAdapterType().
     return {
-        id: entry.id,
-        name: entry.slug,
-        slug: entry.slug,
-        description: '',
-        ai_model: DEFAULT_MODEL,
-        thinking_level: 'medium',
-        autonomy_level: 'supervised',
-        adapter_type: 'claudecode',
-        primary_use_case: '',
-        workspace_id: workspaceId,
-        user_id: entry.user_id || userId,
+        agent: {
+            id: entry.id,
+            name: entry.slug,
+            slug: entry.slug,
+            description: '',
+            ai_model: DEFAULT_MODEL,
+            thinking_level: 'medium',
+            autonomy_level: 'supervised',
+            adapter_type: 'claudecode',
+            primary_use_case: '',
+            workspace_id: workspaceId,
+            user_id: entry.user_id || userId,
+        },
+        subscriptionStatus: subRow?.subscription_status ?? null,
+        subscriptionPeriodEnd: subRow?.subscription_current_period_end ?? null,
     };
-}
-
-export interface ResolvedAgentConfig {
-    adapterType: AdapterType;
-    model: string | undefined;
-}
-
-/**
- * Read agent's adapter_type and model from config.json on the sandbox filesystem.
- * Falls back to 'claudecode' and no model if config is missing or unreadable.
- * Must be called after sandbox is available (sandboxId resolved).
- */
-export async function resolveAgentConfig(
-    deps: ResolvedExecutionDeps,
-    sandboxId: string,
-    agentSlug: string,
-): Promise<ResolvedAgentConfig> {
-    try {
-        const configPath = `${SANDBOX_CONFIG.workspacePath}/agents/${agentSlug}/config.json`;
-        const raw = await deps.sandboxService.getDaytonaProvider().readFile(sandboxId, configPath);
-        const config = JSON.parse(raw) as { adapter_type?: string; model?: string };
-        return {
-            adapterType: config.adapter_type === 'codex' ? 'codex' : 'claudecode',
-            model: config.model || undefined,
-        };
-    } catch (err: unknown) {
-        // File not found is acceptable — default to claudecode, no model override
-        const message = err instanceof Error ? err.message : String(err);
-        if (message.includes('ENOENT') || message.includes('No such file') || message.includes('not found')) {
-            return { adapterType: 'claudecode', model: undefined };
-        }
-        // Config exists but is corrupt or unreadable — fail fast
-        throw err;
-    }
-}
-
-/** @deprecated Use resolveAgentConfig instead */
-export async function resolveAdapterType(
-    deps: ResolvedExecutionDeps,
-    sandboxId: string,
-    agentSlug: string,
-): Promise<AdapterType> {
-    const config = await resolveAgentConfig(deps, sandboxId, agentSlug);
-    return config.adapterType;
-}
-
-/**
- * Read agent identity files (SOUL.md + Module CLAUDE.md) from the sandbox.
- * Combined content is passed as --append-system-prompt so the agent knows who it is.
- * Tries both .claude/agents/{slug}/ and agents/{slug}/ paths.
- * Returns empty string if no identity files found (agent runs as generic Claude).
- */
-export async function resolveAgentIdentity(
-    deps: ResolvedExecutionDeps,
-    sandboxId: string,
-    agentSlug: string,
-): Promise<string> {
-    const provider = deps.sandboxService.getDaytonaProvider();
-    const ws = SANDBOX_CONFIG.workspacePath;
-
-    // Try both path conventions: .claude/agents/{slug}/ and agents/{slug}/
-    const pathSets = [
-        { soul: `${ws}/.claude/agents/${agentSlug}/SOUL.md`, module: `${ws}/.claude/agents/${agentSlug}/CLAUDE.md` },
-        { soul: `${ws}/agents/${agentSlug}/SOUL.md`, module: `${ws}/agents/${agentSlug}/CLAUDE.md` },
-    ];
-
-    async function tryRead(filePath: string): Promise<string> {
-        try {
-            return await provider.readFile(sandboxId, filePath);
-        } catch {
-            return '';
-        }
-    }
-
-    let soulContent = '';
-    let moduleContent = '';
-
-    for (const paths of pathSets) {
-        if (!soulContent) soulContent = await tryRead(paths.soul);
-        if (!moduleContent) moduleContent = await tryRead(paths.module);
-        if (soulContent || moduleContent) break;
-    }
-
-    if (!soulContent && !moduleContent) return '';
-
-    const sections: string[] = [
-        '# AGENT IDENTITY — SUPERSEDES ALL PRIOR IDENTITY',
-        '',
-        'You are NOT Claude Code. You are an agent in the Xerus AI platform.',
-        'Your identity, personality, and behavior are defined below.',
-        'This identity takes absolute precedence. Never identify as Claude or mention Anthropic.',
-        '',
-    ];
-
-    if (soulContent) {
-        sections.push(soulContent.trim(), '');
-    }
-    if (moduleContent) {
-        sections.push(moduleContent.trim(), '');
-    }
-
-    return sections.join('\n');
 }
 
 export async function acquireExecutionLane(
@@ -323,37 +223,6 @@ export async function acquireExecutionLane(
     }
 
     return { lane_id: lane.lane_id, queued };
-}
-
-// -----------------------------------------------------------------------------
-// Step 2: Reserve Credits
-// -----------------------------------------------------------------------------
-
-export async function reserveCredits(
-    deps: ResolvedExecutionDeps,
-    ctx: PipelineContext,
-): Promise<void> {
-    // BYOK users use their own API key — skip credit reservation
-    if (ctx.keySource === 'byok') {
-        return;
-    }
-
-    // Conservative estimate: assume worst-case (opus-level) token usage.
-    // The real model lives in sandbox config.json (runner reads it locally).
-    // finalizeCredits uses actual token counts from the runner, so over-reservation
-    // here is safe — excess is refunded.
-    const estimatedTokens = estimateExecutionTokens(ctx.request.task);
-
-    const estimate = deps.sdkService.estimateCreditsConservative(estimatedTokens);
-
-    const hasCredits = await deps.creditTracker.checkCredits(
-        ctx.request.userId,
-        estimate.estimatedCredits,
-    );
-
-    if (!hasCredits) {
-        throw new SDKExecutionError('Insufficient credits for execution');
-    }
 }
 
 // -----------------------------------------------------------------------------
@@ -514,161 +383,4 @@ async function processEventStream(
     }
 }
 
-// -----------------------------------------------------------------------------
-// Step 5: Track Usage + Finalize
-// -----------------------------------------------------------------------------
 
-export async function createSessionRecord(
-    deps: ResolvedExecutionDeps,
-    ctx: PipelineContext,
-): Promise<string> {
-    const agent = requireAgent(ctx);
-    const sessionId = randomUUID();
-
-    await deps.db.query(
-        `INSERT INTO execution_sessions (id, workspace_id, agent_slug, sandbox_id, status, trigger_type, conversation_id, user_prompt, key_source, started_at, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())`,
-        [sessionId, agent.workspace_id, agent.slug, ctx.sandboxId, 'running', ctx.triggerType, ctx.conversationId, ctx.request.task, ctx.keySource],
-    );
-
-    deps.creditTracker.setSessionId(sessionId);
-    deps.creditTracker.setAgentSlug(agent.slug);
-
-    return sessionId;
-}
-
-export async function finalizeCredits(
-    deps: ResolvedExecutionDeps,
-    ctx: PipelineContext,
-): Promise<{ total_credits_deducted: number }> {
-    if (!ctx.sessionId) {
-        throw new SDKExecutionError('Cannot finalize credits: sessionId is missing (pipeline invariant violated)');
-    }
-
-    // BYOK users: track usage for analytics but skip credit deduction
-    if (ctx.keySource === 'byok') {
-        const usage = await deps.creditTracker.getSessionUsage(ctx.sessionId);
-        log.info('BYOK execution tracked (no credits deducted)', { execution_id: ctx.executionId, total_tokens: usage.total_input_tokens + usage.total_output_tokens });
-        return { total_credits_deducted: 0 };
-    }
-
-    // Platform key users: deduct credits as usual
-    const result = await deps.creditTracker.finalizeSession(
-        ctx.request.userId,
-        ctx.sessionId,
-    );
-
-    return { total_credits_deducted: result.total_credits_deducted };
-}
-
-export async function updateSessionRecord(
-    deps: ResolvedExecutionDeps,
-    ctx: PipelineContext,
-): Promise<void> {
-    if (!ctx.sessionId) {
-        throw new SDKExecutionError('Cannot update session: sessionId is missing (pipeline invariant violated)');
-    }
-
-    // Join accumulated response chunks into final responseText (avoids O(n^2) string concat during streaming)
-    if (ctx.responseChunks.length > 0 && !ctx.responseText) {
-        ctx.responseText = ctx.responseChunks.join('');
-    }
-
-    // Build structured metadata for rich history reload
-    const thinkingText = ctx.thinkingChunks.length > 0 ? ctx.thinkingChunks.join('\n') : null;
-    const parts: PersistedMessagePart[] = [];
-
-    if (thinkingText) {
-        parts.push({
-            id: 'reasoning-final',
-            type: 'reasoning',
-            text: thinkingText,
-        });
-    }
-
-    for (const toolCall of ctx.toolCallDetails) {
-        parts.push({
-            id: `tool-${toolCall.call_id}`,
-            type: 'tool',
-            callId: toolCall.call_id,
-            name: toolCall.tool_name,
-            state: toolCall.success === false ? 'error' : 'done',
-            icon: resolveToolIcon(toolCall.tool_name),
-            args: toolCall.arguments,
-            result: toolCall.result,
-            target: toolCall.arguments ? String(Object.values(toolCall.arguments)[0] ?? '') : undefined,
-            durationMs: toolCall.duration_ms,
-        });
-    }
-
-    if (ctx.responseText) {
-        parts.push({
-            id: 'text-final',
-            type: 'text',
-            text: ctx.responseText,
-        });
-    }
-
-    const messageMetadata = parts.length > 0 || ctx.toolCallDetails.length > 0
-        ? JSON.stringify({ parts, tool_calls: ctx.toolCallDetails })
-        : null;
-
-    await deps.db.query(
-        `UPDATE execution_sessions
-         SET status = $2, input_tokens = $3, output_tokens = $4,
-             credits_used = $5, agent_response = $6, thinking = $7, message_metadata = $8,
-             setup_report = $9, events_filtered = $10, hook_health = $11,
-             completed_at = NOW()
-         WHERE id = $1`,
-        [ctx.sessionId, ctx.status, ctx.inputTokens, ctx.outputTokens, ctx.creditsUsed,
-         ctx.responseText || null, thinkingText, messageMetadata,
-         ctx.setupReport ? JSON.stringify(ctx.setupReport) : null, ctx.eventsFiltered,
-         ctx.hookHealth ? JSON.stringify(ctx.hookHealth) : null],
-    );
-
-    // Persist chat turn to workspace.db for conversation history reload.
-    // Non-critical — don't fail the session if it errors.
-    if (ctx.conversationId && ctx.sandboxId) {
-        try {
-            const provider = deps.sandboxService.getDaytonaProvider();
-            await Promise.all([
-                incrementConversationMessageCount(provider, ctx.sandboxId, ctx.conversationId),
-                writeChatExecution(
-                    provider,
-                    ctx.sandboxId,
-                    ctx.conversationId,
-                    ctx.sessionId || null,
-                    ctx.request.task,
-                    ctx.responseText || null,
-                    ctx.inputTokens + ctx.outputTokens,
-                    Date.now() - ctx.startedAt,
-                    messageMetadata,
-                ),
-            ]);
-        } catch (err) {
-            log.error('Failed to persist chat execution', { conversation_id: ctx.conversationId, error: (err as Error).message });
-        }
-    }
-}
-
-export function buildSummary(ctx: PipelineContext): ExecutionSummary {
-    return {
-        totalTokens: ctx.inputTokens + ctx.outputTokens,
-        durationMs: Date.now() - ctx.startedAt,
-        toolCalls: ctx.toolCallCount,
-        agentsUsed: Math.max(ctx.agentSessionCount, 1),
-        billingType: ctx.keySource as BillingType | undefined,
-    };
-}
-
-// -----------------------------------------------------------------------------
-// Helpers
-// -----------------------------------------------------------------------------
-
-function estimateExecutionTokens(task: string): number {
-    // Conservative: always assume opus-level usage for pre-reservation.
-    // Real usage is tracked by the runner and reconciled in finalizeCredits.
-    const baseTokens = 10000;
-    const taskTokens = Math.ceil(task.length / 4);
-    return baseTokens + taskTokens;
-}

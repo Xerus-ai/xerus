@@ -32,15 +32,16 @@ export class SandboxRegistry {
 
     async persist(session: SandboxSession): Promise<void> {
         await this.db.query(
-            `INSERT INTO workspaces (user_id, slug, name, sandbox_id, sandbox_status, created_at, sandbox_last_activity_at, sandbox_novnc_url)
-             VALUES ($1, 'default', 'Default Workspace', $2, $3, $4, $5, $6)
+            `INSERT INTO workspaces (user_id, slug, name, sandbox_id, sandbox_status, created_at, sandbox_last_activity_at, sandbox_novnc_url, sandbox_plan)
+             VALUES ($1, 'default', 'Default Workspace', $2, $3, $4, $5, $6, $7)
              ON CONFLICT (user_id) DO UPDATE SET
                  sandbox_id = EXCLUDED.sandbox_id,
                  sandbox_status = EXCLUDED.sandbox_status,
                  sandbox_last_activity_at = EXCLUDED.sandbox_last_activity_at,
                  sandbox_novnc_url = EXCLUDED.sandbox_novnc_url,
+                 sandbox_plan = EXCLUDED.sandbox_plan,
                  updated_at = NOW()`,
-            [session.userId, session.sandboxId, session.status, session.createdAt, session.lastActivityAt, session.novncUrl || null]
+            [session.userId, session.sandboxId, session.status, session.createdAt, session.lastActivityAt, session.novncUrl || null, session.sandboxPlan || null]
         );
         this.invalidate(session.userId);
     }
@@ -104,7 +105,7 @@ export class SandboxRegistry {
             `SELECT id, user_id, slug, name, sandbox_id, sandbox_status, sandbox_template_version,
                     sandbox_active_agent_id, sandbox_active_execution_count, created_at,
                     sandbox_paused_at, sandbox_last_activity_at, sandbox_total_runtime_seconds,
-                    sandbox_resume_count, sandbox_novnc_url
+                    sandbox_resume_count, sandbox_novnc_url, sandbox_plan
              FROM workspaces WHERE user_id = $1`,
             [userId],
         ).then(result => {

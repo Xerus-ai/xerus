@@ -198,22 +198,52 @@ export class CreditService {
         };
     }
 
-    // Scheduled job methods
-    async resetDailyCreditsForFreeUsers(): Promise<number> {
-        // Free plan has 0 credits — nothing to reset
-        return 0;
+    async grantCredits(userId: string, amount: number, reason: string): Promise<CreditBalance> {
+        if (amount <= 0) {
+            throw new CreditOperationError('grant', 'Amount must be positive');
+        }
+
+        return transaction(async (client: PoolClient) => {
+            const balance = await userRepository.getCreditBalanceForUpdate(client, userId);
+            if (!balance) {
+                throw new UserNotFoundError(userId);
+            }
+
+            const updated = await userRepository.addCredits(client, userId, amount);
+
+            await logTransaction(client, userId, amount, 'add', updated.balance, reason);
+
+            return updated;
+        });
     }
 
-    async resetMonthlyCreditsForStarterUsers(): Promise<number> {
-        return this.resetExpiredForPlan('starter');
+    async grantCreditsWithClient(client: PoolClient, userId: string, amount: number, reason: string): Promise<CreditBalance> {
+        if (amount <= 0) {
+            throw new CreditOperationError('grant', 'Amount must be positive');
+        }
+
+        const balance = await userRepository.getCreditBalanceForUpdate(client, userId);
+        if (!balance) {
+            throw new UserNotFoundError(userId);
+        }
+
+        const updated = await userRepository.addCredits(client, userId, amount);
+
+        await logTransaction(client, userId, amount, 'add', updated.balance, reason);
+
+        return updated;
     }
 
-    async resetMonthlyCreditsForAdvancedUsers(): Promise<number> {
-        return this.resetExpiredForPlan('advanced');
+    async resetMonthlyCreditsForProUsers(): Promise<number> {
+        return this.resetExpiredForPlan('pro');
     }
 
-    async resetMonthlyCreditsForProdigyUsers(): Promise<number> {
-        return this.resetExpiredForPlan('prodigy');
+    async resetMonthlyCreditsForMaxUsers(): Promise<number> {
+        return this.resetExpiredForPlan('max');
+    }
+
+    async resetMonthlyCreditsForUltraUsers(): Promise<number> {
+        return this.resetExpiredForPlan('ultra');
     }
 }
 
