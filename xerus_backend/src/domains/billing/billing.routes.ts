@@ -7,7 +7,7 @@ import { InvalidPlanError, NoBillingAccountError, NoActiveSubscriptionError } fr
 import { query } from '../../database/connection';
 import { userRepository } from '../users/repository';
 import { handlePolarWebhook } from './webhook.handler';
-import { createCheckoutSession, getCustomerPortalUrl, cancelSubscription, updateSubscription } from './polar.client';
+import { getClient, createCheckoutSession, getCustomerPortalUrl, cancelSubscription, updateSubscription } from './polar.client';
 import type { PlanType } from '../users/types';
 import { POLAR_PRODUCT_IDS, CREDIT_TOPUP_PRODUCTS, type BillingInterval } from './types';
 import { checkoutSchema, creditCheckoutSchema, changePlanSchema } from './billing.validators';
@@ -49,13 +49,9 @@ router.post('/checkout', auth, async (req: AuthenticatedRequest, res: Response, 
         if (!productId) throw new InvalidPlanError(productKey);
 
         const user = await userRepository.findById(userId);
-        const frontendUrl = process.env.FRONTEND_URL;
-        if (!frontendUrl) throw new Error('FRONTEND_URL environment variable is required');
-        const successUrl = `${frontendUrl}/onboarding?checkout=success`;
 
         const checkout = await createCheckoutSession({
             productId,
-            successUrl,
             customerEmail: user?.email ?? undefined,
             metadata: { user_id: userId },
         });
@@ -83,13 +79,9 @@ router.post('/checkout/credits', auth, async (req: AuthenticatedRequest, res: Re
         if (!productId) throw new InvalidPlanError(String(credits));
 
         const user = await userRepository.findById(userId);
-        const frontendUrl = process.env.FRONTEND_URL;
-        if (!frontendUrl) throw new Error('FRONTEND_URL environment variable is required');
-        const successUrl = `${frontendUrl}/settings/billing?topup=success`;
 
         const checkout = await createCheckoutSession({
             productId,
-            successUrl,
             customerEmail: user?.email ?? undefined,
             metadata: { user_id: userId, credits: String(credits) },
         });
@@ -145,6 +137,86 @@ router.get('/subscription', auth, async (req: AuthenticatedRequest, res: Respons
     }
 });
 
+router.post('/subscription/sync', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const startTime = res.locals.startTime || Date.now();
+    try {
+        const userId = req.user?.uid;
+        if (!userId) throw new UnauthorizedError('Authentication required');
+
+        const user = await userRepository.findById(userId);
+        if (!user) throw new BadRequestError('User not found');
+
+        const client = getClient();
+        const email = user.email;
+
+        const customers = await client.customers.list({ email, limit: 1 });
+        const customer = customers.result.items[0];
+        if (!customer) {
+            if (user.polar_customer_id) {
+                await query(
+                    `UPDATE users SET polar_customer_id = NULL, polar_subscription_id = NULL,
+                        subscription_status = 'revoked', updated_at = NOW()
+                     WHERE user_id = $1`,
+                    [userId],
+                );
+            }
+            sendResponse(res, 200, { synced: true, subscription_status: user.polar_customer_id ? 'revoked' : user.subscription_status }, startTime);
+            return;
+        }
+
+        // Check active subscriptions first, then any subscription (including canceled)
+        let sub: { id: string; productId: string; status: string; currentPeriodEnd?: Date | null; cancelAtPeriodEnd?: boolean } | undefined;
+        const activeSubs = await client.subscriptions.list({ customerId: customer.id, active: true, limit: 1 });
+        sub = activeSubs.result.items[0];
+        if (!sub) {
+            const allSubs = await client.subscriptions.list({ customerId: customer.id, limit: 1 });
+            sub = allSubs.result.items[0];
+        }
+        if (!sub) {
+            if (user.polar_subscription_id) {
+                await query(
+                    `UPDATE users SET polar_subscription_id = NULL, subscription_status = 'revoked', updated_at = NOW()
+                     WHERE user_id = $1`,
+                    [userId],
+                );
+            }
+            sendResponse(res, 200, { synced: true, subscription_status: user.polar_subscription_id ? 'revoked' : user.subscription_status }, startTime);
+            return;
+        }
+
+        const polarStatus = sub.cancelAtPeriodEnd ? 'canceled'
+            : sub.status === 'active' ? 'active'
+            : sub.status === 'canceled' ? 'canceled'
+            : sub.status === 'revoked' ? 'revoked'
+            : user.subscription_status;
+
+        const productMapping = POLAR_PRODUCT_IDS[sub.productId];
+        const planType = productMapping?.plan ?? user.plan_type;
+
+        await query(
+            `UPDATE users SET
+                polar_customer_id = $1,
+                polar_subscription_id = $2,
+                subscription_status = $3,
+                plan_type = $4,
+                billing_email = $5,
+                subscription_current_period_end = $6,
+                updated_at = NOW()
+             WHERE user_id = $7`,
+            [customer.id, sub.id, polarStatus, planType, email, sub.currentPeriodEnd ?? null, userId],
+        );
+
+        sendResponse(res, 200, {
+            synced: true,
+            subscription_status: polarStatus,
+            plan_type: planType,
+            polar_subscription_id: sub.id,
+        }, startTime);
+    } catch (err) {
+        next(err);
+    }
+});
+
 router.post('/subscription/cancel', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const startTime = res.locals.startTime || Date.now();
     try {
@@ -157,6 +229,12 @@ router.post('/subscription/cancel', auth, async (req: AuthenticatedRequest, res:
         }
 
         await cancelSubscription(user.polar_subscription_id);
+
+        await query(
+            `UPDATE users SET subscription_status = 'canceled', updated_at = NOW()
+             WHERE user_id = $1`,
+            [userId],
+        );
 
         sendResponse(res, 200, { status: 'canceled' }, startTime);
     } catch (err) {
@@ -177,6 +255,9 @@ router.post('/subscription/change', auth, async (req: AuthenticatedRequest, res:
         const user = await userRepository.findById(userId);
         if (!user?.polar_subscription_id) {
             throw new NoActiveSubscriptionError();
+        }
+        if (user.subscription_status === 'canceled' || user.subscription_status === 'revoked') {
+            throw new BadRequestError('Cannot change plan: subscription is no longer active. Please create a new subscription.');
         }
 
         const productKey = `${plan}-${interval}`;

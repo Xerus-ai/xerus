@@ -115,6 +115,18 @@ export function startSandboxCleanupJob(provider?: SandboxProvider, sandboxServic
                 );
                 return result.rows;
             },
+            async findRevokedPausedSandboxes(gracePeriodMs: number) {
+                const result = await query<RegistryRow>(
+                    `SELECT w.sandbox_id, w.user_id, w.sandbox_status AS status, w.sandbox_last_activity_at AS last_activity_at
+                     FROM workspaces w
+                     JOIN users u ON w.user_id = u.user_id
+                     WHERE u.subscription_status = 'revoked'
+                       AND w.sandbox_status = 'paused'
+                       AND w.sandbox_paused_at < NOW() - make_interval(secs => $1::numeric / 1000)`,
+                    [gracePeriodMs]
+                );
+                return result.rows;
+            },
             async findStuckSessions(stuckThresholdMs: number) {
                 const result = await query<SessionRow>(
                     `SELECT id, status, started_at

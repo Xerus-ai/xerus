@@ -8,6 +8,7 @@ import {
   createCreditCheckout,
   getPortalUrl,
   getSubscription,
+  syncSubscription,
   getUsage,
   changePlan,
   type Subscription,
@@ -16,7 +17,7 @@ import {
 import { PLANS, type PlanType } from '@/lib/plans'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
-import { Crown, Sparkles, CreditCard, ExternalLink } from 'lucide-react'
+import { Crown, Sparkles, CreditCard, ExternalLink, AlertTriangle } from 'lucide-react'
 import { toast } from '@/lib/toast'
 import { easeOutQuart } from '@/lib/motion'
 import { UsageDashboard } from '@/components/billing/UsageDashboard'
@@ -41,9 +42,12 @@ export default function BillingPage() {
         console.error('Failed to fetch credits:', err)
         setBillingError(true)
       }),
-      getSubscription().then(setSubscription).catch((err) => {
-        console.error('Failed to fetch subscription:', err)
-      }),
+      syncSubscription()
+        .then(() => getSubscription())
+        .then(setSubscription)
+        .catch((err) => {
+          console.error('Failed to fetch subscription:', err)
+        }),
       getUsage().then(setUsage).catch((err) => {
         console.error('Failed to fetch usage:', err)
       }),
@@ -55,10 +59,12 @@ export default function BillingPage() {
 
   const hasPolarSubscription = subscription?.polar_subscription_id != null
 
+  const canChangePlanInline = hasPolarSubscription && subscription?.subscription_status === 'active'
+
   const handlePlanSelect = async (planId: PlanType) => {
     setLoadingPlan(planId)
     try {
-      if (hasPolarSubscription && subscription!.subscription_status === 'active' && subscription!.plan_type !== planId) {
+      if (canChangePlanInline && subscription!.plan_type !== planId) {
         await changePlan(planId, billingCycle)
         toast.success('Plan changed successfully')
         const updated = await getSubscription()
@@ -71,6 +77,7 @@ export default function BillingPage() {
       }
     } catch (error) {
       console.error('Plan selection failed:', error)
+      toast.error('Plan change failed', { description: (error as Error).message })
     } finally {
       setLoadingPlan(null)
     }
@@ -92,7 +99,7 @@ export default function BillingPage() {
     setPortalLoading(true)
     try {
       const { portal_url } = await getPortalUrl()
-      window.location.href = portal_url
+      window.open(portal_url, '_blank')
     } catch (error) {
       console.error('Failed to open portal:', error)
     } finally {
@@ -184,6 +191,46 @@ export default function BillingPage() {
 
       {credits && (
         <>
+          {/* Subscription Expired Banner */}
+          {subscription && (subscription.subscription_status === 'revoked' || subscription.subscription_status === 'canceled') && (
+            <motion.div
+              className={cn(
+                'rounded-2xl border p-5 mb-4',
+                subscription.subscription_status === 'revoked'
+                  ? 'bg-red-50/30 border-red-200/60'
+                  : 'bg-amber-50/30 border-amber-200/60'
+              )}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, delay: 0.05, ease: easeOutQuart }}
+            >
+              <div className="flex items-start gap-3">
+                <AlertTriangle className={cn(
+                  'w-4 h-4 shrink-0 mt-0.5',
+                  subscription.subscription_status === 'revoked' ? 'text-red-500' : 'text-amber-500'
+                )} />
+                <div>
+                  <p className={cn(
+                    'text-sm font-medium',
+                    subscription.subscription_status === 'revoked' ? 'text-red-700' : 'text-amber-700'
+                  )}>
+                    {subscription.subscription_status === 'revoked'
+                      ? 'Your subscription has expired'
+                      : 'Your subscription is canceled'}
+                  </p>
+                  <p className={cn(
+                    'text-xs mt-1',
+                    subscription.subscription_status === 'revoked' ? 'text-red-600/70' : 'text-amber-600/70'
+                  )}>
+                    {subscription.subscription_status === 'revoked'
+                      ? 'Subscribe to a plan below to resume your workspace and agents.'
+                      : `Your access continues until ${subscription.subscription_current_period_end ? formatDate(subscription.subscription_current_period_end) : 'the end of your billing period'}. Subscribe below to ensure uninterrupted service.`}
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {/* Current Plan */}
           <motion.div
             className="bg-surface/60 rounded-2xl border border-surface-active/60 p-6 mb-4"

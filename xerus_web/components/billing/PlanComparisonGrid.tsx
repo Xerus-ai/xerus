@@ -208,11 +208,11 @@ export function PlanComparisonGrid({
               {/* CTA */}
               <button
                 onClick={() => onPlanSelect(plan.id)}
-                disabled={isCurrentPlan || loadingPlan === plan.id}
+                disabled={(isCurrentPlan && subscription?.subscription_status === 'active') || loadingPlan === plan.id}
                 aria-label={`Select ${plan.name} plan at $${price} per month`}
                 className={cn(
                   'w-full py-2.5 rounded-xl text-sm font-medium transition-all duration-200 mb-5',
-                  isCurrentPlan
+                  isCurrentPlan && subscription?.subscription_status === 'active'
                     ? plan.highlighted
                       ? 'bg-white/10 text-white/50 cursor-default'
                       : 'bg-surface-hover text-text-secondary cursor-default'
@@ -223,11 +223,15 @@ export function PlanComparisonGrid({
               >
                 {loadingPlan === plan.id
                   ? 'Loading...'
-                  : isCurrentPlan
+                  : isCurrentPlan && subscription?.subscription_status === 'active'
                     ? 'Current plan'
-                    : subscription?.polar_subscription_id && subscription.subscription_status === 'active'
-                      ? 'Switch plan'
-                      : 'Get started'
+                    : isCurrentPlan && subscription?.subscription_status === 'canceled'
+                      ? 'Resubscribe'
+                      : subscription?.polar_subscription_id && subscription.subscription_status === 'active'
+                        ? 'Switch plan'
+                        : subscription?.subscription_status === 'canceled' || subscription?.subscription_status === 'revoked'
+                          ? 'Subscribe'
+                          : 'Get started'
                 }
               </button>
 

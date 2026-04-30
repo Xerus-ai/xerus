@@ -277,6 +277,13 @@ async function startServer(): Promise<void> {
 
         setSkillRoutesDeps({ sandboxService });
 
+        // Wire billing revocation → sandbox pause
+        const { billingService } = await import('./domains/billing');
+        billingService.setRevocationHandler(async (userId: string) => {
+            log.info('Pausing sandbox for revoked subscription', { user_id: userId });
+            await sandboxService.pauseSandbox(userId);
+        });
+
         sandboxProvider = sandboxService.getProvider();
         log.info('ExecutionService initialized');
 

@@ -80,6 +80,12 @@ async function findUserBySubscriptionOrCustomer(
 // ===== SERVICE =====
 
 export class BillingService {
+    private onSubscriptionRevoked?: (userId: string) => Promise<void>;
+
+    setRevocationHandler(handler: (userId: string) => Promise<void>): void {
+        this.onSubscriptionRevoked = handler;
+    }
+
     async processWebhookEvent(
         eventId: string,
         eventType: PolarWebhookEventType,
@@ -241,6 +247,12 @@ export class BillingService {
         }, client);
 
         log.info('Subscription revoked -- immediate block', { user_id: user.user_id });
+
+        if (this.onSubscriptionRevoked) {
+            this.onSubscriptionRevoked(user.user_id).catch((err) => {
+                log.warn('Post-revocation handler failed (non-blocking)', { user_id: user.user_id, error: (err as Error).message });
+            });
+        }
     }
 
     private extractCustomerId(payload: Record<string, unknown>): string | null {

@@ -38,6 +38,10 @@ class InMemoryCleanupDatabase {
         );
     }
 
+    async findRevokedPausedSandboxes(_gracePeriodMs: number): Promise<RegistryRow[]> {
+        return [];
+    }
+
     async findStuckSessions(stuckThresholdMs: number): Promise<SessionRow[]> {
         const cutoff = new Date(Date.now() - stuckThresholdMs);
         return this.sessionRows.filter(
@@ -87,6 +91,7 @@ function createConfig(overrides?: Partial<CleanupConfig>): CleanupConfig {
         idle_threshold_ms: 24 * 60 * 60 * 1000,
         stuck_session_threshold_ms: 2 * 60 * 60 * 1000,
         paused_threshold_ms: 30 * 24 * 60 * 60 * 1000,
+        revoked_grace_period_ms: 7 * 24 * 60 * 60 * 1000,
         max_sandboxes_per_user: 1,
         ...overrides,
     };
