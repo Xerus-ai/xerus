@@ -20,6 +20,7 @@ export interface TreeResponse {
 export interface WorkspaceStatus {
     sandbox_running: boolean;
     sandbox_id: string | null;
+    sandbox_plan?: string | null;
 }
 
 export type EditabilityStatus = 'editable' | 'read_only' | 'hidden';

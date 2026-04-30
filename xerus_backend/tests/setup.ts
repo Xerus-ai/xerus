@@ -282,6 +282,10 @@ class InMemorySandboxService {
   async getSandboxFs(sandboxId: string): Promise<SandboxFileSystem> {
     return this.provider.createFileSystem(sandboxId);
   }
+
+  getDatabase() {
+    return { query: async () => ({ rows: [] }) };
+  }
 }
 
 const testSandboxService = new InMemorySandboxService();

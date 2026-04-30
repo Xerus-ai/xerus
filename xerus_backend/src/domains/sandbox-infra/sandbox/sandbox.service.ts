@@ -28,6 +28,10 @@ import type { S3BackupService } from '../storage/s3-backup.service';
 
 const log = logger('SandboxService');
 
+// Per-plan sandbox resources. Source: 2026-04-27-pricing-billing-polar-design.md Section 10.
+// Margin on compute is the primary billing differentiator — do NOT inflate these values.
+// NOTE: Snapshot must be built with pro-tier base resources so max/ultra resize UP.
+// If snapshot disk > pro disk, pro users get over-provisioned disk until snapshot is rebuilt.
 const PLAN_RESOURCES: Record<PlanType, { cpu: number; memory: number; disk: number }> = {
     pro:   { cpu: 1, memory: 2, disk: 10 },
     max:   { cpu: 2, memory: 4, disk: 25 },
@@ -57,6 +61,7 @@ export class SandboxService {
     }
 
     getProvider(): SandboxProvider { return this.provider; }
+    getDatabase(): SandboxDatabase { return this.db; }
 
     /** Invalidate registry cache for a user. Call after external DB writes to sandbox_status. */
     invalidateRegistryCache(userId: string): void {
@@ -172,11 +177,42 @@ export class SandboxService {
         }
         const daytonaProvider = this.provider as DaytonaProvider;
         if (daytonaProvider.resizeSandbox) {
-            try {
-                await daytonaProvider.resizeSandbox(sandbox.sandboxId, resources);
-                log.info('Sandbox resized for plan', { sandbox_id: sandbox.sandboxId, plan: planType, resources });
-            } catch (resizeErr) {
-                throw new Error(`Sandbox resize failed for plan ${planType}: ${(resizeErr as Error).message}`);
+            // Daytona constraint: disk can only increase, never decrease.
+            // CPU/memory support both directions via hot resize.
+            // Build resize request with only feasible changes.
+            const snapshotDefaults = { cpu: 2, memory: 4, disk: 20 };
+            const resizeRequest: { cpu?: number; memory?: number; disk?: number } = {};
+
+            if (resources.cpu !== snapshotDefaults.cpu) resizeRequest.cpu = resources.cpu;
+            if (resources.memory !== snapshotDefaults.memory) resizeRequest.memory = resources.memory;
+            if (resources.disk > snapshotDefaults.disk) {
+                resizeRequest.disk = resources.disk;
+            } else if (resources.disk < snapshotDefaults.disk) {
+                log.warn('Sandbox disk over-provisioned: snapshot base exceeds plan limit. Rebuild snapshot with pro-tier disk.', {
+                    sandbox_id: sandbox.sandboxId, plan: planType,
+                    plan_disk: resources.disk, snapshot_disk: snapshotDefaults.disk,
+                });
+            }
+
+            if (Object.keys(resizeRequest).length > 0) {
+                const needsDiskResize = resizeRequest.disk !== undefined;
+                try {
+                    if (needsDiskResize) {
+                        await this.provider.pause(sandbox.sandboxId);
+                    }
+                    await daytonaProvider.resizeSandbox(sandbox.sandboxId, resizeRequest);
+                    if (needsDiskResize) {
+                        await daytonaProvider.start(sandbox.sandboxId);
+                    }
+                    log.info('Sandbox resized for plan', { sandbox_id: sandbox.sandboxId, plan: planType, resized: resizeRequest });
+                } catch (resizeErr) {
+                    if (needsDiskResize) {
+                        try { await daytonaProvider.start(sandbox.sandboxId); } catch { /* best effort */ }
+                    }
+                    throw new Error(`Sandbox resize failed for plan ${planType}: ${(resizeErr as Error).message}`);
+                }
+            } else {
+                log.info('Sandbox resources match plan, no resize needed', { sandbox_id: sandbox.sandboxId, plan: planType });
             }
         }
 
@@ -190,6 +226,7 @@ export class SandboxService {
             activeExecutionCount: 0,
             agentSessions: new Map(),
             setupReport,
+            sandboxPlan: planType,
         };
 
         this.sessions.set(userId, session);
@@ -449,8 +486,6 @@ export class SandboxService {
             await restoreWorkspaceTar(provider, sandboxId, snapshot.content);
             log.info('Restored S3 snapshot', { user_id: userId, snapshot_key: latestKey, size_bytes: snapshot.sizeBytes });
         } catch (err) {
-            // Corrupt snapshot (e.g., wrong encoding from older code). Delete it so the
-            // next pause creates a clean one, and continue with a fresh workspace.
             log.warn('Snapshot restore failed, deleting corrupt snapshot and continuing fresh', { user_id: userId, error: (err as Error).message });
             try {
                 await this.s3Backup.deleteSnapshot(latestKey);
@@ -537,6 +572,7 @@ export class SandboxService {
             wasResumed: true,
             activeExecutionCount: 0,
             agentSessions: new Map(),
+            sandboxPlan: entry.sandbox_plan ?? undefined,
         };
 
         this.sessions.set(userId, session);

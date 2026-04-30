@@ -305,6 +305,68 @@ export function createLifecycleRouter(deps: LifecycleRouteDeps): Router {
         },
     );
 
+    // GET /usage - disk usage for the user's sandbox
+    router.get(
+        '/usage',
+        auth,
+        async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+            const startTime = res.locals.startTime || Date.now();
+            try {
+                if (!req.user) throw new UnauthorizedError();
+
+                const service = deps.getDriveService();
+                const usage = await service.getUsage(req.user.uid);
+
+                sendResponse(res, 200, usage, startTime);
+            } catch (err) {
+                next(err);
+            }
+        },
+    );
+
+    // POST /resize - in-place resize for plan upgrade
+    router.post(
+        '/resize',
+        auth,
+        async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+            const startTime = res.locals.startTime || Date.now();
+            try {
+                if (!req.user) throw new UnauthorizedError();
+
+                const service = deps.getDriveService();
+                const result = await service.resizeForPlan(req.user.uid);
+
+                sendResponse(res, 200, result, startTime);
+            } catch (err) {
+                next(err);
+            }
+        },
+    );
+
+    // POST /recreate - destroy and recreate sandbox for plan downgrade
+    router.post(
+        '/recreate',
+        auth,
+        async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+            const startTime = res.locals.startTime || Date.now();
+            try {
+                if (!req.user) throw new UnauthorizedError();
+
+                const { confirmed } = req.body;
+                if (confirmed !== true) {
+                    throw new BadRequestError('confirmed must be true to proceed with sandbox recreation');
+                }
+
+                const service = deps.getDriveService();
+                const result = await service.recreateForPlan(req.user.uid);
+
+                sendResponse(res, 200, result, startTime);
+            } catch (err) {
+                next(err);
+            }
+        },
+    );
+
     // DELETE /snapshots - remove an S3 snapshot owned by the user
     router.delete(
         '/snapshots',
