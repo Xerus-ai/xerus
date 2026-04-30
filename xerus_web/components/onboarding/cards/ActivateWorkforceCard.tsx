@@ -56,7 +56,7 @@ export function ActivateWorkforceCard({ onAction }: ActivateWorkforceCardProps) 
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-text">Use Claude Code</p>
-            <p className="text-[10px] text-text-secondary mt-0.5">Configure Anthropic key in Settings</p>
+            <p className="text-[10px] text-text-secondary mt-0.5">Set up your Anthropic key in Settings after onboarding</p>
           </div>
           <motion.div
             animate={{ x: hoveredProvider === 'claude' ? 3 : 0 }}
