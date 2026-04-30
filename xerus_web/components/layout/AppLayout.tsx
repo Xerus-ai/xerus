@@ -15,6 +15,7 @@ import { MotionConfig } from 'framer-motion'
 import { GradientBackground } from '@/components/GradientBackground'
 
 import { InviteCodeGate } from '@/components/InviteCodeGate'
+import { PlanChangeModal } from '@/components/billing/PlanChangeModal'
 
 // Code-split: only loaded on /login route
 const LoginOverlay = dynamic(
@@ -65,7 +66,6 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
   const isOnboardingPage = pathname === '/onboarding'
   // E2E auth page bypass — dev only, stripped from production by dead code elimination
   const isE2EAuthPage = process.env.NODE_ENV !== 'production' && pathname === '/e2e-auth'
-
   // Redirect unauthenticated users to login
   useEffect(() => {
     if (isAuthReady && !user && !isLoginPage && !isE2EAuthPage) {
@@ -98,6 +98,7 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
   if (isE2EAuthPage) {
     return <>{children}</>
   }
+
 
   // Show loading screen while auth state is resolving
   if (!isAuthReady) {
@@ -142,6 +143,7 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
     return (
       <div className="flex flex-col h-screen relative">
         <GradientBackground />
+        <PlanChangeModal />
         <a
           href="#main-content"
           className="absolute -top-full left-2 z-[100] px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium focus:top-2 focus:outline-none transition-[top]"
@@ -165,6 +167,7 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen overflow-hidden relative">
       <GradientBackground />
+      <PlanChangeModal />
       <a
         href="#main-content"
         className="absolute -top-full left-2 z-[100] px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium focus:top-2 focus:outline-none transition-[top]"

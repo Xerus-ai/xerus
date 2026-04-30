@@ -25,6 +25,14 @@ export interface TreeResponse {
 export interface WorkspaceStatus {
   sandbox_running: boolean;
   sandbox_id: string | null;
+  sandbox_plan?: string | null;
+}
+
+export interface WorkspaceUsage {
+  disk_used_mb: number;
+  disk_limit_mb: number;
+  disk_used_percent: number;
+  plan: string;
 }
 
 export type EditabilityStatus = 'editable' | 'read_only' | 'hidden';
@@ -374,6 +382,38 @@ export async function syncTemplate(dryRun = false): Promise<TemplateSyncResult> 
   const response = await apiCall('/workspace/sync-template', {
     method: 'POST',
     body: JSON.stringify({ dryRun }),
+  });
+  const data = await response.json();
+  return data.data ?? data;
+}
+
+// ---------- Plan Lifecycle ----------
+
+/**
+ * Get workspace disk usage
+ */
+export async function getWorkspaceUsage(): Promise<WorkspaceUsage> {
+  const response = await apiCall('/workspace/usage', { method: 'GET' });
+  const data = await response.json();
+  return data.data ?? data;
+}
+
+/**
+ * Resize workspace sandbox for plan upgrade (in-place)
+ */
+export async function resizeWorkspace(): Promise<{ resized: boolean; sandbox_plan: string }> {
+  const response = await apiCall('/workspace/resize', { method: 'POST' });
+  const data = await response.json();
+  return data.data ?? data;
+}
+
+/**
+ * Recreate workspace sandbox for plan downgrade (destroys data)
+ */
+export async function recreateWorkspace(): Promise<{ recreated: boolean; sandbox_plan: string; sandbox_id: string }> {
+  const response = await apiCall('/workspace/recreate', {
+    method: 'POST',
+    body: JSON.stringify({ confirmed: true }),
   });
   const data = await response.json();
   return data.data ?? data;

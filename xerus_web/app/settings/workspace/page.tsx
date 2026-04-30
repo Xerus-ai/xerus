@@ -5,12 +5,13 @@ import { useRedirectIfNotAuth } from '@/utils/AuthContext'
 import { getCreditBalance, type CreditBalance } from '@/lib/api/user'
 import {
   getStatus as getWorkspaceStatus,
+  getWorkspaceUsage,
   pauseWorkspace,
   startWorkspace,
   stopWorkspace,
   triggerBackup,
 } from '@/lib/api/workspace'
-import type { WorkspaceStatus } from '@/lib/api/workspace'
+import type { WorkspaceStatus, WorkspaceUsage } from '@/lib/api/workspace'
 import { Cpu, HardDrive, MemoryStick, Server, Sparkles, Play, Pause, Square, Archive, Bot, Puzzle, ChevronRight } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { toast } from '@/lib/toast'
@@ -35,6 +36,7 @@ export default function WorkspaceOverviewPage() {
   const [workspaceLoading, setWorkspaceLoading] = useState(true)
   const [workspaceAction, setWorkspaceAction] = useState<string | null>(null)
   const [credits, setCredits] = useState<CreditBalance | null>(null)
+  const [diskUsage, setDiskUsage] = useState<WorkspaceUsage | null>(null)
 
   const fetchWorkspaceStatus = useCallback(async () => {
     try {
@@ -51,6 +53,7 @@ export default function WorkspaceOverviewPage() {
     if (!user) return
     fetchWorkspaceStatus()
     getCreditBalance().then(setCredits).catch(() => {})
+    getWorkspaceUsage().then(setDiskUsage).catch(() => {})
   }, [user, fetchWorkspaceStatus])
 
   const handleAction = async (
@@ -259,21 +262,49 @@ export default function WorkspaceOverviewPage() {
               <HardDrive className="w-4 h-4 text-text-secondary" />
               <p className="text-sm font-medium text-text">Storage</p>
             </div>
-            <p className="text-2xl font-semibold text-text mb-0.5">
-              --
-              <span className="text-sm font-normal text-text-secondary ml-1">
-                / {podResources.storageGb} GB
-              </span>
-            </p>
-            <div className="w-full h-1.5 bg-surface-hover rounded-full mt-2 mb-2 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-primary/70 transition-all duration-500"
-                style={{ width: '0%' }}
-              />
-            </div>
-            <p className="text-[11px] text-text-secondary">
-              Workspace files, knowledge base, memory
-            </p>
+            {diskUsage ? (
+              <>
+                <p className="text-2xl font-semibold text-text mb-0.5">
+                  {diskUsage.disk_used_mb < 1024
+                    ? `${diskUsage.disk_used_mb} MB`
+                    : `${(diskUsage.disk_used_mb / 1024).toFixed(1)} GB`}
+                  <span className="text-sm font-normal text-text-secondary ml-1">
+                    / {podResources.storageGb} GB
+                  </span>
+                </p>
+                <div className="w-full h-1.5 bg-surface-hover rounded-full mt-2 mb-2 overflow-hidden">
+                  <div
+                    className={cn(
+                      'h-full rounded-full transition-all duration-500',
+                      diskUsage.disk_used_percent < 80 ? 'bg-emerald-500/70' :
+                      diskUsage.disk_used_percent < 95 ? 'bg-amber-500/70' : 'bg-red-500/70'
+                    )}
+                    style={{ width: `${Math.min(100, diskUsage.disk_used_percent)}%` }}
+                  />
+                </div>
+                <p className="text-[11px] text-text-secondary">
+                  {diskUsage.disk_used_percent}% used
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-2xl font-semibold text-text mb-0.5">
+                  --
+                  <span className="text-sm font-normal text-text-secondary ml-1">
+                    / {podResources.storageGb} GB
+                  </span>
+                </p>
+                <div className="w-full h-1.5 bg-surface-hover rounded-full mt-2 mb-2 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-primary/70 transition-all duration-500"
+                    style={{ width: '0%' }}
+                  />
+                </div>
+                <p className="text-[11px] text-text-secondary">
+                  Workspace files, knowledge base, memory
+                </p>
+              </>
+            )}
           </div>
         </div>
       </motion.div>
