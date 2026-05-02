@@ -43,9 +43,9 @@ export function AgentFilesSection({
     <>
       {/* Running agent warning */}
       {isAgentRunning && (
-        <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-2xl">
-          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
-          <p className="text-sm text-amber-800">
+        <div className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-500/30 rounded-2xl">
+          <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+          <p className="text-sm text-amber-800 dark:text-amber-200">
             This agent has an active session. File changes may be overwritten during execution.
           </p>
         </div>
@@ -114,7 +114,7 @@ export function AgentFilesSection({
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-sm font-semibold text-text">{file.label}</span>
                     {fileData?.isTemplate && (
-                      <span className="text-[10px] font-medium text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full border border-amber-200/50">
+                      <span className="text-[10px] font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 px-1.5 py-0.5 rounded-full border border-amber-200/50 dark:border-amber-500/30">
                         Template
                       </span>
                     )}

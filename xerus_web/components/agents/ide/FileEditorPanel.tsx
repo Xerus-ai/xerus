@@ -92,9 +92,9 @@ export function FileEditorPanel({
 
           {/* Running agent warning inside editor */}
           {isAgentRunning && activeFile && (
-            <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl mb-4 shrink-0">
-              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-              <p className="text-xs text-amber-800">
+            <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-500/30 rounded-xl mb-4 shrink-0">
+              <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+              <p className="text-xs text-amber-800 dark:text-amber-200">
                 Agent is running. Changes may be overwritten.
               </p>
             </div>

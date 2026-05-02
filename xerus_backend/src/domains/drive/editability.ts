@@ -25,6 +25,7 @@ const HIDDEN_PATTERNS: RegExp[] = [
     /^node_modules\//,
     /^\.next\//,
     /^drive\/mood-board\.md$/,
+    /^drive\/\..+/,
 ];
 
 // Read-only paths - visible but not writable.

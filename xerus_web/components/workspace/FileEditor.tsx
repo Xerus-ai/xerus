@@ -138,10 +138,10 @@ export function FileEditor({ path, name, size, onDirtyChange, className }: FileE
   const showSyntaxViewer = mode === 'view' && !isMd
 
   return (
-    <div className={cn("flex flex-col h-full min-h-0", className)}>
+    <div className={cn("relative h-full min-h-0", className)}>
 
-      {/* Content area */}
-      <div className="flex-1 min-h-0 overflow-hidden relative">
+      {/* Content area — fills the entire container */}
+      <div className="h-full overflow-hidden relative">
         {/* Read-only label — pure overlay, no card / no background */}
         {!isEditable && (
           <div
@@ -154,7 +154,7 @@ export function FileEditor({ path, name, size, onDirtyChange, className }: FileE
         )}
 
         {showPreview ? (
-          <MarkdownPreview content={content} className="h-full overflow-y-auto" />
+          <MarkdownPreview content={content} className="h-full overflow-y-auto pb-14" />
         ) : showEditor ? (
           <Suspense
             fallback={
@@ -172,17 +172,15 @@ export function FileEditor({ path, name, size, onDirtyChange, className }: FileE
             />
           </Suspense>
         ) : (
-          <SyntaxViewer content={content} filename={name} className="h-full" />
+          <SyntaxViewer content={content} filename={name} className="h-full pb-14" />
         )}
       </div>
 
-      {/* Footer Toolbar — overflow-proof layout.
-          Editor lives in a user-resizable panel, so viewport breakpoints can't
-          drive responsiveness. Instead: every fixed-width control is shrink-0,
-          and the word count is the only flex-1/min-w-0/truncate item — when
-          the panel narrows, the word count clips first while every button
-          stays fully visible. */}
-      <div className="mx-3 mb-3 mt-2 p-1 rounded-xl border border-surface-active bg-card flex items-center gap-2 shadow-sm shrink-0">
+      {/* Footer Toolbar — floats over content at the bottom.
+          Uses absolute positioning so it doesn't consume layout space.
+          Content areas have bottom padding (pb-14) to prevent last lines
+          from being permanently obscured. */}
+      <div className="absolute bottom-3 left-3 right-3 p-1 rounded-xl border border-surface-active bg-card/95 backdrop-blur-sm flex items-center gap-2 shadow-sm z-10">
         <button
           disabled
           aria-label="Write with AI"

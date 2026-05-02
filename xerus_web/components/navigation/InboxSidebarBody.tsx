@@ -172,16 +172,20 @@ export function InboxSidebarBody({ counts, markRead, showNewRow, onNewRowDone }:
           const domainUnread = domain.channels.reduce((sum, ch) => sum + (counts[ch.id] ?? 0), 0)
           return (
             <div key={domain.id} className="mb-1">
-              <button onClick={() => toggleDomain(domain.id)} className="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-text hover:bg-surface-hover transition-colors group">
-                {isExpanded ? <ChevronDown className="w-4 h-4 text-text-secondary shrink-0" /> : <ChevronRight className="w-4 h-4 text-text-secondary shrink-0" />}
-                {isExpanded ? <FolderOpen className="w-[18px] h-[18px] text-secondary shrink-0" /> : <Folder className="w-[18px] h-[18px] text-text-secondary shrink-0" />}
-                <span className="flex-1 text-left truncate">{domain.name}</span>
-                {domainUnread > 0 ? (
-                  <span className="min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full bg-secondary/15 text-secondary text-[11px] font-semibold tabular-nums">{domainUnread > 99 ? '99+' : domainUnread}</span>
-                ) : (
-                  <span className="text-xs font-medium text-text-muted tabular-nums">{domain.channels.length}</span>
-                )}
-              </button>
+              <div className="flex items-center gap-0 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-text hover:bg-surface-hover transition-colors group">
+                <button onClick={(e) => { e.stopPropagation(); toggleDomain(domain.id) }} className="shrink-0 p-0.5 -ml-0.5 rounded hover:bg-surface-active/50 transition-colors" aria-label={isExpanded ? 'Collapse' : 'Expand'}>
+                  {isExpanded ? <ChevronDown className="w-4 h-4 text-text-secondary" /> : <ChevronRight className="w-4 h-4 text-text-secondary" />}
+                </button>
+                <Link href={`/inbox/${domain.slug}`} onClick={() => { if (!isExpanded) toggleDomain(domain.id) }} className="flex items-center gap-2.5 flex-1 min-w-0 ml-1">
+                  {isExpanded ? <FolderOpen className="w-[18px] h-[18px] text-secondary shrink-0" /> : <Folder className="w-[18px] h-[18px] text-text-secondary shrink-0" />}
+                  <span className="flex-1 text-left truncate">{domain.name}</span>
+                  {domainUnread > 0 ? (
+                    <span className="min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full bg-secondary/15 text-secondary text-[11px] font-semibold tabular-nums">{domainUnread > 99 ? '99+' : domainUnread}</span>
+                  ) : (
+                    <span className="text-xs font-medium text-text-muted tabular-nums">{domain.channels.length}</span>
+                  )}
+                </Link>
+              </div>
               <div className={cn('overflow-hidden transition-all duration-200', isExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0')}>
                 <div className="pl-7 pr-2 py-0.5 space-y-0.5">
                   {domain.channels.map((channel) => {

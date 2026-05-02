@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { FolderOpen, Upload, LayoutGrid, FolderClosed } from 'lucide-react'
+import { FolderOpen } from 'lucide-react'
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from 'react-resizable-panels'
 import { motion, useReducedMotion } from 'framer-motion'
 import { XerusLoader } from '@/components/common/XerusLoader'
@@ -196,6 +196,12 @@ export default function WorkspacePage() {
     }
   }, [])
 
+  useEffect(() => {
+    const handleUploadEvent = () => { setUploadTargetPath('drive'); setUploadPanelOpen(true) }
+    window.addEventListener('xerus:upload', handleUploadEvent)
+    return () => window.removeEventListener('xerus:upload', handleUploadEvent)
+  }, [])
+
   const reduceMotion = useReducedMotion()
 
   // Stable callbacks for panels (rule: rerender-functional-setstate)
@@ -230,51 +236,6 @@ export default function WorkspacePage() {
     <FloatingPanelProvider>
       <div className="flex flex-col h-screen overflow-hidden">
         <div className="flex-1 flex flex-col min-w-0 min-h-0">
-          {/* Toolbar */}
-          <div className="flex items-center justify-between px-4 py-2 border-b border-surface-active/40 shrink-0">
-            <div className="flex items-center gap-3">
-              <h3 className="text-sm font-medium text-text capitalize">
-                {activeSection === 'files' ? 'All Files'
-                  : activeSection === 'browse' ? (currentDirPath?.split('/').pop() || 'Browse')
-                  : activeSection === 'connectors' ? 'Connectors'
-                  : activeSection}
-              </h3>
-              {hasUIMode && (
-                <div className="flex bg-surface-hover/50 p-0.5 rounded-lg">
-                  <button
-                    onClick={() => handleContentViewChange('ui')}
-                    className={cn(
-                      'flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all',
-                      contentViewMode === 'ui' ? 'bg-white text-text shadow-sm' : 'text-text-secondary hover:text-text'
-                    )}
-                  >
-                    <LayoutGrid className="w-3 h-3" />
-                    Cards
-                  </button>
-                  <button
-                    onClick={() => handleContentViewChange('browse')}
-                    className={cn(
-                      'flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all',
-                      contentViewMode === 'browse' ? 'bg-white text-text shadow-sm' : 'text-text-secondary hover:text-text'
-                    )}
-                  >
-                    <FolderClosed className="w-3 h-3" />
-                    Files
-                  </button>
-                </div>
-              )}
-            </div>
-            {showFileBrowser && (
-              <button
-                onClick={() => { setUploadTargetPath('drive'); setUploadPanelOpen(true) }}
-                className="p-1.5 rounded-lg hover:bg-surface-hover text-text-secondary hover:text-text transition-colors"
-                title="Upload file"
-              >
-                <Upload className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
           {/* Content area */}
           <div className="flex-1 overflow-hidden">
             {showDetailView && detailView ? (

@@ -83,7 +83,7 @@ export function FileCard({
 
         {/* Badges */}
         {showTemplate && (
-          <span className="text-[10px] font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/50">
+          <span className="text-[10px] font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 px-2 py-0.5 rounded-full border border-amber-200/50 dark:border-amber-500/30">
             Template
           </span>
         )}

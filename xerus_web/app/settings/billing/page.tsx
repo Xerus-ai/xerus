@@ -197,8 +197,8 @@ export default function BillingPage() {
               className={cn(
                 'rounded-2xl border p-5 mb-4',
                 subscription.subscription_status === 'revoked'
-                  ? 'bg-red-50/30 border-red-200/60'
-                  : 'bg-amber-50/30 border-amber-200/60'
+                  ? 'bg-red-50/30 dark:bg-red-950/30 border-red-200/60 dark:border-red-500/30'
+                  : 'bg-amber-50/30 dark:bg-amber-950/30 border-amber-200/60 dark:border-amber-500/30'
               )}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
@@ -288,10 +288,10 @@ export default function BillingPage() {
                     <span className={cn(
                       'text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full',
                       subscription.subscription_status === 'active'
-                        ? 'text-emerald-600 bg-emerald-50'
+                        ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50'
                         : subscription.subscription_status === 'canceled'
-                          ? 'text-amber-600 bg-amber-50'
-                          : 'text-red-600 bg-red-50'
+                          ? 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50'
+                          : 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/50'
                     )}>
                       {subscription.subscription_status}
                     </span>

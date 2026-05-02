@@ -229,16 +229,16 @@ export function ChannelHeader({
               <PopoverTrigger asChild>
                 <button
                   className={cn(
-                    'flex items-center gap-1.5 rounded-full transition-colors',
+                    'flex items-center gap-1.5 rounded-lg transition-colors',
                     'min-h-[44px] min-w-[44px] justify-center',
                     'hover:bg-secondary/8 text-secondary',
-                    'sm:min-h-0 sm:min-w-0 sm:px-3 sm:py-1.5 sm:text-xs sm:font-medium sm:border sm:border-secondary/20 sm:hover:border-secondary/40',
+                    'sm:min-h-0 sm:min-w-0 sm:px-2 sm:py-1 sm:text-sm sm:font-medium',
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary/40',
                   )}
                   aria-label={agentPopoverOpen ? 'Close agent manager' : 'Manage channel agents'}
                   data-testid="channel-manage-agents"
                 >
-                  {agentPopoverOpen ? <X className="w-5 h-5 sm:w-3.5 sm:h-3.5" /> : <Plus className="w-5 h-5 sm:w-3.5 sm:h-3.5" />}
+                  {agentPopoverOpen ? <X className="w-5 h-5 sm:w-4 sm:h-4" /> : <Plus className="w-5 h-5 sm:w-4 sm:h-4" />}
                   <span className="hidden sm:inline">
                     {channelAgents.length > 0 ? 'Manage agents' : 'Add agent'}
                   </span>
