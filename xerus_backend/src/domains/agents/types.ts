@@ -168,11 +168,11 @@ export interface EnrichedTool {
 }
 
 // Default model for new agents (OpenRouter format: vendor/model-name)
-export const DEFAULT_MODEL = 'anthropic/claude-sonnet-4.6';
+export const DEFAULT_MODEL = 'anthropic/claude-sonnet-4';
 
 // Default model in OpenRouter format (vendor/model).
 // Used by runner config.json and SDK CLI (routed through OpenRouter).
-export const DEFAULT_SDK_MODEL = 'anthropic/claude-sonnet-4.6';
+export const DEFAULT_SDK_MODEL = 'anthropic/claude-sonnet-4';
 
 // Lightweight model for cheap operations (memory extraction, compression, delegation patterns)
 export const DEFAULT_LIGHT_MODEL = 'anthropic/claude-haiku-4-5-20251001';
