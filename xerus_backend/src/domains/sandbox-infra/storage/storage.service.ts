@@ -218,6 +218,25 @@ export class StorageService {
         }
     }
 
+    async headObjectWithMetadata(key: string): Promise<{ metadata?: Record<string, string> } | null> {
+        if (!key) throw new Error('S3 key is required');
+        const command = new HeadObjectCommand({
+            Bucket: this.config.bucket,
+            Key: key,
+        });
+
+        try {
+            const response = await this.client.send(command);
+            return { metadata: response.Metadata };
+        } catch (error) {
+            const err = error as { name?: string };
+            if (err.name === 'NotFound' || err.name === 'NoSuchKey') {
+                return null;
+            }
+            throw error;
+        }
+    }
+
     async exists(key: string): Promise<boolean> {
         if (!key) throw new Error('S3 key is required');
         const command = new HeadObjectCommand({

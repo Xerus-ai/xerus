@@ -4,6 +4,7 @@
 import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
 import type { AdapterType } from './types';
 import type { ResolvedExecutionDeps } from './execution-pipeline.types';
+import { parseAgentYamlFields } from '../../shared/agent-yaml-parser';
 
 // -----------------------------------------------------------------------------
 // Agent Config Resolution
@@ -24,21 +25,38 @@ export async function resolveAgentConfig(
     sandboxId: string,
     agentSlug: string,
 ): Promise<ResolvedAgentConfig> {
+    const provider = deps.sandboxService.getDaytonaProvider();
+    const ws = SANDBOX_CONFIG.workspacePath;
+
+    // Try agent.yaml (gitagent-protocol) first, fall back to config.json
     try {
-        const configPath = `${SANDBOX_CONFIG.workspacePath}/agents/${agentSlug}/config.json`;
-        const raw = await deps.sandboxService.getDaytonaProvider().readFile(sandboxId, configPath);
+        const yamlPath = `${ws}/agents/${agentSlug}/agent.yaml`;
+        const raw = await provider.readFile(sandboxId, yamlPath);
+        const fields = parseAgentYamlFields(raw);
+        return {
+            adapterType: fields.adapter_type === 'codex' ? 'codex' : 'claudecode',
+            model: fields.preferred?.trim() || undefined,
+        };
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (!message.includes('ENOENT') && !message.includes('No such file') && !message.includes('not found')) {
+            throw err;
+        }
+    }
+
+    try {
+        const configPath = `${ws}/agents/${agentSlug}/config.json`;
+        const raw = await provider.readFile(sandboxId, configPath);
         const config = JSON.parse(raw) as { adapter_type?: string; model?: string };
         return {
             adapterType: config.adapter_type === 'codex' ? 'codex' : 'claudecode',
             model: config.model || undefined,
         };
     } catch (err: unknown) {
-        // File not found is acceptable — default to claudecode, no model override
         const message = err instanceof Error ? err.message : String(err);
         if (message.includes('ENOENT') || message.includes('No such file') || message.includes('not found')) {
             return { adapterType: 'claudecode', model: undefined };
         }
-        // Config exists but is corrupt or unreadable — fail fast
         throw err;
     }
 }
@@ -71,12 +89,6 @@ export async function resolveAgentIdentity(
     const provider = deps.sandboxService.getDaytonaProvider();
     const ws = SANDBOX_CONFIG.workspacePath;
 
-    // Try both path conventions: .claude/agents/{slug}/ and agents/{slug}/
-    const pathSets = [
-        { soul: `${ws}/.claude/agents/${agentSlug}/SOUL.md`, module: `${ws}/.claude/agents/${agentSlug}/CLAUDE.md` },
-        { soul: `${ws}/agents/${agentSlug}/SOUL.md`, module: `${ws}/agents/${agentSlug}/CLAUDE.md` },
-    ];
-
     async function tryRead(filePath: string): Promise<string> {
         try {
             return await provider.readFile(sandboxId, filePath);
@@ -85,12 +97,22 @@ export async function resolveAgentIdentity(
         }
     }
 
+    // Try both path conventions: .claude/agents/{slug}/ and agents/{slug}/
+    const pathSets = [
+        `${ws}/.claude/agents/${agentSlug}`,
+        `${ws}/agents/${agentSlug}`,
+    ];
+
     let soulContent = '';
     let moduleContent = '';
+    let rulesContent = '';
+    let operatingContent = '';
 
-    for (const paths of pathSets) {
-        if (!soulContent) soulContent = await tryRead(paths.soul);
-        if (!moduleContent) moduleContent = await tryRead(paths.module);
+    for (const base of pathSets) {
+        if (!soulContent) soulContent = await tryRead(`${base}/SOUL.md`);
+        if (!moduleContent) moduleContent = await tryRead(`${base}/CLAUDE.md`);
+        if (!rulesContent) rulesContent = await tryRead(`${base}/RULES.md`);
+        if (!operatingContent) operatingContent = await tryRead(`${base}/OPERATING.md`);
         if (soulContent || moduleContent) break;
     }
 
@@ -107,6 +129,12 @@ export async function resolveAgentIdentity(
 
     if (soulContent) {
         sections.push(soulContent.trim(), '');
+    }
+    if (rulesContent) {
+        sections.push(rulesContent.trim(), '');
+    }
+    if (operatingContent) {
+        sections.push(operatingContent.trim(), '');
     }
     if (moduleContent) {
         sections.push(moduleContent.trim(), '');

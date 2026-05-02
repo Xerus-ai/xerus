@@ -190,6 +190,7 @@ async function startServer(): Promise<void> {
                 download: storageService.download.bind(storageService),
                 delete: storageService.delete.bind(storageService),
                 list: storageService.list.bind(storageService),
+                head: storageService.headObjectWithMetadata.bind(storageService),
             });
             log.info('S3BackupService initialized');
         } else {

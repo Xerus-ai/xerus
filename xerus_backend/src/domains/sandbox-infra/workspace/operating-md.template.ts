@@ -116,11 +116,50 @@ export function generateOperatingMd(params: OperatingMdParams): string {
     sections.push('2. Address issues before marking complete');
     sections.push('');
 
+    // Session Start Protocol
+    sections.push('## Session Start');
+    sections.push('');
+    sections.push('1. Read `' + memBase + '/agents/' + params.agentSlug + '/.task-context.md` (your assignment)');
+    sections.push('2. If BLOCKED: output blocked message, end session');
+    sections.push('3. If READY: execute the task described, nothing else');
+    sections.push('4. If IDLE: read HEARTBEAT.md for proactive tasks, then read working.md');
+    sections.push('5. Check `agents/' + params.agentSlug + '/inbox/` for coordination messages');
+    if (params.channelSlug) {
+        sections.push('6. If channel lead: check `.channel/state/handoffs/` for recent handoff from previous shift');
+    }
+    sections.push('');
+
+    // Channel Lead Duties
+    if (params.channelSlug) {
+        sections.push('## If Channel Lead');
+        sections.push('');
+        sections.push('- On first session of the day: TeamCreate with all channel_members');
+        sections.push('- Distribute tasks to teammates via TaskCreate');
+        sections.push('- Monitor teammate progress via SendMessage');
+        sections.push('- Run daily standup: collect updates from each agent, post summary');
+        sections.push('');
+    }
+
     // Communication
     sections.push('## Communication');
     sections.push('');
-    sections.push('- Post progress to `output/posts.jsonl`');
+    sections.push('- Post updates to `output/posts.jsonl` in your channel');
+    sections.push('- For agent-to-agent: use coordination message with `target_agent` in metadata');
+    sections.push('- For escalation: set `metadata.requires_approval: true`');
+    if (params.channelSlug && params.domainSlug) {
+        sections.push('- For cross-channel: post to target channel\'s `output/posts.jsonl`');
+    }
     sections.push('- When blocked: write to `agents/xerus-master/inbox/`');
+    sections.push('');
+
+    // Before Session End
+    sections.push('## Before Session End');
+    sections.push('');
+    sections.push('1. Save state to `' + memBase + '/agents/' + params.agentSlug + '/working.md`');
+    sections.push('2. Update `agents/' + params.agentSlug + '/STATUS.md` (mood, energy, active focus)');
+    if (params.channelSlug) {
+        sections.push('3. If shift ending and next-shift agent exists: write handoff to `.channel/state/handoffs/`');
+    }
 
     return sections.join('\n') + '\n';
 }

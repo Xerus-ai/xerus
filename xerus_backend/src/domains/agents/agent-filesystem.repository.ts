@@ -5,6 +5,7 @@
 import { DriveService } from '../drive/drive.service';
 import type { PublicMetadata } from './types';
 import { generateMascotConfig } from './avatar';
+import { parseAgentYamlFields } from '../../shared/agent-yaml-parser';
 
 // Daytona SDK throws generic errors for missing files — match by message
 function isFileNotFoundError(err: unknown): boolean {
@@ -92,10 +93,47 @@ function normalizeConfig(raw: Record<string, unknown>): { config: AgentConfigFil
     return { config: raw as unknown as AgentConfigFile, dirty };
 }
 
+function parseAgentYamlToConfig(slug: string, raw: string): AgentConfigFile {
+    const f = parseAgentYamlFields(raw);
+
+    const rawAdapter = f.adapter_type;
+
+    return {
+        name: f.display_name || f.name || slug,
+        slug,
+        description: f.description || f.role || '',
+        personality_type: null,
+        mascot: f.mascot || generateMascotConfig(),
+        ai_model: f.preferred || 'sonnet',
+        thinking_level: 'medium',
+        autonomy_level: f.autonomy_level || 'supervised',
+        adapter_type: rawAdapter === 'codex' ? 'codex' : 'claudecode',
+        is_verified: false,
+        clone_count: 0,
+        tags: [],
+        public_metadata: null,
+        source_agent_id: null,
+        is_default: false,
+        execution_count: 0,
+        success_rate: 0,
+        last_used_at: null,
+        tools: [],
+        domain: f.domain || '',
+        primary_channel: f.primary_channel || '',
+        channels: [],
+        created_at: f.created_at || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+    };
+}
+
 export class AgentFilesystemRepository {
     constructor(private readonly driveService: DriveService) {}
 
     async getAgentConfig(userId: string, slug: string): Promise<AgentConfigFile | null> {
+        // Try agent.yaml (gitagent-protocol) first, fall back to config.json
+        const yamlConfig = await this.readAgentYaml(userId, slug);
+        if (yamlConfig) return yamlConfig;
+
         let raw: string;
         try {
             const result = await this.driveService.readFile(userId, `agents/${slug}/config.json`);
@@ -106,10 +144,21 @@ export class AgentFilesystemRepository {
         }
         const { config, dirty } = normalizeConfig(JSON.parse(raw));
         if (dirty) {
-            // Persist normalized fields so they stay stable across reads
             this.putAgentConfig(userId, slug, config).catch(() => {});
         }
         return config;
+    }
+
+    private async readAgentYaml(userId: string, slug: string): Promise<AgentConfigFile | null> {
+        let raw: string;
+        try {
+            const result = await this.driveService.readFile(userId, `agents/${slug}/agent.yaml`);
+            raw = result.content;
+        } catch (err) {
+            if (isFileNotFoundError(err)) return null;
+            throw err;
+        }
+        return parseAgentYamlToConfig(slug, raw);
     }
 
     async getAgentConfigs(userId: string, slugs: string[]): Promise<Map<string, AgentConfigFile>> {

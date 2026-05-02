@@ -12,6 +12,12 @@ import { query } from '../../database/connection';
 import type { SandboxService } from '../sandbox-infra';
 import { createDomain, createChannel, createChannelMessage } from '../company/company-workspace-db.service';
 import { createConversation } from '../conversations/workspace-db.service';
+import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
+import { sanitizeSlug } from '../../shared/slugify';
+import { logger } from '../../utils/logger';
+
+const log = logger('Onboarding');
+import { shellEscapePath } from '../../utils/shell-safety';
 
 const router = Router();
 const auth = authenticateFirebaseToken;
@@ -123,36 +129,59 @@ router.post('/handoff', auth, async (req: AuthenticatedRequest, res: Response, n
         const sandboxId = session.sandboxId;
         const provider = sandboxService.getDaytonaProvider();
 
-        // 3. Seed workspace-DB: domain + channel + conversation + welcome message
+        // 3. Seed workspace-DB: domain + channel (mirrors POST /company/domains flow)
         const domain = await createDomain(
             provider, sandboxId,
             projectSlug, projectDisplayName,
             `${projectDisplayName} department`,
         );
 
+        // Channel slug is domain-scoped (e.g. "marketing--general") to match the
+        // convention in company.routes.ts and satisfy PK uniqueness across projects.
+        const generalSlug = `${projectSlug}--general`;
         const channel = await createChannel(
             provider, sandboxId,
-            domain.slug, 'general', 'General',
+            domain.slug, generalSlug, 'General',
             'Default channel for team communication',
         );
 
-        const conversation = await createConversation(
-            provider, sandboxId,
-            'xerus-master', 'Onboarding',
-        );
+        // Create filesystem directories (projects/<slug>/channels/general/)
+        const domainDir = `${SANDBOX_CONFIG.workspacePath}/projects/${sanitizeSlug(projectSlug)}`;
+        const channelDir = `${domainDir}/channels/general`;
+        await provider.executeCommand(sandboxId, `mkdir -p ${shellEscapePath(channelDir)}`);
 
-        // 4. Seed welcome message as a channel message
-        await createChannelMessage(
-            provider, sandboxId,
-            channel.slug, 'agent', 'xerus-master',
-            welcomeMessage, 'post', {},
-        );
+        // Conversation + welcome message are best-effort: the agents table may
+        // not be populated yet (syncAgentsToWorkspace runs after workspace setup),
+        // so the FK on conversations.agent_slug can fail. Domain + channel are the
+        // critical deliverables — don't let a conversation FK failure block onboarding.
+        let conversationId: string | null = null;
+        try {
+            const conversation = await createConversation(
+                provider, sandboxId,
+                'xerus-master', 'Onboarding',
+            );
+            conversationId = conversation.id;
+
+            await createChannelMessage(
+                provider, sandboxId,
+                generalSlug, 'agent', 'xerus-master',
+                welcomeMessage, 'post', {},
+            );
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            if (msg.includes('FOREIGN KEY') || msg.includes('constraint')) {
+                log.info('Conversation seeding deferred (FK not yet satisfied)', { project: projectSlug });
+            } else {
+                log.warn('Conversation seeding failed', { error: msg });
+                throw err;
+            }
+        }
 
         sendResponse(res, 200, {
             workspace: { id: workspace.id, slug: workspace.slug, name: workspace.name },
             domain: { slug: domain.slug, name: domain.name },
             channel: { slug: channel.slug, name: channel.name },
-            conversation_id: conversation.id,
+            conversation_id: conversationId,
             sandbox_provisioned: true,
         }, startTime);
     } catch (err) {

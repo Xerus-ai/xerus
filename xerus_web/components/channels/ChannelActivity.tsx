@@ -373,21 +373,21 @@ export function ChannelActivity({ channelId, className, assignedAgents, onManage
       {/* Empty-agent guidance — prevents silent sends into channels with no agents */}
       {!hasAssignedAgents && !isLoading && (
         <div
-          className="mx-4 mb-2 flex items-start gap-2.5 rounded-xl border border-amber-400/30 bg-amber-50/40 px-3.5 py-2.5"
+          className="mx-4 mb-2 flex items-start gap-2.5 rounded-xl border border-amber-400/30 dark:border-amber-500/30 bg-amber-50/40 dark:bg-amber-950/40 px-3.5 py-2.5"
           role="status"
           data-testid="channel-no-agents-banner"
         >
-          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium text-text">No agents in this channel yet</p>
-            <p className="text-[11px] text-text-secondary mt-0.5">
+            <p className="text-[11px] text-text-secondary dark:text-text mt-0.5">
               Assign an agent so they can see and respond to messages you post here.
             </p>
           </div>
           {onManageAgents && (
             <button
               onClick={onManageAgents}
-              className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium text-secondary bg-secondary/10 hover:bg-secondary/15 transition-colors"
+              className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium text-secondary bg-secondary/10 hover:bg-secondary/15 dark:bg-secondary/20 dark:hover:bg-secondary/25 transition-colors"
             >
               <Users className="w-3 h-3" />
               Add agent

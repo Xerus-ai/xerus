@@ -1,5 +1,5 @@
 // S3 Backup Service Tests
-// Tests for workspace snapshot backup and retention
+// Tests for workspace snapshot backup, retention, and deduplication
 
 import {
     S3BackupService,
@@ -20,6 +20,12 @@ class InMemoryS3 {
         const entry = this.store.get(key);
         if (!entry) throw new Error(`Key not found: ${key}`);
         return entry;
+    }
+
+    async head(key: string): Promise<{ metadata?: Record<string, string> } | null> {
+        const entry = this.store.get(key);
+        if (!entry) return null;
+        return { metadata: entry.metadata };
     }
 
     async delete(key: string): Promise<void> {
@@ -49,6 +55,16 @@ class InMemoryS3 {
     }
 }
 
+function createDeps(s3: InMemoryS3): S3BackupDeps {
+    return {
+        upload: s3.upload.bind(s3),
+        download: s3.download.bind(s3),
+        delete: s3.delete.bind(s3),
+        list: s3.list.bind(s3),
+        head: s3.head.bind(s3),
+    };
+}
+
 // ---- Tests ----
 
 describe('S3BackupService', () => {
@@ -57,13 +73,7 @@ describe('S3BackupService', () => {
 
     beforeEach(() => {
         s3 = new InMemoryS3();
-        const deps: S3BackupDeps = {
-            upload: s3.upload.bind(s3),
-            download: s3.download.bind(s3),
-            delete: s3.delete.bind(s3),
-            list: s3.list.bind(s3),
-        };
-        service = new S3BackupService(deps);
+        service = new S3BackupService(createDeps(s3));
     });
 
     describe('createSnapshot', () => {
@@ -88,6 +98,59 @@ describe('S3BackupService', () => {
             const downloaded = await s3.download(result.snapshotKey);
             expect(downloaded.content).toEqual(content);
         });
+
+        it('stores content hash in metadata', async () => {
+            const content = Buffer.from('hashable data');
+            const result = await service.createSnapshot('user-hash', content);
+
+            const meta = await s3.head(result.snapshotKey);
+            expect(meta?.metadata?.content_sha256).toBeDefined();
+            expect(meta?.metadata?.content_sha256).toHaveLength(64);
+        });
+    });
+
+    describe('deduplication', () => {
+        it('skips upload when content is unchanged', async () => {
+            const content = Buffer.from('same workspace data');
+            const first = await service.createSnapshot('user-dedup', content);
+            expect(first.skipped).toBeUndefined();
+
+            const second = await service.createSnapshot('user-dedup', content);
+            expect(second.skipped).toBe(true);
+            expect(second.snapshotKey).toBe(first.snapshotKey);
+
+            const snapshots = await service.listSnapshots('user-dedup');
+            expect(snapshots).toHaveLength(1);
+        });
+
+        it('uploads when content changes', async () => {
+            await service.createSnapshot('user-changed', Buffer.from('version-1'));
+            const second = await service.createSnapshot('user-changed', Buffer.from('version-2'));
+            expect(second.skipped).toBeUndefined();
+
+            const snapshots = await service.listSnapshots('user-changed');
+            expect(snapshots).toHaveLength(2);
+        });
+
+        it('uploads when no previous snapshot exists', async () => {
+            const result = await service.createSnapshot('user-fresh', Buffer.from('first'));
+            expect(result.skipped).toBeUndefined();
+            expect(result.success).toBe(true);
+        });
+
+        it('works without head dep (falls back to download)', async () => {
+            const noHeadService = new S3BackupService({
+                upload: s3.upload.bind(s3),
+                download: s3.download.bind(s3),
+                delete: s3.delete.bind(s3),
+                list: s3.list.bind(s3),
+            });
+
+            const content = Buffer.from('fallback test');
+            await noHeadService.createSnapshot('user-nohead', content);
+            const second = await noHeadService.createSnapshot('user-nohead', content);
+            expect(second.skipped).toBe(true);
+        });
     });
 
     describe('listSnapshots', () => {
@@ -108,10 +171,7 @@ describe('S3BackupService', () => {
     describe('enforceRetention', () => {
         it('keeps only the last N snapshots', async () => {
             const retentionService = new S3BackupService({
-                upload: s3.upload.bind(s3),
-                download: s3.download.bind(s3),
-                delete: s3.delete.bind(s3),
-                list: s3.list.bind(s3),
+                ...createDeps(s3),
                 maxSnapshots: 3,
             });
 

@@ -82,6 +82,14 @@ export async function ensureWorkspaceIntegrity(
         log.info('Personalized workspace', { files_created: result.createdFiles.length });
     }
 
+    // Seed drive/ starter files once (handles sandboxes created before drive/ existed).
+    // Gated behind sentinel to skip ~15 filesystem ops on subsequent resumes.
+    const driveSeedPath = `${SANDBOX_CONFIG.workspacePath}/drive/.seeded`;
+    if (!(await sandboxFs.exists(driveSeedPath))) {
+        await personalizeWorkspace(sandboxFs, { userId });
+        try { await sandboxFs.writeFile(driveSeedPath, new Date().toISOString()); } catch { /* best-effort sentinel */ }
+    }
+
     // Sync DB agents into workspace (scaffold any missing ones, update index.json)
     if (db) {
         await syncAgentsToWorkspace(sandboxFs, userId, db);

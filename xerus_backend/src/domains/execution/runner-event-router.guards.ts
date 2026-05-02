@@ -65,7 +65,7 @@ export interface AgentMessageEventData {
     content: string;
     agent_slug?: string;
     project?: string;
-    message_type?: 'chat' | 'task_update' | 'status' | 'system';
+    message_type?: 'chat' | 'task_update' | 'status' | 'system' | 'coordination';
     metadata?: Record<string, unknown>;
 }
 
@@ -224,8 +224,8 @@ export function assertAgentMessageData(d: Record<string, unknown>): AgentMessage
     };
 }
 
-function isMessageType(v: unknown): v is 'chat' | 'task_update' | 'status' | 'system' {
-    return v === 'chat' || v === 'task_update' || v === 'status' || v === 'system';
+function isMessageType(v: unknown): v is 'chat' | 'task_update' | 'status' | 'system' | 'coordination' {
+    return v === 'chat' || v === 'task_update' || v === 'status' || v === 'system' || v === 'coordination';
 }
 
 export function assertHookLogData(d: Record<string, unknown>): HookLogEventData {

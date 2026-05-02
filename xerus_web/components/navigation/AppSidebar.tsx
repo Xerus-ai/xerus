@@ -7,7 +7,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import useSWR from 'swr'
 import {
   MessageSquare, Inbox, Home,
-  Bot, Puzzle, Unplug, FileText, Files, Folder, Settings,
+  Bot, Puzzle, Unplug, FileText, Files, Folder, Settings, Upload,
   PanelLeftClose, PanelLeftOpen,
   Plus,
 } from 'lucide-react'
@@ -58,6 +58,12 @@ export function AppSidebar() {
     navigateToPath(path)
     if (!isOnWorkspaceRef.current) router.push('/workspace')
   }, [navigateToPath, router])
+
+  const handleUploadClick = useCallback(() => {
+    setActiveSection('knowledge')
+    if (!isOnWorkspaceRef.current) router.push('/workspace')
+    window.dispatchEvent(new CustomEvent('xerus:upload'))
+  }, [setActiveSection, router])
 
   // ---- Collapsed mode ----
   if (collapsed) {
@@ -155,6 +161,7 @@ export function AppSidebar() {
             isOnWorkspace={isOnWorkspace}
             onSectionClick={handleSectionClick}
             onPathClick={handlePathClick}
+            onUploadClick={handleUploadClick}
           />
         ) : activeTab === 'chat' ? (
           SlotComponent ? <SlotComponent /> : <ChatSidebarLoading />
@@ -186,11 +193,12 @@ export function AppSidebar() {
 }
 
 /* ---- Home body: Dynamic from workspace overview ---- */
-function HomeSidebarBody({ activeSection, isOnWorkspace, onSectionClick, onPathClick }: {
+function HomeSidebarBody({ activeSection, isOnWorkspace, onSectionClick, onPathClick, onUploadClick }: {
   activeSection: WorkspaceSection
   isOnWorkspace: boolean
   onSectionClick: (section: WorkspaceSection) => void
   onPathClick: (path: string) => void
+  onUploadClick: () => void
 }) {
   const { data: overview } = useSWR('workspace/overview', getWorkspaceOverview, {
     revalidateOnFocus: false,
@@ -201,7 +209,16 @@ function HomeSidebarBody({ activeSection, isOnWorkspace, onSectionClick, onPathC
     <nav className="px-3 py-3 space-y-5">
       {/* Workspace — drive content */}
       <div>
-        <p className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-2 px-3">Workspace</p>
+        <div className="flex items-center justify-between mb-2 px-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-text-muted">Workspace</p>
+          <button
+            onClick={onUploadClick}
+            className="p-1 rounded-md hover:bg-surface-hover text-text-muted hover:text-text transition-colors"
+            title="Upload file"
+          >
+            <Upload className="w-3.5 h-3.5" />
+          </button>
+        </div>
         <div className="space-y-0.5">
           {(overview?.folders?.length ?? 0) + (overview?.documents?.length ?? 0) > 0 ? (
             <>

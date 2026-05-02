@@ -25,6 +25,7 @@ import {
     runBrowserSetup,
 } from './sandbox-setup';
 import type { S3BackupService } from '../storage/s3-backup.service';
+import { syncWorkspaceTemplate } from './workspace-template-sync';
 
 const log = logger('SandboxService');
 
@@ -146,6 +147,25 @@ export class SandboxService {
         // Restore latest S3 snapshot if available (user data: memory, agents, KB)
         await this.tryRestoreSnapshot(sandbox.sandboxId, userId);
 
+        // Re-overlay platform-owned template files that S3 restore may have overwritten.
+        // S3 snapshots predate newer template versions, so the restore can wipe out
+        // new files like .agent/templates/*.tmpl, .agent/scripts/*, scaffold.json.
+        const daytonaProviderForSync = this.getDaytonaProvider();
+        try {
+            const syncResult = await syncWorkspaceTemplate(daytonaProviderForSync, sandbox.sandboxId);
+            log.info('Re-synced workspace template after S3 restore', {
+                sandbox_id: sandbox.sandboxId,
+                updated: syncResult.updatedPaths.length,
+                skipped: syncResult.skippedPaths.length,
+                duration_ms: syncResult.durationMs,
+            });
+        } catch (syncErr) {
+            log.warn('Template re-sync after S3 restore failed (non-blocking)', {
+                sandbox_id: sandbox.sandboxId,
+                error: (syncErr as Error).message,
+            });
+        }
+
         // Write dynamic content (userId in settings, master memory seeds, company.db)
         // Runs AFTER restore so personalize fixes up any stale config from snapshot
         await runWorkspacePersonalize(sandbox.sandboxId, userId, deps);
@@ -178,7 +198,7 @@ export class SandboxService {
         const daytonaProvider = this.provider as DaytonaProvider;
         if (daytonaProvider.resizeSandbox) {
             // Daytona constraint: disk can only increase, never decrease.
-            // CPU/memory support both directions via hot resize.
+            // CPU/memory decrease requires the sandbox to be stopped first.
             // Build resize request with only feasible changes.
             const snapshotDefaults = { cpu: 2, memory: 4, disk: 20 };
             const resizeRequest: { cpu?: number; memory?: number; disk?: number } = {};
@@ -195,18 +215,20 @@ export class SandboxService {
             }
 
             if (Object.keys(resizeRequest).length > 0) {
-                const needsDiskResize = resizeRequest.disk !== undefined;
+                const needsStop = (resizeRequest.cpu !== undefined && resizeRequest.cpu < snapshotDefaults.cpu)
+                    || (resizeRequest.memory !== undefined && resizeRequest.memory < snapshotDefaults.memory)
+                    || resizeRequest.disk !== undefined;
                 try {
-                    if (needsDiskResize) {
+                    if (needsStop) {
                         await this.provider.pause(sandbox.sandboxId);
                     }
                     await daytonaProvider.resizeSandbox(sandbox.sandboxId, resizeRequest);
-                    if (needsDiskResize) {
+                    if (needsStop) {
                         await daytonaProvider.start(sandbox.sandboxId);
                     }
                     log.info('Sandbox resized for plan', { sandbox_id: sandbox.sandboxId, plan: planType, resized: resizeRequest });
                 } catch (resizeErr) {
-                    if (needsDiskResize) {
+                    if (needsStop) {
                         try { await daytonaProvider.start(sandbox.sandboxId); } catch { /* best effort */ }
                     }
                     throw new Error(`Sandbox resize failed for plan ${planType}: ${(resizeErr as Error).message}`);

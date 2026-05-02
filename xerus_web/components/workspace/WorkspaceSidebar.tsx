@@ -1,7 +1,7 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { Bot, Puzzle, BookOpen, Brain, FolderKanban, Files } from 'lucide-react'
+import { Bot, Puzzle, BookOpen, Brain, FolderKanban, Files, Upload } from 'lucide-react'
 
 import type { WorkspaceSection } from '@/components/layout/WorkspaceSectionContext'
 
@@ -18,15 +18,25 @@ interface WorkspaceSidebarProps {
   activeSection: WorkspaceSection
   onSectionChange: (section: WorkspaceSection) => void
   counts?: Partial<Record<WorkspaceSection, number>>
+  onUploadClick?: () => void
 }
 
-export function WorkspaceSidebar({ activeSection, onSectionChange, counts }: WorkspaceSidebarProps) {
+export function WorkspaceSidebar({ activeSection, onSectionChange, counts, onUploadClick }: WorkspaceSidebarProps) {
   return (
     <>
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex w-[220px] flex-shrink-0 border-r border-surface-active/50 bg-surface-alt/40 flex-col">
-        <div className="px-4 pt-4 pb-2">
+        <div className="px-4 pt-4 pb-2 flex items-center justify-between">
           <h2 className="font-serif text-lg text-text tracking-tight">Workspace</h2>
+          {onUploadClick && (
+            <button
+              onClick={onUploadClick}
+              className="p-1.5 rounded-lg hover:bg-surface-hover text-text-secondary hover:text-text transition-colors"
+              title="Upload file"
+            >
+              <Upload className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
         <nav className="flex-1 px-2 py-2 space-y-0.5">

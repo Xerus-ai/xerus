@@ -157,6 +157,28 @@ describe('personalizeWorkspace', () => {
         });
     });
 
+    describe('drive seed files', () => {
+        it('creates company.md and welcome.md in drive/', async () => {
+            await personalizeWorkspace(fs, { userId: 'user-1' }, BASE_PATH);
+
+            const companyPath = `${BASE_PATH}/drive/company.md`;
+            const welcomePath = `${BASE_PATH}/drive/welcome.md`;
+            expect(fs.files.has(companyPath)).toBe(true);
+            expect(fs.files.get(companyPath)).toContain('# Company');
+            expect(fs.files.has(welcomePath)).toBe(true);
+            expect(fs.files.get(welcomePath)).toContain('# Welcome to Xerus');
+        });
+
+        it('does not overwrite existing drive files', async () => {
+            const companyPath = `${BASE_PATH}/drive/company.md`;
+            fs.files.set(companyPath, '# My Real Company Info');
+
+            await personalizeWorkspace(fs, { userId: 'user-1' }, BASE_PATH);
+
+            expect(fs.files.get(companyPath)).toBe('# My Real Company Info');
+        });
+    });
+
     describe('result shape', () => {
         it('reports success true', async () => {
             const result = await personalizeWorkspace(fs, { userId: 'user-1' }, BASE_PATH);
@@ -176,8 +198,8 @@ describe('personalizeWorkspace', () => {
 
         it('lists only dynamically created files', async () => {
             const result = await personalizeWorkspace(fs, { userId: 'user-1' }, BASE_PATH);
-            // 2 agents (xerus-master, xerus-cto) x 2 files (working.md, expertise.md) + company.db = 5
-            expect(result.createdFiles.length).toBe(5);
+            // 2 agents (xerus-master, xerus-cto) x 2 files (working.md, expertise.md) + company.db + 2 drive seeds = 7
+            expect(result.createdFiles.length).toBe(7);
         });
     });
 
@@ -185,7 +207,7 @@ describe('personalizeWorkspace', () => {
         it('is safe to run twice without duplicating files', async () => {
             const result1 = await personalizeWorkspace(fs, { userId: 'user-1' }, BASE_PATH);
             expect(result1.success).toBe(true);
-            expect(result1.createdFiles.length).toBe(5);
+            expect(result1.createdFiles.length).toBe(7);
 
             const result2 = await personalizeWorkspace(fs, { userId: 'user-1' }, BASE_PATH);
             expect(result2.success).toBe(true);
