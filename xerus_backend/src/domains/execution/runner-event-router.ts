@@ -4,14 +4,15 @@
 import { logger } from '../../utils/logger';
 import type { PipelineContext, ResolvedExecutionDeps } from './execution-pipeline.types';
 import { requireAgent } from './pipeline-guards';
-import { validateWorkspacePath } from '../../utils/path-validation';
-import { STREAM_EVENT_TYPES, type StreamEventType, type RunnerEventType } from './types';
+import { STREAM_EVENT_TYPES, type RunnerEventType } from './types';
 import type { HITLRequest } from './hitl/hitl.types';
 import { handleMetadataSync } from './metadata-sync-router';
 import { handleTriggerIndexing } from './indexing-event-handler';
+import { handleCliStreamEvent } from './cli-stream-router';
+import { dispatchCrossChannelCoordination, dispatchMentionToAgent } from './coordination-router';
+import { handleSseForward, handleAgentOutput } from './sse-forward-handler';
+import { FILE_WRITE_TOOLS, syncFileChangeToNeon, emitFileChangedFromToolCall } from './file-change-handler';
 import { ChannelNotFoundError, MentionParser } from '../inbox';
-// triggerAgentExecution callback is wired via ResolvedExecutionDeps (no circular dep)
-import { workspaceSSEBroadcaster, reverseSyncToDB } from '../drive';
 import { updateSdkSessionId } from '../conversations/workspace-db.service';
 import {
     assertToolCallData,
@@ -20,7 +21,6 @@ import {
     assertSessionEndedData,
     assertSessionCompletedData,
     assertCreditUsageData,
-    assertSseForwardData,
     assertCreateInboxItemData,
     assertAgentMessageData,
     assertHookLogData,
@@ -29,8 +29,6 @@ import {
     assertPushNotificationData,
     assertDelegationRecordData,
     assertHitlRequestData,
-    isTextContentBlock,
-    resolveContentBlocks,
 } from './runner-event-router.guards';
 
 const mentionParser = new MentionParser();
@@ -168,179 +166,14 @@ export async function routeEventToBackend(
         case 'hitl_request':
             await handleHitlRequest(d, ctx, deps);
             break;
-        // ----- CLI stream-json events (Claude Code --output-format stream-json) -----
+        // ----- CLI stream-json events — delegated to cli-stream-router.ts -----
         case 'user':
-            // Echo of our input message — ignore
-            break;
-
-        case 'stream_event': {
-            // Real-time streaming deltas from --include-partial-messages.
-            // Claude CLI wraps Anthropic API streaming events inside an `event` field:
-            //   {"type":"stream_event","event":{"type":"content_block_delta","delta":{...}}}
-            const nestedEvent = d.event as Record<string, unknown> | undefined;
-            if (!nestedEvent) break;
-
-            const streamType = nestedEvent.type as string | undefined;
-            const contentBlock = nestedEvent.content_block as Record<string, unknown> | undefined;
-            const delta = nestedEvent.delta as Record<string, unknown> | undefined;
-
-            if (streamType === 'content_block_delta' && delta) {
-                if (delta.type === 'text_delta' && typeof delta.text === 'string') {
-                    ctx.responseChunks.push(delta.text);
-                    ctx.stream.send('token' as StreamEventType, { text: delta.text, tokenCount: 0 });
-                } else if (delta.type === 'thinking_delta' && typeof delta.thinking === 'string') {
-                    ctx.thinkingChunks.push(delta.thinking);
-                    ctx.stream.send('reasoning' as StreamEventType, { thought: delta.thinking });
-                } else if (delta.type === 'input_json_delta' && typeof delta.partial_json === 'string') {
-                    // Tool input streaming — accumulate but don't send (tool_call sent on block_start)
-                }
-            } else if (streamType === 'content_block_start' && contentBlock) {
-                if (contentBlock.type === 'tool_use') {
-                    ctx.toolCallCount++;
-                    const callId = (contentBlock.id as string) || `tc-${ctx.toolCallCount}`;
-                    const toolName = (contentBlock.name as string) || 'unknown';
-                    ctx.toolCallDetails.push({ call_id: callId, tool_name: toolName, arguments: {}, started_at: Date.now() });
-                    ctx.toolCallMap.set(callId, ctx.toolCallDetails[ctx.toolCallDetails.length - 1]);
-                    ctx.stream.send('tool_call' as StreamEventType, { toolName, arguments: {}, callId });
-                }
-            } else if (streamType === 'content_block_stop') {
-                // Block finished — tool_result will come in the assistant message
-            }
-            break;
-        }
-
-        case 'system': {
-            const subtype = d.subtype as string | undefined;
-            if (subtype === 'init') {
-                // Capture CLI session_id for --resume on next message
-                const cliSessionId = d.session_id as string | undefined;
-                if (cliSessionId && ctx.conversationId && ctx.sandboxId) {
-                    const provider = deps.sandboxService.getDaytonaProvider();
-                    await updateSdkSessionId(provider, ctx.sandboxId, ctx.conversationId, cliSessionId);
-                    ctx.sdkSessionId = cliSessionId;
-                }
-                log.debug('CLI init', { model: d.model, tools_count: (d.tools as string[] | undefined)?.length });
-            } else if (subtype === 'hook_started' || subtype === 'hook_response') {
-                log.debug('CLI hook event', { hook_name: d.hook_name, subtype });
-            } else {
-                log.debug('CLI system event', { subtype });
-            }
-            break;
-        }
-
-        case 'assistant': {
-            // Full assistant message with all content blocks.
-            // With --include-partial-messages, text/thinking/tool_use blocks were
-            // already streamed in real-time via stream_event deltas. Here we:
-            // - Track text/thinking for persistence (ctx.responseText, ctx.thinkingChunks)
-            //   but DON'T re-emit as SSE (prevents duplicate tokens on frontend)
-            // - Emit tool_result SSE — only source for tool execution results
-            // - Track tool_use for metrics if not already seen in stream_event
-            const msg = d.message as Record<string, unknown> | undefined;
-            if (msg) {
-                const content = msg.content as Array<Record<string, unknown>> | undefined;
-                if (content) {
-                    for (const block of content) {
-                        switch (block.type) {
-                            case 'text': {
-                                const text = block.text as string;
-                                if (text) {
-                                    ctx.responseText = text;
-                                    // Only emit token SSE if stream_event didn't stream it
-                                    if (ctx.responseChunks.length === 0) {
-                                        ctx.responseChunks.push(text);
-                                        ctx.stream.send('token' as StreamEventType, { text, tokenCount: ctx.outputTokens });
-                                    }
-                                }
-                                break;
-                            }
-                            case 'tool_use': {
-                                const callId = (block.id as string) || `tc-${ctx.toolCallCount + 1}`;
-                                const toolName = (block.name as string) || 'unknown';
-                                const args = (block.input as Record<string, unknown>) || {};
-                                // Only emit if not already tracked by stream_event content_block_start
-                                if (!ctx.toolCallMap.has(callId)) {
-                                    ctx.toolCallCount++;
-                                    ctx.toolCallDetails.push({ call_id: callId, tool_name: toolName, arguments: args, started_at: Date.now() });
-                                    ctx.toolCallMap.set(callId, ctx.toolCallDetails[ctx.toolCallDetails.length - 1]);
-                                    ctx.stream.send('tool_call' as StreamEventType, { toolName, arguments: args, callId });
-                                } else {
-                                    // Update arguments (stream_event only had empty args from block_start)
-                                    const tracked = ctx.toolCallMap.get(callId)!;
-                                    tracked.arguments = args;
-                                }
-                                break;
-                            }
-                            case 'tool_result': {
-                                // Tool results are NOT in stream_event — always emit
-                                const callId = (block.tool_use_id as string) || '';
-                                const resultContent = block.content;
-                                const resultText = typeof resultContent === 'string'
-                                    ? resultContent
-                                    : Array.isArray(resultContent)
-                                        ? (resultContent as Array<{ type: string; text?: string }>).filter(b => b.type === 'text').map(b => b.text).join('\n')
-                                        : '';
-                                const tracked = ctx.toolCallMap.get(callId);
-                                const durationMs = tracked ? Date.now() - tracked.started_at : 0;
-                                if (tracked) { tracked.result = resultText; tracked.success = true; tracked.duration_ms = durationMs; }
-                                ctx.stream.send('tool_result' as StreamEventType, { callId, result: resultText, durationMs, success: true });
-                                break;
-                            }
-                            case 'thinking': {
-                                const thought = (block.thinking as string) || (block.text as string) || '';
-                                if (thought) {
-                                    // Only emit reasoning SSE if stream_event didn't stream it
-                                    if (ctx.thinkingChunks.length === 0) {
-                                        ctx.thinkingChunks.push(thought);
-                                        ctx.stream.send('reasoning' as StreamEventType, { thought });
-                                    }
-                                }
-                                break;
-                            }
-                            default:
-                                break;
-                        }
-                    }
-                }
-                // Track token usage
-                const usage = msg.usage as Record<string, number> | undefined;
-                if (usage) {
-                    ctx.inputTokens += usage.input_tokens || 0;
-                    ctx.outputTokens += usage.output_tokens || 0;
-                }
-            }
-            break;
-        }
-
+        case 'stream_event':
+        case 'system':
+        case 'assistant':
         case 'result': {
-            // CLI execution complete — map to session_ended
-            const isError = d.is_error as boolean | undefined;
-            const result = d.result as string | undefined;
-            const sessionId = d.session_id as string | undefined;
-            const totalCost = d.total_cost_usd as number | undefined;
-            const numTurns = d.num_turns as number | undefined;
-
-            if (result && !isError) {
-                ctx.responseText = result;
-            }
-            if (totalCost) {
-                ctx.creditsUsed = totalCost;
-            }
-
-            // Track usage from result event
-            const usage = d.usage as Record<string, number> | undefined;
-            if (usage) {
-                ctx.inputTokens = usage.input_tokens || ctx.inputTokens;
-                ctx.outputTokens = usage.output_tokens || ctx.outputTokens;
-            }
-
-            log.info('CLI result', {
-                is_error: isError,
-                num_turns: numTurns,
-                cost_usd: totalCost,
-                session_id: sessionId,
-                duration_ms: d.duration_ms,
-            });
+            const handled = await handleCliStreamEvent(eventType, d, ctx, deps);
+            if (!handled) log.warn('CLI stream handler returned false', { event_type: eventType });
             break;
         }
 
@@ -348,46 +181,6 @@ export async function routeEventToBackend(
             log.warn('Unknown event type', { event_type: eventType });
             break;
     }
-}
-
-function handleAgentOutput(d: Record<string, unknown>, ctx: PipelineContext): void {
-    const text = extractTextFromAgentOutput(d);
-    if (text.length > 0) {
-        // Only emit if no sse_forward token events were already received for this text.
-        // The runner's stdout-emitter emits both sse_forward tokens (from stream_event
-        // deltas or result messages) AND agent_output events for the same response text.
-        // Emitting from both paths causes duplicate tokens on the frontend.
-        if (ctx.responseChunks.length === 0) {
-            ctx.responseChunks.push(text);
-            ctx.stream.send('token' as StreamEventType, { text, tokenCount: 0 });
-        }
-    }
-    logEvent('agent_output', d);
-}
-
-/**
- * Extract text from agent_output events.
- * Handles multiple shapes:
- *   1. d.content is a plain string (simple output)
- *   2. d.content is an array of content blocks directly
- *   3. d.content is an object with a `content` array (SDK message shape)
- *   4. d.content is an object with a `message.content` array (nested SDK shape)
- */
-function extractTextFromAgentOutput(d: Record<string, unknown>): string {
-    if (typeof d.content === 'string') {
-        return d.content;
-    }
-
-    const blocks = resolveContentBlocks(d.content);
-    if (!blocks) return '';
-
-    const parts: string[] = [];
-    for (const block of blocks) {
-        if (isTextContentBlock(block)) {
-            parts.push(block.text);
-        }
-    }
-    return parts.join('');
 }
 
 async function handleSessionStarted(
@@ -484,66 +277,6 @@ function handleCreditUsage(d: Record<string, unknown>, ctx: PipelineContext): vo
     }
 }
 
-async function handleSseForward(
-    d: Record<string, unknown>,
-    ctx: PipelineContext,
-    deps: ResolvedExecutionDeps,
-): Promise<void> {
-    const fwd = assertSseForwardData(d);
-    if (!VALID_SSE_FORWARD_EVENTS.has(fwd.sse_event)) return;
-
-    // Live preview events: agent supplies port (and optionally url + label).
-    // When only port is given, resolve the Daytona preview URL on the backend
-    // so the agent doesn't have to hardcode the sandbox URL pattern.
-    let payloadToForward: Record<string, unknown> | undefined = fwd.payload;
-    if (fwd.sse_event === 'preview') {
-        payloadToForward = await resolvePreviewPayload(fwd.payload, ctx, deps);
-        if (!payloadToForward) return;
-    }
-
-    ctx.stream.send(fwd.sse_event as StreamEventType, payloadToForward, fwd.meta);
-    const payload = fwd.payload;
-
-    if (fwd.sse_event === 'token' && payload) {
-        if (typeof payload.text === 'string') {
-            ctx.responseChunks.push(payload.text);
-        }
-    }
-    if (fwd.sse_event === 'reasoning' && payload) {
-        if (typeof payload.thought === 'string') {
-            ctx.thinkingChunks.push(payload.thought);
-        }
-    }
-    // Track tool calls and results for metrics (these arrive as sse_forward,
-    // not as raw 'tool_call'/'tool_result' event types)
-    if (fwd.sse_event === 'tool_call' && payload) {
-        const tc = assertToolCallData(payload);
-        const callId = tc.call_id || `tc-${ctx.toolCallCount + 1}`;
-        if (!ctx.toolCallMap.has(callId)) {
-            ctx.toolCallCount++;
-            const detail = {
-                call_id: callId,
-                tool_name: tc.tool_name,
-                arguments: tc.arguments,
-                started_at: Date.now(),
-            };
-            ctx.toolCallDetails.push(detail);
-            ctx.toolCallMap.set(callId, detail);
-        }
-    }
-    if (fwd.sse_event === 'tool_result' && payload) {
-        const tr = assertToolResultData(payload);
-        if (tr.call_id) {
-            const entry = ctx.toolCallMap.get(tr.call_id);
-            if (entry) {
-                entry.result = tr.result;
-                entry.success = tr.success ?? true;
-                entry.duration_ms = Date.now() - entry.started_at;
-            }
-        }
-    }
-}
-
 async function handleCreateInboxItem(
     d: Record<string, unknown>, ctx: PipelineContext, deps: ResolvedExecutionDeps,
 ): Promise<void> {
@@ -595,74 +328,18 @@ async function handleAgentMessage(
     const mentions = mentionParser.parseMentions(data.content);
     for (const mention of mentions) {
         if (mention.target === agentSlug) continue;
-
-        // Try live dispatch first; if target agent isn't running, trigger execution immediately
-        deps.messageBridge.dispatchMention(
-            ctx.request.userId, agentSlug, mention.target, mention.message, data.project || '', data.channel,
-        ).then(async (dispatched) => {
-            if (dispatched) return;
-
-            // Target agent not running — fire their execution immediately
-            const channelSlug = data.project && data.channel
-                ? `${data.project}--${data.channel}`
-                : data.channel;
-
-            log.info('Mention target not running, triggering execution', {
-                from: agentSlug, target: mention.target, channel: channelSlug,
-            });
-
-            if (deps.triggerAgentExecution) {
-                await deps.triggerAgentExecution(
-                    ctx.request.userId,
-                    mention.target,
-                    mention.message,
-                    channelSlug,
-                );
-            } else {
-                log.warn('triggerAgentExecution not wired, mention to offline agent dropped', {
-                    target: mention.target,
-                });
-            }
-        }).catch(err => {
-            log.warn('agent_message mention dispatch failed', { target: mention.target, error: (err as Error).message });
-        });
+        dispatchMentionToAgent(deps, ctx, agentSlug, mention.target, mention.message, data.project || '', data.channel)
+            .catch(err => log.warn('agent_message mention dispatch failed', { target: mention.target, error: (err as Error).message }));
     }
 
-    // Cross-channel coordination: explicit target_agent in metadata (no @mention needed)
     const metadata = data.metadata as Record<string, unknown> | undefined;
     const targetAgent = typeof metadata?.target_agent === 'string' ? metadata.target_agent : undefined;
     if (data.message_type === 'coordination' && targetAgent && targetAgent !== agentSlug) {
         const alreadyMentioned = mentions.some(m => m.target === targetAgent);
         if (!alreadyMentioned) {
-            dispatchCrossChannelCoordination(
-                deps, ctx, agentSlug, targetAgent, data.content, data.project || '', data.channel,
-            ).catch(err => {
-                log.warn('Cross-channel coordination dispatch failed', { target: targetAgent, error: (err as Error).message });
-            });
+            dispatchCrossChannelCoordination(deps, ctx, agentSlug, targetAgent, data.content, data.project || '', data.channel)
+                .catch(err => log.warn('Cross-channel coordination dispatch failed', { target: targetAgent, error: (err as Error).message }));
         }
-    }
-}
-
-async function dispatchCrossChannelCoordination(
-    deps: ResolvedExecutionDeps,
-    ctx: PipelineContext,
-    fromAgent: string,
-    targetAgent: string,
-    content: string,
-    project: string,
-    channel: string,
-): Promise<void> {
-    if (!deps.messageBridge) throw new Error('coordination: messageBridge not initialized');
-    if (!ctx.sandboxId) throw new Error('coordination: sandboxId not set');
-
-    const dispatched = await deps.messageBridge.trySendToAgent(
-        ctx.request.userId, targetAgent, project, channel, fromAgent, content,
-    );
-
-    if (!dispatched && deps.triggerAgentExecution) {
-        const channelSlug = project && channel ? `${project}--${channel}` : channel;
-        log.info('Cross-channel target not running, triggering execution', { from: fromAgent, target: targetAgent, channel: channelSlug });
-        await deps.triggerAgentExecution(ctx.request.userId, targetAgent, content, channelSlug);
     }
 }
 
@@ -723,41 +400,6 @@ function handleDelegationForward(d: Record<string, unknown>, ctx: PipelineContex
     logEvent('delegation_record', d);
 }
 
-async function resolvePreviewPayload(
-    payload: Record<string, unknown> | undefined,
-    ctx: PipelineContext,
-    deps: ResolvedExecutionDeps,
-): Promise<Record<string, unknown> | undefined> {
-    if (!payload || typeof payload !== 'object') return undefined;
-
-    const port = typeof payload.port === 'number' ? payload.port : Number(payload.port);
-    if (!Number.isInteger(port) || port < 1 || port > 65535) {
-        log.warn('preview event: invalid port', { port: payload.port });
-        return undefined;
-    }
-
-    if (typeof payload.url === 'string' && payload.url.length > 0) {
-        return { ...payload, port };
-    }
-
-    if (!ctx.sandboxId) {
-        log.warn('preview event: no sandboxId on context, cannot resolve URL');
-        return undefined;
-    }
-
-    try {
-        const provider = deps.sandboxService.getDaytonaProvider();
-        const url = await provider.getPreviewUrl(ctx.sandboxId, port);
-        return { ...payload, port, url };
-    } catch (err) {
-        log.warn('preview event: failed to resolve Daytona URL', {
-            port,
-            error: (err as Error).message,
-        });
-        return undefined;
-    }
-}
-
 async function handleHitlRequest(
     d: Record<string, unknown>, ctx: PipelineContext, deps: ResolvedExecutionDeps,
 ): Promise<void> {
@@ -794,72 +436,6 @@ async function handleHitlRequest(
     );
 
     log.info('hitl_request', { scenario: request.scenario, tool_name: data.tool_name });
-}
-
-const FILE_WRITE_TOOLS = new Set(['Write', 'Edit', 'NotebookEdit']);
-
-// Regex patterns for paths that need Neon DB sync
-const AGENT_CONFIG_PATTERN = /^agents\/([a-zA-Z0-9._-]+)\/config\.json$/;
-
-/**
- * Sync agent file changes to Neon agent_registry.
- * Fires on Write/Edit of agents/{slug}/config.json.
- * This ensures Neon stays in sync when agents create other agents via native Write tool,
- * without requiring the agent to emit metadata_sync events manually.
- * Non-critical — errors are caught by the caller and logged as warnings.
- */
-async function syncFileChangeToNeon(
-    entry: { tool_name: string; arguments?: Record<string, unknown> },
-    ctx: PipelineContext,
-): Promise<void> {
-    const args = entry.arguments;
-    if (!args) return;
-
-    const rawPath = typeof args.file_path === 'string' ? args.file_path
-        : typeof args.path === 'string' ? args.path
-        : undefined;
-    if (!rawPath) return;
-
-    const pathResult = validateWorkspacePath(rawPath);
-    if (!pathResult.valid) return;
-
-    const match = pathResult.normalized.match(AGENT_CONFIG_PATTERN);
-    if (!match) return;
-
-    const syncAction = entry.tool_name === 'Write' ? 'create' : 'update';
-    await reverseSyncToDB(syncAction, pathResult.normalized, null, ctx.request.userId);
-    log.debug('Neon agent_registry synced from tool_result', { path: pathResult.normalized, action: syncAction, user_id: ctx.request.userId });
-}
-
-function emitFileChangedFromToolCall(d: Record<string, unknown>, ctx: PipelineContext): void {
-    const tc = assertToolCallData(d);
-    if (!tc.tool_name || !FILE_WRITE_TOOLS.has(tc.tool_name)) {
-        return;
-    }
-
-    const args = tc.arguments;
-    if (!args) return;
-
-    const rawPath = typeof args.file_path === 'string' ? args.file_path
-        : typeof args.path === 'string' ? args.path
-        : typeof args.notebook_path === 'string' ? args.notebook_path
-        : undefined;
-    if (!rawPath) {
-        return;
-    }
-
-    const pathResult = validateWorkspacePath(rawPath);
-    if (!pathResult.valid) {
-        return;
-    }
-
-    const action = tc.tool_name === 'Write' ? 'created' : 'modified';
-    workspaceSSEBroadcaster.broadcastFileChanged(ctx.request.userId, {
-        type: 'file_changed',
-        path: pathResult.normalized,
-        action,
-        timestamp: new Date().toISOString(),
-    });
 }
 
 function logEvent(eventType: string, d: Record<string, unknown>): void {

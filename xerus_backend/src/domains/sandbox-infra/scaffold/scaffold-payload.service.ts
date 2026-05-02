@@ -266,6 +266,24 @@ export function buildScaffoldFilesFromRow(
         content: operatingContent,
     });
 
+    // RULES.md — behavioral constraints
+    files.push({
+        path: `agents/${agentSlug}/RULES.md`,
+        content: buildRulesMd(),
+    });
+
+    // Good Outputs — calibration examples placeholder
+    files.push({
+        path: `agents/${agentSlug}/examples/good-outputs.md`,
+        content: buildGoodOutputsMd(),
+    });
+
+    // Knowledge index — progressive retrieval hints
+    files.push({
+        path: `agents/${agentSlug}/knowledge/index.yaml`,
+        content: buildKnowledgeIndexYaml(),
+    });
+
     // Memory files
     files.push({
         path: `.memory/agents/${agentSlug}/working.md`,
@@ -277,4 +295,58 @@ export function buildScaffoldFilesFromRow(
     });
 
     return files;
+}
+
+function buildRulesMd(): string {
+    return `# Rules
+
+## Must Always
+- Follow data-steward protocol for any data-producing work
+- Post updates to channel output/posts.jsonl
+- Close beads tasks when completed: \`bd close {id} --reason "..."\`
+- Save progress to working.md before session end
+
+## Must Never
+- Modify other agents' files (inbox, knowledge, config)
+- Delete channel output/deliverables/ files
+- Override human decisions on escalated items
+- Work on tasks not assigned to you (unless IDLE + HEARTBEAT task)
+
+## Output Constraints
+- Deliverables go to output/deliverables/ with descriptive filenames
+- Include date in filenames: competitor-analysis-2026-05-01.md
+- No placeholder or TODO content in deliverables
+`;
+}
+
+function buildGoodOutputsMd(): string {
+    return `# Good Outputs
+
+Examples of high-quality work from this agent. Used for calibration.
+
+## Format
+Each example should include:
+- **Task**: What was asked
+- **Output**: What was delivered
+- **Why good**: What made it excellent
+
+## Examples
+
+(none yet -- add examples as the agent produces quality work)
+`;
+}
+
+function buildKnowledgeIndexYaml(): string {
+    return `documents: []
+# Progressive retrieval hints for agent knowledge.
+# Example:
+# - path: brand-voice.md
+#   always_load: true
+#   priority: high
+#   tags: [brand, voice]
+# - path: competitor-landscape.md
+#   always_load: false
+#   priority: medium
+#   tags: [research, competitors]
+`;
 }
