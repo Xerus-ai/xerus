@@ -4,7 +4,9 @@
 // Reference: docs/planning/workspace-redesign.md Section 4
 
 import type { DaytonaProvider } from '../sandbox-infra/sandbox/providers/daytona.provider';
-import { escapeSQL, executeWorkspaceQuery, executeWorkspaceJsonQuery } from '../conversations/workspace-db.helpers';
+import { escapeSQL, executeWorkspaceQuery, executeWorkspaceJsonQuery, WORKSPACE_DB_PATH } from '../conversations/workspace-db.helpers';
+import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
+import { shellEscapePath } from '../../utils/shell-safety';
 
 // Auto-create table if missing (handles unmigrated sandboxes)
 const ENSURE_TABLE_SQL = `
@@ -25,7 +27,24 @@ const ensured = new Set<string>();
 
 async function ensureTable(provider: DaytonaProvider, sandboxId: string): Promise<void> {
     if (ensured.has(sandboxId)) return;
-    await executeWorkspaceQuery(provider, sandboxId, ENSURE_TABLE_SQL);
+
+    // Ensure data directory exists (sqlite3 can't create the file without it)
+    await provider.executeCommand(
+        sandboxId,
+        `mkdir -p '${SANDBOX_CONFIG.workspacePath}/data'`,
+    );
+
+    // Run CREATE TABLE without -json flag (DDL doesn't return rows)
+    const dbPath = shellEscapePath(WORKSPACE_DB_PATH);
+    const result = await provider.executeCommand(
+        sandboxId,
+        `sqlite3 ${dbPath} <<'EOSQL'\n${ENSURE_TABLE_SQL}\nEOSQL`,
+    );
+
+    if (result.exitCode !== 0) {
+        throw new Error(`Failed to ensure file_connections table: ${(result.result || '').slice(-200)}`);
+    }
+
     ensured.add(sandboxId);
 }
 

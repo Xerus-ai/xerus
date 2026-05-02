@@ -92,10 +92,56 @@ function normalizeConfig(raw: Record<string, unknown>): { config: AgentConfigFil
     return { config: raw as unknown as AgentConfigFile, dirty };
 }
 
+// Parse gitagent-protocol agent.yaml into AgentConfigFile shape.
+// Uses simple line parsing to avoid adding a YAML dependency.
+function parseAgentYamlToConfig(slug: string, raw: string): AgentConfigFile {
+    const lines = raw.split('\n');
+    const fields: Record<string, string> = {};
+    for (const line of lines) {
+        const match = line.match(/^\s*([\w.]+)\s*:\s*"?([^"]*)"?\s*$/);
+        if (match) {
+            fields[match[1].trim()] = match[2].trim();
+        }
+    }
+
+    const meta = (key: string) => fields[key] || '';
+
+    return {
+        name: meta('display_name') || meta('name') || slug,
+        slug,
+        description: meta('description') || meta('role') || '',
+        personality_type: null,
+        mascot: meta('mascot') || generateMascotConfig(),
+        ai_model: meta('preferred') || meta('model') || 'sonnet',
+        thinking_level: 'medium',
+        autonomy_level: meta('autonomy_level') || 'supervised',
+        adapter_type: (meta('adapter_type') || 'claudecode') as 'claudecode' | 'codex',
+        is_verified: false,
+        clone_count: 0,
+        tags: [],
+        public_metadata: null,
+        source_agent_id: null,
+        is_default: false,
+        execution_count: 0,
+        success_rate: 0,
+        last_used_at: null,
+        tools: [],
+        domain: meta('domain') || '',
+        primary_channel: meta('primary_channel') || '',
+        channels: [],
+        created_at: meta('created_at') || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+    };
+}
+
 export class AgentFilesystemRepository {
     constructor(private readonly driveService: DriveService) {}
 
     async getAgentConfig(userId: string, slug: string): Promise<AgentConfigFile | null> {
+        // Try agent.yaml (gitagent-protocol) first, fall back to config.json
+        const yamlConfig = await this.readAgentYaml(userId, slug);
+        if (yamlConfig) return yamlConfig;
+
         let raw: string;
         try {
             const result = await this.driveService.readFile(userId, `agents/${slug}/config.json`);
@@ -106,10 +152,21 @@ export class AgentFilesystemRepository {
         }
         const { config, dirty } = normalizeConfig(JSON.parse(raw));
         if (dirty) {
-            // Persist normalized fields so they stay stable across reads
             this.putAgentConfig(userId, slug, config).catch(() => {});
         }
         return config;
+    }
+
+    private async readAgentYaml(userId: string, slug: string): Promise<AgentConfigFile | null> {
+        let raw: string;
+        try {
+            const result = await this.driveService.readFile(userId, `agents/${slug}/agent.yaml`);
+            raw = result.content;
+        } catch (err) {
+            if (isFileNotFoundError(err)) return null;
+            throw err;
+        }
+        return parseAgentYamlToConfig(slug, raw);
     }
 
     async getAgentConfigs(userId: string, slugs: string[]): Promise<Map<string, AgentConfigFile>> {

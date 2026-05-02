@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { apiGet } from '@/lib/api/client'
+import useSWR from 'swr'
 import { useAuth } from '@/utils/AuthContext'
 
 export interface Channel {
@@ -24,6 +23,8 @@ interface DomainsResponse {
   domains: Domain[]
 }
 
+const SWR_KEY = '/company/domains?include=channels'
+
 interface UseDomainReturn {
   domains: Domain[]
   isLoading: boolean
@@ -33,31 +34,22 @@ interface UseDomainReturn {
 
 export function useDomains(): UseDomainReturn {
   const { isAuthReady } = useAuth()
-  const [domains, setDomains] = useState<Domain[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
-  const fetchDomains = useCallback(async () => {
-    if (!isAuthReady) return
+  const { data, error, isLoading, mutate } = useSWR<{ data: DomainsResponse }>(
+    isAuthReady ? SWR_KEY : null,
+  )
 
-    try {
-      setIsLoading(true)
-      setError(null)
-      const raw = await apiGet<{ data: DomainsResponse }>('/company/domains?include=channels')
-      const response = raw.data ?? raw
-      setDomains(response.domains ?? [])
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load channels')
-      setDomains([])
-    } finally {
-      setIsLoading(false)
-    }
-  }, [isAuthReady])
+  const response = data?.data ?? data
+  const domains = (response as DomainsResponse | undefined)?.domains ?? []
 
-  useEffect(() => {
-    fetchDomains()
-  }, [fetchDomains])
+  const refetch = async () => {
+    await mutate()
+  }
 
-  return { domains, isLoading, error, refetch: fetchDomains }
+  return {
+    domains,
+    isLoading,
+    error: error ? (error instanceof Error ? error.message : 'Failed to load channels') : null,
+    refetch,
+  }
 }
-

@@ -102,11 +102,40 @@ export async function runWorkspaceHealthCheck(
 
     await ensureWorkspaceIntegrity(sandboxFs, userId, deps.db, cloneWorkspace, installRunner);
 
+    // Run schema migrations (init-db.sh) on every resume.
+    // S3-restored databases may predate newer schema tables (e.g. file_connections).
+    // init-db.sh migrations are idempotent (CREATE TABLE IF NOT EXISTS) so safe to re-run.
+    await runDatabaseMigrations(sandboxId, deps);
+
     // Sync Pipedream MCP servers (connections may have changed while sandbox was paused)
     await runMcpConfigSync(sandboxId, userId, deps);
 
     // Restart scheduler daemon if not running (sandbox was paused/stopped)
     await startSchedulerDaemon(sandboxId, deps);
+}
+
+/**
+ * Run init-db.sh to apply schema migrations on workspace databases.
+ * Idempotent — uses CREATE TABLE IF NOT EXISTS and ALTER TABLE ADD COLUMN.
+ * Called on both create and resume to handle S3-restored databases that
+ * predate newer schema additions (e.g. file_connections, file_tags).
+ */
+async function runDatabaseMigrations(
+    sandboxId: string,
+    deps: SetupDeps,
+): Promise<void> {
+    const provider = deps.getDaytonaProvider();
+    const basePath = SANDBOX_CONFIG.workspacePath;
+    const initDbScript = `${basePath}/.claude/hooks/scripts/init-db.sh`;
+
+    const result = await provider.executeCommand(
+        sandboxId,
+        `[ -f '${initDbScript}' ] && XERUS_WORKSPACE_ROOT='${basePath}' bash '${initDbScript}' 2>&1 || echo 'init-db.sh not found'`,
+    );
+
+    if (result.exitCode !== 0) {
+        log.warn('Database migrations failed', { sandbox_id: sandboxId, output: (result.result || '').slice(-200) });
+    }
 }
 
 export async function runBrowserSetup(
@@ -357,20 +386,28 @@ export async function startSchedulerDaemon(
         return;
     }
 
-    // Verify bun is available (fail-fast — scheduler requires Bun runtime)
+    // Verify bun is available (scheduler requires Bun runtime)
     const bunCheck = await provider.executeCommand(sandboxId, 'which bun 2>/dev/null && echo FOUND || echo MISSING');
     if ((bunCheck.result || '').trim().endsWith('MISSING')) {
-        throw new Error(`Bun runtime not found in sandbox ${sandboxId}. Scheduler cannot start.`);
+        log.warn('Bun not found, scheduler skipped', { sandbox_id: sandboxId });
+        return;
     }
 
-    // Start scheduler daemon in background, then verify PID file appears
-    const startResult = await provider.executeCommand(
+    // Start scheduler daemon in background, then poll for PID file.
+    // Bun may need >2s on first run (auto-installs deps from package.json).
+    await provider.executeCommand(
         sandboxId,
-        `cd '${basePath}' && nohup bun run '${schedulerScript}' >> '${basePath}/.xerus/runner/scheduler.log' 2>&1 & sleep 2 && [ -f '${pidFile}' ] && echo STARTED || echo FAILED`,
+        `cd '${basePath}' && nohup bun run '${schedulerScript}' >> '${basePath}/.xerus/runner/scheduler.log' 2>&1 &`,
     );
 
-    if (startResult.exitCode !== 0 || (startResult.result || '').trim() === 'FAILED') {
-        throw new Error(`Scheduler daemon failed to start in sandbox ${sandboxId}: ${startResult.result}`);
+    const checkResult = await provider.executeCommand(
+        sandboxId,
+        `for i in 1 2 3 4 5; do [ -f '${pidFile}' ] && echo STARTED && exit 0; sleep 2; done; echo FAILED`,
+    );
+
+    if ((checkResult.result || '').trim() === 'FAILED') {
+        log.warn('Scheduler daemon failed to start (PID file not created within 10s)', { sandbox_id: sandboxId });
+        return;
     }
 
     log.info('Scheduler daemon started', { sandbox_id: sandboxId });

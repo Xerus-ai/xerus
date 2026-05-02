@@ -19,6 +19,7 @@ import { triggerChannelExecution, syncMessageToSandbox } from './channel-executi
 import { shellEscapePath } from '../../utils/shell-safety';
 import { slugify, sanitizeSlug } from '../../shared/slugify';
 import { strictRateLimit } from '../../middleware/rate-limit';
+import { scaffoldProject, scaffoldChannel } from './workspace-scaffold.service';
 import { executeWorkspaceJsonQuery as execWsQuery } from '../conversations/workspace-db.helpers';
 import {
     listDomainsWithChannels,
@@ -29,6 +30,7 @@ import {
     domainExists,
     getChannelWithDomain,
     updateChannel,
+    getProjectOverview,
 } from './company-workspace-db.service';
 import { logger } from '../../utils/logger';
 
@@ -167,6 +169,17 @@ router.post('/domains', auth, strictRateLimit, async (req: AuthenticatedRequest,
         const channelDir = `${domainDir}/channels/general`;
         await provider.executeCommand(sandboxId, `mkdir -p ${shellEscapePath(channelDir)}`);
 
+        // Scaffold project and channel template files (CLAUDE.md, context.md, etc.)
+        await scaffoldProject(provider, sandboxId, slug, {
+            PROJECT_NAME: name,
+            PROJECT_MISSION: description,
+        }).catch(err => log.warn('Project scaffold failed (non-critical)', { error: (err as Error).message }));
+
+        await scaffoldChannel(provider, sandboxId, slug, 'general', {
+            CHANNEL_NAME: 'General',
+            CHANNEL_MISSION: `Default channel for ${name}`,
+        }).catch(err => log.warn('Channel scaffold failed (non-critical)', { error: (err as Error).message }));
+
         sendResponse(res, 201, {
             domain: {
                 id: domain.slug,
@@ -244,6 +257,12 @@ router.post('/domains/:domainId/channels', auth, strictRateLimit, async (req: Au
         const channelDir = `${SANDBOX_CONFIG.workspacePath}/projects/${sanitizeSlug(domainId)}/channels/${sanitizeSlug(nameSlug)}`;
         await provider.executeCommand(sandboxId, `mkdir -p ${shellEscapePath(channelDir)}`);
 
+        // Scaffold channel template files (CLAUDE.md, context.md, shift.yaml, AGENTS.md)
+        await scaffoldChannel(provider, sandboxId, sanitizeSlug(domainId), sanitizeSlug(nameSlug), {
+            CHANNEL_NAME: name,
+            CHANNEL_MISSION: description || `Channel: ${name}`,
+        }).catch(err => log.warn('Channel scaffold failed (non-critical)', { error: (err as Error).message }));
+
         sendResponse(res, 201, {
             channel: {
                 id: channel.slug,
@@ -289,6 +308,61 @@ router.patch('/channels/:channelId', auth, strictRateLimit, async (req: Authenti
                 name: updated.name,
                 description: updated.description,
             },
+        }, startTime);
+    } catch (err) {
+        next(err);
+    }
+});
+
+// -------------------------------------------------------------------------
+// GET /api/v1/company/domains/:domainId/overview - Project dashboard overview
+// Returns aggregated project data: mission, channels, agents, costs, sessions
+// -------------------------------------------------------------------------
+
+router.get('/domains/:domainId/overview', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const startTime = res.locals.startTime || Date.now();
+    try {
+        const userId = req.user?.uid;
+        if (!userId) throw new UnauthorizedError();
+        if (!companyDeps) throw new Error('Company routes dependencies not initialized');
+
+        const { sandboxService } = companyDeps;
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
+
+        const { domainId } = req.params;
+        const overview = await getProjectOverview(provider, sandboxId, domainId);
+        if (!overview) throw new NotFoundError('Project');
+
+        let readme = '';
+        try {
+            readme = await provider.readFile(
+                sandboxId,
+                `${SANDBOX_CONFIG.workspacePath}/projects/${sanitizeSlug(domainId)}/CLAUDE.md`,
+            );
+        } catch {
+            // CLAUDE.md may not exist yet
+        }
+
+        const prefix = `${domainId}--`;
+        sendResponse(res, 200, {
+            domain: {
+                slug: overview.domain.slug,
+                name: overview.domain.name,
+                description: overview.domain.description,
+            },
+            readme,
+            channels: overview.channels.map(c => ({
+                slug: c.slug.startsWith(prefix) ? c.slug.slice(prefix.length) : c.slug,
+                id: c.slug,
+                name: c.name,
+                description: c.description,
+                agent_count: c.agent_count,
+                lead_name: c.lead_name,
+            })),
+            agents: overview.agents,
+            recent_sessions: overview.recent_sessions,
+            cost_summary: overview.cost_summary,
         }, startTime);
     } catch (err) {
         next(err);

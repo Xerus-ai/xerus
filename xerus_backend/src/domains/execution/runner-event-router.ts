@@ -470,6 +470,10 @@ async function handleSessionCompleted(
         executeWorkspaceQuery(provider, ctx.sandboxId,
             `UPDATE agents SET status = 'idle', updated_at = '${new Date().toISOString()}' WHERE slug = '${agentSlug}'`,
         ).catch(err => log.warn('Failed to update agent status to idle', { error: (err as Error).message }));
+
+        // Trigger memory indexing for files changed during this session
+        handleTriggerIndexing({ agent_slug: agentSlug, scope: 'session' }, ctx, deps)
+            .catch(err => log.warn('Post-session memory indexing failed (non-critical)', { error: (err as Error).message }));
     }
 }
 
@@ -622,6 +626,42 @@ async function handleAgentMessage(
         }).catch(err => {
             log.warn('agent_message mention dispatch failed', { target: mention.target, error: (err as Error).message });
         });
+    }
+
+    // Cross-channel coordination: explicit target_agent in metadata (no @mention needed)
+    const metadata = data.metadata as Record<string, unknown> | undefined;
+    const targetAgent = metadata?.target_agent as string | undefined;
+    if (data.message_type === 'coordination' && targetAgent && targetAgent !== agentSlug) {
+        const alreadyMentioned = mentions.some(m => m.target === targetAgent);
+        if (!alreadyMentioned) {
+            dispatchCrossChannelCoordination(
+                deps, ctx, agentSlug, targetAgent, data.content, data.project || '', data.channel,
+            ).catch(err => {
+                log.warn('Cross-channel coordination dispatch failed', { target: targetAgent, error: (err as Error).message });
+            });
+        }
+    }
+}
+
+async function dispatchCrossChannelCoordination(
+    deps: ResolvedExecutionDeps,
+    ctx: PipelineContext,
+    fromAgent: string,
+    targetAgent: string,
+    content: string,
+    project: string,
+    channel: string,
+): Promise<void> {
+    if (!deps.messageBridge || !ctx.sandboxId) return;
+
+    const dispatched = await deps.messageBridge.trySendToAgent(
+        ctx.request.userId, targetAgent, project, channel, fromAgent, content,
+    );
+
+    if (!dispatched && deps.triggerAgentExecution) {
+        const channelSlug = project && channel ? `${project}--${channel}` : channel;
+        log.info('Cross-channel target not running, triggering execution', { from: fromAgent, target: targetAgent, channel: channelSlug });
+        await deps.triggerAgentExecution(ctx.request.userId, targetAgent, content, channelSlug);
     }
 }
 

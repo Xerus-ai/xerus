@@ -82,6 +82,10 @@ export async function ensureWorkspaceIntegrity(
         log.info('Personalized workspace', { files_created: result.createdFiles.length });
     }
 
+    // Seed drive/ starter files on every resume (handles sandboxes created before drive/ existed).
+    // Cheap: 2 exists() checks that return immediately when files are already present.
+    await personalizeWorkspace(sandboxFs, { userId });
+
     // Sync DB agents into workspace (scaffold any missing ones, update index.json)
     if (db) {
         await syncAgentsToWorkspace(sandboxFs, userId, db);
