@@ -179,8 +179,8 @@ function ProjectHubInner() {
             Recent Sessions
           </h2>
           <div className="flex flex-col gap-1">
-            {overview.recent_sessions.map((s, i) => (
-              <div key={i} className="flex items-center gap-3 px-3 py-2 text-sm">
+            {overview.recent_sessions.map((s) => (
+              <div key={`${s.agent_slug}-${s.started_at}`} className="flex items-center gap-3 px-3 py-2 text-sm">
                 <StatusDot status={s.status} />
                 <span className="text-text-primary font-medium min-w-[120px]">{s.agent_slug}</span>
                 <span className="text-text-tertiary text-xs">
@@ -220,7 +220,7 @@ function extractMission(readme: string): string {
 }
 
 function formatTimeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime()
+  const diff = Math.max(0, Date.now() - new Date(dateStr).getTime())
   const mins = Math.floor(diff / 60000)
   if (mins < 1) return 'just now'
   if (mins < 60) return `${mins}m ago`

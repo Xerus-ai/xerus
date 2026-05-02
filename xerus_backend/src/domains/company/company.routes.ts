@@ -212,7 +212,7 @@ router.post('/domains/:domainId/channels', auth, strictRateLimit, async (req: Au
             throw new UnauthorizedError();
         }
 
-        const { domainId } = req.params;
+        const domainId = sanitizeSlug(req.params.domainId);
         const name = (req.body.name as string || '').trim();
         if (!name) {
             throw new BadRequestError('name is required');
@@ -290,7 +290,7 @@ router.patch('/channels/:channelId', auth, strictRateLimit, async (req: Authenti
         const sandboxId = await requireRunningSandbox(sandboxService, userId);
         const provider = getDaytonaProvider(sandboxService);
 
-        const { channelId } = req.params;
+        const channelId = sanitizeSlug(req.params.channelId);
         const { name, description } = req.body;
         const updates: { name?: string; description?: string } = {};
         if (typeof name === 'string' && name.trim()) updates.name = name.trim().slice(0, MAX_NAME_LENGTH);
@@ -330,7 +330,7 @@ router.get('/domains/:domainId/overview', auth, async (req: AuthenticatedRequest
         const sandboxId = await requireRunningSandbox(sandboxService, userId);
         const provider = getDaytonaProvider(sandboxService);
 
-        const { domainId } = req.params;
+        const domainId = sanitizeSlug(req.params.domainId);
         const overview = await getProjectOverview(provider, sandboxId, domainId);
         if (!overview) throw new NotFoundError('Project');
 
@@ -389,7 +389,7 @@ router.get('/channels/:channelId/agents', auth, async (req: AuthenticatedRequest
         const sandboxId = await requireRunningSandbox(sandboxService, userId);
         const provider = getDaytonaProvider(sandboxService);
 
-        const channelSlug = req.params.channelId;
+        const channelSlug = sanitizeSlug(req.params.channelId);
 
         // Get all agent slugs for this user from Neon agent_registry
         const registryResult = await query<{ id: string; slug: string }>(
@@ -464,7 +464,7 @@ router.get('/channels/:channelId/messages', auth, async (req: AuthenticatedReque
             throw new UnauthorizedError();
         }
 
-        const { channelId } = req.params;
+        const channelId = sanitizeSlug(req.params.channelId);
         const limit = Math.min(parseInt(req.query.limit as string, 10) || 50, 100);
         const offset = parseInt(req.query.offset as string, 10) || 0;
 
@@ -553,7 +553,7 @@ router.post('/channels/:channelId/messages', auth, strictRateLimit, async (req: 
             throw new UnauthorizedError();
         }
 
-        const { channelId } = req.params;
+        const channelId = sanitizeSlug(req.params.channelId);
         const { content, message_type, metadata } = req.body;
 
         if (!content || typeof content !== 'string' || content.trim() === '') {

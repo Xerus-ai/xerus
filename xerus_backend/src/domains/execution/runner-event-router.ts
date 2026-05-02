@@ -428,9 +428,9 @@ async function handleSessionStarted(
         // Update agent status to 'running' in workspace.db so frontend shows online count
         const agentSlug = evt.agent_slug || ctx.agent?.slug;
         if (agentSlug) {
-            const { executeWorkspaceQuery } = await import('../conversations/workspace-db.helpers');
+            const { executeWorkspaceQuery, escapeSQL } = await import('../conversations/workspace-db.helpers');
             executeWorkspaceQuery(provider, ctx.sandboxId,
-                `UPDATE agents SET status = 'running', updated_at = '${new Date().toISOString()}' WHERE slug = '${agentSlug}'`,
+                `UPDATE agents SET status = 'running', updated_at = '${new Date().toISOString()}' WHERE slug = '${escapeSQL(agentSlug)}'`,
             ).catch(err => log.warn('Failed to update agent status to running', { error: (err as Error).message }));
         }
     }
@@ -466,9 +466,9 @@ async function handleSessionCompleted(
     const agentSlug = ctx.agent?.slug;
     if (agentSlug && ctx.sandboxId) {
         const provider = deps.sandboxService.getDaytonaProvider();
-        const { executeWorkspaceQuery } = await import('../conversations/workspace-db.helpers');
+        const { executeWorkspaceQuery, escapeSQL } = await import('../conversations/workspace-db.helpers');
         executeWorkspaceQuery(provider, ctx.sandboxId,
-            `UPDATE agents SET status = 'idle', updated_at = '${new Date().toISOString()}' WHERE slug = '${agentSlug}'`,
+            `UPDATE agents SET status = 'idle', updated_at = '${new Date().toISOString()}' WHERE slug = '${escapeSQL(agentSlug)}'`,
         ).catch(err => log.warn('Failed to update agent status to idle', { error: (err as Error).message }));
 
         // Trigger memory indexing for files changed during this session
