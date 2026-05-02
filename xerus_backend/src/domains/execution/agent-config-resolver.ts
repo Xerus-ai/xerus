@@ -4,6 +4,7 @@
 import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
 import type { AdapterType } from './types';
 import type { ResolvedExecutionDeps } from './execution-pipeline.types';
+import { parseAgentYamlFields } from '../../shared/agent-yaml-parser';
 
 // -----------------------------------------------------------------------------
 // Agent Config Resolution
@@ -31,14 +32,16 @@ export async function resolveAgentConfig(
     try {
         const yamlPath = `${ws}/agents/${agentSlug}/agent.yaml`;
         const raw = await provider.readFile(sandboxId, yamlPath);
-        const adapterLine = raw.match(/^\s+adapter_type:\s*"?(\w+)"?/m);
-        const modelLine = raw.match(/^\s+preferred:\s*"?([^"\n]+)"?/m);
+        const fields = parseAgentYamlFields(raw);
         return {
-            adapterType: adapterLine?.[1] === 'codex' ? 'codex' : 'claudecode',
-            model: modelLine?.[1]?.trim() || undefined,
+            adapterType: fields.adapter_type === 'codex' ? 'codex' : 'claudecode',
+            model: fields.preferred?.trim() || undefined,
         };
-    } catch {
-        // agent.yaml not found — try config.json
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (!message.includes('ENOENT') && !message.includes('No such file') && !message.includes('not found')) {
+            throw err;
+        }
     }
 
     try {

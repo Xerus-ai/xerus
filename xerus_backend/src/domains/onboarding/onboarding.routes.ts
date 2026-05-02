@@ -14,6 +14,9 @@ import { createDomain, createChannel, createChannelMessage } from '../company/co
 import { createConversation } from '../conversations/workspace-db.service';
 import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
 import { sanitizeSlug } from '../../shared/slugify';
+import { logger } from '../../utils/logger';
+
+const log = logger('Onboarding');
 import { shellEscapePath } from '../../utils/shell-safety';
 
 const router = Router();
@@ -164,8 +167,14 @@ router.post('/handoff', auth, async (req: AuthenticatedRequest, res: Response, n
                 generalSlug, 'agent', 'xerus-master',
                 welcomeMessage, 'post', {},
             );
-        } catch {
-            // Will be created on first chat interaction
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            if (msg.includes('FOREIGN KEY') || msg.includes('constraint')) {
+                log.info('Conversation seeding deferred (FK not yet satisfied)', { project: projectSlug });
+            } else {
+                log.warn('Conversation seeding failed', { error: msg });
+                throw err;
+            }
         }
 
         sendResponse(res, 200, {

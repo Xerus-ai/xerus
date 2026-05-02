@@ -18,8 +18,12 @@ interface ScaffoldVars {
 async function tryReadTemplate(provider: DaytonaProvider, sandboxId: string, path: string): Promise<string | null> {
     try {
         return await provider.readFile(sandboxId, path);
-    } catch {
-        return null;
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes('ENOENT') || msg.includes('No such file') || msg.includes('not found')) {
+            return null;
+        }
+        throw err;
     }
 }
 
@@ -40,9 +44,13 @@ async function writeIfMissing(
     try {
         await provider.readFile(sandboxId, filePath);
         return false;
-    } catch {
-        await provider.writeFile(sandboxId, filePath, content);
-        return true;
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes('ENOENT') || msg.includes('No such file') || msg.includes('not found')) {
+            await provider.writeFile(sandboxId, filePath, content);
+            return true;
+        }
+        throw err;
     }
 }
 

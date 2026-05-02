@@ -389,8 +389,7 @@ export async function startSchedulerDaemon(
     // Verify bun is available (scheduler requires Bun runtime)
     const bunCheck = await provider.executeCommand(sandboxId, 'which bun 2>/dev/null && echo FOUND || echo MISSING');
     if ((bunCheck.result || '').trim().endsWith('MISSING')) {
-        log.warn('Bun not found, scheduler skipped', { sandbox_id: sandboxId });
-        return;
+        throw new Error(`Bun runtime not found in sandbox ${sandboxId}. Scheduler cannot start.`);
     }
 
     // Start scheduler daemon in background, then poll for PID file.
@@ -402,12 +401,11 @@ export async function startSchedulerDaemon(
 
     const checkResult = await provider.executeCommand(
         sandboxId,
-        `for i in 1 2 3 4 5; do [ -f '${pidFile}' ] && echo STARTED && exit 0; sleep 2; done; echo FAILED`,
+        `for i in 1 2 3; do [ -f '${pidFile}' ] && echo STARTED && exit 0; sleep 2; done; echo FAILED`,
     );
 
     if ((checkResult.result || '').trim() === 'FAILED') {
-        log.warn('Scheduler daemon failed to start (PID file not created within 10s)', { sandbox_id: sandboxId });
-        return;
+        throw new Error(`Scheduler daemon failed to start in sandbox ${sandboxId}: PID file not created within 6s`);
     }
 
     log.info('Scheduler daemon started', { sandbox_id: sandboxId });

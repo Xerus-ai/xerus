@@ -340,8 +340,11 @@ router.get('/domains/:domainId/overview', auth, async (req: AuthenticatedRequest
                 sandboxId,
                 `${SANDBOX_CONFIG.workspacePath}/projects/${sanitizeSlug(domainId)}/CLAUDE.md`,
             );
-        } catch {
-            // CLAUDE.md may not exist yet
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            if (!msg.includes('ENOENT') && !msg.includes('No such file') && !msg.includes('not found')) {
+                throw err;
+            }
         }
 
         const prefix = `${domainId}--`;

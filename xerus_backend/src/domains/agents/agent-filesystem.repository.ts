@@ -5,6 +5,7 @@
 import { DriveService } from '../drive/drive.service';
 import type { PublicMetadata } from './types';
 import { generateMascotConfig } from './avatar';
+import { parseAgentYamlFields } from '../../shared/agent-yaml-parser';
 
 // Daytona SDK throws generic errors for missing files — match by message
 function isFileNotFoundError(err: unknown): boolean {
@@ -92,30 +93,21 @@ function normalizeConfig(raw: Record<string, unknown>): { config: AgentConfigFil
     return { config: raw as unknown as AgentConfigFile, dirty };
 }
 
-// Parse gitagent-protocol agent.yaml into AgentConfigFile shape.
-// Uses simple line parsing to avoid adding a YAML dependency.
 function parseAgentYamlToConfig(slug: string, raw: string): AgentConfigFile {
-    const lines = raw.split('\n');
-    const fields: Record<string, string> = {};
-    for (const line of lines) {
-        const match = line.match(/^\s*([\w.]+)\s*:\s*"?([^"]*)"?\s*$/);
-        if (match) {
-            fields[match[1].trim()] = match[2].trim();
-        }
-    }
+    const f = parseAgentYamlFields(raw);
 
-    const meta = (key: string) => fields[key] || '';
+    const rawAdapter = f.adapter_type;
 
     return {
-        name: meta('display_name') || meta('name') || slug,
+        name: f.display_name || f.name || slug,
         slug,
-        description: meta('description') || meta('role') || '',
+        description: f.description || f.role || '',
         personality_type: null,
-        mascot: meta('mascot') || generateMascotConfig(),
-        ai_model: meta('preferred') || meta('model') || 'sonnet',
+        mascot: f.mascot || generateMascotConfig(),
+        ai_model: f.preferred || 'sonnet',
         thinking_level: 'medium',
-        autonomy_level: meta('autonomy_level') || 'supervised',
-        adapter_type: (meta('adapter_type') || 'claudecode') as 'claudecode' | 'codex',
+        autonomy_level: f.autonomy_level || 'supervised',
+        adapter_type: rawAdapter === 'codex' ? 'codex' : 'claudecode',
         is_verified: false,
         clone_count: 0,
         tags: [],
@@ -126,10 +118,10 @@ function parseAgentYamlToConfig(slug: string, raw: string): AgentConfigFile {
         success_rate: 0,
         last_used_at: null,
         tools: [],
-        domain: meta('domain') || '',
-        primary_channel: meta('primary_channel') || '',
+        domain: f.domain || '',
+        primary_channel: f.primary_channel || '',
         channels: [],
-        created_at: meta('created_at') || new Date().toISOString(),
+        created_at: f.created_at || new Date().toISOString(),
         updated_at: new Date().toISOString(),
     };
 }

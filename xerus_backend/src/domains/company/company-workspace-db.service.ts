@@ -346,15 +346,18 @@ export async function getProjectOverview(
     let recent_sessions: ProjectOverview['recent_sessions'] = [];
     try {
         const sessionsSql = `
-            SELECT es.agent_slug, es.status, es.started_at, es.completed_at
+            SELECT es.agent_slug, es.status, es.started_at, es.ended_at AS completed_at
             FROM execution_sessions es
             WHERE es.agent_slug IN (SELECT DISTINCT cm.agent_slug FROM channel_members cm JOIN channels c ON c.slug = cm.channel_slug WHERE c.domain_slug = '${esc}')
             ORDER BY es.started_at DESC
             LIMIT 10
         `;
         recent_sessions = await executeWorkspaceJsonQuery<{ agent_slug: string; status: string; started_at: string; completed_at: string | null }>(provider, sandboxId, sessionsSql);
-    } catch {
-        // execution_sessions may not exist in all workspaces
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (!msg.includes('no such table') && !msg.includes('no such view')) {
+            throw err;
+        }
     }
 
     let cost_summary: ProjectOverview['cost_summary'] = { total_cost: 0, session_count: 0 };
@@ -362,8 +365,11 @@ export async function getProjectOverview(
         const costSql = `SELECT COALESCE(SUM(total_cost), 0) AS total_cost, COUNT(*) AS session_count FROM v_daily_costs`;
         const costRows = await executeWorkspaceJsonQuery<{ total_cost: number; session_count: number }>(provider, sandboxId, costSql);
         if (costRows.length > 0) cost_summary = costRows[0];
-    } catch {
-        // v_daily_costs view may not exist
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (!msg.includes('no such table') && !msg.includes('no such view')) {
+            throw err;
+        }
     }
 
     return { domain: domains[0], channels, agents, recent_sessions, cost_summary };

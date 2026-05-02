@@ -630,7 +630,7 @@ async function handleAgentMessage(
 
     // Cross-channel coordination: explicit target_agent in metadata (no @mention needed)
     const metadata = data.metadata as Record<string, unknown> | undefined;
-    const targetAgent = metadata?.target_agent as string | undefined;
+    const targetAgent = typeof metadata?.target_agent === 'string' ? metadata.target_agent : undefined;
     if (data.message_type === 'coordination' && targetAgent && targetAgent !== agentSlug) {
         const alreadyMentioned = mentions.some(m => m.target === targetAgent);
         if (!alreadyMentioned) {
@@ -652,7 +652,8 @@ async function dispatchCrossChannelCoordination(
     project: string,
     channel: string,
 ): Promise<void> {
-    if (!deps.messageBridge || !ctx.sandboxId) return;
+    if (!deps.messageBridge) throw new Error('coordination: messageBridge not initialized');
+    if (!ctx.sandboxId) throw new Error('coordination: sandboxId not set');
 
     const dispatched = await deps.messageBridge.trySendToAgent(
         ctx.request.userId, targetAgent, project, channel, fromAgent, content,

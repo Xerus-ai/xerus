@@ -137,22 +137,24 @@ export class S3BackupService {
     }
 
     private async getSnapshotHash(snapshotKey: string): Promise<string | null> {
-        // Prefer head (metadata-only, no download) when available
         if (this.headFn) {
             try {
                 const result = await this.headFn(snapshotKey);
                 return result?.metadata?.[HASH_METADATA_KEY] ?? null;
-            } catch {
-                return null;
+            } catch (err) {
+                const name = (err as { name?: string }).name;
+                if (name === 'NotFound' || name === 'NoSuchKey') return null;
+                throw err;
             }
         }
 
-        // Fallback: download the snapshot to read metadata (old snapshots without head dep)
         try {
             const result = await this.download(snapshotKey);
             return result.metadata?.[HASH_METADATA_KEY] ?? null;
-        } catch {
-            return null;
+        } catch (err) {
+            const name = (err as { name?: string }).name;
+            if (name === 'NotFound' || name === 'NoSuchKey') return null;
+            throw err;
         }
     }
 
