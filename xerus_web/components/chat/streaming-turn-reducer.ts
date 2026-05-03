@@ -15,8 +15,10 @@ function formatTarget(value: unknown): string | undefined {
   if (typeof value === 'number' || typeof value === 'boolean') return String(value)
   if (Array.isArray(value)) return `${value.length} items`
   if (typeof value === 'object') {
-    const name = (value as Record<string, unknown>).name ?? (value as Record<string, unknown>).subject
-    if (typeof name === 'string') return name
+    const obj = value as Record<string, unknown>
+    for (const key of ['path', 'file_path', 'command', 'query', 'pattern', 'name', 'subject', 'description', 'url']) {
+      if (typeof obj[key] === 'string' && obj[key]) return obj[key] as string
+    }
     return undefined
   }
   return undefined

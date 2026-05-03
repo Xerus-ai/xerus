@@ -202,7 +202,7 @@ export function useChatExecution({ setState }: UseChatExecutionOptions) {
               ...(prev.executionState.steps ?? []),
               {
                 id: `subagent-${Date.now()}`,
-                name: `Spawning ${content.subagentType}`,
+                name: content.taskDescription || content.subagentType,
                 status: 'active' as const,
                 startTime: Date.now(),
               },

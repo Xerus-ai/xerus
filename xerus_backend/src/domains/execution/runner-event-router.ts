@@ -211,7 +211,7 @@ async function handleSessionStarted(
         ctx.stream.send('meta', {
             model: runnerModel || ctx.agent?.ai_model || 'unknown',
             agentSlug: evt.agent_slug || ctx.agent?.slug || '',
-            agentName: evt.agent_slug || ctx.agent?.slug || '',
+            agentName: ctx.agent?.name || evt.agent_slug || ctx.agent?.slug || '',
             startedAt: new Date().toISOString(),
         });
     }
