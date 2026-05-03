@@ -16,8 +16,9 @@ import { isMascotConfig } from '@/lib/mascot-config'
 import { MascotAvatar } from '@/components/agents/MascotAvatar'
 import { MarkdownContent } from './MarkdownContent'
 import { ToolCallCard, type ToolCallCardData } from './ToolCallCard'
+import { ToolActionGroup } from './ToolActionGroup'
 import { ThinkingSection } from './ThinkingSection'
-import { extractTextFromParts } from './streaming-turn.utils'
+import { extractTextFromParts, groupConsecutiveTools } from './streaming-turn.utils'
 
 // ---------------------------------------------------------------------------
 // TodoProgress - expandable checklist
@@ -387,7 +388,10 @@ export const MessageBubble = memo(function MessageBubble({
       {message.parts ? (
         message.parts.length > 0 ? (
           <div className="space-y-2">
-            {message.parts.map((part) => {
+            {groupConsecutiveTools(message.parts).map((part) => {
+              if (part.type === 'tool-group') {
+                return <ToolActionGroup key={part.id} tools={part.parts} agents={agents} />
+              }
               switch (part.type) {
                 case 'text':
                   return <MarkdownContent key={part.id} content={part.text} />

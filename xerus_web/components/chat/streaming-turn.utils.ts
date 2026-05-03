@@ -25,13 +25,43 @@ export function extractTextFromParts(parts?: TurnPart[]): string {
     .join('')
 }
 
+type ToolPart = Extract<TurnPart, { type: 'tool' }>
+export type GroupedPart = TurnPart | { type: 'tool-group'; parts: ToolPart[]; id: string }
+
+export function groupConsecutiveTools(parts: TurnPart[]): GroupedPart[] {
+  const result: GroupedPart[] = []
+  let toolBuffer: ToolPart[] = []
+
+  const flushBuffer = () => {
+    if (toolBuffer.length >= 3) {
+      result.push({ type: 'tool-group', parts: [...toolBuffer], id: `group-${toolBuffer[0].id}` })
+    } else {
+      result.push(...toolBuffer)
+    }
+    toolBuffer = []
+  }
+
+  for (const part of parts) {
+    if (part.type === 'tool') {
+      toolBuffer.push(part)
+    } else {
+      flushBuffer()
+      result.push(part)
+    }
+  }
+  flushBuffer()
+  return result
+}
+
 export function finalizeTurnParts(parts: TurnPart[], finalText?: string): TurnPart[] {
   const canonicalText = finalText ?? extractTextFromParts(parts)
   const reasoningText = parts
     .filter((part): part is Extract<TurnPart, { type: 'reasoning' }> => part.type === 'reasoning')
     .map((part) => part.text)
     .join('')
-  const toolParts = parts.filter((part): part is Extract<TurnPart, { type: 'tool' }> => part.type === 'tool')
+  const toolParts = parts
+    .filter((part): part is Extract<TurnPart, { type: 'tool' }> => part.type === 'tool')
+    .map((part) => part.state === 'running' ? { ...part, state: 'done' as const } : part)
   const statusParts = parts.filter((part) => part.type === 'status')
   const stableParts: TurnPart[] = []
 

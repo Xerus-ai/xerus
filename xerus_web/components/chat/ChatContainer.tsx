@@ -5,6 +5,8 @@ import dynamic from 'next/dynamic'
 import { MessageList } from './MessageList'
 import { ChatInput } from './ChatInput'
 import { DeliverableChips } from './DeliverableChips'
+import { TaskDock } from './TaskDock'
+import { useTaskDock } from './useTaskDock'
 import type { SandboxTab } from './SandboxPanel'
 
 // Heavy panels loaded only when user opens them (bundle-dynamic-imports + bundle-conditional rules)
@@ -96,6 +98,26 @@ export function ChatContainer({
   const [terminalUrl, setTerminalUrl] = useState<string | null>(null)
   const [isTerminalLoading, setIsTerminalLoading] = useState(false)
   const [sandboxTab, setSandboxTab] = useState<SandboxTab>('terminal')
+
+  // ---- Task dock (subagent progress) ----
+  const taskDock = useTaskDock()
+
+  // Sync subagent events from executionState to task dock
+  const prevStepsRef = useRef<number>(0)
+  useEffect(() => {
+    const steps = state.executionState?.steps ?? []
+    if (steps.length === prevStepsRef.current) return
+    prevStepsRef.current = steps.length
+    for (const step of steps) {
+      if (step.status === 'active') {
+        taskDock.addTask(step.id, step.name ?? 'Working', step.name ?? '')
+      } else if (step.status === 'completed') {
+        const durationMs = step.endTime && step.startTime ? step.endTime - step.startTime : undefined
+        const success = !step.name?.includes('failed')
+        taskDock.completeTask(step.id, success, durationMs)
+      }
+    }
+  }, [state.executionState?.steps, taskDock])
 
   // ---- Tool auth (Pipedream OAuth) ----
   const handleToolAuthConnect = useCallback((appSlug: string) => {
@@ -325,6 +347,16 @@ export function ChatContainer({
               onSelect={handleOpenDeliverable}
             />
 
+            {taskDock.isVisible && (
+              <TaskDock
+                tasks={taskDock.tasks}
+                activeCount={taskDock.activeCount}
+                isCollapsed={taskDock.isCollapsed}
+                onCollapse={taskDock.collapse}
+                onExpand={taskDock.expand}
+              />
+            )}
+
             <ChatInput
               onSendMessage={chat.sendMessage}
               disabled={state.isLoading}
@@ -342,6 +374,7 @@ export function ChatContainer({
               onOpenBrowser={handleOpenBrowser}
               isBrowserLoading={isBrowserLoading}
               isBrowserOpen={!!browserUrl}
+              conversationId={conversationId}
             />
           </div>
         </Panel>

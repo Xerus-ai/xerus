@@ -4,7 +4,7 @@
 import { logger } from '../../utils/logger';
 import type { PipelineContext, ResolvedExecutionDeps } from './execution-pipeline.types';
 import { requireAgent } from './pipeline-guards';
-import { STREAM_EVENT_TYPES, type RunnerEventType } from './types';
+import { STREAM_EVENT_TYPES, type RunnerEventType, type StreamEventType } from './types';
 import type { HITLRequest } from './hitl/hitl.types';
 import { handleMetadataSync } from './metadata-sync-router';
 import { handleTriggerIndexing } from './indexing-event-handler';
@@ -75,6 +75,11 @@ export async function routeEventToBackend(
             };
             ctx.toolCallDetails.push(tcDetail);
             ctx.toolCallMap.set(tcDetail.call_id, tcDetail);
+            ctx.stream.send('tool_call' as StreamEventType, {
+                toolName: tc.tool_name,
+                arguments: tc.arguments ?? {},
+                callId: tcDetail.call_id,
+            });
             break;
         }
         case 'tool_result': {
@@ -85,6 +90,13 @@ export async function routeEventToBackend(
                     entry.result = tr.result;
                     entry.success = tr.success ?? true;
                     entry.duration_ms = Date.now() - entry.started_at;
+
+                    ctx.stream.send('tool_result' as StreamEventType, {
+                        callId: tr.call_id,
+                        result: tr.result,
+                        durationMs: entry.duration_ms,
+                        success: entry.success,
+                    });
 
                     // Sync to Neon AFTER write succeeds (not on tool_call)
                     // Prevents phantom agent_registry entries from failed writes

@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { MessageBubble } from './MessageBubble'
 import { ChatWelcome } from './ChatWelcome'
-import { ThinkingIndicator } from './ThinkingIndicator'
+import { RichThinkingIndicator } from './RichThinkingIndicator'
 import { XERUS_AGENT } from './AgentDropdown'
 import { cn } from '@/lib/utils'
 import { Agent, ExecutionState } from './types'
@@ -141,7 +141,7 @@ export function MessageList({
                   <span className="text-base font-semibold text-secondary block">
                     {thinkingAgent.name}
                   </span>
-                  <ThinkingIndicator executionState={executionState} />
+                  <RichThinkingIndicator executionState={executionState} />
                 </div>
               </div>
             </div>

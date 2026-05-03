@@ -112,6 +112,13 @@ export function completeToolCall(
   success: boolean,
   durationMs?: number,
 ): StreamingAssistantTurn {
+  const found = turn.parts.some((p) => p.type === 'tool' && p.callId === callId)
+  if (!found) {
+    console.warn(
+      `[streaming-turn] completeToolCall: no matching part for callId="${callId}". ` +
+      `Available tool callIds: ${turn.parts.filter((p) => p.type === 'tool').map((p) => (p as { callId: string }).callId).join(', ') || 'none'}`,
+    )
+  }
   const parts = turn.parts.map((part) => {
     if (part.type === 'tool' && part.callId === callId) {
       return {
