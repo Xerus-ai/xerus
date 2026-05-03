@@ -239,6 +239,16 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
     )
   }, [agents, state.conversationId, state.conversations])
 
+  // ---- Sync conversationId to URL so reloads preserve the conversation ----
+  useEffect(() => {
+    if (!state.conversationId) return
+    const url = new URL(window.location.href)
+    if (url.searchParams.get('c') !== state.conversationId) {
+      url.searchParams.set('c', state.conversationId)
+      window.history.replaceState({}, '', url.toString())
+    }
+  }, [state.conversationId])
+
   // ---- Connect SSE stream when conversation changes ----
   useEffect(() => {
     if (state.conversationId && isAuthReady) {
