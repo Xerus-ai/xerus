@@ -42,7 +42,7 @@ export function TaskDock({
   const completedCount = tasks.filter((t) => t.status !== 'running').length
 
   return (
-    <div className="shrink-0 mx-4 mb-2">
+    <div className="shrink-0 mx-4 mb-2 max-w-md">
       <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
         {/* Header */}
         <button

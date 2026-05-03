@@ -61,21 +61,26 @@ export function ToolCallCard({ tool }: ToolCallCardProps) {
   const Icon = TOOL_ICON[tool.icon] ?? Terminal
   const colorClass = TOOL_COLOR[tool.icon] ?? TOOL_COLOR.bash
   const isRunning = tool.status === 'running'
+  const isQuestion = tool.icon === 'question'
+  const isAwaitingResponse = isQuestion && isRunning
 
   return (
     <button
       type="button"
       onClick={() => !isRunning && setExpanded(!expanded)}
       className={cn(
-        'inline-flex flex-col items-start max-w-full text-left rounded-xl border border-surface-active bg-surface-alt/50 overflow-hidden',
+        'inline-flex flex-col items-start max-w-full text-left rounded-xl border overflow-hidden',
         'hover:bg-surface-hover/80 transition-colors duration-150',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+        isAwaitingResponse
+          ? 'border-rose-200 bg-rose-50/50'
+          : 'border-surface-active bg-surface-alt/50',
       )}
     >
       {/* Header row */}
       <div className="flex items-center gap-2.5 px-3 py-2 min-w-0">
         <div className={cn('w-6 h-6 rounded-lg flex items-center justify-center shrink-0 overflow-hidden', colorClass)}>
-          {isRunning ? (
+          {isRunning && !isQuestion ? (
             <Loader2 className="w-3 h-3 animate-spin" />
           ) : tool.avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -95,7 +100,9 @@ export function ToolCallCard({ tool }: ToolCallCardProps) {
             ({tool.detail})
           </span>
         )}
-        {isRunning ? (
+        {isAwaitingResponse ? (
+          <span className="text-[10px] font-medium text-rose-500 shrink-0 animate-pulse">Awaiting response</span>
+        ) : isRunning ? (
           <Loader2 className="w-3 h-3 animate-spin text-text-muted shrink-0" />
         ) : tool.duration_ms != null ? (
           <span className="text-[10px] text-text-muted tabular-nums shrink-0">
