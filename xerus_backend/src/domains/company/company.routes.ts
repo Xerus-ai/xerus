@@ -20,7 +20,7 @@ import { shellEscapePath } from '../../utils/shell-safety';
 import { slugify, sanitizeSlug } from '../../shared/slugify';
 import { strictRateLimit } from '../../middleware/rate-limit';
 import { scaffoldProject, scaffoldChannel } from './workspace-scaffold.service';
-import { executeWorkspaceJsonQuery as execWsQuery } from '../conversations/workspace-db.helpers';
+import { executeWorkspaceJsonQuery as execWsQuery, executeWorkspaceQuery as execWsMutate, escapeSQL } from '../conversations/workspace-db.helpers';
 import {
     listDomainsWithChannels,
     createDomain,
@@ -39,6 +39,19 @@ const log = logger('CompanyRoutes');
 const MAX_NAME_LENGTH = 100;
 const MAX_DESCRIPTION_LENGTH = 500;
 const MAX_MESSAGE_CONTENT_LENGTH = 50000;
+
+const SYSTEM_AGENT_SLUGS = ['xerus-master', 'xerus-cto'];
+
+async function addSystemAgentsToChannel(
+    provider: import('../sandbox-infra/sandbox/providers/daytona.provider').DaytonaProvider,
+    sandboxId: string,
+    channelSlug: string,
+): Promise<void> {
+    for (const slug of SYSTEM_AGENT_SLUGS) {
+        const sql = `INSERT OR IGNORE INTO channel_members (channel_slug, agent_slug, role) VALUES ('${escapeSQL(channelSlug)}', '${escapeSQL(slug)}', 'member')`;
+        await execWsMutate(provider, sandboxId, sql).catch(() => {});
+    }
+}
 
 const router = Router();
 const auth = authenticateFirebaseToken;
@@ -180,6 +193,8 @@ router.post('/domains', auth, strictRateLimit, async (req: AuthenticatedRequest,
             CHANNEL_MISSION: `Default channel for ${name}`,
         }).catch(err => log.warn('Channel scaffold failed (non-critical)', { error: (err as Error).message }));
 
+        await addSystemAgentsToChannel(provider, sandboxId, generalSlug);
+
         sendResponse(res, 201, {
             domain: {
                 id: domain.slug,
@@ -262,6 +277,8 @@ router.post('/domains/:domainId/channels', auth, strictRateLimit, async (req: Au
             CHANNEL_NAME: name,
             CHANNEL_MISSION: description || `Channel: ${name}`,
         }).catch(err => log.warn('Channel scaffold failed (non-critical)', { error: (err as Error).message }));
+
+        await addSystemAgentsToChannel(provider, sandboxId, channelDbSlug);
 
         sendResponse(res, 201, {
             channel: {

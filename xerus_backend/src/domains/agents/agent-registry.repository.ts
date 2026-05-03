@@ -29,7 +29,7 @@ export class AgentRegistryRepository {
 
     async findBySlug(slug: string, userId: string | null): Promise<AgentRegistryEntry | null> {
         const result = await query<AgentRegistryEntry>(
-            `SELECT * FROM agent_registry WHERE slug = $1 AND user_id = $2 LIMIT 1`,
+            `SELECT * FROM agent_registry WHERE slug = $1 AND (user_id = $2 OR agent_type = 'system') LIMIT 1`,
             [slug, userId],
         );
         return result.rows[0] || null;
@@ -77,8 +77,9 @@ export class AgentRegistryRepository {
     async listByUser(userId: string): Promise<AgentRegistryEntry[]> {
         const result = await query<AgentRegistryEntry>(
             `SELECT * FROM agent_registry
-             WHERE user_id = $1 AND agent_type IN ('private', 'public')
-             ORDER BY created_at DESC`,
+             WHERE (user_id = $1 AND agent_type IN ('private', 'public'))
+                OR agent_type = 'system'
+             ORDER BY agent_type ASC, created_at DESC`,
             [userId],
         );
         return result.rows;

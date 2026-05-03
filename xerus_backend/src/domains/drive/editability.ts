@@ -13,6 +13,7 @@ import { EditabilityStatus } from './types';
 const HIDDEN_PATTERNS: RegExp[] = [
     /^\.xerus\//,
     /(^|\/)\.git(\/|$)/,
+    /(^|\/)\.github(\/|$)/,
     /(^|\/)\.gitignore$/,
     /(^|\/)\.gitattributes$/,
     /(^|\/)\.gitmodules$/,

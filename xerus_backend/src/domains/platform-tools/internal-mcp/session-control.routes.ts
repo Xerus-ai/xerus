@@ -159,7 +159,7 @@ router.post('/get_status', async (req: InternalMcpRequest, res: Response, next: 
 
         if (include_agents !== false) {
             const agentResult = await query<{ slug: string; status: string; adapter_type: string }>(
-                `SELECT slug, status, adapter_type FROM agent_registry WHERE user_id = $1 ORDER BY slug`,
+                `SELECT slug, status, adapter_type FROM agent_registry WHERE (user_id = $1 OR agent_type = 'system') ORDER BY slug`,
                 [userId]
             );
             statusData.agents = agentResult.rows;

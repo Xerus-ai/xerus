@@ -37,6 +37,7 @@ const PLATFORM_OVERLAY_PATHS: ReadonlyArray<string> = [
     'agents/index.json',
     'agents/xerus-master',
     'agents/xerus-cto',
+    'drive/welcome.md',
 ];
 
 export interface WorkspaceTemplateSyncOptions {
@@ -86,7 +87,8 @@ export async function syncWorkspaceTemplate(
     const script = [
         `set -e`,
         `rm -rf ${tempDir}`,
-        `git clone --recurse-submodules --depth 1 ${branchFlag} '${templateUrl}' ${tempDir} >/dev/null 2>&1`,
+        `git clone --recurse-submodules --depth 1 ${branchFlag} '${templateUrl}' ${tempDir} 2>/dev/null`,
+        `if [ ! -f "${tempDir}/CLAUDE.md" ]; then echo "CLONE_FAILED: template missing CLAUDE.md"; exit 1; fi`,
         `mkdir -p '${basePath}'`,
         `cd '${basePath}'`,
         `for path in ${pathsLiteral}; do`,
@@ -94,6 +96,21 @@ export async function syncWorkspaceTemplate(
         `  dst="${basePath}/$path"`,
         `  if [ ! -e "$src" ]; then`,
         `    echo "MISSING:$path"`,
+        `    continue`,
+        `  fi`,
+        `  changed=1`,
+        `  if [ -d "$src" ]; then`,
+        `    if [ -d "$dst" ]; then`,
+        `      diff_out=$(diff -rq "$src" "$dst" 2>/dev/null) || true`,
+        `      if [ -z "$diff_out" ]; then changed=0; fi`,
+        `    fi`,
+        `  else`,
+        `    if [ -f "$dst" ] && cmp -s "$src" "$dst"; then`,
+        `      changed=0`,
+        `    fi`,
+        `  fi`,
+        `  if [ "$changed" = "0" ]; then`,
+        `    echo "UNCHANGED:$path"`,
         `    continue`,
         `  fi`,
         ...(dryRun

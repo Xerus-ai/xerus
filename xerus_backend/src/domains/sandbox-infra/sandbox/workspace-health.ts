@@ -107,7 +107,7 @@ export async function syncAgentsToWorkspace(
 ): Promise<void> {
     const result = await db.query<{ id: number; slug: string; name: string; role: string | null }>(
         `SELECT id, slug, slug AS name, 'specialist' AS role
-         FROM agent_registry WHERE user_id = $1`,
+         FROM agent_registry WHERE (user_id = $1 OR agent_type = 'system')`,
         [userId],
     );
 

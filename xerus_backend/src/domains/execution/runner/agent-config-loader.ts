@@ -150,7 +150,7 @@ export class AgentConfigLoader {
             return {
                 agent_slug: agentSlug,
                 system_prompt,
-                model: String(parsed.model || DEFAULT_SDK_MODEL),
+                model: String(parsed.ai_model || parsed.model || DEFAULT_SDK_MODEL),
                 tools,
                 max_turns: Number(parsed.max_turns) || 50,
                 mcp_servers,
@@ -252,7 +252,7 @@ export class AgentConfigLoader {
                 description: String(parsed.description || parsed.name || slug),
                 prompt: soulAppend,
                 tools,
-                model: resolveModelAlias(String(parsed.model || '')),
+                model: resolveModelAlias(String(parsed.ai_model || parsed.model || '')),
                 maxTurns: Number(parsed.max_turns) || 50,
             };
         } catch (error) {

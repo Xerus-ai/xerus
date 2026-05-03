@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { FolderOpen } from 'lucide-react'
+import { FolderOpen, LayoutGrid, List } from 'lucide-react'
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from 'react-resizable-panels'
 import { motion, useReducedMotion } from 'framer-motion'
 import { XerusLoader } from '@/components/common/XerusLoader'
@@ -26,7 +26,7 @@ import { cn } from '@/lib/utils'
 
 const SECTION_PATHS: Partial<Record<WorkspaceSection, string>> = {
   agents: 'agents',
-  skills: 'marketplace',
+  skills: 'marketplace/skills',
   connectors: 'connectors',
   knowledge: 'drive',
   memory: '.memory',
@@ -93,6 +93,7 @@ export default function WorkspacePage() {
     if (!tree?.root) return []
     const folders: Array<{ id: string; name: string }> = []
     function walk(node: FileNode) {
+      if (node.type === 'directory' && node.path.startsWith('.claude/')) return
       if (node.type === 'directory' && (node.path.endsWith('/knowledge') || node.name === 'knowledge')) {
         folders.push({ id: node.path, name: node.path })
       }
@@ -204,6 +205,31 @@ export default function WorkspacePage() {
 
   const reduceMotion = useReducedMotion()
 
+  const viewToggleElement = (
+    <div className="flex items-center bg-surface-hover rounded-lg p-0.5 border border-surface-active/60">
+      <button
+        onClick={() => handleContentViewChange('ui')}
+        className={cn(
+          'p-1.5 rounded-md transition-all',
+          contentViewMode === 'ui' ? 'bg-card text-text shadow-sm' : 'text-text-secondary hover:text-text'
+        )}
+        title="Card view"
+      >
+        <LayoutGrid className="w-4 h-4" />
+      </button>
+      <button
+        onClick={() => handleContentViewChange('browse')}
+        className={cn(
+          'p-1.5 rounded-md transition-all',
+          contentViewMode === 'browse' ? 'bg-card text-text shadow-sm' : 'text-text-secondary hover:text-text'
+        )}
+        title="File view"
+      >
+        <List className="w-4 h-4" />
+      </button>
+    </div>
+  )
+
   // Stable callbacks for panels (rule: rerender-functional-setstate)
   const handleAgentSelect = useCallback((agent: Assistant) => {
     setDetailView({ type: 'agent', id: agent.slug || agent.id })
@@ -249,13 +275,13 @@ export default function WorkspacePage() {
               /* ---- UI Mode: Card grid ---- */
               <div className="h-full">
                 {activeSection === 'agents' && (
-                  <AgentsPanel onSelect={handleAgentSelect} />
+                  <AgentsPanel onSelect={handleAgentSelect} viewToggle={viewToggleElement} />
                 )}
                 {activeSection === 'skills' && (
-                  <SkillsPanel onSelect={handleSkillSelect} />
+                  <SkillsPanel onSelect={handleSkillSelect} viewToggle={viewToggleElement} />
                 )}
                 {activeSection === 'connectors' && (
-                  <ConnectorsPanel />
+                  <ConnectorsPanel viewToggle={viewToggleElement} />
                 )}
               </div>
             ) : (
@@ -299,6 +325,7 @@ export default function WorkspacePage() {
                         onUploadClick={(path) => { setUploadTargetPath(path); setUploadPanelOpen(true) }}
                         onNewFolder={confirmNewFolder}
                         showPropertyBar={currentDirPath?.startsWith('drive') ?? false}
+                        sectionToggle={hasUIMode ? viewToggleElement : undefined}
                       />
                     </div>
                   </Panel>

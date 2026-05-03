@@ -65,9 +65,20 @@ function buildInitialModuleClaudeMd(opts: {
     tools: string[];
     autonomyLevel: string;
 }): string {
-    const toolsList = opts.tools.length > 0
-        ? opts.tools.map((t) => `- ${t} [status: check Pipedream MCP]`).join('\n')
-        : 'No tool integrations assigned. Use code-first approach for external API calls.';
+    let toolsSection: string;
+    if (opts.tools.length > 0) {
+        const toolLines = opts.tools.map((t) =>
+            `- ${t} [NOT_CONNECTED — needs OAuth authentication]`
+        ).join('\n');
+        toolsSection = [
+            'Tools are assigned but not yet connected. Ask @human to authenticate these integrations in Settings > Connectors:',
+            toolLines,
+            '',
+            'Once connected, these tools become available as MCP servers. Use mcp__<tool_name>__* tool calls to interact with them.',
+        ].join('\n');
+    } else {
+        toolsSection = 'No tool integrations assigned. Use code-first approach for external API calls.';
+    }
 
     return `## Identity
 
@@ -83,10 +94,7 @@ No specialized skills assigned. Use your general capabilities.
 
 ## Connected Tools
 
-Integrations available to you (via MCP):
-${toolsList}
-
-If a tool action fails with "NOT_CONNECTED", ask @human to authenticate the integration.
+${toolsSection}
 
 ## Colleagues
 

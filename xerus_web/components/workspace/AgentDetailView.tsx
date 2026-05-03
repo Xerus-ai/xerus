@@ -77,7 +77,7 @@ export function AgentDetailView({ agentId, onBack }: AgentDetailViewProps) {
 
   const { data: agentConnections = [] } = useSWR(
     isAuthReady && agent?.slug && !isMarketplace ? ['agent-connections', agent.slug] : null,
-    () => (agent?.slug ? listAgentConnections(agent.slug) : Promise.resolve([]))
+    () => (agent?.slug ? listAgentConnections(agent.slug).catch(() => []) : Promise.resolve([]))
   )
 
   const schedules = schedulesData ?? []
@@ -119,7 +119,7 @@ export function AgentDetailView({ agentId, onBack }: AgentDetailViewProps) {
   const isPublic = agent?.agentType === 'public'
   const canPublishAgent = isOwner && isPrivate
   const canUnpublishAgent = isOwner && isPublic && agent?.userId !== null
-  const canDeleteAgent = isOwner && isPrivate
+  const canDeleteAgent = isOwner && isPrivate && agent?.agentType !== 'system'
 
   if (isLoadingAgent) return <XerusLoader />
 

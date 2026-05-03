@@ -12,9 +12,10 @@ import { UploadPanel } from '@/components/upload/UploadPanel'
 interface SkillsPanelProps {
   onSelect: (skill: Skill) => void
   onCountChange?: (count: number) => void
+  viewToggle?: React.ReactNode
 }
 
-export function SkillsPanel({ onSelect, onCountChange }: SkillsPanelProps) {
+export function SkillsPanel({ onSelect, onCountChange, viewToggle }: SkillsPanelProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [uploadPanelOpen, setUploadPanelOpen] = useState(false)
@@ -94,6 +95,7 @@ export function SkillsPanel({ onSelect, onCountChange }: SkillsPanelProps) {
           selectedCategories={selectedCategories}
           onToggleCategory={handleToggleCategory}
           onClearCategories={handleClearCategories}
+          actions={viewToggle}
         />
 
         {/* My Skills (user-created + installed) */}
