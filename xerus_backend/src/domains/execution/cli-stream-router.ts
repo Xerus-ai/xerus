@@ -96,6 +96,9 @@ export async function handleCliStreamEvent(
                                 } else {
                                     const tracked = ctx.toolCallMap.get(callId)!;
                                     tracked.arguments = args;
+                                    if (Object.keys(args).length > 0) {
+                                        ctx.stream.send('tool_call' as StreamEventType, { toolName, arguments: args, callId });
+                                    }
                                 }
                                 break;
                             }
