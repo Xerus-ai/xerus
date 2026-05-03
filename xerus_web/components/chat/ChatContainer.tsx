@@ -347,8 +347,8 @@ export function ChatContainer({
               onSelect={handleOpenDeliverable}
             />
 
-            <div className="relative shrink-0">
-              {taskDock.isVisible && (
+            <ChatInput
+              headerContent={taskDock.isVisible ? (
                 <TaskDock
                   tasks={taskDock.tasks}
                   activeCount={taskDock.activeCount}
@@ -357,8 +357,7 @@ export function ChatContainer({
                   onExpand={taskDock.expand}
                   onDismiss={taskDock.clearTasks}
                 />
-              )}
-            <ChatInput
+              ) : undefined}
               onSendMessage={chat.sendMessage}
               disabled={state.isLoading}
               placeholder={
@@ -377,7 +376,6 @@ export function ChatContainer({
               isBrowserOpen={!!browserUrl}
               conversationId={conversationId}
             />
-            </div>
           </div>
         </Panel>
 

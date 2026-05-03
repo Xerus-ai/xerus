@@ -26,6 +26,7 @@ interface ChatInputProps {
   isBrowserLoading?: boolean
   isBrowserOpen?: boolean
   conversationId?: string
+  headerContent?: React.ReactNode
 }
 
 export function ChatInput({
@@ -43,6 +44,7 @@ export function ChatInput({
   isBrowserLoading,
   isBrowserOpen,
   conversationId,
+  headerContent,
 }: ChatInputProps) {
   const [value, setValue] = useState('')
   const [focused, setFocused] = useState(false)
@@ -345,6 +347,9 @@ export function ChatInput({
               : 'border-border shadow-sm hover:border-border/80'
           )}
         >
+          {/* Dynamic header content (task dock, etc.) */}
+          {headerContent}
+
           {/* Textarea */}
           <textarea
             ref={textareaRef}
