@@ -347,16 +347,17 @@ export function ChatContainer({
               onSelect={handleOpenDeliverable}
             />
 
-            {taskDock.isVisible && (
-              <TaskDock
-                tasks={taskDock.tasks}
-                activeCount={taskDock.activeCount}
-                isCollapsed={taskDock.isCollapsed}
-                onCollapse={taskDock.collapse}
-                onExpand={taskDock.expand}
-              />
-            )}
-
+            <div className="relative shrink-0">
+              {taskDock.isVisible && (
+                <TaskDock
+                  tasks={taskDock.tasks}
+                  activeCount={taskDock.activeCount}
+                  isCollapsed={taskDock.isCollapsed}
+                  onCollapse={taskDock.collapse}
+                  onExpand={taskDock.expand}
+                  onDismiss={taskDock.clearTasks}
+                />
+              )}
             <ChatInput
               onSendMessage={chat.sendMessage}
               disabled={state.isLoading}
@@ -376,6 +377,7 @@ export function ChatContainer({
               isBrowserOpen={!!browserUrl}
               conversationId={conversationId}
             />
+            </div>
           </div>
         </Panel>
 
