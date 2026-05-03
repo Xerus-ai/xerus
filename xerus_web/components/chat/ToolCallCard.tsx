@@ -96,7 +96,7 @@ export function ToolCallCard({ tool }: ToolCallCardProps) {
           </span>
         )}
         {isRunning ? (
-          <span className="text-[10px] text-text-muted shrink-0">running...</span>
+          <Loader2 className="w-3 h-3 animate-spin text-text-muted shrink-0" />
         ) : tool.duration_ms != null ? (
           <span className="text-[10px] text-text-muted tabular-nums shrink-0">
             {formatDuration(tool.duration_ms)}

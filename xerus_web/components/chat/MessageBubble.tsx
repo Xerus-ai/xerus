@@ -377,9 +377,9 @@ export const MessageBubble = memo(function MessageBubble({
           {formatTime(message.timestamp)}
         </span>
         {isStreaming && (
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary">
-            <span className="h-1.5 w-1.5 rounded-full bg-secondary" />
-            Live
+          <span className="inline-flex items-center gap-1.5 text-[11px] text-text-muted">
+            <span className="h-1.5 w-1.5 rounded-full bg-secondary animate-pulse" />
+            Generating
           </span>
         )}
       </div>
@@ -415,9 +415,8 @@ export const MessageBubble = memo(function MessageBubble({
             })}
           </div>
         ) : isStreaming ? (
-          <div className="flex items-center gap-2 text-sm text-text-secondary">
-            <span className="h-1.5 w-1.5 rounded-full bg-secondary" />
-            Waiting for response...
+          <div className="flex items-center gap-2 text-sm text-text-muted">
+            <span className="h-1.5 w-1.5 rounded-full bg-secondary animate-pulse" />
           </div>
         ) : null
       ) : (

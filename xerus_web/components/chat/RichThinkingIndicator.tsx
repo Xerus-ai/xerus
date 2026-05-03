@@ -35,17 +35,17 @@ const VERB_MAP: Record<ToolCallIcon, string> = {
   task: 'Tracking', question: 'Asking',
 }
 
-const AMBIENT_VERBS = ['thinking...', 'pondering...', 'considering...', 'working on it...']
+const AMBIENT_VERBS = ['Thinking...', 'Analyzing...', 'Processing...', 'Working...']
 const VERB_CYCLE_MS = 3500
 
 function resolvePhaseVerb(phase: string | undefined): string | null {
   if (!phase) return null
   const p = phase.toLowerCase()
-  if (p.includes('workspace') || p.includes('scaffold')) return 'preparing workspace...'
-  if (p.includes('plan')) return 'crafting a plan...'
-  if (p.includes('analyz') || p.includes('assess')) return 'analyzing your request...'
-  if (p.includes('generat') || p.includes('complet')) return 'generating a response...'
-  if (p.includes('verif') || p.includes('review')) return 'verifying results...'
+  if (p.includes('workspace') || p.includes('scaffold')) return 'Setting up workspace...'
+  if (p.includes('plan')) return 'Creating a plan...'
+  if (p.includes('analyz') || p.includes('assess')) return 'Analyzing request...'
+  if (p.includes('generat') || p.includes('complet')) return 'Generating response...'
+  if (p.includes('verif') || p.includes('review')) return 'Reviewing results...'
   return null
 }
 
@@ -101,7 +101,7 @@ export function RichThinkingIndicator({ executionState, parts }: RichThinkingInd
 
   const displayText = toolSummary
     ?? phaseVerb
-    ?? (executionState?.error ? 'ran into a problem...' : null)
+    ?? (executionState?.error ? 'Something went wrong' : null)
     ?? AMBIENT_VERBS[ambientIndex]
 
   useEffect(() => {

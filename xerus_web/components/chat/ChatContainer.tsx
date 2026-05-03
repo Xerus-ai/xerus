@@ -103,17 +103,17 @@ export function ChatContainer({
   const taskDock = useTaskDock()
 
   // Sync subagent events from executionState to task dock
-  const prevStepsRef = useRef<number>(0)
   useEffect(() => {
     const steps = state.executionState?.steps ?? []
-    if (steps.length === prevStepsRef.current) return
-    prevStepsRef.current = steps.length
     for (const step of steps) {
+      const rawName = step.name ?? ''
+      const cleanName = rawName.replace(/^Spawning\s+/i, '').replace(/\s*\(failed\)\s*$/i, '')
+      const displayName = cleanName || 'Processing'
       if (step.status === 'active') {
-        taskDock.addTask(step.id, step.name ?? 'Working', step.name ?? '')
+        taskDock.addTask(step.id, displayName, rawName)
       } else if (step.status === 'completed') {
         const durationMs = step.endTime && step.startTime ? step.endTime - step.startTime : undefined
-        const success = !step.name?.includes('failed')
+        const success = !rawName.includes('failed')
         taskDock.completeTask(step.id, success, durationMs)
       }
     }

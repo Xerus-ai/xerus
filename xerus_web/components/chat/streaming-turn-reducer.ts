@@ -9,6 +9,19 @@ function nextPartId(): string {
   return `part-${crypto.randomUUID()}`
 }
 
+function formatTarget(value: unknown): string | undefined {
+  if (value == null) return undefined
+  if (typeof value === 'string') return value || undefined
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  if (Array.isArray(value)) return `${value.length} items`
+  if (typeof value === 'object') {
+    const name = (value as Record<string, unknown>).name ?? (value as Record<string, unknown>).subject
+    if (typeof name === 'string') return name
+    return undefined
+  }
+  return undefined
+}
+
 export function createStreamingTurn(
   agentSlug?: string,
   agentName?: string,
@@ -66,7 +79,7 @@ export function startToolCall(
   args?: Record<string, unknown>,
 ): StreamingAssistantTurn {
   const target = args && Object.keys(args).length > 0
-    ? String(Object.values(args)[0] ?? '')
+    ? formatTarget(Object.values(args)[0])
     : undefined
 
   // If a part with this callId already exists, update it with richer data
