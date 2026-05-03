@@ -251,13 +251,29 @@ export function useChatExecution({ setState }: UseChatExecutionOptions) {
     onDelegation: useCallback((event: StreamEvent<'delegation'>) => {
       const content = event.content as DelegationEventContent
       if (content) {
-        setState(prev => ({
-          ...prev,
-          executionState: prev.executionState ? {
-            ...prev.executionState,
-            currentNode: `Delegating to ${content.toAgent}`,
-          } : prev.executionState,
-        }))
+        setState(prev => {
+          const delegationStep = {
+            id: `delegation-${Date.now()}`,
+            name: content.task || `Delegating to ${content.toAgent}`,
+            status: 'active' as const,
+            startTime: Date.now(),
+            metadata: { toAgent: content.toAgent, fromAgent: content.fromAgent },
+          }
+          return {
+            ...prev,
+            executionState: prev.executionState ? {
+              ...prev.executionState,
+              currentNode: `Delegating to ${content.toAgent}`,
+              steps: [...(prev.executionState.steps ?? []), delegationStep],
+            } : {
+              mode: 'coordinated' as const,
+              steps: [delegationStep],
+              completedSteps: 0,
+              currentNode: `Delegating to ${content.toAgent}`,
+              agents: [content.toAgent],
+            },
+          }
+        })
       }
     }, [setState]),
     onNotification: useCallback((event: StreamEvent<'notification'>) => {

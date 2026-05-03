@@ -102,15 +102,19 @@ export function ChatContainer({
   // ---- Task dock (subagent progress) ----
   const taskDock = useTaskDock()
 
-  // Sync subagent events from executionState to task dock
+  // Sync delegation tasks to task dock (skip raw infra steps like sandbox/executing)
+  const INFRA_NOISE = new Set(['sandbox', 'executing', 'provisioning', 'connecting'])
   useEffect(() => {
     const steps = state.executionState?.steps ?? []
     for (const step of steps) {
       const rawName = step.name ?? ''
       const cleanName = rawName.replace(/^Spawning\s+/i, '').replace(/\s*\(failed\)\s*$/i, '')
-      const displayName = cleanName || 'Processing'
+      if (INFRA_NOISE.has(cleanName.toLowerCase())) continue
+      if (!cleanName) continue
+      const meta = step.metadata as Record<string, string> | undefined
+      const subtitle = meta?.toAgent ? `@${meta.toAgent}` : ''
       if (step.status === 'active') {
-        taskDock.addTask(step.id, displayName, rawName)
+        taskDock.addTask(step.id, cleanName, subtitle)
       } else if (step.status === 'completed') {
         const durationMs = step.endTime && step.startTime ? step.endTime - step.startTime : undefined
         const success = !rawName.includes('failed')
