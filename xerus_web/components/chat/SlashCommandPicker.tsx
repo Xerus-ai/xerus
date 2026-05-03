@@ -16,7 +16,6 @@ interface SlashCommandPickerProps {
   commands: SlashCommand[]
   selectedIdx: number
   onSelect: (cmd: SlashCommand) => void
-  onClose: () => void
   onSelectedIdxChange: (idx: number) => void
 }
 
@@ -31,7 +30,6 @@ export function SlashCommandPicker({
   commands,
   selectedIdx,
   onSelect,
-  onClose,
   onSelectedIdxChange,
 }: SlashCommandPickerProps) {
   const pickerRef = useRef<HTMLDivElement>(null)
@@ -61,8 +59,6 @@ export function SlashCommandPicker({
 
   if (flatItems.length === 0) return null
 
-  let globalIdx = 0
-
   return (
     <div
       ref={pickerRef}
@@ -79,7 +75,7 @@ export function SlashCommandPicker({
           </div>
           <div className="p-1">
             {group.items.map((cmd) => {
-              const idx = globalIdx++
+              const idx = flatItems.indexOf(cmd)
               const Icon = cmd.icon
               return (
                 <button

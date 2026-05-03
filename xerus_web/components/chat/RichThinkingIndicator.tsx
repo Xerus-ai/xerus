@@ -1,33 +1,10 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { cn } from '@/lib/utils'
-import {
-  Terminal, FileText, Pencil, Search, Globe, Brain,
-  Bot, Puzzle, ListChecks, HelpCircle,
-} from 'lucide-react'
 import type { ExecutionState } from './types'
 import type { TurnPart, ToolCallIcon } from './streaming-turn.types'
-
-const TOOL_ICON: Record<ToolCallIcon, typeof Terminal> = {
-  bash: Terminal, read: FileText, write: Pencil, search: Search,
-  web: Globe, think: Brain, agent: Bot, skill: Puzzle,
-  task: ListChecks, question: HelpCircle,
-}
-
-const TOOL_COLOR: Record<ToolCallIcon, string> = {
-  bash: 'text-emerald-600', read: 'text-blue-600', write: 'text-violet-600',
-  search: 'text-amber-600', web: 'text-cyan-600', think: 'text-slate-500',
-  agent: 'text-secondary', skill: 'text-purple-600', task: 'text-teal-600',
-  question: 'text-rose-600',
-}
-
-const ICON_BG: Record<ToolCallIcon, string> = {
-  bash: 'bg-emerald-500/10', read: 'bg-blue-500/10', write: 'bg-violet-500/10',
-  search: 'bg-amber-500/10', web: 'bg-cyan-500/10', think: 'bg-slate-500/10',
-  agent: 'bg-secondary/10', skill: 'bg-purple-500/10', task: 'bg-teal-500/10',
-  question: 'bg-rose-500/10',
-}
+import { TOOL_ICON_MAP, TOOL_COLOR_MAP } from './tool-icon.utils'
 
 const VERB_MAP: Record<ToolCallIcon, string> = {
   read: 'Reading', write: 'Writing', bash: 'Running', search: 'Searching',
@@ -81,7 +58,6 @@ interface RichThinkingIndicatorProps {
 
 export function RichThinkingIndicator({ executionState, parts }: RichThinkingIndicatorProps) {
   const [ambientIndex, setAmbientIndex] = useState(0)
-  const lastVerbRef = useRef(Date.now())
 
   const toolSummary = useMemo(() => {
     if (!parts || parts.length === 0) return null
@@ -108,7 +84,6 @@ export function RichThinkingIndicator({ executionState, parts }: RichThinkingInd
     if (toolSummary || phaseVerb) return
     const interval = setInterval(() => {
       setAmbientIndex((prev) => (prev + 1) % AMBIENT_VERBS.length)
-      lastVerbRef.current = Date.now()
     }, VERB_CYCLE_MS)
     return () => clearInterval(interval)
   }, [toolSummary, phaseVerb])
@@ -120,13 +95,13 @@ export function RichThinkingIndicator({ executionState, parts }: RichThinkingInd
       {runningIcons.length > 0 ? (
         <span className="inline-flex items-center gap-0.5 mr-0.5">
           {runningIcons.map((icon) => {
-            const Icon = TOOL_ICON[icon]
+            const Icon = TOOL_ICON_MAP[icon]
             return (
               <span
                 key={icon}
                 className={cn(
                   'w-5 h-5 rounded-md inline-flex items-center justify-center animate-pulse',
-                  ICON_BG[icon], TOOL_COLOR[icon],
+                  TOOL_COLOR_MAP[icon],
                 )}
               >
                 <Icon className="w-2.5 h-2.5" />

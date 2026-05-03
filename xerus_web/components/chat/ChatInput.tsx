@@ -317,7 +317,6 @@ export function ChatInput({
             commands={commands}
             selectedIdx={slashSelectedIdx}
             onSelect={handleSelectSlashCommand}
-            onClose={closeSlashPicker}
             onSelectedIdxChange={setSlashSelectedIdx}
           />
         )}

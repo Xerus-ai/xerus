@@ -3,37 +3,10 @@
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import {
-  ChevronRight, ChevronDown,
-  Terminal, FileText, Pencil, Search, Globe, Brain,
-  Loader2, Bot, Puzzle, ListChecks, HelpCircle,
+  ChevronRight, ChevronDown, Terminal, Loader2,
 } from 'lucide-react'
 import type { ToolCallIcon } from './streaming-turn.types'
-
-const TOOL_ICON: Record<ToolCallIcon, typeof Terminal> = {
-  bash: Terminal,
-  read: FileText,
-  write: Pencil,
-  search: Search,
-  web: Globe,
-  think: Brain,
-  agent: Bot,
-  skill: Puzzle,
-  task: ListChecks,
-  question: HelpCircle,
-}
-
-const TOOL_COLOR: Record<ToolCallIcon, string> = {
-  bash: 'bg-emerald-500/10 text-emerald-600',
-  read: 'bg-blue-500/10 text-blue-600',
-  write: 'bg-violet-500/10 text-violet-600',
-  search: 'bg-amber-500/10 text-amber-600',
-  web: 'bg-cyan-500/10 text-cyan-600',
-  think: 'bg-slate-500/10 text-slate-600',
-  agent: 'bg-secondary/10 text-secondary',
-  skill: 'bg-purple-500/10 text-purple-600',
-  task: 'bg-teal-500/10 text-teal-600',
-  question: 'bg-rose-500/10 text-rose-600',
-}
+import { TOOL_ICON_MAP, TOOL_COLOR_MAP } from './tool-icon.utils'
 
 function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`
@@ -58,8 +31,8 @@ interface ToolCallCardProps {
 
 export function ToolCallCard({ tool }: ToolCallCardProps) {
   const [expanded, setExpanded] = useState(false)
-  const Icon = TOOL_ICON[tool.icon] ?? Terminal
-  const colorClass = TOOL_COLOR[tool.icon] ?? TOOL_COLOR.bash
+  const Icon = TOOL_ICON_MAP[tool.icon] ?? Terminal
+  const colorClass = TOOL_COLOR_MAP[tool.icon] ?? TOOL_COLOR_MAP.bash
   const isRunning = tool.status === 'running'
   const isQuestion = tool.icon === 'question'
   const isAwaitingResponse = isQuestion && isRunning
@@ -109,7 +82,7 @@ export function ToolCallCard({ tool }: ToolCallCardProps) {
             {formatDuration(tool.duration_ms)}
           </span>
         ) : null}
-        {!isRunning && (
+        {!isRunning && tool.output && (
           expanded ? (
             <ChevronDown className="w-3.5 h-3.5 text-text-muted shrink-0" />
           ) : (

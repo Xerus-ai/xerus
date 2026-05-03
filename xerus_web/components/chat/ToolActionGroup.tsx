@@ -3,39 +3,12 @@
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import {
-  ChevronRight, ChevronDown, Loader2,
-  Terminal, FileText, Pencil, Search, Globe, Brain,
-  Bot, Puzzle, ListChecks, HelpCircle,
+  ChevronRight, ChevronDown, Loader2, Terminal,
 } from 'lucide-react'
-import type { TurnPart, ToolCallIcon } from './streaming-turn.types'
+import type { TurnPart } from './streaming-turn.types'
+import { TOOL_ICON_MAP, TOOL_COLOR_MAP } from './tool-icon.utils'
 import { ToolCallCard, type ToolCallCardData } from './ToolCallCard'
 import type { Agent } from './types'
-
-const TOOL_ICON: Record<ToolCallIcon, typeof Terminal> = {
-  bash: Terminal,
-  read: FileText,
-  write: Pencil,
-  search: Search,
-  web: Globe,
-  think: Brain,
-  agent: Bot,
-  skill: Puzzle,
-  task: ListChecks,
-  question: HelpCircle,
-}
-
-const TOOL_COLOR: Record<ToolCallIcon, string> = {
-  bash: 'bg-emerald-500/10 text-emerald-600',
-  read: 'bg-blue-500/10 text-blue-600',
-  write: 'bg-violet-500/10 text-violet-600',
-  search: 'bg-amber-500/10 text-amber-600',
-  web: 'bg-cyan-500/10 text-cyan-600',
-  think: 'bg-slate-500/10 text-slate-600',
-  agent: 'bg-secondary/10 text-secondary',
-  skill: 'bg-purple-500/10 text-purple-600',
-  task: 'bg-teal-500/10 text-teal-600',
-  question: 'bg-rose-500/10 text-rose-600',
-}
 
 type ToolPart = Extract<TurnPart, { type: 'tool' }>
 
@@ -90,8 +63,8 @@ export function ToolActionGroup({ tools, agents, defaultExpanded = false }: Tool
       >
         <div className="flex items-center gap-1">
           {uniqueIcons.map((icon) => {
-            const Icon = TOOL_ICON[icon] ?? Terminal
-            const colorClass = TOOL_COLOR[icon] ?? TOOL_COLOR.bash
+            const Icon = TOOL_ICON_MAP[icon] ?? Terminal
+            const colorClass = TOOL_COLOR_MAP[icon] ?? TOOL_COLOR_MAP.bash
             return (
               <div
                 key={icon}
