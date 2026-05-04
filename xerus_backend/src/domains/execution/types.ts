@@ -77,6 +77,12 @@ export const STREAM_EVENT_TYPES = [
     'credit_warning',
     'insufficient_credits',
     'provider_unavailable',
+    'tool_progress',
+    'tool_use_summary',
+    'task_started',
+    'task_progress',
+    'task_updated',
+    'task_notification',
 ] as const;
 
 export type StreamEventType = (typeof STREAM_EVENT_TYPES)[number];

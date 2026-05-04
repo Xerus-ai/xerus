@@ -29,6 +29,12 @@ import type {
   CreditWarningEventContent,
   InsufficientCreditsEventContent,
   ProviderUnavailableEventContent,
+  TaskStartedEventContent,
+  TaskUpdatedEventContent,
+  TaskProgressEventContent,
+  TaskNotificationEventContent,
+  ToolProgressEventContent,
+  ToolUseSummaryEventContent,
 } from '@/hooks/useExecutionStream'
 import type { ChatState } from './types'
 import type { ChatMessageExtended } from './chat-message.types'
@@ -39,6 +45,8 @@ import {
   appendReasoning,
   startToolCall,
   completeToolCall,
+  updateToolProgress,
+  enrichToolSummary,
   addStatus,
   commitTurn,
 } from './streaming-turn-reducer'
@@ -79,11 +87,14 @@ export function useChatExecution({ setState }: UseChatExecutionOptions) {
   const stream = useExecutionStream({
     onToken: useCallback((event: StreamEvent<'token'>) => {
       const content = event.content as TokenEventContent
-      rawTextRef.current += content.text
+      const text = content.text
+      // Skip raw error JSON chunks from upstream LLM providers
+      if (text.includes('"type":"error"') && text.includes('"api_error"')) return
+      rawTextRef.current += text
       setState(prev => {
         const turn = prev.streamingTurn
         if (!turn) return prev
-        return { ...prev, streamingTurn: appendToken(turn, content.text) }
+        return { ...prev, streamingTurn: appendToken(turn, text) }
       })
     }, [setState]),
     onProgress: useCallback((event: StreamEvent<'progress'>) => {
@@ -355,11 +366,108 @@ export function useChatExecution({ setState }: UseChatExecutionOptions) {
       if (!content) return
       toast.error('AI provider temporarily unavailable', { description: content.message })
     }, []),
+    onTaskStarted: useCallback((event: StreamEvent<'task_started'>) => {
+      const content = event.content as TaskStartedEventContent
+      setState(prev => {
+        const turn = prev.streamingTurn
+        if (!turn) return prev
+        return {
+          ...prev,
+          streamingTurn: addStatus(turn, `Started: ${content.taskName}`),
+        }
+      })
+    }, [setState]),
+    onTaskUpdated: useCallback((event: StreamEvent<'task_updated'>) => {
+      const content = event.content as TaskUpdatedEventContent
+      if (content.status === 'completed') {
+        setState(prev => {
+          const turn = prev.streamingTurn
+          if (!turn) return prev
+          return {
+            ...prev,
+            streamingTurn: addStatus(turn, `Completed task`),
+          }
+        })
+      } else if (content.status === 'failed') {
+        setState(prev => {
+          const turn = prev.streamingTurn
+          if (!turn) return prev
+          return {
+            ...prev,
+            streamingTurn: addStatus(turn, `Task failed`),
+          }
+        })
+      }
+    }, [setState]),
+    onTaskProgress: useCallback((event: StreamEvent<'task_progress'>) => {
+      const content = event.content as TaskProgressEventContent
+      if (content.message) {
+        setState(prev => {
+          const turn = prev.streamingTurn
+          if (!turn) return prev
+          return {
+            ...prev,
+            streamingTurn: addStatus(turn, content.message!),
+          }
+        })
+      }
+    }, [setState]),
+    onTaskNotification: useCallback((event: StreamEvent<'task_notification'>) => {
+      const content = event.content as TaskNotificationEventContent
+      const statusText = content.status === 'completed'
+        ? `Finished: ${content.taskSubject}`
+        : content.status === 'failed'
+          ? `Failed: ${content.taskSubject}`
+          : content.taskSubject
+      setState(prev => {
+        const turn = prev.streamingTurn
+        if (!turn) return prev
+        return {
+          ...prev,
+          streamingTurn: addStatus(turn, statusText),
+        }
+      })
+    }, [setState]),
+    onToolProgress: useCallback((event: StreamEvent<'tool_progress'>) => {
+      const content = event.content as ToolProgressEventContent
+      setState(prev => {
+        const turn = prev.streamingTurn
+        if (!turn) return prev
+        return {
+          ...prev,
+          streamingTurn: updateToolProgress(turn, content.toolUseId, content.progress.message),
+        }
+      })
+    }, [setState]),
+    onToolUseSummary: useCallback((event: StreamEvent<'tool_use_summary'>) => {
+      const content = event.content as ToolUseSummaryEventContent
+      setState(prev => {
+        const turn = prev.streamingTurn
+        if (!turn) return prev
+        return {
+          ...prev,
+          streamingTurn: enrichToolSummary(turn, content.toolUseId, content.durationMs, content.output, content.status),
+        }
+      })
+    }, [setState]),
     onDone: useCallback((event: StreamEvent<'done'>) => {
       if (doneReceivedRef.current) return
       doneReceivedRef.current = true
       const content = event.content as DoneEventContent
-      const finalText = content.finalResponse ?? rawTextRef.current
+      const isError = event.success === false || !!content.error
+
+      let finalText = content.finalResponse ?? rawTextRef.current
+
+      // Strip raw error JSON that upstream LLM providers sometimes inject as text
+      // e.g. {"type":"error","error":{"type":"api_error","message":"stream closed..."}}
+      if (finalText) {
+        finalText = finalText.replace(/\{"type"\s*:\s*"error"[^}]*\{[^}]*\}\s*\}/g, '').trim()
+      }
+
+      if (isError) {
+        const errorMsg = content.error?.message ?? 'The AI provider encountered an error'
+        toast.error('Response interrupted', { description: errorMsg })
+      }
 
       // Clear refs immediately after capturing finalText to prevent stale late-arriving tokens
       rawTextRef.current = ''

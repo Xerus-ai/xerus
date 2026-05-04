@@ -36,6 +36,14 @@ export const STREAM_EVENT_TYPES = [
   'credit_warning',
   'insufficient_credits',
   'provider_unavailable',
+  // Tool lifecycle events (from SDK runner)
+  'tool_progress',
+  'tool_use_summary',
+  // Task/subagent lifecycle events (from SDK runner)
+  'task_started',
+  'task_progress',
+  'task_updated',
+  'task_notification',
 ] as const;
 
 export type StreamEventType = (typeof STREAM_EVENT_TYPES)[number];
@@ -206,6 +214,47 @@ export interface ProviderUnavailableEventContent {
   message: string;
 }
 
+export interface ToolProgressEventContent {
+  toolName: string;
+  toolUseId: string;
+  progress: { status: string; message: string };
+}
+
+export interface ToolUseSummaryEventContent {
+  toolName: string;
+  toolUseId: string;
+  durationMs: number;
+  input?: unknown;
+  output?: unknown;
+  status: 'success' | 'error';
+}
+
+export interface TaskStartedEventContent {
+  taskId: string;
+  taskName: string;
+  taskDescription?: string;
+  parentToolUseId?: string;
+}
+
+export interface TaskProgressEventContent {
+  taskId: string;
+  progress: number;
+  message?: string;
+}
+
+export interface TaskUpdatedEventContent {
+  taskId: string;
+  status: 'running' | 'completed' | 'failed';
+  result?: unknown;
+}
+
+export interface TaskNotificationEventContent {
+  taskId: string;
+  taskSubject: string;
+  status: string;
+  result?: unknown;
+}
+
 // Map from event type string to its content type
 export interface StreamEventContentMap {
   meta: MetaEventContent;
@@ -230,6 +279,12 @@ export interface StreamEventContentMap {
   credit_warning: CreditWarningEventContent;
   insufficient_credits: InsufficientCreditsEventContent;
   provider_unavailable: ProviderUnavailableEventContent;
+  tool_progress: ToolProgressEventContent;
+  tool_use_summary: ToolUseSummaryEventContent;
+  task_started: TaskStartedEventContent;
+  task_progress: TaskProgressEventContent;
+  task_updated: TaskUpdatedEventContent;
+  task_notification: TaskNotificationEventContent;
 }
 
 export interface StreamEvent<T extends StreamEventType = StreamEventType> {
@@ -272,6 +327,12 @@ export interface UseExecutionStreamOptions {
   onDelegation?: StreamEventCallback<'delegation'>;
   onNotification?: StreamEventCallback<'notification'>;
   onPreview?: StreamEventCallback<'preview'>;
+  onToolProgress?: StreamEventCallback<'tool_progress'>;
+  onToolUseSummary?: StreamEventCallback<'tool_use_summary'>;
+  onTaskStarted?: StreamEventCallback<'task_started'>;
+  onTaskProgress?: StreamEventCallback<'task_progress'>;
+  onTaskUpdated?: StreamEventCallback<'task_updated'>;
+  onTaskNotification?: StreamEventCallback<'task_notification'>;
   onError?: (error: Error) => void;
   onConnectionChange?: (connected: boolean) => void;
 }

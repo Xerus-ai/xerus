@@ -153,6 +153,8 @@ function createTestContext(overrides?: Partial<PipelineContext>): PipelineContex
         setupReport: null,
         hookHealth: null,
         triggerType: 'user_message',
+        executionFailed: false,
+        executionError: null,
         ...overrides,
     };
 }

@@ -79,7 +79,7 @@ function createContext(agentSlug: string, overrides?: Partial<PipelineContext>):
         toolCallCount: 0, status: 'running', streamOffset: 0, conversationId: null,
         responseText: '', responseChunks: [], creditsUsed: 0, keySource: null,
         agentSessionCount: 0, announceQueue: null, thinkingChunks: [], toolCallDetails: [],
-        eventsFiltered: 0, setupReport: null, hookHealth: null, sdkSessionId: null, triggerType: 'user_message' as const, toolCallMap: new Map(),
+        eventsFiltered: 0, setupReport: null, hookHealth: null, sdkSessionId: null, triggerType: 'user_message' as const, toolCallMap: new Map(), executionFailed: false, executionError: null,
         ...overrides,
     };
 }

@@ -11,13 +11,14 @@ import {
 import type { ChatMessageExtended, ToolCall, TodoItem, WorkspaceArtifact } from './chat-message.types'
 import type { TurnPart } from './streaming-turn.types'
 import type { Agent } from './types'
-import { XERUS_AGENT } from './AgentDropdown'
+import { XERUS_AGENT, XERUS_MASTER_SLUG, CTO_AGENT, XERUS_CTO_SLUG } from './AgentDropdown'
 import { isMascotConfig } from '@/lib/mascot-config'
 import { MascotAvatar } from '@/components/agents/MascotAvatar'
 import { MarkdownContent } from './MarkdownContent'
 import { ToolCallCard, type ToolCallCardData } from './ToolCallCard'
 import { ToolActionGroup } from './ToolActionGroup'
 import { ThinkingSection } from './ThinkingSection'
+import { RichThinkingIndicator } from './RichThinkingIndicator'
 import { extractTextFromParts, groupConsecutiveTools } from './streaming-turn.utils'
 
 // ---------------------------------------------------------------------------
@@ -243,8 +244,12 @@ function partToToolCall(part: TurnPart & { type: 'tool' }, agents?: Agent[]): To
   return {
     id: part.id,
     name: part.name,
+    label: part.label,
     icon: part.icon,
     target: part.target,
+    detail: part.detail,
+    progressMessage: part.progressMessage,
+    args: part.args,
     output: part.result != null
       ? (typeof part.result === 'string' ? part.result : JSON.stringify(part.result))
       : undefined,
@@ -275,6 +280,7 @@ function legacyToolCallToCardData(tool: ToolCall): ToolCallCardData {
   return {
     id: tool.id,
     name: tool.name,
+    label: tool.name,
     icon: tool.icon,
     target: tool.target,
     detail: tool.detail,
@@ -316,14 +322,18 @@ export const MessageBubble = memo(function MessageBubble({
   // This prevents the bug where the Xerus logo flashes on a message that was
   // actually produced by a specific agent. Fall back to the canonical XERUS_AGENT
   // so the header always renders with a real agent identity (no hardcoded logos).
-  const resolvedAgent: Agent = agent ?? (
-    agents && (message.agentSlug || message.agentName)
-      ? agents.find((a) =>
-          (message.agentSlug && a.slug === message.agentSlug) ||
-          (message.agentName && a.name === message.agentName)
-        ) ?? XERUS_AGENT
-      : XERUS_AGENT
-  )
+  const resolvedAgent: Agent = agent ?? (() => {
+    // System agents use their static definitions (correct SVG avatars)
+    if (message.agentSlug === XERUS_MASTER_SLUG) return XERUS_AGENT
+    if (message.agentSlug === XERUS_CTO_SLUG) return CTO_AGENT
+    if (agents && (message.agentSlug || message.agentName)) {
+      return agents.find((a) =>
+        (message.agentSlug && a.slug === message.agentSlug) ||
+        (message.agentName && a.name === message.agentName)
+      ) ?? XERUS_AGENT
+    }
+    return XERUS_AGENT
+  })()
   const hasExecution =
     !isUser &&
     !isStreaming &&
@@ -368,7 +378,7 @@ export const MessageBubble = memo(function MessageBubble({
         )}>
           {isUser ? 'You' : resolvedAgent.name}
         </span>
-        {!isUser && (
+        {!isUser && !isStreaming && (
           <span className="text-[10px] font-medium text-text-muted bg-surface-hover rounded-full px-1.5 py-0.5">
             AI
           </span>
@@ -377,10 +387,7 @@ export const MessageBubble = memo(function MessageBubble({
           {formatTime(message.timestamp)}
         </span>
         {isStreaming && (
-          <span className="inline-flex items-center gap-1.5 text-[11px] text-text-muted">
-            <span className="h-1.5 w-1.5 rounded-full bg-secondary animate-pulse" />
-            Generating
-          </span>
+          <RichThinkingIndicator parts={message.parts} />
         )}
       </div>
 

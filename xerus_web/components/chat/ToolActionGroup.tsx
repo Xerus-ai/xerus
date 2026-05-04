@@ -25,8 +25,12 @@ function partToToolCall(part: ToolPart, agents?: Agent[]): ToolCallCardData {
   return {
     id: part.id,
     name: part.name,
+    label: part.label,
     icon: part.icon,
     target: part.target,
+    detail: part.detail,
+    progressMessage: part.progressMessage,
+    args: part.args,
     output: part.result != null
       ? (typeof part.result === 'string' ? part.result : JSON.stringify(part.result))
       : undefined,
