@@ -3,7 +3,7 @@
  * Maps agent_type to user-friendly labels and badges
  */
 
-export type AgentType = 'public' | 'private' | 'shared';
+export type AgentType = 'public' | 'private' | 'shared' | 'system';
 
 /**
  * Get user-friendly label for agent visibility type
@@ -113,6 +113,9 @@ export function canEditAgent(
   // Must have a logged-in user
   if (!currentUserId) return false;
 
+  // System agents are editable by any logged-in user (model, schedules, behaviour)
+  if (agentType === 'system') return true;
+
   // System templates (public agents with no owner) are read-only
   if (agentType === 'public' && !agentUserId) return false;
 
@@ -131,4 +134,12 @@ export function isSystemTemplate(
   agentType?: AgentType
 ): boolean {
   return agentType === 'public' && !agentUserId;
+}
+
+export function isSystemAgent(agentType?: AgentType): boolean {
+  return agentType === 'system';
+}
+
+export function canDeleteAgent(agentType?: AgentType): boolean {
+  return agentType !== 'system';
 }

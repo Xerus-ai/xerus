@@ -149,6 +149,10 @@ export interface PipelineContext {
     hookHealth: HookHealth | null;
     /** Trigger type that initiated this execution (user_message, heartbeat, schedule, etc.) */
     triggerType: TriggerType;
+    /** Set to true when CLI result reports is_error (e.g., "stream closed before completion") */
+    executionFailed: boolean;
+    /** Error message from CLI result when is_error is true */
+    executionError: string | null;
 }
 
 // -----------------------------------------------------------------------------

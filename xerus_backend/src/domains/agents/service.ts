@@ -296,6 +296,12 @@ export class AgentService {
 
         const validatedData = this.validator.validateUpdate(data);
 
+        if (entry.agent_type === 'system') {
+            if (validatedData.name !== undefined || validatedData.description !== undefined) {
+                throw new AgentAccessDeniedError(id);
+            }
+        }
+
         if (validatedData.ai_model) {
             await this.validator.validateModel(validatedData.ai_model);
         }
@@ -351,6 +357,10 @@ export class AgentService {
     async delete(id: number, userId: string): Promise<Agent> {
         const entry = await this.registry.findById(id);
         if (!entry) throw new AgentNotFoundError(id);
+
+        if (entry.agent_type === 'system') {
+            throw new AgentAccessDeniedError(id);
+        }
 
         const fs = this.getFs();
         const config = await fs.getAgentConfig(userId, entry.slug);

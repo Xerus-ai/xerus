@@ -42,6 +42,7 @@ export function configToAgent(
 
 export function canUserView(agent: Agent, userId: string): boolean {
     if (agent.agent_type === 'internal') return false;
+    if (agent.agent_type === 'system') return true;
     if (agent.agent_type === 'public') return true;
     return agent.user_id === userId;
 }
@@ -49,6 +50,7 @@ export function canUserView(agent: Agent, userId: string): boolean {
 export function canUserModify(agent: Agent, userId: string): boolean {
     if (agent.agent_type === 'public' && agent.user_id === null) return false;
     if (agent.agent_type === 'internal') return false;
+    if (agent.agent_type === 'system') return true;
     return agent.user_id === userId;
 }
 

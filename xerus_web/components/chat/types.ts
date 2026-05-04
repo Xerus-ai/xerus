@@ -123,6 +123,7 @@ export interface ExecutionStep {
   startTime?: number
   endTime?: number
   data?: Record<string, unknown>
+  metadata?: Record<string, unknown>
 }
 
 export interface ToolExecution {

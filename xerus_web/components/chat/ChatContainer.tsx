@@ -5,6 +5,8 @@ import dynamic from 'next/dynamic'
 import { MessageList } from './MessageList'
 import { ChatInput } from './ChatInput'
 import { DeliverableChips } from './DeliverableChips'
+import { TaskDock } from './TaskDock'
+import { useTaskDock } from './useTaskDock'
 import type { SandboxTab } from './SandboxPanel'
 
 // Heavy panels loaded only when user opens them (bundle-dynamic-imports + bundle-conditional rules)
@@ -96,6 +98,30 @@ export function ChatContainer({
   const [terminalUrl, setTerminalUrl] = useState<string | null>(null)
   const [isTerminalLoading, setIsTerminalLoading] = useState(false)
   const [sandboxTab, setSandboxTab] = useState<SandboxTab>('terminal')
+
+  // ---- Task dock (subagent progress) ----
+  const taskDock = useTaskDock()
+
+  // Sync delegation tasks to task dock (skip raw infra steps like sandbox/executing)
+  const INFRA_NOISE = new Set(['sandbox', 'executing', 'provisioning', 'connecting'])
+  useEffect(() => {
+    const steps = state.executionState?.steps ?? []
+    for (const step of steps) {
+      const rawName = step.name ?? ''
+      const cleanName = rawName.replace(/^Spawning\s+/i, '').replace(/\s*\(failed\)\s*$/i, '')
+      if (INFRA_NOISE.has(cleanName.toLowerCase())) continue
+      if (!cleanName) continue
+      const meta = step.metadata as Record<string, string> | undefined
+      const subtitle = meta?.toAgent ? `@${meta.toAgent}` : ''
+      if (step.status === 'active') {
+        taskDock.addTask(step.id, cleanName, subtitle)
+      } else if (step.status === 'completed') {
+        const durationMs = step.endTime && step.startTime ? step.endTime - step.startTime : undefined
+        const success = !rawName.includes('failed')
+        taskDock.completeTask(step.id, success, durationMs)
+      }
+    }
+  }, [state.executionState?.steps, taskDock])
 
   // ---- Tool auth (Pipedream OAuth) ----
   const handleToolAuthConnect = useCallback((appSlug: string) => {
@@ -326,6 +352,16 @@ export function ChatContainer({
             />
 
             <ChatInput
+              headerContent={taskDock.isVisible ? (
+                <TaskDock
+                  tasks={taskDock.tasks}
+                  activeCount={taskDock.activeCount}
+                  isCollapsed={taskDock.isCollapsed}
+                  onCollapse={taskDock.collapse}
+                  onExpand={taskDock.expand}
+                  onDismiss={taskDock.clearTasks}
+                />
+              ) : undefined}
               onSendMessage={chat.sendMessage}
               disabled={state.isLoading}
               placeholder={
@@ -342,6 +378,7 @@ export function ChatContainer({
               onOpenBrowser={handleOpenBrowser}
               isBrowserLoading={isBrowserLoading}
               isBrowserOpen={!!browserUrl}
+              conversationId={conversationId}
             />
           </div>
         </Panel>

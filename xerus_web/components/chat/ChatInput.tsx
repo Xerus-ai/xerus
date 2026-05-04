@@ -1,12 +1,15 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { ArrowUp, AtSign, Paperclip, Bot, Monitor, TerminalSquare } from 'lucide-react'
+import { ArrowUp, AtSign, Paperclip, Monitor, TerminalSquare } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Agent } from './types'
 import { AgentDropdown } from './AgentDropdown'
-import { isMascotConfig } from '@/lib/mascot-config'
-import { MascotAvatar } from '@/components/agents/MascotAvatar'
+import { SlashCommandPicker } from './SlashCommandPicker'
+import { useSlashCommands } from './useSlashCommands'
+import { UnifiedMentionPicker, type MentionItem } from './UnifiedMentionPicker'
+import { useWorkspaceFiles } from '@/hooks/useWorkspaceFiles'
+import { useKBSearch } from '@/hooks/useKBSearch'
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void
@@ -22,6 +25,8 @@ interface ChatInputProps {
   onOpenBrowser?: () => void
   isBrowserLoading?: boolean
   isBrowserOpen?: boolean
+  conversationId?: string
+  headerContent?: React.ReactNode
 }
 
 export function ChatInput({
@@ -38,6 +43,8 @@ export function ChatInput({
   onOpenBrowser,
   isBrowserLoading,
   isBrowserOpen,
+  conversationId,
+  headerContent,
 }: ChatInputProps) {
   const [value, setValue] = useState('')
   const [focused, setFocused] = useState(false)
@@ -49,7 +56,19 @@ export function ChatInput({
   const [mentionQuery, setMentionQuery] = useState('')
   const [mentionStart, setMentionStart] = useState(-1)
   const [selectedIdx, setSelectedIdx] = useState(0)
-  const pickerRef = useRef<HTMLDivElement>(null)
+
+  // Slash command state
+  const [showSlashPicker, setShowSlashPicker] = useState(false)
+  const [slashQuery, setSlashQuery] = useState('')
+  const [slashSelectedIdx, setSlashSelectedIdx] = useState(0)
+  const { commands, executeCommand } = useSlashCommands({
+    currentAgent: selectedAgent,
+    onSendMessage,
+  })
+
+  // File and KB search for unified @mention
+  const { files: workspaceFiles, loading: filesLoading, search: searchFiles } = useWorkspaceFiles(conversationId)
+  const { entries: kbEntries, loading: kbLoading, search: searchKB } = useKBSearch()
 
   const hasContent = value.trim().length > 0
 
@@ -58,6 +77,14 @@ export function ChatInput({
       a.name.toLowerCase().includes(mentionQuery.toLowerCase()) ||
       (a.domain ?? '').toLowerCase().includes(mentionQuery.toLowerCase())
   ).slice(0, 6)
+
+  const isFileMode = mentionQuery.startsWith('/')
+  const isKBMode = mentionQuery.startsWith('kb:')
+  const mentionItems: MentionItem[] = [
+    ...(isFileMode || isKBMode ? [] : filteredAgents.map((a): MentionItem => ({ type: 'agent', agent: a }))),
+    ...(isFileMode ? workspaceFiles.filter(f => f.path.toLowerCase().includes(mentionQuery.slice(1).toLowerCase())).slice(0, 6).map((f): MentionItem => ({ type: 'file', file: f })) : []),
+    ...(isKBMode ? kbEntries.filter(e => e.title.toLowerCase().includes(mentionQuery.slice(3).toLowerCase())).slice(0, 6).map((e): MentionItem => ({ type: 'kb', entry: e })) : []),
+  ]
 
   // Auto-resize textarea
   useEffect(() => {
@@ -71,12 +98,6 @@ export function ChatInput({
     setSelectedIdx(0)
   }, [mentionQuery])
 
-  // Scroll selected picker item into view
-  useEffect(() => {
-    if (!showPicker || !pickerRef.current) return
-    const item = pickerRef.current.children[1]?.children[selectedIdx] as HTMLElement | undefined
-    item?.scrollIntoView({ block: 'nearest' })
-  }, [selectedIdx, showPicker])
 
   const closePicker = useCallback(() => {
     setShowPicker(false)
@@ -84,26 +105,50 @@ export function ChatInput({
     setMentionStart(-1)
   }, [])
 
-  const insertMention = useCallback(
-    (agent: Agent) => {
+  const insertMentionItem = useCallback(
+    (item: MentionItem) => {
       if (mentionStart < 0) return
-      const slug = agent.name.toLowerCase().replace(/\s+/g, '-')
+      let insertText: string
+      switch (item.type) {
+        case 'agent': {
+          const slug = item.agent.name.toLowerCase().replace(/\s+/g, '-')
+          insertText = `@${slug} `
+          break
+        }
+        case 'file':
+          insertText = `@file:${item.file.path} `
+          break
+        case 'kb':
+          insertText = `@kb:${item.entry.id} `
+          break
+      }
       const before = value.slice(0, mentionStart)
       const after = value.slice(textareaRef.current?.selectionStart ?? value.length)
-      const newValue = `${before}@${slug} ${after}`
+      const newValue = `${before}${insertText}${after}`
       setValue(newValue)
       closePicker()
       requestAnimationFrame(() => {
         const textarea = textareaRef.current
         if (textarea) {
           textarea.focus()
-          const cursorPos = mentionStart + slug.length + 2
+          const cursorPos = mentionStart + insertText.length
           textarea.setSelectionRange(cursorPos, cursorPos)
         }
       })
     },
-    [mentionStart, value, closePicker]
+    [mentionStart, value, closePicker],
   )
+
+  const insertMention = useCallback(
+    (agent: Agent) => insertMentionItem({ type: 'agent', agent }),
+    [insertMentionItem],
+  )
+
+  const closeSlashPicker = useCallback(() => {
+    setShowSlashPicker(false)
+    setSlashQuery('')
+    setSlashSelectedIdx(0)
+  }, [])
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -114,6 +159,7 @@ export function ChatInput({
       const textBeforeCursor = newValue.slice(0, cursorPos)
       const lastAt = textBeforeCursor.lastIndexOf('@')
 
+      // @mention detection
       if (lastAt >= 0) {
         const charBefore = lastAt > 0 ? newValue[lastAt - 1] : ' '
         if (charBefore === ' ' || charBefore === '\n' || lastAt === 0) {
@@ -122,13 +168,30 @@ export function ChatInput({
             setMentionStart(lastAt)
             setMentionQuery(mentionText)
             setShowPicker(true)
+            closeSlashPicker()
+            if (mentionText.startsWith('/')) searchFiles(mentionText.slice(1))
+            else if (mentionText.startsWith('kb:')) searchKB(mentionText.slice(3))
             return
           }
         }
       }
       closePicker()
+
+      // Slash command detection — only at line start, not after @
+      const lineStart = textBeforeCursor.lastIndexOf('\n') + 1
+      const lineText = textBeforeCursor.slice(lineStart)
+      if (lineText.startsWith('/') && (lineStart === 0 || textBeforeCursor[lineStart - 1] === '\n')) {
+        const charBeforeSlash = lineStart > 0 ? textBeforeCursor[lineStart - 1] : undefined
+        if (charBeforeSlash !== '@') {
+          setSlashQuery(lineText.slice(1))
+          setShowSlashPicker(true)
+          setSlashSelectedIdx(0)
+          return
+        }
+      }
+      closeSlashPicker()
     },
-    [closePicker]
+    [closePicker, closeSlashPicker]
   )
 
   const handleSend = useCallback(() => {
@@ -142,23 +205,70 @@ export function ChatInput({
     }
   }, [value, disabled, onSendMessage, closePicker])
 
+  const handleSelectSlashCommand = useCallback(
+    (cmd: (typeof commands)[number]) => {
+      const textarea = textareaRef.current
+      if (!textarea) return
+      const cursorPos = textarea.selectionStart
+      const textBeforeCursor = value.slice(0, cursorPos)
+      const lineStart = textBeforeCursor.lastIndexOf('\n') + 1
+      const before = value.slice(0, lineStart)
+      const after = value.slice(cursorPos)
+      executeCommand(cmd, after.trim())
+      setValue('')
+      closeSlashPicker()
+      if (textareaRef.current) textareaRef.current.style.height = 'auto'
+    },
+    [value, executeCommand, closeSlashPicker],
+  )
+
+  const slashFilteredCommands = commands.filter(
+    (cmd) =>
+      cmd.name.toLowerCase().includes(slashQuery.toLowerCase()) ||
+      cmd.description.toLowerCase().includes(slashQuery.toLowerCase()),
+  )
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      // Mention picker navigation
-      if (showPicker && filteredAgents.length > 0) {
+      // Slash picker navigation (higher priority)
+      if (showSlashPicker && slashFilteredCommands.length > 0) {
         if (e.key === 'ArrowDown') {
           e.preventDefault()
-          setSelectedIdx((prev) => (prev + 1) % filteredAgents.length)
+          setSlashSelectedIdx((prev) => (prev + 1) % slashFilteredCommands.length)
           return
         }
         if (e.key === 'ArrowUp') {
           e.preventDefault()
-          setSelectedIdx((prev) => (prev - 1 + filteredAgents.length) % filteredAgents.length)
+          setSlashSelectedIdx((prev) => (prev - 1 + slashFilteredCommands.length) % slashFilteredCommands.length)
           return
         }
         if (e.key === 'Tab' || e.key === 'Enter') {
           e.preventDefault()
-          insertMention(filteredAgents[selectedIdx])
+          handleSelectSlashCommand(slashFilteredCommands[slashSelectedIdx])
+          return
+        }
+        if (e.key === 'Escape') {
+          e.preventDefault()
+          closeSlashPicker()
+          return
+        }
+      }
+
+      // Mention picker navigation
+      if (showPicker && mentionItems.length > 0) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault()
+          setSelectedIdx((prev) => (prev + 1) % mentionItems.length)
+          return
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault()
+          setSelectedIdx((prev) => (prev - 1 + mentionItems.length) % mentionItems.length)
+          return
+        }
+        if (e.key === 'Tab' || e.key === 'Enter') {
+          e.preventDefault()
+          insertMentionItem(mentionItems[selectedIdx])
           return
         }
         if (e.key === 'Escape') {
@@ -174,7 +284,8 @@ export function ChatInput({
         handleSend()
       }
     },
-    [showPicker, filteredAgents, selectedIdx, insertMention, closePicker, isComposing, handleSend]
+    [showSlashPicker, slashFilteredCommands, slashSelectedIdx, handleSelectSlashCommand, closeSlashPicker,
+     showPicker, mentionItems, selectedIdx, insertMentionItem, closePicker, isComposing, handleSend]
   )
 
   const triggerMention = useCallback(() => {
@@ -199,53 +310,31 @@ export function ChatInput({
   return (
     <div className={cn('w-full max-w-3xl mx-auto px-4 pb-1.5 pt-2 shrink-0', className)}>
       <div className="relative">
-        {/* @mention Picker */}
-        {showPicker && filteredAgents.length > 0 && (
-          <div
-            ref={pickerRef}
-            className="absolute bottom-full left-0 w-[280px] mb-2 bg-card border border-border rounded-xl shadow-lg backdrop-blur-sm overflow-hidden max-h-[220px] overflow-y-auto z-10"
-            role="listbox"
-            aria-label="Mention an agent"
-          >
-            <div className="px-3 py-1.5 border-b border-border">
-              <span className="text-[11px] font-medium uppercase tracking-wide text-text-muted">
-                Agents
-              </span>
-            </div>
-            <div className="p-1">
-              {filteredAgents.map((agent, idx) => (
-                <button
-                  key={agent.id}
-                  type="button"
-                  role="option"
-                  aria-selected={idx === selectedIdx}
-                  className={cn(
-                    'flex items-center gap-2.5 w-full px-2 py-1.5 text-left text-sm rounded-md transition-colors duration-100',
-                    idx === selectedIdx
-                      ? 'bg-surface-hover text-text'
-                      : 'text-text hover:bg-surface-hover'
-                  )}
-                  onMouseDown={(e) => {
-                    e.preventDefault()
-                    insertMention(agent)
-                  }}
-                  onMouseEnter={() => setSelectedIdx(idx)}
-                >
-                  <div className="w-6 h-6 rounded-lg overflow-hidden shrink-0 flex items-center justify-center bg-surface-hover text-text-secondary">
-                    {isMascotConfig(agent.avatarUrl) ? (
-                      <MascotAvatar config={agent.avatarUrl!} size={24} className="w-full h-full" alt={agent.name} />
-                    ) : agent.avatarUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={agent.avatarUrl} alt={agent.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <Bot className="w-3.5 h-3.5" />
-                    )}
-                  </div>
-                  <span className="font-medium truncate">{agent.name}</span>
-                </button>
-              ))}
-            </div>
-          </div>
+        {/* Slash Command Picker */}
+        {showSlashPicker && (
+          <SlashCommandPicker
+            query={slashQuery}
+            commands={commands}
+            selectedIdx={slashSelectedIdx}
+            onSelect={handleSelectSlashCommand}
+            onSelectedIdxChange={setSlashSelectedIdx}
+          />
+        )}
+
+        {/* Unified @mention Picker */}
+        {showPicker && (
+          <UnifiedMentionPicker
+            query={mentionQuery}
+            agents={agents}
+            files={workspaceFiles}
+            kbEntries={kbEntries}
+            filesLoading={filesLoading}
+            kbLoading={kbLoading}
+            selectedIdx={selectedIdx}
+            onSelect={insertMentionItem}
+            onClose={closePicker}
+            onSelectedIdxChange={setSelectedIdx}
+          />
         )}
 
         {/* Composer Card */}
@@ -257,6 +346,9 @@ export function ChatInput({
               : 'border-border shadow-sm hover:border-border/80'
           )}
         >
+          {/* Dynamic header content (task dock, etc.) */}
+          {headerContent}
+
           {/* Textarea */}
           <textarea
             ref={textareaRef}
@@ -266,7 +358,7 @@ export function ChatInput({
             onFocus={() => setFocused(true)}
             onBlur={() => {
               setFocused(false)
-              setTimeout(() => closePicker(), 150)
+              setTimeout(() => { closePicker(); closeSlashPicker() }, 150)
             }}
             onCompositionStart={() => setIsComposing(true)}
             onCompositionEnd={() => setIsComposing(false)}
@@ -375,7 +467,7 @@ export function ChatInput({
                   hasContent || focused ? 'opacity-0' : 'opacity-100'
                 )}
               >
-                @ mention &middot; Enter to send
+                / commands &middot; @ mention &middot; Enter to send
               </span>
             </div>
 

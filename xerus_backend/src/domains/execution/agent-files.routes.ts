@@ -94,10 +94,10 @@ async function resolveAndVerifyAgent(
                 EXISTS(
                     SELECT 1 FROM execution_sessions es
                     JOIN workspaces w ON es.workspace_id = w.id
-                    WHERE w.user_id = a.user_id AND es.agent_slug = a.slug AND es.status = 'running'
+                    WHERE w.user_id = $1 AND es.agent_slug = a.slug AND es.status = 'running'
                 ) AS has_running_execution
          FROM agent_registry a
-         WHERE a.user_id = $1
+         WHERE (a.user_id = $1 OR a.agent_type = 'system')
          AND a.slug = $2
          LIMIT 1`,
         [userId, agentSlug],

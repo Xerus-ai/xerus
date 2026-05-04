@@ -30,6 +30,7 @@ interface PageHeaderProps {
     onClearCategories?: () => void
     className?: string
     children?: React.ReactNode
+    actions?: React.ReactNode
 }
 
 export function PageHeader({
@@ -43,7 +44,8 @@ export function PageHeader({
     onToggleCategory,
     onClearCategories,
     className,
-    children
+    children,
+    actions,
 }: PageHeaderProps) {
     const [inputValue, setInputValue] = useState(searchQuery || '')
     const [debouncedValue] = useDebounce(inputValue, 500)
@@ -97,17 +99,22 @@ export function PageHeader({
             {/* Search & Filter Row */}
             {(onSearchChange || categories) && (
                 <div className="flex flex-col items-start gap-6 w-full mt-2">
-                    {onSearchChange && (
-                        <div className="relative w-full max-w-md">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
-                            <input
-                                type="text"
-                                placeholder={searchPlaceholder}
-                                value={inputValue}
-                                onChange={(e) => setInputValue(e.target.value)}
-                                data-testid="agent-search"
-                                className="w-full pl-10 pr-4 py-3 bg-card/60 border border-surface-active rounded-full text-sm focus:outline-none focus:border-primary transition-colors placeholder:text-text/40"
-                            />
+                    {(onSearchChange || actions) && (
+                        <div className="flex items-center gap-3 w-full">
+                            {onSearchChange && (
+                                <div className="relative w-full max-w-md">
+                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
+                                    <input
+                                        type="text"
+                                        placeholder={searchPlaceholder}
+                                        value={inputValue}
+                                        onChange={(e) => setInputValue(e.target.value)}
+                                        data-testid="agent-search"
+                                        className="w-full pl-10 pr-4 py-3 bg-card/60 border border-surface-active rounded-full text-sm focus:outline-none focus:border-primary transition-colors placeholder:text-text/40"
+                                    />
+                                </div>
+                            )}
+                            {actions}
                         </div>
                     )}
 

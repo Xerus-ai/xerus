@@ -31,7 +31,7 @@ function mapConversation(c: ApiConversation): Conversation {
     agentSlug: c.agent_slug ?? undefined,
     messages: [],
     createdAt: new Date(c.created_at).getTime(),
-    updatedAt: new Date(c.last_message_at).getTime(),
+    updatedAt: new Date(c.last_message_at || c.created_at).getTime(),
   }
 }
 
@@ -238,6 +238,20 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
         : { ...prev, currentAgent: matchingAgent }
     )
   }, [agents, state.conversationId, state.conversations])
+
+  // ---- Sync conversationId to URL so reloads preserve the conversation ----
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    if (state.conversationId) {
+      if (url.searchParams.get('c') !== state.conversationId) {
+        url.searchParams.set('c', state.conversationId)
+        window.history.replaceState({}, '', url.toString())
+      }
+    } else if (url.searchParams.has('c')) {
+      url.searchParams.delete('c')
+      window.history.replaceState({}, '', url.toString())
+    }
+  }, [state.conversationId])
 
   // ---- Connect SSE stream when conversation changes ----
   useEffect(() => {

@@ -37,6 +37,7 @@ interface BrowseViewProps {
   onNewFolder: (name: string) => Promise<void>
   previews?: Record<string, string>
   showPropertyBar?: boolean
+  sectionToggle?: React.ReactNode
 }
 
 export function BrowseView({
@@ -59,6 +60,7 @@ export function BrowseView({
   onNewFolder,
   previews,
   showPropertyBar = false,
+  sectionToggle,
 }: BrowseViewProps) {
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
@@ -152,27 +154,31 @@ export function BrowseView({
             onChange={(e) => onSearchChange(e.target.value)}
             className="flex-1 min-w-0 pl-3 pr-2 py-2.5 bg-transparent text-sm text-text focus:outline-none placeholder:text-text-muted"
           />
-          {/* View toggle — right side of search */}
-          <div className="mr-1 flex items-center gap-1 bg-card rounded-full p-0.5 border border-surface-active shrink-0">
-            <button
-              onClick={() => onViewModeChange('grid')}
-              className={cn(
-                'p-1.5 rounded-full transition-colors',
-                viewMode === 'grid' ? 'bg-surface-active text-text' : 'text-text-muted hover:text-text',
-              )}
-            >
-              <LayoutGrid className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => onViewModeChange('list')}
-              className={cn(
-                'p-1.5 rounded-full transition-colors',
-                viewMode === 'list' ? 'bg-surface-active text-text' : 'text-text-muted hover:text-text',
-              )}
-            >
-              <List className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          {/* View toggle — cards↔files when coming from a UI section, grid↔list otherwise */}
+          {sectionToggle ? (
+            <div className="mr-1 shrink-0">{sectionToggle}</div>
+          ) : (
+            <div className="mr-1 flex items-center gap-1 bg-card rounded-full p-0.5 border border-surface-active shrink-0">
+              <button
+                onClick={() => onViewModeChange('grid')}
+                className={cn(
+                  'p-1.5 rounded-full transition-colors',
+                  viewMode === 'grid' ? 'bg-surface-active text-text' : 'text-text-muted hover:text-text',
+                )}
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => onViewModeChange('list')}
+                className={cn(
+                  'p-1.5 rounded-full transition-colors',
+                  viewMode === 'list' ? 'bg-surface-active text-text' : 'text-text-muted hover:text-text',
+                )}
+              >
+                <List className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Filter segmented control — matching tools/id page */}

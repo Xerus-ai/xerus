@@ -12,9 +12,10 @@ import { UploadPanel } from '@/components/upload/UploadPanel'
 interface AgentsPanelProps {
   onSelect: (agent: Assistant) => void
   onCountChange?: (count: number) => void
+  viewToggle?: React.ReactNode
 }
 
-export function AgentsPanel({ onSelect, onCountChange }: AgentsPanelProps) {
+export function AgentsPanel({ onSelect, onCountChange, viewToggle }: AgentsPanelProps) {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
@@ -90,6 +91,7 @@ export function AgentsPanel({ onSelect, onCountChange }: AgentsPanelProps) {
           selectedCategories={selectedCategories}
           onToggleCategory={handleToggleCategory}
           onClearCategories={handleClearCategories}
+          actions={viewToggle}
         />
 
         {/* My Agents */}

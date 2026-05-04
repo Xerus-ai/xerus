@@ -13,11 +13,14 @@ export type TurnPart =
       type: 'tool'
       callId: string
       name: string
+      label: string
       state: 'running' | 'done' | 'error'
       icon: ToolCallIcon
       args?: Record<string, unknown>
       result?: unknown
       target?: string
+      detail?: string
+      progressMessage?: string
       durationMs?: number
     }
   | { id: string; type: 'status'; label: string }

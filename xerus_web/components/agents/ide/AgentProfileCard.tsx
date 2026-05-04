@@ -25,7 +25,7 @@ interface Agent {
     is_active?: boolean
     avatar?: string
     avatarUrl?: string | null
-    agentType?: 'public' | 'private' | 'shared'
+    agentType?: 'public' | 'private' | 'shared' | 'system'
     userId?: string | null
     isVerified?: boolean
     cloneCount?: number
@@ -51,6 +51,7 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
 
     // Check if user can edit this agent
     const isEditable = canEditAgent(agent.userId, user?.uid, agent.agentType)
+    const isSystem = agent.agentType === 'system'
     const isPublic = agent.agentType === 'public'
 
     useEffect(() => {
@@ -245,7 +246,7 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
             <div className="flex-1 min-w-0 ml-6">
                 {/* Name & Status Row */}
                 <div className="flex items-center gap-3 mb-2">
-                    {isEditingName && isEditable ? (
+                    {isEditingName && isEditable && !isSystem ? (
                         <Input
                             ref={nameInputRef}
                             value={localAgent.name}
@@ -261,8 +262,8 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                     ) : (
                         <div className="flex items-center gap-2">
                             <h1
-                                onClick={() => isEditable && setIsEditingName(true)}
-                                className={`font-serif text-3xl tracking-tight text-text ${isEditable ? 'cursor-text hover:text-text/80' : ''} transition-colors`}
+                                onClick={() => isEditable && !isSystem && setIsEditingName(true)}
+                                className={`font-serif text-3xl tracking-tight text-text ${isEditable && !isSystem ? 'cursor-text hover:text-text/80' : ''} transition-colors`}
                             >
                                 {localAgent.name}
                             </h1>
@@ -274,7 +275,7 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                                     </svg>
                                 </span>
                             )}
-                            {isEditable && (
+                            {isEditable && !isSystem && (
                                 <button
                                     onClick={() => setIsEditingName(true)}
                                     className="p-1.5 rounded-lg hover:bg-surface-hover text-text-secondary hover:text-secondary transition-colors"
@@ -295,7 +296,7 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
 
                 {/* Description */}
                 <div className="mb-3">
-                    {isEditingDesc && isEditable ? (
+                    {isEditingDesc && isEditable && !isSystem ? (
                         <Textarea
                             ref={descInputRef}
                             value={localAgent.description}
@@ -313,12 +314,12 @@ export function AgentProfileCard({ agent, onUpdate, isSaving }: AgentProfileCard
                     ) : (
                         <div className="flex items-start gap-2">
                             <p
-                                onClick={() => isEditable && setIsEditingDesc(true)}
-                                className={`text-base text-text-secondary leading-relaxed ${isEditable ? 'cursor-text hover:text-text-secondary/80' : ''} transition-colors flex-1`}
+                                onClick={() => isEditable && !isSystem && setIsEditingDesc(true)}
+                                className={`text-base text-text-secondary leading-relaxed ${isEditable && !isSystem ? 'cursor-text hover:text-text-secondary/80' : ''} transition-colors flex-1`}
                             >
                                 {localAgent.description || (isEditable ? "Add a description..." : "No description")}
                             </p>
-                            {isEditable && (
+                            {isEditable && !isSystem && (
                                 <button
                                     onClick={() => setIsEditingDesc(true)}
                                     className="p-1.5 rounded-lg hover:bg-surface-hover text-text-secondary hover:text-secondary transition-colors shrink-0"

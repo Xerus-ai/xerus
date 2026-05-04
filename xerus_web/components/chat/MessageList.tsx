@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { MessageBubble } from './MessageBubble'
 import { ChatWelcome } from './ChatWelcome'
-import { ThinkingIndicator } from './ThinkingIndicator'
+import { RichThinkingIndicator } from './RichThinkingIndicator'
 import { XERUS_AGENT } from './AgentDropdown'
 import { cn } from '@/lib/utils'
 import { Agent, ExecutionState } from './types'
@@ -120,15 +120,11 @@ export function MessageList({
           })}
         </div>
 
-        {/* Thinking indicator — show while waiting for first token. Prefer the
-            delegated subagent (from executionState) over currentAgent so the avatar
-            matches the agent actually working. */}
+        {/* Thinking indicator — show while waiting for first token.
+            Always show the user's selected agent (currentAgent). Delegated
+            subagents are visible in the TaskDock instead. */}
         {isLoading && !streamingTurn && (() => {
-          const delegatedSlug = executionState?.agents?.[executionState.agents.length - 1]
-          const thinkingAgent =
-            (delegatedSlug && agents?.find((a) => a.slug === delegatedSlug || a.name === delegatedSlug)) ||
-            currentAgent ||
-            XERUS_AGENT
+          const thinkingAgent = currentAgent || XERUS_AGENT
           return (
             <div className="px-6 py-5">
               <div className="flex items-start gap-3">
@@ -141,7 +137,7 @@ export function MessageList({
                   <span className="text-base font-semibold text-secondary block">
                     {thinkingAgent.name}
                   </span>
-                  <ThinkingIndicator executionState={executionState} />
+                  <RichThinkingIndicator executionState={executionState} />
                 </div>
               </div>
             </div>

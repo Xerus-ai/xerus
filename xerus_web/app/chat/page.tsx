@@ -10,11 +10,13 @@ function ChatPageInner() {
     const searchParams = useSearchParams()
     const initialMessage = searchParams.get('q') || undefined
     const agentId = searchParams.get('agent') || undefined
+    const conversationId = searchParams.get('c') || undefined
 
     return (
         <ChatContainer
             initialMessage={initialMessage}
             initialAgentId={agentId}
+            conversationId={conversationId}
         />
     )
 }

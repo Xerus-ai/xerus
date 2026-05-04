@@ -44,21 +44,29 @@ export async function resolveAgentConfig(
         }
     }
 
-    try {
-        const configPath = `${ws}/agents/${agentSlug}/config.json`;
-        const raw = await provider.readFile(sandboxId, configPath);
-        const config = JSON.parse(raw) as { adapter_type?: string; model?: string };
-        return {
-            adapterType: config.adapter_type === 'codex' ? 'codex' : 'claudecode',
-            model: config.model || undefined,
-        };
-    } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        if (message.includes('ENOENT') || message.includes('No such file') || message.includes('not found')) {
-            return { adapterType: 'claudecode', model: undefined };
+    const configPaths = [
+        `${ws}/agents/${agentSlug}/config.json`,
+        `${ws}/.claude/agents/${agentSlug}/config.json`,
+    ];
+
+    for (const configPath of configPaths) {
+        try {
+            const raw = await provider.readFile(sandboxId, configPath);
+            const config = JSON.parse(raw) as { adapter_type?: string; model?: string; ai_model?: string };
+            return {
+                adapterType: config.adapter_type === 'codex' ? 'codex' : 'claudecode',
+                model: config.ai_model || config.model || undefined,
+            };
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err);
+            if (message.includes('ENOENT') || message.includes('No such file') || message.includes('not found')) {
+                continue;
+            }
+            throw err;
         }
-        throw err;
     }
+
+    return { adapterType: 'claudecode', model: undefined };
 }
 
 /** @deprecated Use resolveAgentConfig instead */

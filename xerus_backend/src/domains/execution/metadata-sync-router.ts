@@ -77,7 +77,7 @@ export async function handleMetadataSync(
             const agentSlug = data.agent_id as string | undefined;
             if (appSlug && agentSlug) {
                 const agentCheck = await deps.db.query<{ id: number }>(
-                    `SELECT id FROM agent_registry WHERE slug = $1 AND user_id = $2 LIMIT 1`,
+                    `SELECT id FROM agent_registry WHERE slug = $1 AND (user_id = $2 OR agent_type = 'system') LIMIT 1`,
                     [agentSlug, userId],
                 );
                 if (agentCheck.rows.length > 0) {

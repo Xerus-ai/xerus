@@ -3,8 +3,8 @@
 import React from 'react'
 import type { Assistant } from "@/lib/api/types"
 import { AgentAvatarWithModel, ModelIcon, AdapterIcon } from './AgentAvatar'
-import { Loader2, Lock, Users, Plus, Upload, Wrench, Settings, Copy, ArrowRight } from 'lucide-react'
-import { canCloneAgent, getAgentVisibilityClass } from "@/utils/agentLabels"
+import { Loader2, Lock, Users, Plus, Upload, Wrench, Settings, Copy, ArrowRight, Shield } from 'lucide-react'
+import { canCloneAgent, getAgentVisibilityClass, isSystemAgent } from "@/utils/agentLabels"
 import { formatModelName, getAdapterIconPath } from "@/utils/models"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
@@ -19,10 +19,13 @@ interface AgentCardProps {
 
 const AgentCardComponent = ({ agent, onClone, onChat, onClick, isCloning, isOwner }: AgentCardProps) => {
     const isPublic = agent.agentType === 'public' || agent.agentType === 'shared'
+    const isSystem = isSystemAgent(agent.agentType)
 
     // Get visibility icon based on agent type
     const getVisibilityIcon = () => {
         switch (agent.agentType) {
+            case 'system':
+                return <Shield className="w-3 h-3" />;
             case 'private':
                 return <Lock className="w-3 h-3" />;
             case 'shared':
@@ -129,9 +132,13 @@ const AgentCardComponent = ({ agent, onClone, onChat, onClick, isCloning, isOwne
                         </div>
                     )}
                     {/* Visibility Badge */}
-                    <div className={`flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-md border ${agent.agentType === 'public' ? 'text-text-secondary bg-surface-alt border-surface-active' : getAgentVisibilityClass(agent.agentType)}`}>
+                    <div className={`flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-md border ${
+                        isSystem ? 'text-amber-700 bg-amber-50 border-amber-200 dark:text-amber-400 dark:bg-amber-950/30 dark:border-amber-800'
+                        : agent.agentType === 'public' ? 'text-text-secondary bg-surface-alt border-surface-active'
+                        : getAgentVisibilityClass(agent.agentType)
+                    }`}>
                         {getVisibilityIcon()}
-                        <span className="capitalize">{agent.agentType || 'public'}</span>
+                        <span className="capitalize">{isSystem ? 'System' : agent.agentType || 'public'}</span>
                     </div>
                 </div>
             </div>

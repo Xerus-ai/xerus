@@ -157,7 +157,7 @@ export default function AgentDetailsClient({ agentId }: AgentDetailsClientProps)
   const isPublic = agent?.agentType === 'public'
   const canPublish = isOwner && isPrivate
   const canUnpublish = isOwner && isPublic && agent?.userId !== null
-  const canDelete = isOwner && isPrivate
+  const canDelete = isOwner && isPrivate && agent?.agentType !== 'system'
 
   // --- Render ---
   if (isLoadingAgent) {

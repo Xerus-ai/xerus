@@ -4,6 +4,7 @@
 
 import type { StreamingAssistantTurn, TurnPart, ToolCallIcon } from './streaming-turn.types'
 import { finalizeTurnParts } from './streaming-turn.utils'
+import { formatToolDisplay } from './format-tool-display'
 
 function nextPartId(): string {
   return `part-${crypto.randomUUID()}`
@@ -65,9 +66,7 @@ export function startToolCall(
   icon: ToolCallIcon,
   args?: Record<string, unknown>,
 ): StreamingAssistantTurn {
-  const target = args && Object.keys(args).length > 0
-    ? String(Object.values(args)[0] ?? '')
-    : undefined
+  const display = formatToolDisplay(name, args)
 
   // If a part with this callId already exists, update it with richer data
   // (content_block_start sends empty args; assistant message sends complete args)
@@ -77,15 +76,16 @@ export function startToolCall(
 
   if (existingIndex >= 0) {
     const existing = turn.parts[existingIndex] as TurnPart & { type: 'tool' }
-    // Only update if new data is richer (has args when existing doesn't)
     const hasNewArgs = args && Object.keys(args).length > 0
     if (!hasNewArgs) return turn
 
     const updated: TurnPart = {
       ...existing,
+      label: display.label ?? existing.label,
       icon: icon ?? existing.icon,
       args: args ?? existing.args,
-      target: target ?? existing.target,
+      target: display.target ?? existing.target,
+      detail: display.detail ?? existing.detail,
     }
     const parts = [...turn.parts]
     parts[existingIndex] = updated
@@ -97,10 +97,12 @@ export function startToolCall(
     type: 'tool',
     callId,
     name,
+    label: display.label,
     state: 'running',
     icon,
     args,
-    target,
+    target: display.target,
+    detail: display.detail,
   }
   return { ...turn, parts: [...turn.parts, part] }
 }
@@ -112,6 +114,14 @@ export function completeToolCall(
   success: boolean,
   durationMs?: number,
 ): StreamingAssistantTurn {
+  if (process.env.NODE_ENV === 'development') {
+    const found = turn.parts.some((p) => p.type === 'tool' && p.callId === callId)
+    if (!found) {
+      console.warn(
+        `[streaming-turn] completeToolCall: no matching callId="${callId}"`,
+      )
+    }
+  }
   const parts = turn.parts.map((part) => {
     if (part.type === 'tool' && part.callId === callId) {
       return {
@@ -119,6 +129,42 @@ export function completeToolCall(
         state: success ? 'done' as const : 'error' as const,
         result,
         durationMs,
+      }
+    }
+    return part
+  })
+  return { ...turn, parts }
+}
+
+export function updateToolProgress(
+  turn: StreamingAssistantTurn,
+  toolUseId: string,
+  message: string,
+): StreamingAssistantTurn {
+  const parts = turn.parts.map((part) => {
+    if (part.type === 'tool' && part.callId === toolUseId && part.state === 'running') {
+      return { ...part, progressMessage: message }
+    }
+    return part
+  })
+  return { ...turn, parts }
+}
+
+export function enrichToolSummary(
+  turn: StreamingAssistantTurn,
+  toolUseId: string,
+  durationMs: number,
+  output: unknown,
+  status: 'success' | 'error',
+): StreamingAssistantTurn {
+  const parts = turn.parts.map((part) => {
+    if (part.type === 'tool' && part.callId === toolUseId) {
+      return {
+        ...part,
+        state: status === 'success' ? 'done' as const : 'error' as const,
+        result: output ?? part.result,
+        durationMs: durationMs ?? part.durationMs,
+        progressMessage: undefined,
       }
     }
     return part

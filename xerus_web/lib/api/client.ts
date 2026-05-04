@@ -80,7 +80,8 @@ export const apiCall = async (
   options: ApiCallOptions = {},
   showErrorToast: boolean = true
 ): Promise<Response> => {
-  const [baseUrl, apiHeaders] = await Promise.all([getApiBaseUrl(), getApiHeaders()]);
+  const isFormData = options.body instanceof FormData;
+  const [baseUrl, apiHeaders] = await Promise.all([getApiBaseUrl(), getApiHeaders(isFormData)]);
   const url = `${baseUrl}${endpoint}`;
   const { timeoutMs = DEFAULT_TIMEOUT_MS, signal: callerSignal, ...restOptions } = options;
 

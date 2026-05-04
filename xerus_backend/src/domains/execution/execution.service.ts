@@ -150,6 +150,8 @@ export class ExecutionService {
             setupReport: null,
             hookHealth: null,
             triggerType: triggerType || 'user_message',
+            executionFailed: false,
+            executionError: null,
         };
 
         // Track preflight promises for cleanup if early failure occurs
@@ -347,12 +349,19 @@ export class ExecutionService {
             await updateSessionRecord(resolved, ctx);
 
             const summary = buildSummary(ctx);
-            stream.sendDone(ctx.responseText || undefined, summary, {
-                runId: null,
-                requestId: ctx.executionId,
-                traceId: ctx.executionId,
-                responseTimeMs: Date.now() - startedAt,
-            }, { databaseUpdated: true, conversationId: ctx.conversationId });
+            if (ctx.executionFailed) {
+                stream.sendError(
+                    { message: ctx.executionError || 'Agent execution failed', code: 'EXECUTION_ERROR', type: 'llm_error' },
+                    { runId: null, requestId: ctx.executionId, traceId: ctx.executionId, responseTimeMs: Date.now() - startedAt },
+                );
+            } else {
+                stream.sendDone(ctx.responseText || undefined, summary, {
+                    runId: null,
+                    requestId: ctx.executionId,
+                    traceId: ctx.executionId,
+                    responseTimeMs: Date.now() - startedAt,
+                }, { databaseUpdated: true, conversationId: ctx.conversationId });
+            }
 
         } catch (error) {
             ctx.status = 'failed';

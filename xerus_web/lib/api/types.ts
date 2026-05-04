@@ -74,7 +74,7 @@ export interface Assistant {
   isDefault: boolean;
   createdAt: string;
   model?: string;
-  agentType?: 'public' | 'private' | 'shared';
+  agentType?: 'public' | 'private' | 'shared' | 'system';
   workflowConfig?: WorkflowConfig;
   teams?: AgentTeamMembership[];
   userId?: string | null;  // Owner's user_id (null for system templates)

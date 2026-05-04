@@ -149,7 +149,7 @@ export async function handleTriggerSync(
     }
 
     const agentResult = await deps.db.query<{ id: number }>(
-        `SELECT id FROM agent_registry WHERE slug = $1 AND user_id = $2 LIMIT 1`,
+        `SELECT id FROM agent_registry WHERE slug = $1 AND (user_id = $2 OR agent_type = 'system') LIMIT 1`,
         [d.agent_slug, ctx.request.userId],
     );
     if (agentResult.rows.length === 0) {

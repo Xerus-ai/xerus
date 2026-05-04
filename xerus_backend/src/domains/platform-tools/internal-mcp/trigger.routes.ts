@@ -35,7 +35,7 @@ router.post('/register_trigger', async (req: InternalMcpRequest, res: Response, 
 
         // Look up agent_id from slug
         const agentResult = await query<{ id: number }>(
-            `SELECT id FROM agent_registry WHERE slug = $1 AND user_id = $2`,
+            `SELECT id FROM agent_registry WHERE slug = $1 AND (user_id = $2 OR agent_type = 'system')`,
             [agent_slug, userId]
         );
 

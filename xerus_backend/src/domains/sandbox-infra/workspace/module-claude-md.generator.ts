@@ -47,10 +47,7 @@ Auto-activated expertise available to you:
 
 ## Connected Tools
 
-Integrations available to you (via MCP):
 {connected_tools}
-
-If a tool action fails with "NOT_CONNECTED", ask @human to authenticate the integration.
 
 ## Colleagues
 
@@ -129,6 +126,18 @@ async function listInstalledSkills(
     return skills;
 }
 
+async function listMcpServers(sandboxFs: SandboxFileSystem, workspacePath: string): Promise<string[]> {
+    const mcpJsonPath = `${workspacePath}/.mcp.json`;
+    try {
+        const raw = await sandboxFs.readFile(mcpJsonPath);
+        const doc = JSON.parse(raw) as { mcpServers?: Record<string, unknown> };
+        if (!doc.mcpServers || typeof doc.mcpServers !== 'object') return [];
+        return Object.keys(doc.mcpServers);
+    } catch {
+        return [];
+    }
+}
+
 async function readColleagues(
     slug: string,
     sandboxFs: SandboxFileSystem,
@@ -176,9 +185,41 @@ function formatSkills(skills: Array<{ name: string; scope: 'global' | 'channel';
     }).join('\n');
 }
 
-function formatConnectedTools(tools: string[]): string {
-    if (tools.length === 0) return 'No tool integrations assigned. Use code-first approach for external API calls.';
-    return tools.map((t) => `- ${t} [status: check Pipedream MCP]`).join('\n');
+function formatConnectedTools(tools: string[], mcpServers: string[]): string {
+    if (tools.length === 0 && mcpServers.length === 0) {
+        return 'No tool integrations assigned. Use code-first approach for external API calls.';
+    }
+
+    const lines: string[] = [];
+
+    lines.push('You have external integrations connected via MCP (Model Context Protocol) servers.');
+    lines.push('These tools are ALREADY configured and available — use them by calling their MCP tools directly.');
+    lines.push('');
+
+    if (mcpServers.length > 0) {
+        lines.push('Available MCP servers (call their tools like any other tool):');
+        for (const server of mcpServers) {
+            const displayName = server.replace(/-/g, ' ').replace(/_/g, ' ');
+            lines.push(`- **${server}**: Use mcp__${server}__* tool calls to interact with ${displayName}`);
+        }
+    }
+
+    if (tools.length > 0) {
+        const toolsNotInMcp = tools.filter(t => !mcpServers.includes(t));
+        if (toolsNotInMcp.length > 0) {
+            lines.push('');
+            lines.push('Assigned but not yet connected (ask @human to authenticate):');
+            for (const t of toolsNotInMcp) {
+                lines.push(`- ${t} [NOT_CONNECTED — needs OAuth authentication]`);
+            }
+        }
+    }
+
+    lines.push('');
+    lines.push('To discover available actions for any MCP server, call its tools. Each server exposes actions specific to that integration (e.g., list files, send messages, create records).');
+    lines.push('If a tool call fails with an auth error, ask @human to re-authenticate the integration in Settings > Connectors.');
+
+    return lines.join('\n');
 }
 
 function formatColleagues(colleagues: Array<{ slug: string; description: string }>): string {
@@ -217,10 +258,11 @@ export class ModuleClaudeMdGenerator {
         // Resolve agent's channel paths for channel-scoped skill discovery
         const agentChannelPaths = this.resolveAgentChannelPaths(config);
 
-        const [kbDocs, skills, colleagues] = await Promise.all([
+        const [kbDocs, skills, colleagues, mcpServers] = await Promise.all([
             listKbDocs(slug, sandboxFs, workspacePath),
             listInstalledSkills(sandboxFs, workspacePath, agentChannelPaths),
             readColleagues(slug, sandboxFs, workspacePath),
+            listMcpServers(sandboxFs, workspacePath),
         ]);
 
         const agentName = config.name || slug;
@@ -233,7 +275,7 @@ export class ModuleClaudeMdGenerator {
             .replaceAll('{agent_description}', agentDescription)
             .replaceAll('{kb_documents}', formatKbDocs(kbDocs, slug))
             .replaceAll('{skills}', formatSkills(skills))
-            .replaceAll('{connected_tools}', formatConnectedTools(tools))
+            .replaceAll('{connected_tools}', formatConnectedTools(tools, mcpServers))
             .replaceAll('{colleagues}', formatColleagues(colleagues))
             .replaceAll('{autonomy_level}', autonomyLevel)
             .replaceAll('{autonomy_rules}', AUTONOMY_RULES[autonomyLevel] || AUTONOMY_RULES.supervised);

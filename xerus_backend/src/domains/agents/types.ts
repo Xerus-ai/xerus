@@ -20,7 +20,7 @@ export type {
     AgentCapabilities,
 } from '../../shared/types/agent-shared.types';
 
-export type AgentType = 'internal' | 'public' | 'private';
+export type AgentType = 'internal' | 'public' | 'private' | 'system';
 
 // Public Metadata Structure
 export interface PublicMetadata {

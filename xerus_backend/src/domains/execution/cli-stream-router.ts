@@ -29,6 +29,10 @@ export async function handleCliStreamEvent(
 
             if (streamType === 'content_block_delta' && delta) {
                 if (delta.type === 'text_delta' && typeof delta.text === 'string') {
+                    // Filter out raw error JSON from upstream LLM providers
+                    if (delta.text.includes('"type":"error"') && delta.text.includes('"api_error"')) {
+                        return true;
+                    }
                     ctx.responseChunks.push(delta.text);
                     ctx.stream.send('token' as StreamEventType, { text: delta.text, tokenCount: 0 });
                 } else if (delta.type === 'thinking_delta' && typeof delta.thinking === 'string') {
@@ -96,6 +100,9 @@ export async function handleCliStreamEvent(
                                 } else {
                                     const tracked = ctx.toolCallMap.get(callId)!;
                                     tracked.arguments = args;
+                                    if (Object.keys(args).length > 0) {
+                                        ctx.stream.send('tool_call' as StreamEventType, { toolName, arguments: args, callId });
+                                    }
                                 }
                                 break;
                             }
@@ -143,7 +150,10 @@ export async function handleCliStreamEvent(
             const totalCost = d.total_cost_usd as number | undefined;
             const numTurns = d.num_turns as number | undefined;
 
-            if (result && !isError) {
+            if (isError) {
+                ctx.executionFailed = true;
+                ctx.executionError = result || 'Agent execution failed';
+            } else if (result) {
                 ctx.responseText = result;
             }
             if (totalCost) {

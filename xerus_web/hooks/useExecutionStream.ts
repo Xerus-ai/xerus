@@ -19,6 +19,8 @@ export type {
   SubagentStartEventContent, SubagentStopEventContent, DelegationEventContent, NotificationEventContent,
   PreviewEventContent,
   CreditWarningEventContent, InsufficientCreditsEventContent, ProviderUnavailableEventContent,
+  ToolProgressEventContent, ToolUseSummaryEventContent,
+  TaskStartedEventContent, TaskProgressEventContent, TaskUpdatedEventContent, TaskNotificationEventContent,
   StreamEventContentMap, StreamEvent, StreamEventCallback,
   UseExecutionStreamOptions, UseExecutionStreamReturn, ConnectionState,
 } from './useExecutionStream.types';
@@ -57,6 +59,12 @@ export interface UseExecutionStreamCallbacks {
   onCreditWarning?: (event: StreamEvent<'credit_warning'>) => void;
   onInsufficientCredits?: (event: StreamEvent<'insufficient_credits'>) => void;
   onProviderUnavailable?: (event: StreamEvent<'provider_unavailable'>) => void;
+  onToolProgress?: (event: StreamEvent<'tool_progress'>) => void;
+  onToolUseSummary?: (event: StreamEvent<'tool_use_summary'>) => void;
+  onTaskStarted?: (event: StreamEvent<'task_started'>) => void;
+  onTaskProgress?: (event: StreamEvent<'task_progress'>) => void;
+  onTaskUpdated?: (event: StreamEvent<'task_updated'>) => void;
+  onTaskNotification?: (event: StreamEvent<'task_notification'>) => void;
   onError?: (error: Error) => void;
   onConnectionChange?: (connected: boolean) => void;
 }
@@ -159,6 +167,24 @@ export function useExecutionStream(
         break;
       case 'provider_unavailable':
         cbs.onProviderUnavailable?.(event as StreamEvent<'provider_unavailable'>);
+        break;
+      case 'tool_progress':
+        cbs.onToolProgress?.(event as StreamEvent<'tool_progress'>);
+        break;
+      case 'tool_use_summary':
+        cbs.onToolUseSummary?.(event as StreamEvent<'tool_use_summary'>);
+        break;
+      case 'task_started':
+        cbs.onTaskStarted?.(event as StreamEvent<'task_started'>);
+        break;
+      case 'task_progress':
+        cbs.onTaskProgress?.(event as StreamEvent<'task_progress'>);
+        break;
+      case 'task_updated':
+        cbs.onTaskUpdated?.(event as StreamEvent<'task_updated'>);
+        break;
+      case 'task_notification':
+        cbs.onTaskNotification?.(event as StreamEvent<'task_notification'>);
         break;
     }
   }, []);

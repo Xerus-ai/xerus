@@ -86,6 +86,10 @@ function normalizeConfig(raw: Record<string, unknown>): { config: AgentConfigFil
         raw.ai_model = raw.model;
         dirty = true;
     }
+    if (raw.model && raw.ai_model) {
+        delete raw.model;
+        dirty = true;
+    }
     if (!raw.mascot) {
         raw.mascot = generateMascotConfig();
         dirty = true;
@@ -139,8 +143,15 @@ export class AgentFilesystemRepository {
             const result = await this.driveService.readFile(userId, `agents/${slug}/config.json`);
             raw = result.content;
         } catch (err) {
-            if (isFileNotFoundError(err)) return null;
-            throw err;
+            if (!isFileNotFoundError(err)) throw err;
+            // System agents may live at .claude/agents/{slug}/config.json
+            try {
+                const fallback = await this.driveService.readFile(userId, `.claude/agents/${slug}/config.json`);
+                raw = fallback.content;
+            } catch (err2) {
+                if (isFileNotFoundError(err2)) return null;
+                throw err2;
+            }
         }
         const { config, dirty } = normalizeConfig(JSON.parse(raw));
         if (dirty) {
@@ -177,7 +188,26 @@ export class AgentFilesystemRepository {
 
     async putAgentConfig(userId: string, slug: string, config: AgentConfigFile): Promise<void> {
         const content = JSON.stringify(config, null, 2);
-        await this.driveService.writeFile(userId, `agents/${slug}/config.json`, content);
+        const path = await this.resolveConfigWritePath(userId, slug);
+        await this.driveService.writeFile(userId, path, content);
+    }
+
+    private async resolveConfigWritePath(userId: string, slug: string): Promise<string> {
+        const primary = `agents/${slug}/config.json`;
+        try {
+            await this.driveService.readFile(userId, primary);
+            return primary;
+        } catch (err) {
+            if (!isFileNotFoundError(err)) throw err;
+        }
+        const fallback = `.claude/agents/${slug}/config.json`;
+        try {
+            await this.driveService.readFile(userId, fallback);
+            return fallback;
+        } catch (err) {
+            if (!isFileNotFoundError(err)) throw err;
+        }
+        return primary;
     }
 
     async getAgentIndex(userId: string): Promise<AgentIndexEntry[]> {

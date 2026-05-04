@@ -8,7 +8,7 @@ import { ToolCard } from '@/components/tools/ToolCard'
 import { useConnectedTools, useToolCatalog } from '@/hooks/useTools'
 import { useToolAuth } from '@/hooks/useToolAuth'
 
-export function ConnectorsPanel() {
+export function ConnectorsPanel({ viewToggle }: { viewToggle?: React.ReactNode }) {
   const router = useRouter()
 
   const {
@@ -102,6 +102,7 @@ export function ConnectorsPanel() {
           selectedCategories={selectedCategories}
           onToggleCategory={toggleCategory}
           onClearCategories={clearCategories}
+          actions={viewToggle}
         />
 
         {/* Active Connections */}
