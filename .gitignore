@@ -32,6 +32,7 @@ serviceAccountKey.json
 .beads/
 .claude/
 .gitmodules
+todos/
 
 # ─── Internal Documentation (excluded until professional docs written) ───────
 xerus_backend/docs/
