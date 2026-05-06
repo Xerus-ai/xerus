@@ -87,31 +87,17 @@ test.describe('02 - Chat', () => {
     }
   })
 
-  test('@mention button or @ trigger shows picker', async ({ authenticatedPage: page }) => {
+  test('@mention input accepts @ character', async ({ authenticatedPage: page }) => {
     await chatPage.goto()
     await chatPage.messageInput.waitFor({ state: 'visible', timeout: 15_000 })
 
-    // First send a message to get into an active conversation (welcome screen may not have mention)
-    await chatPage.sendMessage('[E2E] test')
-    await page.waitForTimeout(2_000)
+    // Type @ in the message input
+    await chatPage.messageInput.click()
+    await page.keyboard.type('@')
+    await page.waitForTimeout(500)
 
-    // Now try @mention
-    await chatPage.messageInput.fill('@')
-    await page.waitForTimeout(1_500)
-
-    const anyPicker = page.locator('[role="listbox"], [role="menu"], [data-testid*="mention"], [data-testid*="picker"]').first()
-    const hasPicker = await anyPicker.isVisible({ timeout: 3_000 }).catch(() => false)
-
-    // Also try the mention button if @ didn't work
-    if (!hasPicker && await chatPage.mentionButton.isVisible({ timeout: 2_000 }).catch(() => false)) {
-      await chatPage.messageInput.clear()
-      await chatPage.mentionButton.click()
-      await page.waitForTimeout(1_000)
-    }
-
-    // At minimum, verify the input accepts @ character
     const value = await chatPage.messageInput.inputValue()
-    expect(value.includes('@') || hasPicker).toBeTruthy()
+    expect(value).toContain('@')
   })
 
   test('delete conversation removes from sidebar and DB', async ({
