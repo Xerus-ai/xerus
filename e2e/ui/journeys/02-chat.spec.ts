@@ -89,17 +89,19 @@ test.describe('02 - Chat', () => {
 
   test('@mention opens agent picker', async ({ authenticatedPage: page }) => {
     await chatPage.goto()
-    if (!(await chatPage.mentionButton.isVisible({ timeout: 5_000 }).catch(() => false))) {
-      test.skip(true, 'Mention button not visible')
-      return
-    }
-    await chatPage.mentionButton.click()
-    // Picker may use role="listbox" or just a dropdown div
+    // Type @ in message input to trigger mention picker
+    await chatPage.messageInput.waitFor({ state: 'visible', timeout: 15_000 })
+    await chatPage.messageInput.fill('@')
+    await page.waitForTimeout(1_000)
+
+    // Check if any picker/dropdown appeared
     const picker = chatPage.mentionPicker
     const dropdown = page.locator('[data-testid="mention-dropdown"], [data-testid="agent-picker"]')
-    const hasPicker = await picker.isVisible({ timeout: 5_000 }).catch(() => false)
+    const anyPopup = page.locator('[role="listbox"], [role="menu"]').first()
+    const hasPicker = await picker.isVisible({ timeout: 3_000 }).catch(() => false)
     const hasDropdown = await dropdown.isVisible({ timeout: 2_000 }).catch(() => false)
-    expect(hasPicker || hasDropdown).toBeTruthy()
+    const hasPopup = await anyPopup.isVisible({ timeout: 2_000 }).catch(() => false)
+    expect(hasPicker || hasDropdown || hasPopup).toBeTruthy()
   })
 
   test('delete conversation removes from sidebar and DB', async ({

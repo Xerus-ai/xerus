@@ -13,19 +13,23 @@ test.describe('03 - Agents', () => {
     db,
     testUserId,
   }) => {
-    await workspacePage.goto()
+    // Navigate directly to workspace agents view
+    await page.goto('/workspace?view=agents', { waitUntil: 'domcontentloaded', timeout: 30_000 })
+    await page.waitForLoadState('domcontentloaded')
+    await page.waitForTimeout(3_000)
 
-    // Workspace defaults to files view — click Agents in sidebar
-    const agentsLink = page.locator('a[href*="agents"], [data-testid="nav-agents"]').first()
-    const agentsSidebar = page.getByText('Agents').first()
-    if (await agentsLink.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await agentsLink.click()
-    } else if (await agentsSidebar.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      await agentsSidebar.click()
+    // If still on files view, click Agents sidebar link
+    if (!(await workspacePage.agentCard.first().isVisible({ timeout: 5_000 }).catch(() => false))) {
+      // Try clicking sidebar Agents link
+      const sidebar = page.locator('aside, nav')
+      const agentsLink = sidebar.getByText('Agents', { exact: true }).first()
+      if (await agentsLink.isVisible({ timeout: 3_000 }).catch(() => false)) {
+        await agentsLink.click()
+        await page.waitForTimeout(3_000)
+      }
     }
-    await page.waitForTimeout(2_000)
 
-    // Wait for agent cards to load
+    // Wait for agent cards
     await expect(workspacePage.agentCard.first()).toBeVisible({ timeout: 30_000 })
 
     // Count agents in DB
