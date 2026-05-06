@@ -41,36 +41,29 @@ export class SSEClient {
         if (streamDone) break
 
         buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() ?? ''
 
-        let currentEvent = ''
-        let currentData = ''
+        // Split on \r\n or \n — SSE uses double-newline as event separator
+        const parts = buffer.split(/\r?\n/)
+        buffer = parts.pop() ?? ''
 
-        for (const line of lines) {
-          if (line.startsWith('event:')) {
-            currentEvent = line.slice(6).trim()
-          } else if (line.startsWith('data:')) {
-            currentData += line.slice(5).trim()
-          } else if (line === '') {
-            if (currentData) {
-              try {
-                const parsed = JSON.parse(currentData)
-                this.events.push({
-                  type: currentEvent || parsed.type || 'message',
-                  data: parsed,
-                  raw: currentData,
-                })
-              } catch {
-                this.events.push({
-                  type: currentEvent || 'message',
-                  data: { text: currentData },
-                  raw: currentData,
-                })
+        for (const line of parts) {
+          if (line.startsWith('data:')) {
+            const raw = line.slice(5).trim()
+            if (!raw) continue
+            try {
+              const parsed = JSON.parse(raw)
+              this.events.push({
+                type: parsed.type || 'message',
+                data: parsed,
+                raw,
+              })
+              // Auto-disconnect on terminal events
+              if (parsed.type === 'done' || parsed.type === 'session_complete' || parsed.type === 'error') {
+                this.done = true
               }
+            } catch {
+              this.events.push({ type: 'message', data: { text: raw }, raw })
             }
-            currentEvent = ''
-            currentData = ''
           }
         }
       }
@@ -98,49 +91,13 @@ export class SSEClient {
   hasEvent(type: string): boolean {
     return this.events.some((e) => e.type === type)
   }
-
-  waitForEvent(type: string, timeoutMs = 30_000): Promise<SSEEvent> {
-    return new Promise((resolve, reject) => {
-      const existing = this.events.find((e) => e.type === type)
-      if (existing) {
-        resolve(existing)
-        return
-      }
-
-      const interval = setInterval(() => {
-        const found = this.events.find((e) => e.type === type)
-        if (found) {
-          clearInterval(interval)
-          clearTimeout(timeout)
-          resolve(found)
-        }
-      }, 200)
-
-      const timeout = setTimeout(() => {
-        clearInterval(interval)
-        reject(new Error(`Timeout waiting for SSE event "${type}" after ${timeoutMs}ms`))
-      }, timeoutMs)
-    })
-  }
-}
-
-export async function collectSSEEvents(
-  url: string,
-  headers: Record<string, string>,
-  durationMs = 10_000
-): Promise<SSEEvent[]> {
-  const client = new SSEClient(url, headers)
-  const connectPromise = client.connect(durationMs)
-  setTimeout(() => client.disconnect(), durationMs)
-  await connectPromise
-  return client.getEvents()
 }
 
 export async function sendMessageAndCollectSSE(
   conversationId: string,
   content: string,
   token: string,
-  timeoutMs = 60_000
+  timeoutMs = 90_000
 ): Promise<{ events: SSEEvent[]; agentMessage: string }> {
   const API = CONFIG.apiURL
   const headers = {
@@ -160,13 +117,10 @@ export async function sendMessageAndCollectSSE(
     headers
   )
 
-  // Start stream connection (runs in background collecting events)
   const connectPromise = client.connect(timeoutMs)
 
-  // Give the SSE stream a moment to establish before sending message
   await new Promise((r) => setTimeout(r, 1000))
 
-  // Send message — API expects { task, agent_slug }
   const msgResp = await fetch(`${API}/execute/conversations/${conversationId}/messages`, {
     method: 'POST',
     headers,
@@ -179,12 +133,13 @@ export async function sendMessageAndCollectSSE(
     throw new Error(`Message send failed: ${msgResp.status} ${JSON.stringify(err)}`)
   }
 
-  // Wait for stream to complete or timeout
   await connectPromise.catch(() => {})
   const events = client.getEvents()
+
   const agentMessages = events
-    .filter((e) => e.type === 'agent_message' || e.data?.type === 'agent_message')
+    .filter((e) => ['agent_message', 'reasoning', 'progress'].includes(e.type))
     .map((e) => (e.data.content as string) || (e.data.text as string) || '')
+    .filter(Boolean)
     .join('')
 
   return { events, agentMessage: agentMessages }

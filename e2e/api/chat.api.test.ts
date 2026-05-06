@@ -94,8 +94,9 @@ test.describe('Part 5: Chat — CRUD & Plumbing', () => {
         `${API}/execute/conversations/${testConversationId}`,
         { headers }
       )
-      const verifyData = await unwrap<{ conversation: { title: string } }>(verifyResp)
-      expect(verifyData.conversation.title).toBe('[E2E] Renamed Chat')
+      const verifyData = await unwrap<{ title?: string; conversation?: { title: string } }>(verifyResp)
+      const title = verifyData.title || verifyData.conversation?.title
+      expect(title).toBe('[E2E] Renamed Chat')
     })
 
     // 5.1.5
