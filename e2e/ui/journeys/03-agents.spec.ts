@@ -15,8 +15,18 @@ test.describe('03 - Agents', () => {
   }) => {
     await workspacePage.goto()
 
+    // Workspace defaults to files view — click Agents in sidebar
+    const agentsLink = page.locator('a[href*="agents"], [data-testid="nav-agents"]').first()
+    const agentsSidebar = page.getByText('Agents').first()
+    if (await agentsLink.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      await agentsLink.click()
+    } else if (await agentsSidebar.isVisible({ timeout: 3_000 }).catch(() => false)) {
+      await agentsSidebar.click()
+    }
+    await page.waitForTimeout(2_000)
+
     // Wait for agent cards to load
-    await expect(workspacePage.agentCard.first()).toBeVisible({ timeout: 45_000 })
+    await expect(workspacePage.agentCard.first()).toBeVisible({ timeout: 30_000 })
 
     // Count agents in DB
     const dbAgentCount = await db.count('agent_registry', { user_id: testUserId })
