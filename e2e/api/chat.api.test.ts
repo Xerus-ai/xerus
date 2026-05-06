@@ -66,14 +66,16 @@ test.describe('Part 5: Chat — CRUD & Plumbing', () => {
 
     // 5.1.3
     test('get conversation by ID', async ({ request }) => {
-      if (!testConversationId) test.skip()
+      if (!testConversationId) { test.skip(true, 'No conversation created'); return }
       const resp = await request.get(
         `${API}/execute/conversations/${testConversationId}`,
         { headers }
       )
+      if (resp.status() === 429) { test.skip(true, 'Rate limited'); return }
       expect(resp.status()).toBe(200)
-      const data = await unwrap<{ conversation: { id: string } }>(resp)
-      expect(data.conversation.id).toBe(testConversationId)
+      const data = await unwrap<{ id: string; conversation?: { id: string } }>(resp)
+      const convId = data.id || data.conversation?.id
+      expect(convId).toBe(testConversationId)
     })
 
     // 5.1.4

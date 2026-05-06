@@ -160,14 +160,26 @@ export async function sendMessageAndCollectSSE(
     headers
   )
 
+  // Start stream connection (runs in background collecting events)
   const connectPromise = client.connect(timeoutMs)
 
-  await fetch(`${API}/execute/conversations/${conversationId}/messages`, {
+  // Give the SSE stream a moment to establish before sending message
+  await new Promise((r) => setTimeout(r, 1000))
+
+  // Send message — API expects { task, agent_slug }
+  const msgResp = await fetch(`${API}/execute/conversations/${conversationId}/messages`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({ task: content, agent_slug: 'xerus-master' }),
   })
 
+  if (!msgResp.ok) {
+    const err = await msgResp.json().catch(() => ({}))
+    client.disconnect()
+    throw new Error(`Message send failed: ${msgResp.status} ${JSON.stringify(err)}`)
+  }
+
+  // Wait for stream to complete or timeout
   await connectPromise.catch(() => {})
   const events = client.getEvents()
   const agentMessages = events

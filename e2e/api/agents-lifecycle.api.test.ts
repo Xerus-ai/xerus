@@ -98,7 +98,9 @@ test.describe('Part 3: Agent Lifecycle', () => {
       )
       if (!marketplace) { test.skip(true, 'No marketplace agent found'); return }
 
-      const resp = await request.post(`${API}/agents/${marketplace.id}/clone`, { headers })
+      // Marketplace agents have negative IDs — use slug for clone
+      const cloneParam = (marketplace.id as number) > 0 ? marketplace.id : marketplace.slug
+      const resp = await request.post(`${API}/agents/${cloneParam}/clone`, { headers })
       if (resp.status() === 429) { test.skip(true, 'Rate limited'); return }
       expect([200, 201]).toContain(resp.status())
       const cloned = await db.findLatest('agent_registry', { user_id: CONFIG.testUser.uid })
@@ -120,11 +122,12 @@ test.describe('Part 3: Agent Lifecycle', () => {
   test.describe('3.2 Create Custom Agent', () => {
     // 3.2.1
     test('create agent via API', async ({ request }) => {
+      const uniqueSlug = `e2e-growth-hacker-${Date.now()}`
       const resp = await request.post(`${API}/agents`, {
         headers,
         data: {
-          name: '[E2E] Growth Hacker',
-          slug: 'e2e-growth-hacker',
+          name: `[E2E] Growth Hacker ${Date.now()}`,
+          slug: uniqueSlug,
           description: 'Custom growth agent',
           model: 'gemma-4-31b-it:free',
         },

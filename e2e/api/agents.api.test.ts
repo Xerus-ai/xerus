@@ -52,7 +52,9 @@ test.describe('Agents API', () => {
     const beforeCount = await db.count('agent_registry', { user_id: CONFIG.testUser.uid })
 
     await new Promise((r) => setTimeout(r, 300))
-    const cloneResp = await request.post(`${API}/agents/${agentToClone.id}/clone`, { headers })
+    // Marketplace agents have negative IDs — use slug for clone
+    const cloneParam = agentToClone.id > 0 ? agentToClone.id : agentToClone.slug
+    const cloneResp = await request.post(`${API}/agents/${cloneParam}/clone`, { headers })
     if (cloneResp.status() === 429) { test.skip(true, 'Rate limited'); return }
     expect([200, 201]).toContain(cloneResp.status())
 

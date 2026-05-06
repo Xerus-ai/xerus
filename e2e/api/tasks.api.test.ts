@@ -113,11 +113,11 @@ test.describe('Part 7: Tasks & Kanban', () => {
 
     // 7.1.8
     test('list all user tasks', async ({ request }) => {
-      const resp = await request.get(`${API}/company/tasks`, { headers })
+      // Tasks route is mounted at /api/v1/tasks, not /api/v1/company/tasks
+      const resp = await request.get(`${API}/tasks`, { headers })
       if (resp.status() === 429) { test.skip(true, 'Rate limited'); return }
       if (resp.status() === 500) { test.skip(true, 'Sandbox unavailable'); return }
-      // Route may be channel-scoped only (404 at top level)
-      expect([200, 404]).toContain(resp.status())
+      expect(resp.status()).toBe(200)
       const data = await unwrap<{ tasks: unknown[] }>(resp)
       const tasks = data.tasks || (data as unknown as unknown[])
       expect(Array.isArray(tasks)).toBeTruthy()
