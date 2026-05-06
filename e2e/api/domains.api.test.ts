@@ -47,7 +47,9 @@ test.describe('Part 2: Workspace & Company Setup', () => {
     })
     if (resp.status() === 429) { test.skip(true, 'Rate limited'); return }
     if (resp.status() === 500) { test.skip(true, 'Sandbox unavailable'); return }
-    expect([200, 201]).toContain(resp.status())
+    expect([200, 201, 409]).toContain(resp.status())
+
+    if (resp.status() === 409) return // Domain already exists from previous run
 
     const data = await unwrap<{
       domain: { id: string; slug: string; name: string }

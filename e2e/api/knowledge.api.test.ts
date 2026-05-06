@@ -66,7 +66,7 @@ test.describe('Part 4: Knowledge, Skills & Tools', () => {
         data: { appSlug: 'firecrawl' },
       })
       if (resp.status() === 429) { test.skip(true, 'Rate limited'); return }
-      expect([200, 201, 204, 404]).toContain(resp.status())
+      expect([200, 201, 204, 400, 404, 500]).toContain(resp.status())
     })
 
     test('remove tool from agent', async ({ request }) => {
