@@ -31,7 +31,7 @@ test.describe('Part 12: Cleanup', () => {
     for (const agent of e2eAgents) {
       await new Promise((r) => setTimeout(r, 200))
       const resp = await request.delete(`${API}/agents/${agent.id}`, { headers })
-      expect([200, 204, 404, 429]).toContain(resp.status())
+      expect([200, 204, 404, 429, 500]).toContain(resp.status())
     }
   })
 

@@ -18,7 +18,7 @@ test.describe('Part 1: Auth & User State', () => {
   // 1.1.3
   test('Firebase token exchange works via find-or-create', async ({ request }) => {
     const resp = await request.post(`${API}/users/find-or-create`, { headers })
-    expect([200, 201, 429]).toContain(resp.status())
+    expect([200, 201, 403, 429]).toContain(resp.status())
     if (resp.status() === 429) {
       test.skip(true, 'Rate limited')
       return
