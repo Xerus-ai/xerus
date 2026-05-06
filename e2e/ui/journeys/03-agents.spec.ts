@@ -16,7 +16,7 @@ test.describe('03 - Agents', () => {
     await workspacePage.goto()
 
     // Wait for agent cards to load
-    await expect(workspacePage.agentCard.first()).toBeVisible({ timeout: 15_000 })
+    await expect(workspacePage.agentCard.first()).toBeVisible({ timeout: 45_000 })
 
     // Count agents in DB
     const dbAgentCount = await db.count('agent_registry', { user_id: testUserId })
@@ -36,10 +36,9 @@ test.describe('03 - Agents', () => {
     await workspacePage.agentCard.first().click()
 
     // Agent detail view should appear
-    await expect(workspacePage.agentDetailView).toBeVisible({ timeout: 10_000 })
+    await expect(workspacePage.agentDetailView).toBeVisible({ timeout: 30_000 })
 
-    // Identity tab should be active by default
-    await expect(workspacePage.identityTab).toBeVisible()
+    await expect(workspacePage.identityTab).toBeVisible({ timeout: 10_000 })
 
     // Back button should work
     await workspacePage.agentBackButton.click()

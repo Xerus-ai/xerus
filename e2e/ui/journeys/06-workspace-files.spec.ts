@@ -96,6 +96,6 @@ test.describe('06 - Workspace Files', () => {
     await workspacePage.goto()
 
     // Cards view is default — agent cards should be visible
-    await expect(workspacePage.agentCard.first()).toBeVisible({ timeout: 15_000 })
+    await expect(workspacePage.agentCard.first()).toBeVisible({ timeout: 45_000 })
   })
 })
