@@ -3,7 +3,7 @@ import path from 'path'
 const BACKEND_DIR = path.resolve(__dirname, '../../xerus_backend')
 
 export const CONFIG = {
-  baseURL: process.env.E2E_BASE_URL || 'http://localhost:3005',
+  baseURL: process.env.E2E_BASE_URL || 'http://localhost:3002',
   apiURL: process.env.E2E_API_URL || 'http://localhost:5001/api/v1',
 
   testUser: {
