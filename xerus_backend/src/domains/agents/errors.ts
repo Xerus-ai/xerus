@@ -44,8 +44,12 @@ export class AgentAlreadyPrivateError extends AgentError {
 }
 
 export class AgentNameConflictError extends AgentError {
-    constructor(name: string) {
-        super(`An agent with name "${name}" already exists`, 409, 'AGENT_NAME_CONFLICT');
+    public readonly existingSlug: string | undefined;
+
+    constructor(name: string, existingSlug?: string) {
+        const detail = existingSlug ? ` (slug: "${existingSlug}")` : '';
+        super(`An agent with name "${name}" already exists${detail}`, 409, 'AGENT_NAME_CONFLICT');
+        this.existingSlug = existingSlug;
     }
 }
 

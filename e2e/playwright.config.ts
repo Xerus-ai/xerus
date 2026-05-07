@@ -6,7 +6,7 @@ import dotenv from 'dotenv'
 dotenv.config({ path: path.resolve(__dirname, '../xerus_backend/.env') })
 dotenv.config({ path: path.resolve(__dirname, '../xerus_web/.env.local') })
 
-const BASE_URL = process.env.E2E_BASE_URL || 'http://localhost:3005'
+const BASE_URL = process.env.E2E_BASE_URL || 'http://localhost:3002'
 const API_URL = process.env.E2E_API_URL || 'http://localhost:5001/api/v1'
 
 export default defineConfig({

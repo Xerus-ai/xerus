@@ -32,6 +32,7 @@ serviceAccountKey.json
 .beads/
 .claude/
 .gitmodules
+todos/
 
 # ─── Internal Documentation (excluded until professional docs written) ───────
 xerus_backend/docs/
@@ -53,6 +54,7 @@ e2e/playwright-report/
 e2e/blob-report/
 e2e/screenshots/
 e2e/ui/.auth/
+e2e/E2E_TEST_PLAN.md
 
 # ─── Test Data & Artifacts ───────────────────────────────────────────────────
 xerus_backend/TEST_DATA.md

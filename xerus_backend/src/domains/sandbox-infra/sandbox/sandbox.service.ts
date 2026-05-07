@@ -197,44 +197,27 @@ export class SandboxService {
         }
         const daytonaProvider = this.provider as DaytonaProvider;
         if (daytonaProvider.resizeSandbox) {
-            // Daytona constraint: disk can only increase, never decrease.
-            // CPU/memory decrease requires the sandbox to be stopped first.
-            // Build resize request with only feasible changes.
+            // Only resize UP from snapshot defaults. Downsizing is not supported by the
+            // current Daytona server and pro users simply get the snapshot's base resources.
             const snapshotDefaults = { cpu: 2, memory: 4, disk: 20 };
             const resizeRequest: { cpu?: number; memory?: number; disk?: number } = {};
 
-            if (resources.cpu !== snapshotDefaults.cpu) resizeRequest.cpu = resources.cpu;
-            if (resources.memory !== snapshotDefaults.memory) resizeRequest.memory = resources.memory;
-            if (resources.disk > snapshotDefaults.disk) {
-                resizeRequest.disk = resources.disk;
-            } else if (resources.disk < snapshotDefaults.disk) {
-                log.warn('Sandbox disk over-provisioned: snapshot base exceeds plan limit. Rebuild snapshot with pro-tier disk.', {
-                    sandbox_id: sandbox.sandboxId, plan: planType,
-                    plan_disk: resources.disk, snapshot_disk: snapshotDefaults.disk,
-                });
-            }
+            if (resources.cpu > snapshotDefaults.cpu) resizeRequest.cpu = resources.cpu;
+            if (resources.memory > snapshotDefaults.memory) resizeRequest.memory = resources.memory;
+            if (resources.disk > snapshotDefaults.disk) resizeRequest.disk = resources.disk;
 
             if (Object.keys(resizeRequest).length > 0) {
-                const needsStop = (resizeRequest.cpu !== undefined && resizeRequest.cpu < snapshotDefaults.cpu)
-                    || (resizeRequest.memory !== undefined && resizeRequest.memory < snapshotDefaults.memory)
-                    || resizeRequest.disk !== undefined;
                 try {
-                    if (needsStop) {
-                        await this.provider.pause(sandbox.sandboxId);
-                    }
                     await daytonaProvider.resizeSandbox(sandbox.sandboxId, resizeRequest);
-                    if (needsStop) {
-                        await daytonaProvider.start(sandbox.sandboxId);
-                    }
                     log.info('Sandbox resized for plan', { sandbox_id: sandbox.sandboxId, plan: planType, resized: resizeRequest });
                 } catch (resizeErr) {
-                    if (needsStop) {
-                        try { await daytonaProvider.start(sandbox.sandboxId); } catch { /* best effort */ }
-                    }
-                    throw new Error(`Sandbox resize failed for plan ${planType}: ${(resizeErr as Error).message}`);
+                    log.warn('Sandbox resize failed (non-blocking)', {
+                        sandbox_id: sandbox.sandboxId, plan: planType,
+                        error: (resizeErr as Error).message,
+                    });
                 }
             } else {
-                log.info('Sandbox resources match plan, no resize needed', { sandbox_id: sandbox.sandboxId, plan: planType });
+                log.info('Sandbox resources match or exceed plan, no resize needed', { sandbox_id: sandbox.sandboxId, plan: planType });
             }
         }
 

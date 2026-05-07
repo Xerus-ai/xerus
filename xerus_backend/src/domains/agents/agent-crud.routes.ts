@@ -7,7 +7,7 @@ import { sendResponse } from '../../utils/response';
 import { BadRequestError } from '../../utils/errors';
 import { authenticateFirebaseToken } from '../../middleware/auth';
 import { agentService, agentMarketplaceService } from './service';
-import { AgentUnauthorizedError, AgentNotFoundError } from './errors';
+import { AgentUnauthorizedError, AgentNotFoundError, AgentNotClonableError } from './errors';
 import { agentRegistryRepository } from './agent-registry.repository';
 import { formatPromptWithAI } from './prompt-formatter';
 import { resolveAgentParam } from './resolve-agent-param';
@@ -230,21 +230,26 @@ router.post('/:id/clone', auth, async (req: AuthenticatedRequest, res: Response,
 
         const { name } = req.body;
         const param = req.params.id;
+        let resolvedSlug: string | null = null;
 
         // Try registered agent first (private or user-published)
         try {
             const resolved = await resolveAgentParam(param, req.user.uid);
+            resolvedSlug = resolved.slug;
             const { cloned } = await agentMarketplaceService.clone(resolved.id, req.user.uid, { name });
             sendResponse(res, 201, { agent: cloned, source_id: resolved.id }, startTime);
             return;
         } catch (err) {
-            // Only fall through for not-found errors; re-throw auth/limit errors
-            if (!(err instanceof AgentNotFoundError)) throw err;
+            // Fall through for not-found or not-clonable (marketplace agents with negative IDs
+            // resolve by ID but their files live under marketplace/, not user dirs)
+            if (!(err instanceof AgentNotFoundError) && !(err instanceof AgentNotClonableError)) throw err;
         }
 
-        // Not in registry: try marketplace agent clone (by slug)
+        // Not clonable via registry path: try marketplace agent clone by slug.
+        // Use resolved slug (from registry lookup by negative ID) when available.
+        const slugForClone = resolvedSlug || param;
         const { cloned, sourceSlug } = await agentMarketplaceService.cloneMarketplaceAgent(
-            param, req.user.uid, { name },
+            slugForClone, req.user.uid, { name },
         );
         sendResponse(res, 201, { agent: cloned, source_slug: sourceSlug }, startTime);
     } catch (err) {

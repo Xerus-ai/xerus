@@ -4,6 +4,7 @@
 // execution, conversation, company, task, and inbox route files.
 
 import { logger } from '../../../utils/logger';
+import { ServiceUnavailableError } from '../../../utils/errors';
 import type { SandboxService } from './sandbox.service';
 import type { DaytonaProvider } from './providers/daytona.provider';
 
@@ -12,20 +13,25 @@ const log = logger('SandboxRouteHelpers');
 /**
  * Ensure the user has a running sandbox and return its ID.
  * If the sandbox is paused, resumes it. If none exists, creates one.
- * Only throws if provisioning itself fails.
+ * Throws 503 ServiceUnavailableError if provisioning fails.
  */
 export async function requireRunningSandbox(
     sandboxService: SandboxService,
     userId: string,
 ): Promise<string> {
-    const status = await sandboxService.getSandboxStatus(userId);
-    if (status.status === 'running' && status.sandboxId) {
-        return status.sandboxId;
-    }
+    try {
+        const status = await sandboxService.getSandboxStatus(userId);
+        if (status.status === 'running' && status.sandboxId) {
+            return status.sandboxId;
+        }
 
-    log.info('Auto-provisioning sandbox', { user_id: userId, current_status: status.status });
-    const session = await sandboxService.getOrCreateSandbox({ userId });
-    return session.sandboxId;
+        log.info('Auto-provisioning sandbox', { user_id: userId, current_status: status.status });
+        const session = await sandboxService.getOrCreateSandbox({ userId });
+        return session.sandboxId;
+    } catch (err) {
+        log.error('Sandbox unavailable', { user_id: userId, error: String(err) });
+        throw new ServiceUnavailableError('Sandbox unavailable — please try again shortly');
+    }
 }
 
 /**
