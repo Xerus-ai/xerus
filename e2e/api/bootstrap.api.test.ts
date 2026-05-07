@@ -6,7 +6,7 @@ import { unwrap } from '../shared/api-helpers'
 import { sendMessageAndCollectSSE } from '../shared/sse-helpers'
 
 const API = CONFIG.apiURL
-const AGENT_TIMEOUT = 120_000
+const AGENT_TIMEOUT = 75_000
 
 let token: string
 let headers: Record<string, string>

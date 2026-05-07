@@ -32,7 +32,10 @@ router.post('/find-or-create', verifyFirebaseToken, async (req: AuthenticatedReq
             throw new UserUnauthorizedError();
         }
 
-        const { uid, email, display_name, avatar_url } = req.body;
+        const uid = req.body.uid || req.user.uid;
+        const email = req.body.email || req.user.email;
+        const display_name = req.body.display_name || req.user.name;
+        const avatar_url = req.body.avatar_url;
 
         // Validate UID matches authenticated user
         if (req.user.uid !== uid) {

@@ -6,7 +6,7 @@ import { unwrap } from '../shared/api-helpers'
 import { sendMessageAndCollectSSE } from '../shared/sse-helpers'
 
 const API = CONFIG.apiURL
-const AGENT_TIMEOUT = 90_000
+const AGENT_TIMEOUT = 75_000
 
 let token: string
 let headers: Record<string, string>
@@ -19,8 +19,8 @@ test.beforeAll(async () => {
   // Create a conversation for behavioral tests
   const resp = await fetch(`${API}/execute/conversations`, {
     method: 'POST',
-    headers,
-    body: JSON.stringify({ agent: 'xerus-master' }),
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ agent_slug: 'xerus-master' }),
   })
   if (resp.ok) {
     const body = await resp.json()
@@ -31,7 +31,10 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   if (conversationId) {
-    await db.deleteWhere('conversations', { id: conversationId }).catch(() => {})
+    await fetch(`${API}/execute/conversations/${conversationId}`, {
+      method: 'DELETE',
+      headers,
+    }).catch(() => {})
   }
 })
 
@@ -194,7 +197,7 @@ test.describe('Part 5: Chat — Behavioral Tests', () => {
       const convResp = await fetch(`${API}/execute/conversations`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ agent: researcher.slug }),
+        body: JSON.stringify({ agent_slug: researcher.slug }),
       })
       if (!convResp.ok) {
         test.skip()
@@ -215,7 +218,10 @@ test.describe('Part 5: Chat — Behavioral Tests', () => {
       } catch {
         // Expected — agent may not respond
       } finally {
-        await db.deleteWhere('conversations', { id: specialistConvId }).catch(() => {})
+        await fetch(`${API}/execute/conversations/${specialistConvId}`, {
+          method: 'DELETE',
+          headers,
+        }).catch(() => {})
       }
     })
   })

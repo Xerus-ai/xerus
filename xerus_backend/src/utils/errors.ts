@@ -55,6 +55,12 @@ export class RateLimitError extends AppError {
     }
 }
 
+export class ServiceUnavailableError extends AppError {
+    constructor(message = 'Service temporarily unavailable') {
+        super(message, 503, 'SERVICE_UNAVAILABLE');
+    }
+}
+
 // -----------------------------------------------------------------------------
 // Domain Base Error
 // Shared by execution, inbox, triggers, and models domains

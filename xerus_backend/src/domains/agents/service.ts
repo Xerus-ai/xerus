@@ -74,9 +74,9 @@ export class AgentService {
 
         // Check name uniqueness by scanning filesystem index
         const fs = this.getFs();
-        const nameConflict = await this.findNameConflictInFs(validatedData.name, userId, 'private');
-        if (nameConflict) {
-            throw new AgentNameConflictError(validatedData.name);
+        const conflictSlug = await this.findNameConflictInFs(validatedData.name, userId, 'private');
+        if (conflictSlug) {
+            throw new AgentNameConflictError(validatedData.name, conflictSlug);
         }
 
         // Generate slug
@@ -308,9 +308,9 @@ export class AgentService {
 
         // Check name uniqueness if changed
         if (validatedData.name && validatedData.name !== config.name) {
-            const conflict = await this.findNameConflictInFs(validatedData.name, userId, agent.agent_type, id);
-            if (conflict) {
-                throw new AgentNameConflictError(validatedData.name);
+            const conflictSlug = await this.findNameConflictInFs(validatedData.name, userId, agent.agent_type, id);
+            if (conflictSlug) {
+                throw new AgentNameConflictError(validatedData.name, conflictSlug);
             }
         }
 
@@ -381,7 +381,7 @@ export class AgentService {
 
     private async findNameConflictInFs(
         name: string, userId: string, agentType?: string, excludeId?: number,
-    ): Promise<boolean> {
+    ): Promise<string | null> {
         const fs = this.getFs();
         const index = await fs.getAgentIndex(userId);
         const entries = await this.registry.listByUser(userId);
@@ -392,10 +392,10 @@ export class AgentService {
                 const entry = entryBySlug.get(ie.slug);
                 if (entry && excludeId && entry.id === excludeId) continue;
                 if (agentType && entry && entry.agent_type !== agentType) continue;
-                return true;
+                return ie.slug;
             }
         }
-        return false;
+        return null;
     }
 }
 

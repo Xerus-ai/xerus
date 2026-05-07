@@ -109,6 +109,7 @@ app.use('/api/v1/execute', executeRoutes);
 app.use('/api/v1/webhooks/triggers', webhookReceiverRouter);
 app.use('/api/v1/inbox', inboxRoutes);
 app.use('/api/v1/company', companyRoutes);
+app.use('/api/v1/company', taskRoutes);
 app.use('/api/v1', taskRoutes);
 app.use('/api/v1/onboarding', onboardingRoutes);
 app.use('/api/v1/memory', memoryRoutes);
