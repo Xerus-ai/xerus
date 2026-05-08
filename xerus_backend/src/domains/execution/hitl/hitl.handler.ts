@@ -47,6 +47,8 @@ export interface HITLPauseRepository {
         resolvedBy: string,
         feedback?: string
     ): Promise<{ resolved_at: string }>;
+
+    resolveExpiredPauseStates(timeoutSeconds: number): Promise<string[]>;
 }
 
 export interface HITLSSEEmitter {
@@ -169,6 +171,14 @@ export class HITLHandler {
         }
 
         return pauseState;
+    }
+
+    /**
+     * Resolve all pause states that have exceeded the timeout.
+     * Called periodically to prevent agents from hanging indefinitely.
+     */
+    async cleanupExpiredPauses(): Promise<string[]> {
+        return this.deps.pauseRepository.resolveExpiredPauseStates(DEFAULT_HITL_TIMEOUT_SECONDS);
     }
 
     // -------------------------------------------------------------------------

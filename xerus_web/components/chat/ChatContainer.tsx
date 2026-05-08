@@ -7,6 +7,7 @@ import { ChatInput } from './ChatInput'
 import { DeliverableChips } from './DeliverableChips'
 import { TaskDock } from './TaskDock'
 import { useTaskDock } from './useTaskDock'
+import { BackgroundAgentPanel } from './BackgroundAgentPanel'
 import type { SandboxTab } from './SandboxPanel'
 
 // Heavy panels loaded only when user opens them (bundle-dynamic-imports + bundle-conditional rules)
@@ -180,6 +181,15 @@ export function ChatContainer({
     lastHitlPreviewRef.current = url
     artifacts.openPreview(url)
   }, [state.pendingGuidance?.preview_url, artifacts])
+
+  // ---- Auto-open artifact panel when agent writes a viewable file.
+  const lastArtifactFileTsRef = useRef<number | null>(null)
+  useEffect(() => {
+    const file = state.pendingArtifactFile
+    if (!file || file.ts === lastArtifactFileTsRef.current) return
+    lastArtifactFileTsRef.current = file.ts
+    void artifacts.openFile({ name: file.name, path: file.path, extension: file.extension })
+  }, [state.pendingArtifactFile, artifacts])
 
   const lastSsePreviewTsRef = useRef<number | null>(null)
   useEffect(() => {
@@ -363,9 +373,37 @@ export function ChatContainer({
                 />
               </div>
             )}
+            {(state.backgroundTasks?.length ?? 0) > 0 && (
+              <div className="w-full max-w-3xl mx-auto">
+                <BackgroundAgentPanel tasks={state.backgroundTasks!} />
+              </div>
+            )}
+            {(state.pendingMessages?.length ?? 0) > 0 && (
+              <div className="w-full max-w-3xl mx-auto px-4 pb-1">
+                <div className="flex flex-wrap gap-1.5">
+                  {state.pendingMessages!.map((msg, idx) => (
+                    <span
+                      key={idx}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs bg-primary/10 text-primary border border-primary/20"
+                    >
+                      <span className="truncate max-w-[200px]">{msg}</span>
+                      <button
+                        type="button"
+                        onClick={() => chat.handleCancelQueuedMessage(idx)}
+                        className="p-0.5 rounded hover:bg-primary/20"
+                        aria-label="Cancel queued message"
+                      >
+                        <span className="text-[10px]">&times;</span>
+                      </button>
+                    </span>
+                  ))}
+                  <span className="text-[11px] text-text-muted self-center ml-1">queued</span>
+                </div>
+              </div>
+            )}
             <ChatInput
               onSendMessage={chat.sendMessage}
-              disabled={state.isLoading}
+              disabled={false}
               placeholder={
                 state.currentAgent
                   ? `Ask ${state.currentAgent.name} anything...`
@@ -383,6 +421,7 @@ export function ChatContainer({
               conversationId={conversationId}
               isExecuting={state.isLoading}
               onStop={chat.handleStopExecution}
+              tokenUsage={state.tokenUsage}
             />
           </div>
         </Panel>

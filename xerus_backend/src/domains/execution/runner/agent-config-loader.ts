@@ -90,7 +90,12 @@ export class AgentConfigLoader {
             // Config tools are MCP/Pipedream app slugs from workspace config.json
             // Merge both so PreToolUse allows native tools + agent-specific MCP tools
             const configTools = Array.isArray(parsed.tools) ? parsed.tools as string[] : [];
-            const tools = [...new Set([...NATIVE_SDK_TOOLS, ...configTools])];
+            const mergedTools = [...new Set([...NATIVE_SDK_TOOLS, ...configTools])];
+            const modelStr = String(parsed.ai_model || parsed.model || DEFAULT_SDK_MODEL).toLowerCase();
+            const isAnthropicDirect = modelStr.includes('claude') && !modelStr.includes('openrouter');
+            const tools = isAnthropicDirect
+                ? mergedTools
+                : mergedTools.filter(t => t !== 'WebFetch');
 
             // Build runtime hook handlers with runner-compatible deps
             const runtimeHandlers = buildRuntimeHookHandlers(

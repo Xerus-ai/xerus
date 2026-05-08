@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { ArrowUp, Square, AtSign, Paperclip, Monitor, TerminalSquare } from 'lucide-react'
+import { ArrowUp, Square, AtSign, Paperclip, Monitor, TerminalSquare, X, FileIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Agent } from './types'
 import { AgentDropdown } from './AgentDropdown'
@@ -10,6 +10,17 @@ import { useSlashCommands } from './useSlashCommands'
 import { UnifiedMentionPicker, type MentionItem } from './UnifiedMentionPicker'
 import { useWorkspaceFiles } from '@/hooks/useWorkspaceFiles'
 import { useKBSearch } from '@/hooks/useKBSearch'
+import { uploadFile } from '@/lib/api/workspace'
+import { toast } from '@/lib/toast'
+import { TokenCounter } from './TokenCounter'
+
+interface AttachedFile {
+  id: string
+  name: string
+  size: number
+  path: string
+  uploading: boolean
+}
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void
@@ -29,6 +40,7 @@ interface ChatInputProps {
   headerContent?: React.ReactNode
   isExecuting?: boolean
   onStop?: () => void
+  tokenUsage?: { used: number; total: number } | null
 }
 
 export function ChatInput({
@@ -49,11 +61,14 @@ export function ChatInput({
   headerContent,
   isExecuting = false,
   onStop,
+  tokenUsage,
 }: ChatInputProps) {
   const [value, setValue] = useState('')
   const [focused, setFocused] = useState(false)
   const [isComposing, setIsComposing] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([])
 
   // @mention state
   const [showPicker, setShowPicker] = useState(false)
@@ -201,13 +216,18 @@ export function ChatInput({
   const handleSend = useCallback(() => {
     const trimmed = value.trim()
     if (!trimmed || disabled) return
-    onSendMessage(trimmed)
+    const uploadedPaths = attachedFiles.filter(f => !f.uploading && f.path).map(f => f.path)
+    const fileContext = uploadedPaths.length > 0
+      ? `\n\n[Attached files: ${uploadedPaths.join(', ')}]`
+      : ''
+    onSendMessage(trimmed + fileContext)
     setValue('')
+    setAttachedFiles([])
     closePicker()
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
     }
-  }, [value, disabled, onSendMessage, closePicker])
+  }, [value, disabled, onSendMessage, closePicker, attachedFiles])
 
   const handleSelectSlashCommand = useCallback(
     (cmd: (typeof commands)[number]) => {
@@ -292,6 +312,39 @@ export function ChatInput({
      showPicker, mentionItems, selectedIdx, insertMentionItem, closePicker, isComposing, handleSend]
   )
 
+  const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+
+    for (const file of Array.from(files)) {
+      const id = `file_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+      const placeholder: AttachedFile = {
+        id,
+        name: file.name,
+        size: file.size,
+        path: '',
+        uploading: true,
+      }
+      setAttachedFiles(prev => [...prev, placeholder])
+
+      try {
+        const result = await uploadFile(file, `uploads/${file.name}`)
+        setAttachedFiles(prev =>
+          prev.map(f => f.id === id ? { ...f, path: result.path, uploading: false } : f)
+        )
+      } catch {
+        setAttachedFiles(prev => prev.filter(f => f.id !== id))
+        toast.error(`Failed to upload ${file.name}`)
+      }
+    }
+
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }, [])
+
+  const removeAttachedFile = useCallback((id: string) => {
+    setAttachedFiles(prev => prev.filter(f => f.id !== id))
+  }, [])
+
   const triggerMention = useCallback(() => {
     const textarea = textareaRef.current
     if (!textarea) return
@@ -353,6 +406,37 @@ export function ChatInput({
           {/* Dynamic header content (task dock, etc.) */}
           {headerContent}
 
+          {/* Attached file chips */}
+          {attachedFiles.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 px-4 pt-3 pb-0">
+              {attachedFiles.map(file => (
+                <span
+                  key={file.id}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs',
+                    'bg-surface-hover text-text-secondary border border-border',
+                    file.uploading && 'opacity-60'
+                  )}
+                >
+                  <FileIcon className="w-3 h-3 shrink-0" />
+                  <span className="truncate max-w-[120px]">{file.name}</span>
+                  {file.uploading ? (
+                    <span className="w-3 h-3 border-2 border-text-muted/30 border-t-text-muted rounded-full animate-spin shrink-0" />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => removeAttachedFile(file.id)}
+                      className="p-0.5 rounded hover:bg-surface-hover text-text-muted hover:text-text-secondary"
+                      aria-label={`Remove ${file.name}`}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </span>
+              ))}
+            </div>
+          )}
+
           {/* Textarea */}
           <textarea
             ref={textareaRef}
@@ -410,8 +494,17 @@ export function ChatInput({
               </button>
 
               {/* Attach file */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                onChange={handleFileUpload}
+                className="hidden"
+                aria-hidden="true"
+              />
               <button
                 type="button"
+                onClick={() => fileInputRef.current?.click()}
                 disabled={disabled}
                 aria-label="Attach file"
                 className={cn(
@@ -519,10 +612,15 @@ export function ChatInput({
           </div>
         </div>
 
-        {/* Disclaimer */}
-        <p className="text-center text-[11px] text-text-muted/40 mt-1 select-none">
-          AI can make mistakes. Verify important information.
-        </p>
+        {/* Disclaimer + Token counter */}
+        <div className="flex items-center justify-between mt-1 px-1">
+          <p className="text-[11px] text-text-muted/40 select-none">
+            AI can make mistakes. Verify important information.
+          </p>
+          {tokenUsage && tokenUsage.used > 0 && (
+            <TokenCounter used={tokenUsage.used} total={tokenUsage.total} />
+          )}
+        </div>
       </div>
     </div>
   )

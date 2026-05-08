@@ -115,6 +115,7 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
     error: null,
     executionState: null,
     selectedChannel: null,
+    pendingMessages: [],
   }))
 
   const [agents, setAgents] = useState<Agent[]>([])
@@ -273,7 +274,15 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
   // ---- Auto-send initial message ----
   const sendMessageRef = useCallback(
     async (content: string) => {
-      if (!content.trim() || state.isLoading) return
+      if (!content.trim()) return
+
+      if (state.isLoading) {
+        setState(prev => ({
+          ...prev,
+          pendingMessages: [...(prev.pendingMessages ?? []), content],
+        }))
+        return
+      }
 
       const userMessage = {
         id: `msg_${Date.now()}`,
@@ -353,6 +362,19 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
     return () => clearTimeout(timer)
   }, [initialMessage, isAuthReady, sendMessageRef, state.isLoading, state.messages.length])
 
+  // ---- Auto-send queued messages when execution completes ----
+  const prevLoadingRef = useRef(false)
+  useEffect(() => {
+    const wasLoading = prevLoadingRef.current
+    prevLoadingRef.current = state.isLoading
+    if (wasLoading && !state.isLoading && (state.pendingMessages?.length ?? 0) > 0) {
+      const [next, ...rest] = state.pendingMessages!
+      setState(prev => ({ ...prev, pendingMessages: rest }))
+      const timer = setTimeout(() => sendMessageRef(next), 300)
+      return () => clearTimeout(timer)
+    }
+  }, [state.isLoading, state.pendingMessages, sendMessageRef])
+
   // ---- Action handlers ----
   const handleNewConversation = useCallback(() => {
     executionStream.close()
@@ -413,6 +435,13 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
     setState((prev) => ({ ...prev, pendingToolAuth: null }))
   }, [])
 
+  const handleCancelQueuedMessage = useCallback((index: number) => {
+    setState(prev => ({
+      ...prev,
+      pendingMessages: (prev.pendingMessages ?? []).filter((_, i) => i !== index),
+    }))
+  }, [])
+
   const handleStopExecution = useCallback(async () => {
     const execId = activeExecutionIdRef.current
     if (!execId) return
@@ -456,5 +485,6 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
     handleAgentChange,
     handleDismissToolAuth,
     handleStopExecution,
+    handleCancelQueuedMessage,
   }
 }

@@ -65,6 +65,8 @@ export function useChatExecution({ setState }: UseChatExecutionOptions) {
   const respondingAgentRef = useRef<{ agentSlug?: string; agentName?: string }>({})
   // Track tool start times for duration computation
   const toolStartTimesRef = useRef<Map<string, number>>(new Map())
+  // Track tool names/paths by callId for artifact auto-open
+  const toolMetaRef = useRef<Map<string, { toolName: string; filePath?: string }>>(new Map())
   // Buffer status labels that arrive before streamingTurn is created (e.g., plan mode, skills)
   const pendingStatusLabelsRef = useRef<string[]>([])
   // Debounce disconnect reset to allow EventSource auto-reconnect
@@ -72,12 +74,16 @@ export function useChatExecution({ setState }: UseChatExecutionOptions) {
   // Prevent duplicate onDone processing from SSE reconnect replays
   const doneReceivedRef = useRef(false)
 
+  const tokenCountRef = useRef(0)
+
   const resetStreamContent = useCallback(() => {
     rawTextRef.current = ''
     respondingAgentRef.current = {}
     toolStartTimesRef.current.clear()
+    toolMetaRef.current.clear()
     pendingStatusLabelsRef.current = []
     doneReceivedRef.current = false
+    tokenCountRef.current = 0
     if (disconnectTimerRef.current) {
       clearTimeout(disconnectTimerRef.current)
       disconnectTimerRef.current = null
@@ -91,10 +97,14 @@ export function useChatExecution({ setState }: UseChatExecutionOptions) {
       // Skip raw error JSON chunks from upstream LLM providers
       if (text.includes('"type":"error"') && text.includes('"api_error"')) return
       rawTextRef.current += text
+      tokenCountRef.current += Math.ceil(text.length / 4)
       setState(prev => {
         const turn = prev.streamingTurn
         if (!turn) return prev
-        return { ...prev, streamingTurn: appendToken(turn, text) }
+        const tokenUsage = prev.tokenUsage
+          ? { ...prev.tokenUsage, used: tokenCountRef.current }
+          : prev.tokenUsage
+        return { ...prev, streamingTurn: appendToken(turn, text), tokenUsage }
       })
     }, [setState]),
     onProgress: useCallback((event: StreamEvent<'progress'>) => {
@@ -133,6 +143,8 @@ export function useChatExecution({ setState }: UseChatExecutionOptions) {
     onToolCall: useCallback((event: StreamEvent<'tool_call'>) => {
       const content = event.content as ToolCallEventContent
       toolStartTimesRef.current.set(content.callId, Date.now())
+      const filePath = content.arguments?.file_path as string | undefined
+      toolMetaRef.current.set(content.callId, { toolName: content.toolName, filePath })
       setState(prev => {
         const turn = prev.streamingTurn
         return {
@@ -149,14 +161,29 @@ export function useChatExecution({ setState }: UseChatExecutionOptions) {
       const startTime = toolStartTimesRef.current.get(content.callId)
       const durationMs = startTime ? now - startTime : undefined
       toolStartTimesRef.current.delete(content.callId)
+
+      const meta = toolMetaRef.current.get(content.callId)
+      toolMetaRef.current.delete(content.callId)
+
+      const VIEWABLE_EXTS = new Set(['.md', '.html', '.htm', '.svg', '.json', '.txt', '.css', '.csv'])
+      const WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'write_file', 'edit_file'])
+      const isWriteTool = meta && WRITE_TOOLS.has(meta.toolName)
+      const filePath = meta?.filePath ?? ''
+      const ext = filePath.includes('.') ? '.' + filePath.split('.').pop()!.toLowerCase() : ''
+      const isViewable = isWriteTool && content.success && VIEWABLE_EXTS.has(ext)
+
       setState(prev => {
         const turn = prev.streamingTurn
-        return {
-          ...prev,
+        const updates: Partial<import('./types').ChatState> = {
           streamingTurn: turn
             ? completeToolCall(turn, content.callId, content.result, content.success, durationMs)
             : turn,
         }
+        if (isViewable) {
+          const name = filePath.split('/').pop() ?? filePath
+          updates.pendingArtifactFile = { name, path: filePath, extension: ext, ts: now }
+        }
+        return { ...prev, ...updates }
       })
     }, [setState]),
     onMeta: useCallback((event: StreamEvent<'meta'>) => {
@@ -167,8 +194,27 @@ export function useChatExecution({ setState }: UseChatExecutionOptions) {
           agentName: content.agentName ?? respondingAgentRef.current.agentName,
         }
       }
+      const MODEL_CONTEXT: Record<string, number> = {
+        'claude-opus-4': 200000,
+        'claude-sonnet-4': 200000,
+        'claude-3.5-sonnet': 200000,
+        'claude-3-opus': 200000,
+        'claude-3-haiku': 200000,
+        'gpt-4o': 128000,
+        'gpt-4-turbo': 128000,
+        'gpt-4': 8192,
+        'gemini-pro': 1000000,
+        'gemini-1.5-pro': 2000000,
+        'deepseek-chat': 128000,
+      }
       setState(prev => {
         const updates: Partial<ChatState> = {}
+        if (content.model) {
+          const modelKey = Object.keys(MODEL_CONTEXT).find(k => (content.model ?? '').toLowerCase().includes(k))
+          const contextSize = modelKey ? MODEL_CONTEXT[modelKey] : 200000
+          tokenCountRef.current = 0
+          updates.tokenUsage = { used: 0, total: contextSize }
+        }
         if (content.agentName) {
           updates.executionState = {
             mode: 'simple',
@@ -371,34 +417,34 @@ export function useChatExecution({ setState }: UseChatExecutionOptions) {
       const content = event.content as TaskStartedEventContent
       setState(prev => {
         const turn = prev.streamingTurn
-        if (!turn) return prev
+        const bgTask = {
+          id: content.taskId,
+          name: content.taskName,
+          description: content.taskDescription,
+          status: 'running' as const,
+          startedAt: Date.now(),
+        }
         return {
           ...prev,
-          streamingTurn: addStatus(turn, `Started: ${content.taskName}`),
+          streamingTurn: turn ? addStatus(turn, `Started: ${content.taskName}`) : turn,
+          backgroundTasks: [...(prev.backgroundTasks ?? []), bgTask],
         }
       })
     }, [setState]),
     onTaskUpdated: useCallback((event: StreamEvent<'task_updated'>) => {
       const content = event.content as TaskUpdatedEventContent
-      if (content.status === 'completed') {
-        setState(prev => {
-          const turn = prev.streamingTurn
-          if (!turn) return prev
-          return {
-            ...prev,
-            streamingTurn: addStatus(turn, `Completed task`),
-          }
-        })
-      } else if (content.status === 'failed') {
-        setState(prev => {
-          const turn = prev.streamingTurn
-          if (!turn) return prev
-          return {
-            ...prev,
-            streamingTurn: addStatus(turn, `Task failed`),
-          }
-        })
-      }
+      setState(prev => {
+        const turn = prev.streamingTurn
+        const statusLabel = content.status === 'completed' ? 'Completed task' : content.status === 'failed' ? 'Task failed' : null
+        const bgTasks = (prev.backgroundTasks ?? []).map(t =>
+          t.id === content.taskId ? { ...t, status: content.status } : t
+        )
+        return {
+          ...prev,
+          streamingTurn: turn && statusLabel ? addStatus(turn, statusLabel) : turn,
+          backgroundTasks: bgTasks,
+        }
+      })
     }, [setState]),
     onTaskProgress: useCallback((event: StreamEvent<'task_progress'>) => {
       const content = event.content as TaskProgressEventContent
@@ -474,6 +520,7 @@ export function useChatExecution({ setState }: UseChatExecutionOptions) {
       rawTextRef.current = ''
       respondingAgentRef.current = {}
       toolStartTimesRef.current.clear()
+      toolMetaRef.current.clear()
       pendingStatusLabelsRef.current = []
 
       setState(prev => {
@@ -518,6 +565,7 @@ export function useChatExecution({ setState }: UseChatExecutionOptions) {
       rawTextRef.current = ''
       respondingAgentRef.current = {}
       toolStartTimesRef.current.clear()
+      toolMetaRef.current.clear()
       pendingStatusLabelsRef.current = []
 
       setState(prev => {
@@ -558,6 +606,7 @@ export function useChatExecution({ setState }: UseChatExecutionOptions) {
       rawTextRef.current = ''
       respondingAgentRef.current = {}
       toolStartTimesRef.current.clear()
+      toolMetaRef.current.clear()
       pendingStatusLabelsRef.current = []
       setState(prev => ({
         ...prev,

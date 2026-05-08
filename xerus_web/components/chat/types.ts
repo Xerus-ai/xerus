@@ -93,6 +93,22 @@ export interface ChatState {
     preview_url?: string;
     artifact_path?: string;
   } | null
+  pendingMessages?: string[]
+  tokenUsage?: { used: number; total: number } | null
+  backgroundTasks?: Array<{
+    id: string
+    name: string
+    description?: string
+    status: 'running' | 'completed' | 'failed'
+    startedAt: number
+  }>
+  // Tool result that produced a viewable file — ChatContainer opens artifact panel.
+  pendingArtifactFile?: {
+    name: string
+    path: string
+    extension: string
+    ts: number
+  } | null
   // Latest live-preview event from the agent's dev server. ChatContainer
   // watches this and opens an artifact tab when it changes.
   pendingPreview?: {
