@@ -1,13 +1,50 @@
 // Knowledge Base Routes
 // Handles search_kb, upload_kb, assign_kb MCP tools
+// Queries workspace.db (SQLite) on sandbox via executeWorkspaceJsonQuery.
 
 import { Router, Response, NextFunction } from 'express';
-import { query } from '../../../database/connection';
 import { BadRequestError } from '../../../utils/errors';
 import { InternalMcpRequest, McpToolResult } from './types';
+import { escapeSQL, executeWorkspaceJsonQuery, executeWorkspaceQuery } from '../../conversations/workspace-db.helpers';
+import { requireRunningSandbox, getDaytonaProvider } from '../../sandbox-infra/sandbox/sandbox-route-helpers';
+import type { SandboxService } from '../../sandbox-infra/sandbox/sandbox.service';
 
 const MAX_RESULTS = 100;
 const MAX_CONTENT_SIZE = 1_048_576; // 1MB
+
+// ---------------------------------------------------------------------------
+// Dependencies (injected at startup)
+// ---------------------------------------------------------------------------
+
+let _sandboxService: SandboxService | null = null;
+
+export function setKnowledgeBaseRoutesDeps(deps: { sandboxService: SandboxService }): void {
+    _sandboxService = deps.sandboxService;
+}
+
+function getSandboxService(): SandboxService {
+    if (!_sandboxService) {
+        throw new Error('Knowledge base routes dependencies not initialized');
+    }
+    return _sandboxService;
+}
+
+// ---------------------------------------------------------------------------
+// workspace.db row types
+// ---------------------------------------------------------------------------
+
+interface AgentKbRow {
+    id: number;
+    agent_slug: string;
+    kb_id: string;
+    access_level: string;
+    added_at: string;
+}
+
+interface AgentRow {
+    slug: string;
+    name: string;
+}
 
 const router = Router();
 
@@ -23,63 +60,35 @@ router.post('/search_kb', async (req: InternalMcpRequest, res: Response, next: N
 
         const resultLimit = Math.min(limit || 10, MAX_RESULTS);
 
-        const workspaceResult = await query<{ id: string }>(
-            `SELECT id FROM workspaces WHERE user_id = $1 LIMIT 1`,
-            [userId],
-        );
-        if (workspaceResult.rows.length === 0) {
-            throw new BadRequestError('Workspace not found');
-        }
+        const sandboxService = getSandboxService();
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
 
-        const userWorkspaceResult = await query<{ id: string }>(
-            `SELECT id FROM user_workspaces WHERE user_id = $1 LIMIT 1`,
-            [userId],
-        );
-        if (userWorkspaceResult.rows.length === 0) {
-            const mcpResult: McpToolResult = {
-                success: true,
-                data: { results: [], total: 0 },
-            };
-            res.json(mcpResult);
-            return;
-        }
+        const escaped = escapeSQL(searchQuery);
 
-        const workspaceId = userWorkspaceResult.rows[0].id;
-        const searchPattern = `%${searchQuery}%`;
-
-        let queryText = `SELECT id, file_path, content, memory_type, scope, created_at
-                         FROM memory_search_index
-                         WHERE workspace_id = $1::uuid
-                           AND content ILIKE $2`;
-        const params: unknown[] = [workspaceId, searchPattern];
-        let paramIndex = 3;
+        let sql = `SELECT akb.id, akb.agent_slug, akb.kb_id, akb.access_level, akb.added_at
+                   FROM agent_knowledge_bases akb
+                   WHERE akb.kb_id LIKE '%${escaped}%'`;
 
         if (collection_id) {
-            queryText += ` AND file_path LIKE $${paramIndex}`;
-            params.push(`%${collection_id}%`);
-            paramIndex++;
+            sql += ` AND akb.agent_slug = '${escapeSQL(String(collection_id))}'`;
         }
 
-        queryText += ` ORDER BY created_at DESC LIMIT $${paramIndex}`;
-        params.push(resultLimit);
+        sql += ` ORDER BY akb.added_at DESC LIMIT ${resultLimit}`;
 
-        const result = await query<{
-            id: string; file_path: string; content: string;
-            memory_type: string; scope: string; created_at: Date;
-        }>(queryText, params);
+        const rows = await executeWorkspaceJsonQuery<AgentKbRow>(provider, sandboxId, sql);
 
         const mcpResult: McpToolResult = {
             success: true,
             data: {
-                results: result.rows.map(row => ({
+                results: rows.map(row => ({
                     id: row.id,
-                    file_path: row.file_path,
-                    content: row.content.substring(0, 500),
-                    memory_type: row.memory_type,
-                    scope: row.scope,
-                    created_at: row.created_at,
+                    agent_slug: row.agent_slug,
+                    kb_id: row.kb_id,
+                    access_level: row.access_level,
+                    added_at: row.added_at,
                 })),
-                total: result.rows.length,
+                total: rows.length,
             },
         };
 
@@ -105,14 +114,25 @@ router.post('/upload_kb', async (req: InternalMcpRequest, res: Response, next: N
             throw new BadRequestError(`Content exceeds maximum size of ${MAX_CONTENT_SIZE} bytes (1MB)`);
         }
 
+        const sandboxService = getSandboxService();
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
+
         const collection = collection_id || 'default';
         const safeTitle = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        const kbId = `${collection}-${safeTitle}`;
         const kbPath = `knowledge/${collection}/${safeTitle}.md`;
+
+        // Write the KB file to the sandbox filesystem
+        if (content) {
+            const writeCmd = `mkdir -p /home/xerus/workspace/knowledge/${escapeSQL(collection)} && cat > /home/xerus/workspace/${escapeSQL(kbPath)} << 'EOKB'\n${content}\nEOKB`;
+            await provider.executeCommand(sandboxId, writeCmd);
+        }
 
         const mcpResult: McpToolResult = {
             success: true,
             data: {
-                document_id: `kb-${Date.now()}`,
+                document_id: kbId,
                 title,
                 path: kbPath,
                 collection: collection,
@@ -139,28 +159,38 @@ router.post('/assign_kb', async (req: InternalMcpRequest, res: Response, next: N
             throw new BadRequestError('Either document_id or collection_id is required');
         }
 
-        const agentIdNum = parseInt(String(agent_id), 10);
-        if (isNaN(agentIdNum)) {
-            throw new BadRequestError('agent_id must be a valid integer');
-        }
+        const sandboxService = getSandboxService();
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
 
-        const agentResult = await query<{ id: number; slug: string }>(
-            `SELECT id, slug FROM agent_registry WHERE id = $1 AND (user_id = $2 OR agent_type = 'system')`,
-            [agentIdNum, userId],
+        // agent_id is treated as slug in workspace.db
+        const agentSlug = escapeSQL(String(agent_id));
+        const agentRows = await executeWorkspaceJsonQuery<AgentRow>(
+            provider, sandboxId,
+            `SELECT slug, name FROM agents WHERE slug = '${agentSlug}'`,
         );
-        if (agentResult.rows.length === 0) {
+
+        if (agentRows.length === 0) {
             throw new BadRequestError(`Agent not found: ${agent_id}`);
         }
+
+        const kbId = document_id || collection_id;
+        const accessLevel = permission || 'read';
+
+        const sql = `INSERT INTO agent_knowledge_bases (agent_slug, kb_id, access_level)
+                     VALUES ('${agentSlug}', '${escapeSQL(String(kbId))}', '${escapeSQL(accessLevel)}')
+                     ON CONFLICT(agent_slug, kb_id) DO UPDATE SET access_level = '${escapeSQL(accessLevel)}'`;
+
+        await executeWorkspaceQuery(provider, sandboxId, sql);
 
         const mcpResult: McpToolResult = {
             success: true,
             data: {
                 assigned: true,
-                agent_id: agentResult.rows[0].id,
-                agent_slug: agentResult.rows[0].slug,
+                agent_slug: agentRows[0].slug,
                 document_id: document_id || null,
                 collection_id: collection_id || null,
-                permission: permission || 'read',
+                permission: accessLevel,
             },
         };
 

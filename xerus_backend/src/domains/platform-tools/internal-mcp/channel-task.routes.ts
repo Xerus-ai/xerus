@@ -1,12 +1,61 @@
 // Channel & Task Routes
 // Handles create_channel, add_to_channel, create_task MCP tools
+// Queries workspace.db (SQLite) on sandbox via executeWorkspaceJsonQuery.
 
 import { Router, Response, NextFunction } from 'express';
-import { query } from '../../../database/connection';
 import { BadRequestError } from '../../../utils/errors';
 import { InternalMcpRequest, McpToolResult } from './types';
+import { escapeSQL, executeWorkspaceJsonQuery, executeWorkspaceQuery } from '../../conversations/workspace-db.helpers';
+import { requireRunningSandbox, getDaytonaProvider } from '../../sandbox-infra/sandbox/sandbox-route-helpers';
+import type { SandboxService } from '../../sandbox-infra/sandbox/sandbox.service';
 
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
+
+// ---------------------------------------------------------------------------
+// Dependencies (injected at startup)
+// ---------------------------------------------------------------------------
+
+let _sandboxService: SandboxService | null = null;
+
+export function setChannelTaskRoutesDeps(deps: { sandboxService: SandboxService }): void {
+    _sandboxService = deps.sandboxService;
+}
+
+function getSandboxService(): SandboxService {
+    if (!_sandboxService) {
+        throw new Error('Channel task routes dependencies not initialized');
+    }
+    return _sandboxService;
+}
+
+// ---------------------------------------------------------------------------
+// workspace.db row types
+// ---------------------------------------------------------------------------
+
+interface ChannelRow {
+    slug: string;
+    name: string;
+    domain_slug: string;
+    lead_agent_slug: string | null;
+    description: string | null;
+    created_at: string;
+}
+
+interface AgentRow {
+    slug: string;
+    name: string;
+}
+
+interface TaskRow {
+    id: string;
+    project_slug: string;
+    title: string;
+    description: string | null;
+    status: string;
+    priority: string;
+    assigned_agent: string | null;
+    created_at: string;
+}
 
 const router = Router();
 
@@ -25,28 +74,54 @@ router.post('/create_channel', async (req: InternalMcpRequest, res: Response, ne
             throw new BadRequestError(`Invalid channel name: ${name}. Slug must match ${SLUG_PATTERN}`);
         }
 
-        const workspaceResult = await query<{ id: string }>(
-            `SELECT id FROM workspaces WHERE user_id = $1 LIMIT 1`,
-            [userId],
+        const sandboxService = getSandboxService();
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
+
+        // Ensure the domain exists (use project_id as domain_slug, default to 'default')
+        const domainSlug = project_id || 'default';
+        await executeWorkspaceQuery(
+            provider, sandboxId,
+            `INSERT OR IGNORE INTO domains (slug, name) VALUES ('${escapeSQL(domainSlug)}', '${escapeSQL(domainSlug)}')`,
         );
-        if (workspaceResult.rows.length === 0) {
-            throw new BadRequestError('Workspace not found');
+
+        // Determine lead agent (first in agent_ids list, if provided)
+        const leadAgent = Array.isArray(agent_ids) && agent_ids.length > 0
+            ? `'${escapeSQL(String(agent_ids[0]))}'`
+            : 'NULL';
+
+        const descValue = description ? `'${escapeSQL(description)}'` : 'NULL';
+
+        const sql = `
+            INSERT INTO channels (slug, name, domain_slug, lead_agent_slug, description)
+            VALUES ('${escapeSQL(channelSlug)}', '${escapeSQL(name)}', '${escapeSQL(domainSlug)}', ${leadAgent}, ${descValue});
+            SELECT slug, name, domain_slug, lead_agent_slug, description, created_at
+            FROM channels WHERE slug = '${escapeSQL(channelSlug)}';
+        `;
+
+        const rows = await executeWorkspaceJsonQuery<ChannelRow>(provider, sandboxId, sql);
+
+        // If agent_ids provided, add them as channel members
+        if (Array.isArray(agent_ids) && agent_ids.length > 0) {
+            const memberInserts = agent_ids.map((aid: string, idx: number) => {
+                const role = idx === 0 ? 'lead' : 'member';
+                return `INSERT OR IGNORE INTO channel_members (channel_slug, agent_slug, role) VALUES ('${escapeSQL(channelSlug)}', '${escapeSQL(String(aid))}', '${role}')`;
+            });
+            await executeWorkspaceQuery(provider, sandboxId, `BEGIN;\n${memberInserts.join(';\n')};\nCOMMIT;`);
         }
 
-        const channelId = `ch-${Date.now()}`;
-
+        const row = rows[0];
         const mcpResult: McpToolResult = {
             success: true,
             data: {
                 channel: {
-                    id: channelId,
-                    slug: channelSlug,
-                    name,
-                    description: description || '',
-                    project_id: project_id || null,
-                    workspace_id: workspaceResult.rows[0].id,
+                    slug: row?.slug || channelSlug,
+                    name: row?.name || name,
+                    description: row?.description || description || '',
+                    domain_slug: row?.domain_slug || domainSlug,
+                    lead_agent_slug: row?.lead_agent_slug || null,
                     agent_ids: agent_ids || [],
-                    created_at: new Date().toISOString(),
+                    created_at: row?.created_at || new Date().toISOString(),
                 },
             },
         };
@@ -70,27 +145,35 @@ router.post('/add_to_channel', async (req: InternalMcpRequest, res: Response, ne
             throw new BadRequestError('agent_id is required');
         }
 
-        const agentIdNum = parseInt(String(agent_id), 10);
-        if (isNaN(agentIdNum)) {
-            throw new BadRequestError('agent_id must be a valid integer');
-        }
+        const sandboxService = getSandboxService();
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
 
-        const agentResult = await query<{ id: number; slug: string }>(
-            `SELECT id, slug FROM agent_registry WHERE id = $1 AND (user_id = $2 OR agent_type = 'system')`,
-            [agentIdNum, userId],
+        // agent_id is treated as slug in workspace.db
+        const agentSlug = escapeSQL(String(agent_id));
+        const agentRows = await executeWorkspaceJsonQuery<AgentRow>(
+            provider, sandboxId,
+            `SELECT slug, name FROM agents WHERE slug = '${agentSlug}'`,
         );
-        if (agentResult.rows.length === 0) {
+
+        if (agentRows.length === 0) {
             throw new BadRequestError(`Agent not found: ${agent_id}`);
         }
+
+        const memberRole = role || 'member';
+        const sql = `INSERT INTO channel_members (channel_slug, agent_slug, role)
+                     VALUES ('${escapeSQL(channel_id)}', '${agentSlug}', '${escapeSQL(memberRole)}')
+                     ON CONFLICT(channel_slug, agent_slug) DO UPDATE SET role = '${escapeSQL(memberRole)}'`;
+
+        await executeWorkspaceQuery(provider, sandboxId, sql);
 
         const mcpResult: McpToolResult = {
             success: true,
             data: {
                 added: true,
                 channel_id,
-                agent_id: agentResult.rows[0].id,
-                agent_slug: agentResult.rows[0].slug,
-                role: role || 'member',
+                agent_slug: agentRows[0].slug,
+                role: memberRole,
             },
         };
 
@@ -118,22 +201,55 @@ router.post('/create_task', async (req: InternalMcpRequest, res: Response, next:
             throw new BadRequestError(`Invalid priority: ${priority}. Must be one of: ${validPriorities.join(', ')}`);
         }
 
-        const taskId = `task-${Date.now()}`;
+        const sandboxService = getSandboxService();
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
 
+        const taskId = `task-${Date.now()}`;
+        const taskPriority = priority || 'medium';
+        const descValue = description ? `'${escapeSQL(description)}'` : 'NULL';
+        const assignedAgent = Array.isArray(assigned_agent_ids) && assigned_agent_ids.length > 0
+            ? `'${escapeSQL(String(assigned_agent_ids[0]))}'`
+            : 'NULL';
+        const labelsValue = subtasks && Array.isArray(subtasks) && subtasks.length > 0
+            ? `'${escapeSQL(JSON.stringify(subtasks))}'`
+            : 'NULL';
+
+        const sql = `
+            BEGIN;
+            INSERT INTO tasks (id, project_slug, title, description, status, priority, assigned_agent, labels)
+            VALUES (
+                '${escapeSQL(taskId)}',
+                '${escapeSQL(channel_id)}',
+                '${escapeSQL(title)}',
+                ${descValue},
+                'open',
+                '${escapeSQL(taskPriority)}',
+                ${assignedAgent},
+                ${labelsValue}
+            );
+            SELECT id, project_slug, title, description, status, priority, assigned_agent, created_at
+            FROM tasks WHERE id = '${escapeSQL(taskId)}';
+            COMMIT;
+        `;
+
+        const rows = await executeWorkspaceJsonQuery<TaskRow>(provider, sandboxId, sql);
+
+        const row = rows[0];
         const mcpResult: McpToolResult = {
             success: true,
             data: {
                 task: {
-                    id: taskId,
+                    id: row?.id || taskId,
                     channel_id,
-                    title,
-                    description: description || '',
+                    title: row?.title || title,
+                    description: row?.description || description || '',
                     assigned_agent_ids: assigned_agent_ids || [],
-                    priority: priority || 'medium',
+                    priority: row?.priority || taskPriority,
                     subtasks: subtasks || [],
-                    status: 'open',
+                    status: row?.status || 'open',
                     created_by: userId,
-                    created_at: new Date().toISOString(),
+                    created_at: row?.created_at || new Date().toISOString(),
                 },
             },
         };

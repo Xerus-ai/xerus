@@ -1,12 +1,54 @@
 // Search Outputs & List Domains Routes
 // Handles search_outputs, list_domains MCP tools
+// Queries workspace.db (SQLite) on sandbox via executeWorkspaceJsonQuery.
 
 import { Router, Response, NextFunction } from 'express';
-import { query } from '../../../database/connection';
-import { BadRequestError } from '../../../utils/errors';
 import { InternalMcpRequest, McpToolResult } from './types';
+import { escapeSQL, executeWorkspaceJsonQuery } from '../../conversations/workspace-db.helpers';
+import { requireRunningSandbox, getDaytonaProvider } from '../../sandbox-infra/sandbox/sandbox-route-helpers';
+import type { SandboxService } from '../../sandbox-infra/sandbox/sandbox.service';
 
 const MAX_RESULTS = 100;
+
+// ---------------------------------------------------------------------------
+// Dependencies (injected at startup)
+// ---------------------------------------------------------------------------
+
+let _sandboxService: SandboxService | null = null;
+
+export function setSearchOutputsRoutesDeps(deps: { sandboxService: SandboxService }): void {
+    _sandboxService = deps.sandboxService;
+}
+
+function getSandboxService(): SandboxService {
+    if (!_sandboxService) {
+        throw new Error('Search outputs routes dependencies not initialized');
+    }
+    return _sandboxService;
+}
+
+// ---------------------------------------------------------------------------
+// workspace.db row types
+// ---------------------------------------------------------------------------
+
+interface AgentOutputRow {
+    id: number;
+    agent_slug: string;
+    session_id: string | null;
+    output_type: string;
+    title: string;
+    description: string | null;
+    file_path: string | null;
+    content_preview: string | null;
+    created_at: string;
+}
+
+interface DomainRow {
+    slug: string;
+    name: string;
+    description: string | null;
+    created_at: string;
+}
 
 const router = Router();
 
@@ -18,80 +60,50 @@ router.post('/search_outputs', async (req: InternalMcpRequest, res: Response, ne
 
         const resultLimit = Math.min(limit || 20, MAX_RESULTS);
 
-        const workspaceResult = await query<{ id: string }>(
-            `SELECT id FROM user_workspaces WHERE user_id = $1 LIMIT 1`,
-            [userId],
-        );
-        if (workspaceResult.rows.length === 0) {
-            const mcpResult: McpToolResult = {
-                success: true,
-                data: { outputs: [], total: 0 },
-            };
-            res.json(mcpResult);
-            return;
-        }
+        const sandboxService = getSandboxService();
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
 
-        const workspaceId = workspaceResult.rows[0].id;
-
-        let queryText = `SELECT es.id, es.agent_id, ar.slug as agent_slug,
-                         es.status, es.trigger_type, es.started_at, es.completed_at, es.created_at
-                         FROM execution_sessions es
-                         JOIN agent_registry ar ON es.agent_id = ar.id
-                         WHERE es.workspace_id = $1::uuid`;
-        const params: unknown[] = [workspaceId];
-        let paramIndex = 2;
+        let sql = `SELECT ao.id, ao.agent_slug, ao.session_id, ao.output_type, ao.title,
+                          ao.description, ao.file_path, ao.content_preview, ao.created_at
+                   FROM agent_outputs ao
+                   WHERE 1=1`;
 
         if (agent_id) {
-            const agentIdNum = parseInt(String(agent_id), 10);
-            if (isNaN(agentIdNum)) {
-                throw new BadRequestError('agent_id must be a valid integer');
-            }
-            queryText += ` AND es.agent_id = $${paramIndex}`;
-            params.push(agentIdNum);
-            paramIndex++;
-        }
-
-        if (date_from) {
-            queryText += ` AND es.created_at >= $${paramIndex}::timestamptz`;
-            params.push(date_from);
-            paramIndex++;
-        }
-
-        if (date_to) {
-            queryText += ` AND es.created_at <= $${paramIndex}::timestamptz`;
-            params.push(date_to);
-            paramIndex++;
+            sql += ` AND ao.agent_slug = '${escapeSQL(String(agent_id))}'`;
         }
 
         if (output_type) {
-            queryText += ` AND es.trigger_type = $${paramIndex}`;
-            params.push(output_type);
-            paramIndex++;
+            sql += ` AND ao.output_type = '${escapeSQL(String(output_type))}'`;
         }
 
-        queryText += ` ORDER BY es.created_at DESC LIMIT $${paramIndex}`;
-        params.push(resultLimit);
+        if (date_from) {
+            sql += ` AND ao.created_at >= '${escapeSQL(String(date_from))}'`;
+        }
 
-        const result = await query<{
-            id: string; agent_id: number; agent_slug: string;
-            status: string; trigger_type: string;
-            started_at: Date | null; completed_at: Date | null; created_at: Date;
-        }>(queryText, params);
+        if (date_to) {
+            sql += ` AND ao.created_at <= '${escapeSQL(String(date_to))}'`;
+        }
+
+        sql += ` ORDER BY ao.created_at DESC LIMIT ${resultLimit}`;
+
+        const rows = await executeWorkspaceJsonQuery<AgentOutputRow>(provider, sandboxId, sql);
 
         const mcpResult: McpToolResult = {
             success: true,
             data: {
-                outputs: result.rows.map(row => ({
+                outputs: rows.map(row => ({
                     id: row.id,
-                    agent_id: row.agent_id,
                     agent_slug: row.agent_slug,
-                    status: row.status,
-                    trigger_type: row.trigger_type,
-                    started_at: row.started_at,
-                    completed_at: row.completed_at,
+                    session_id: row.session_id,
+                    output_type: row.output_type,
+                    title: row.title,
+                    description: row.description,
+                    file_path: row.file_path,
+                    content_preview: row.content_preview,
                     created_at: row.created_at,
                 })),
-                total: result.rows.length,
+                total: rows.length,
             },
         };
 
@@ -106,40 +118,27 @@ router.post('/list_domains', async (req: InternalMcpRequest, res: Response, next
     try {
         const userId = req.sandbox!.userId;
 
-        const workspaceResult = await query<{ id: string }>(
-            `SELECT id FROM workspaces WHERE user_id = $1 LIMIT 1`,
-            [userId],
-        );
-        if (workspaceResult.rows.length === 0) {
-            const mcpResult: McpToolResult = {
-                success: true,
-                data: { domains: [], total: 0 },
-            };
-            res.json(mcpResult);
-            return;
-        }
+        const sandboxService = getSandboxService();
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
 
-        const workspaceId = workspaceResult.rows[0].id;
+        const sql = `SELECT slug, name, description, created_at
+                     FROM domains
+                     ORDER BY name ASC
+                     LIMIT ${MAX_RESULTS}`;
 
-        const result = await query<{ id: string; slug: string; name: string; created_at: Date }>(
-            `SELECT id, slug, name, created_at
-             FROM domains
-             WHERE workspace_id = $1::uuid
-             ORDER BY name ASC
-             LIMIT $2`,
-            [workspaceId, MAX_RESULTS],
-        );
+        const rows = await executeWorkspaceJsonQuery<DomainRow>(provider, sandboxId, sql);
 
         const mcpResult: McpToolResult = {
             success: true,
             data: {
-                domains: result.rows.map(row => ({
-                    id: row.id,
+                domains: rows.map(row => ({
                     slug: row.slug,
                     name: row.name,
+                    description: row.description,
                     created_at: row.created_at,
                 })),
-                total: result.rows.length,
+                total: rows.length,
             },
         };
 

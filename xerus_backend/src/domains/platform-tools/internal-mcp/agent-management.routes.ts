@@ -1,20 +1,49 @@
 // Agent Management Routes
 // Handles search_agents, clone_agent, create_agent, update_agent, delete_agent, list_agents
+// Queries workspace.db (SQLite) on sandbox via executeWorkspaceJsonQuery.
 
 import { Router, Response, NextFunction } from 'express';
-import { query } from '../../../database/connection';
 import { BadRequestError } from '../../../utils/errors';
 import { InternalMcpRequest, McpToolResult } from './types';
+import { escapeSQL, executeWorkspaceJsonQuery, executeWorkspaceQuery } from '../../conversations/workspace-db.helpers';
+import { requireRunningSandbox, getDaytonaProvider } from '../../sandbox-infra/sandbox/sandbox-route-helpers';
+import type { SandboxService } from '../../sandbox-infra/sandbox/sandbox.service';
 
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 const MAX_RESULTS = 100;
 
-interface AgentRow {
-    id: number;
+// ---------------------------------------------------------------------------
+// Dependencies (injected at startup)
+// ---------------------------------------------------------------------------
+
+let _sandboxService: SandboxService | null = null;
+
+export function setAgentManagementRoutesDeps(deps: { sandboxService: SandboxService }): void {
+    _sandboxService = deps.sandboxService;
+}
+
+function getSandboxService(): SandboxService {
+    if (!_sandboxService) {
+        throw new Error('Agent management routes dependencies not initialized');
+    }
+    return _sandboxService;
+}
+
+// ---------------------------------------------------------------------------
+// workspace.db row types
+// ---------------------------------------------------------------------------
+
+interface WorkspaceAgentRow {
     slug: string;
-    user_id: string | null;
-    agent_type: string;
-    created_at: Date;
+    name: string;
+    adapter_type: string;
+    role: string | null;
+    autonomy_level: string;
+    status: string;
+    config: string | null;
+    marketplace_ref: string | null;
+    installed_at: string;
+    updated_at: string;
 }
 
 const router = Router();
@@ -29,40 +58,44 @@ router.post('/search_agents', async (req: InternalMcpRequest, res: Response, nex
             throw new BadRequestError('query is required');
         }
 
-        const searchPattern = `%${searchQuery}%`;
-        let queryText = `SELECT id, slug, user_id, agent_type, created_at
-                         FROM agent_registry
-                         WHERE slug ILIKE $1`;
-        const params: unknown[] = [searchPattern];
-        let paramIndex = 2;
+        const sandboxService = getSandboxService();
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
 
+        const escaped = escapeSQL(searchQuery);
+
+        let sql: string;
         if (scope === 'mine') {
-            queryText += ` AND user_id = $${paramIndex}`;
-            params.push(userId);
-            paramIndex++;
-        } else if (scope === 'marketplace') {
-            queryText += ` AND agent_type = 'public'`;
+            // In workspace.db all agents belong to the workspace owner
+            sql = `SELECT slug, name, adapter_type, role, autonomy_level, status, installed_at
+                   FROM agents
+                   WHERE slug LIKE '%${escaped}%' OR name LIKE '%${escaped}%'
+                   ORDER BY slug
+                   LIMIT ${MAX_RESULTS}`;
         } else {
-            queryText += ` AND (user_id = $${paramIndex} OR agent_type IN ('system', 'public'))`;
-            params.push(userId);
-            paramIndex++;
+            // Same query — workspace.db is per-user, so all agents are accessible
+            sql = `SELECT slug, name, adapter_type, role, autonomy_level, status, installed_at
+                   FROM agents
+                   WHERE slug LIKE '%${escaped}%' OR name LIKE '%${escaped}%'
+                   ORDER BY slug
+                   LIMIT ${MAX_RESULTS}`;
         }
 
-        queryText += ` ORDER BY slug LIMIT $${paramIndex}`;
-        params.push(MAX_RESULTS);
-
-        const result = await query<AgentRow>(queryText, params);
+        const rows = await executeWorkspaceJsonQuery<WorkspaceAgentRow>(provider, sandboxId, sql);
 
         const mcpResult: McpToolResult = {
             success: true,
             data: {
-                agents: result.rows.map(row => ({
-                    id: row.id,
+                agents: rows.map(row => ({
                     slug: row.slug,
-                    agent_type: row.agent_type,
-                    created_at: row.created_at,
+                    name: row.name,
+                    adapter_type: row.adapter_type,
+                    role: row.role,
+                    autonomy_level: row.autonomy_level,
+                    status: row.status,
+                    installed_at: row.installed_at,
                 })),
-                total: result.rows.length,
+                total: rows.length,
             },
         };
 
@@ -77,26 +110,30 @@ router.post('/list_agents', async (req: InternalMcpRequest, res: Response, next:
     try {
         const userId = req.sandbox!.userId;
 
-        const result = await query<AgentRow>(
-            `SELECT id, slug, user_id, agent_type, created_at
-             FROM agent_registry
-             WHERE (user_id = $1 AND agent_type IN ('private', 'public'))
-                OR agent_type = 'system'
-             ORDER BY agent_type ASC, slug ASC
-             LIMIT $2`,
-            [userId, MAX_RESULTS],
-        );
+        const sandboxService = getSandboxService();
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
+
+        const sql = `SELECT slug, name, adapter_type, role, autonomy_level, status, installed_at
+                     FROM agents
+                     ORDER BY status ASC, slug ASC
+                     LIMIT ${MAX_RESULTS}`;
+
+        const rows = await executeWorkspaceJsonQuery<WorkspaceAgentRow>(provider, sandboxId, sql);
 
         const mcpResult: McpToolResult = {
             success: true,
             data: {
-                agents: result.rows.map(row => ({
-                    id: row.id,
+                agents: rows.map(row => ({
                     slug: row.slug,
-                    agent_type: row.agent_type,
-                    created_at: row.created_at,
+                    name: row.name,
+                    adapter_type: row.adapter_type,
+                    role: row.role,
+                    autonomy_level: row.autonomy_level,
+                    status: row.status,
+                    installed_at: row.installed_at,
                 })),
-                total: result.rows.length,
+                total: rows.length,
             },
         };
 
@@ -127,31 +164,39 @@ router.post('/create_agent', async (req: InternalMcpRequest, res: Response, next
             throw new BadRequestError(`Invalid slug format: ${agentSlug}. Must match ${SLUG_PATTERN}`);
         }
 
-        const result = await query<AgentRow>(
-            `INSERT INTO agent_registry (slug, user_id, agent_type)
-             VALUES ($1, $2, 'private')
-             ON CONFLICT (slug, user_id) DO NOTHING
-             RETURNING *`,
-            [agentSlug, userId],
-        );
+        const sandboxService = getSandboxService();
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
 
-        if (result.rows.length === 0) {
+        const autonomy = autonomy_level || 'supervised';
+        const model = model_id || 'claude-sonnet';
+        const configJson = escapeSQL(JSON.stringify({ model, system_prompt, description }));
+
+        const sql = `
+            INSERT INTO agents (slug, name, adapter_type, role, autonomy_level, status, config)
+            VALUES ('${escapeSQL(agentSlug)}', '${escapeSQL(name)}', 'claudecode', NULL, '${escapeSQL(autonomy)}', 'idle', '${configJson}');
+            SELECT slug, name, adapter_type, role, autonomy_level, status, config, installed_at, updated_at
+            FROM agents WHERE slug = '${escapeSQL(agentSlug)}';
+        `;
+
+        const rows = await executeWorkspaceJsonQuery<WorkspaceAgentRow>(provider, sandboxId, sql);
+
+        if (rows.length === 0) {
             throw new BadRequestError(`Agent with slug "${agentSlug}" already exists`);
         }
 
-        const row = result.rows[0];
+        const row = rows[0];
         const mcpResult: McpToolResult = {
             success: true,
             data: {
                 agent: {
-                    id: row.id,
                     slug: row.slug,
-                    name,
+                    name: row.name,
                     description,
-                    model_id: model_id || 'claude-sonnet',
-                    autonomy_level: autonomy_level || 'semi_autonomous',
-                    agent_type: row.agent_type,
-                    created_at: row.created_at,
+                    model_id: model,
+                    autonomy_level: row.autonomy_level,
+                    status: row.status,
+                    installed_at: row.installed_at,
                 },
             },
         };
@@ -175,47 +220,53 @@ router.post('/clone_agent', async (req: InternalMcpRequest, res: Response, next:
             throw new BadRequestError('name is required');
         }
 
-        const sourceId = parseInt(String(source_agent_id), 10);
-        if (isNaN(sourceId)) {
-            throw new BadRequestError('source_agent_id must be a valid integer');
-        }
+        const sandboxService = getSandboxService();
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
 
-        const sourceResult = await query<AgentRow>(
-            `SELECT * FROM agent_registry WHERE id = $1`,
-            [sourceId],
+        // source_agent_id is treated as a slug in workspace.db (agents table uses slug as PK)
+        const sourceSlug = escapeSQL(String(source_agent_id));
+        const sourceRows = await executeWorkspaceJsonQuery<WorkspaceAgentRow>(
+            provider, sandboxId,
+            `SELECT slug, name, adapter_type, role, autonomy_level, config FROM agents WHERE slug = '${sourceSlug}'`,
         );
-        if (sourceResult.rows.length === 0) {
+
+        if (sourceRows.length === 0) {
             throw new BadRequestError(`Source agent not found: ${source_agent_id}`);
         }
 
-        const source = sourceResult.rows[0];
+        const source = sourceRows[0];
         const cloneSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
         if (!SLUG_PATTERN.test(cloneSlug)) {
             throw new BadRequestError(`Invalid slug generated from name: ${cloneSlug}`);
         }
 
-        const insertResult = await query<AgentRow>(
-            `INSERT INTO agent_registry (slug, user_id, agent_type)
-             VALUES ($1, $2, 'private')
-             ON CONFLICT (slug, user_id) DO NOTHING
-             RETURNING *`,
-            [cloneSlug, userId],
-        );
+        const configValue = source.config ? `'${escapeSQL(source.config)}'` : 'NULL';
+        const roleValue = source.role ? `'${escapeSQL(source.role)}'` : 'NULL';
 
-        if (insertResult.rows.length === 0) {
+        const sql = `
+            INSERT INTO agents (slug, name, adapter_type, role, autonomy_level, status, config, marketplace_ref)
+            VALUES ('${escapeSQL(cloneSlug)}', '${escapeSQL(name)}', '${escapeSQL(source.adapter_type)}', ${roleValue}, '${escapeSQL(source.autonomy_level)}', 'idle', ${configValue}, NULL);
+            SELECT slug, name, adapter_type, role, autonomy_level, status, installed_at
+            FROM agents WHERE slug = '${escapeSQL(cloneSlug)}';
+        `;
+
+        const rows = await executeWorkspaceJsonQuery<WorkspaceAgentRow>(provider, sandboxId, sql);
+
+        if (rows.length === 0) {
             throw new BadRequestError(`Agent with slug "${cloneSlug}" already exists`);
         }
 
-        const row = insertResult.rows[0];
+        const row = rows[0];
         const mcpResult: McpToolResult = {
             success: true,
             data: {
                 agent: {
-                    id: row.id,
                     slug: row.slug,
-                    name,
-                    agent_type: row.agent_type,
-                    created_at: row.created_at,
+                    name: row.name,
+                    adapter_type: row.adapter_type,
+                    autonomy_level: row.autonomy_level,
+                    installed_at: row.installed_at,
                 },
                 cloned_from: source.slug,
             },
@@ -237,28 +288,37 @@ router.post('/update_agent', async (req: InternalMcpRequest, res: Response, next
             throw new BadRequestError('agent_id is required');
         }
 
-        const agentIdNum = parseInt(String(agent_id), 10);
-        if (isNaN(agentIdNum)) {
-            throw new BadRequestError('agent_id must be a valid integer');
-        }
+        const sandboxService = getSandboxService();
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
 
-        const existing = await query<AgentRow>(
-            `SELECT * FROM agent_registry WHERE id = $1 AND user_id = $2`,
-            [agentIdNum, userId],
+        // agent_id is treated as slug in workspace.db
+        const agentSlug = escapeSQL(String(agent_id));
+
+        const existing = await executeWorkspaceJsonQuery<WorkspaceAgentRow>(
+            provider, sandboxId,
+            `SELECT slug, name, adapter_type, role, autonomy_level, status FROM agents WHERE slug = '${agentSlug}'`,
         );
-        if (existing.rows.length === 0) {
+
+        if (existing.length === 0) {
             throw new BadRequestError(`Agent not found or access denied: ${agent_id}`);
         }
 
-        const row = existing.rows[0];
+        const now = new Date().toISOString();
+        await executeWorkspaceQuery(
+            provider, sandboxId,
+            `UPDATE agents SET updated_at = '${now}' WHERE slug = '${agentSlug}'`,
+        );
+
+        const row = existing[0];
         const mcpResult: McpToolResult = {
             success: true,
             data: {
                 agent: {
-                    id: row.id,
                     slug: row.slug,
-                    agent_type: row.agent_type,
-                    updated_at: new Date().toISOString(),
+                    name: row.name,
+                    adapter_type: row.adapter_type,
+                    updated_at: now,
                 },
             },
         };
@@ -279,44 +339,34 @@ router.post('/delete_agent', async (req: InternalMcpRequest, res: Response, next
             throw new BadRequestError('agent_id or agent_slug is required');
         }
 
-        let deleteQuery: string;
-        let deleteParams: unknown[];
-        let lookupQuery: string;
-        let lookupParams: unknown[];
+        const sandboxService = getSandboxService();
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
 
-        if (agent_id) {
-            const agentIdNum = parseInt(String(agent_id), 10);
-            if (isNaN(agentIdNum)) {
-                throw new BadRequestError('agent_id must be a valid integer');
-            }
-            lookupQuery = `SELECT * FROM agent_registry WHERE id = $1 AND user_id = $2`;
-            lookupParams = [agentIdNum, userId];
-            deleteQuery = `DELETE FROM agent_registry WHERE id = $1 AND user_id = $2 AND agent_type != 'system'`;
-            deleteParams = [agentIdNum, userId];
-        } else {
-            lookupQuery = `SELECT * FROM agent_registry WHERE slug = $1 AND user_id = $2`;
-            lookupParams = [agent_slug, userId];
-            deleteQuery = `DELETE FROM agent_registry WHERE slug = $1 AND user_id = $2 AND agent_type != 'system'`;
-            deleteParams = [agent_slug, userId];
-        }
+        // In workspace.db, agents are identified by slug
+        const slug = agent_slug || String(agent_id);
+        const escapedSlug = escapeSQL(slug);
 
-        const existing = await query<AgentRow>(lookupQuery, lookupParams);
-        if (existing.rows.length === 0) {
+        const existing = await executeWorkspaceJsonQuery<WorkspaceAgentRow>(
+            provider, sandboxId,
+            `SELECT slug, name, status FROM agents WHERE slug = '${escapedSlug}'`,
+        );
+
+        if (existing.length === 0) {
             throw new BadRequestError('Agent not found or access denied');
         }
 
-        const agent = existing.rows[0];
-        if (agent.agent_type === 'system') {
-            throw new BadRequestError('Cannot delete system agents');
-        }
-
-        await query(deleteQuery, deleteParams);
+        // workspace.db agents table has ON DELETE CASCADE for related tables
+        await executeWorkspaceQuery(
+            provider, sandboxId,
+            `DELETE FROM agents WHERE slug = '${escapedSlug}'`,
+        );
 
         const mcpResult: McpToolResult = {
             success: true,
             data: {
                 deleted: true,
-                agent_slug: agent.slug,
+                agent_slug: existing[0].slug,
             },
         };
 

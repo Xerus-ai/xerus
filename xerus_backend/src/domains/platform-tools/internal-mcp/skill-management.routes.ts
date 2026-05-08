@@ -1,12 +1,50 @@
 // Skill Management Routes
 // Handles search_skills, create_skill, install_skill, uninstall_skill, cancel_execution
+// Skills routes query workspace.db (SQLite) on sandbox via executeWorkspaceJsonQuery.
+// cancel_execution stays on Neon (needs backend execution session access).
 
 import { Router, Response, NextFunction } from 'express';
 import { query } from '../../../database/connection';
 import { BadRequestError } from '../../../utils/errors';
 import { InternalMcpRequest, McpToolResult } from './types';
+import { escapeSQL, executeWorkspaceJsonQuery, executeWorkspaceQuery } from '../../conversations/workspace-db.helpers';
+import { requireRunningSandbox, getDaytonaProvider } from '../../sandbox-infra/sandbox/sandbox-route-helpers';
+import type { SandboxService } from '../../sandbox-infra/sandbox/sandbox.service';
 
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
+
+// ---------------------------------------------------------------------------
+// Dependencies (injected at startup)
+// ---------------------------------------------------------------------------
+
+let _sandboxService: SandboxService | null = null;
+
+export function setSkillManagementRoutesDeps(deps: { sandboxService: SandboxService }): void {
+    _sandboxService = deps.sandboxService;
+}
+
+function getSandboxService(): SandboxService {
+    if (!_sandboxService) {
+        throw new Error('Skill management routes dependencies not initialized');
+    }
+    return _sandboxService;
+}
+
+// ---------------------------------------------------------------------------
+// workspace.db row types
+// ---------------------------------------------------------------------------
+
+interface SkillRow {
+    slug: string;
+    name: string;
+    version: string;
+    source: string;
+    source_ref: string | null;
+    description: string | null;
+    categories: string | null;
+    installed_at: string;
+    updated_at: string;
+}
 
 const router = Router();
 
@@ -20,19 +58,38 @@ router.post('/search_skills', async (req: InternalMcpRequest, res: Response, nex
             throw new BadRequestError('query is required');
         }
 
-        const workspaceResult = await query<{ id: string }>(
-            `SELECT id FROM workspaces WHERE user_id = $1 LIMIT 1`,
-            [userId],
-        );
+        const sandboxService = getSandboxService();
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
+
+        const escaped = escapeSQL(searchQuery);
+
+        const sql = `SELECT slug, name, version, source, source_ref, description, categories, installed_at
+                     FROM skills
+                     WHERE slug LIKE '%${escaped}%'
+                        OR name LIKE '%${escaped}%'
+                        OR description LIKE '%${escaped}%'
+                        OR categories LIKE '%${escaped}%'
+                     ORDER BY slug
+                     LIMIT 50`;
+
+        const rows = await executeWorkspaceJsonQuery<SkillRow>(provider, sandboxId, sql);
 
         const mcpResult: McpToolResult = {
             success: true,
             data: {
-                skills: [],
-                total: 0,
+                skills: rows.map(row => ({
+                    slug: row.slug,
+                    name: row.name,
+                    version: row.version,
+                    source: row.source,
+                    description: row.description,
+                    categories: row.categories,
+                    installed_at: row.installed_at,
+                })),
+                total: rows.length,
                 search_query: searchQuery,
                 scope: scope || 'all',
-                workspace_id: workspaceResult.rows[0]?.id || null,
             },
         };
 
@@ -63,18 +120,46 @@ router.post('/create_skill', async (req: InternalMcpRequest, res: Response, next
             throw new BadRequestError(`Invalid skill name: ${name}. Slug must match ${SLUG_PATTERN}`);
         }
 
+        const sandboxService = getSandboxService();
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
+
+        const cat = category || 'custom';
+        const categoriesJson = escapeSQL(JSON.stringify([cat]));
+        const descEscaped = escapeSQL(description);
+        const skillPath = `.claude/skills/${skillSlug}/SKILL.md`;
+
+        const sql = `
+            INSERT INTO skills (slug, name, version, source, source_ref, description, categories)
+            VALUES ('${escapeSQL(skillSlug)}', '${escapeSQL(name)}', '1.0.0', 'local', '${escapeSQL(skillPath)}', '${descEscaped}', '${categoriesJson}');
+            SELECT slug, name, version, source, description, categories, installed_at
+            FROM skills WHERE slug = '${escapeSQL(skillSlug)}';
+        `;
+
+        const rows = await executeWorkspaceJsonQuery<SkillRow>(provider, sandboxId, sql);
+
+        // If agent_id specified, also create the agent_skills link
+        if (agent_id) {
+            const agentSlug = escapeSQL(String(agent_id));
+            await executeWorkspaceQuery(
+                provider, sandboxId,
+                `INSERT OR IGNORE INTO agent_skills (agent_slug, skill_slug, enabled) VALUES ('${agentSlug}', '${escapeSQL(skillSlug)}', 1)`,
+            );
+        }
+
+        const row = rows[0];
         const mcpResult: McpToolResult = {
             success: true,
             data: {
                 skill: {
-                    slug: skillSlug,
-                    name,
-                    description,
-                    category: category || 'custom',
+                    slug: row?.slug || skillSlug,
+                    name: row?.name || name,
+                    description: row?.description || description,
+                    category: cat,
                     agent_id: agent_id || null,
                     user_id: userId,
-                    path: `.claude/skills/${skillSlug}/SKILL.md`,
-                    created_at: new Date().toISOString(),
+                    path: skillPath,
+                    created_at: row?.installed_at || new Date().toISOString(),
                 },
             },
         };
@@ -98,19 +183,26 @@ router.post('/install_skill', async (req: InternalMcpRequest, res: Response, nex
             throw new BadRequestError(`Invalid skill_slug format: ${skill_slug}`);
         }
 
-        if (agent_id) {
-            const agentIdNum = parseInt(String(agent_id), 10);
-            if (isNaN(agentIdNum)) {
-                throw new BadRequestError('agent_id must be a valid integer');
-            }
+        const sandboxService = getSandboxService();
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
 
-            const agentResult = await query<{ id: number }>(
-                `SELECT id FROM agent_registry WHERE id = $1 AND (user_id = $2 OR agent_type = 'system')`,
-                [agentIdNum, userId],
+        if (agent_id) {
+            // Verify agent exists in workspace.db
+            const agentSlug = escapeSQL(String(agent_id));
+            const agentRows = await executeWorkspaceJsonQuery<{ slug: string }>(
+                provider, sandboxId,
+                `SELECT slug FROM agents WHERE slug = '${agentSlug}'`,
             );
-            if (agentResult.rows.length === 0) {
+            if (agentRows.length === 0) {
                 throw new BadRequestError(`Agent not found: ${agent_id}`);
             }
+
+            // Install skill for this agent
+            await executeWorkspaceQuery(
+                provider, sandboxId,
+                `INSERT OR IGNORE INTO agent_skills (agent_slug, skill_slug, enabled) VALUES ('${agentSlug}', '${escapeSQL(skill_slug)}', 1)`,
+            );
         }
 
         const mcpResult: McpToolResult = {
@@ -142,19 +234,32 @@ router.post('/uninstall_skill', async (req: InternalMcpRequest, res: Response, n
             throw new BadRequestError(`Invalid skill_slug format: ${skill_slug}`);
         }
 
-        if (agent_id) {
-            const agentIdNum = parseInt(String(agent_id), 10);
-            if (isNaN(agentIdNum)) {
-                throw new BadRequestError('agent_id must be a valid integer');
-            }
+        const sandboxService = getSandboxService();
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
 
-            const agentResult = await query<{ id: number }>(
-                `SELECT id FROM agent_registry WHERE id = $1 AND (user_id = $2 OR agent_type = 'system')`,
-                [agentIdNum, userId],
+        if (agent_id) {
+            // Verify agent exists in workspace.db
+            const agentSlug = escapeSQL(String(agent_id));
+            const agentRows = await executeWorkspaceJsonQuery<{ slug: string }>(
+                provider, sandboxId,
+                `SELECT slug FROM agents WHERE slug = '${agentSlug}'`,
             );
-            if (agentResult.rows.length === 0) {
+            if (agentRows.length === 0) {
                 throw new BadRequestError(`Agent not found: ${agent_id}`);
             }
+
+            // Remove skill assignment for this agent
+            await executeWorkspaceQuery(
+                provider, sandboxId,
+                `DELETE FROM agent_skills WHERE agent_slug = '${agentSlug}' AND skill_slug = '${escapeSQL(skill_slug)}'`,
+            );
+        } else {
+            // Remove skill entirely from the workspace
+            await executeWorkspaceQuery(
+                provider, sandboxId,
+                `DELETE FROM skills WHERE slug = '${escapeSQL(skill_slug)}'`,
+            );
         }
 
         const mcpResult: McpToolResult = {
@@ -173,7 +278,7 @@ router.post('/uninstall_skill', async (req: InternalMcpRequest, res: Response, n
     }
 });
 
-// POST /mcp/cancel_execution
+// POST /mcp/cancel_execution — stays on Neon (needs backend execution session access)
 router.post('/cancel_execution', async (req: InternalMcpRequest, res: Response, next: NextFunction) => {
     try {
         const { session_id } = req.body;

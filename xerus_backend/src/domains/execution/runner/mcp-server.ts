@@ -100,7 +100,7 @@ if (!USER_ID && process.env.NODE_ENV === 'production') {
 // Tool Definitions
 // -----------------------------------------------------------------------------
 
-const TOOLS = [
+export const TOOLS = [
     {
         name: 'pause_execution',
         description: 'Pause the current execution session. Used for human-in-the-loop approval workflows.',
