@@ -15,7 +15,7 @@ export { escapeSQL, executeWorkspaceQuery, executeWorkspaceJsonQuery } from './w
 
 export interface ConversationRow {
     id: string;
-    agent_slug: string;
+    agent_slug: string | null;
     title: string | null;
     summary: string | null;
     message_count: number;
@@ -304,7 +304,8 @@ export async function incrementConversationMessageCount(
 
 /**
  * Persist a chat turn (user message + agent response) to workspace.db chat_executions.
- * Called at the end of each execution so conversation history survives page reloads.
+ * Uses upsert on (conversation_id, session_id) so incremental writes during streaming
+ * update the same row instead of creating duplicates.
  */
 export async function writeChatExecution(
     provider: DaytonaProvider,
@@ -317,23 +318,22 @@ export async function writeChatExecution(
     responseTimeMs: number | null,
     messageMetadata: string | null,
 ): Promise<void> {
-    // Ensure message_metadata column exists (added after initial schema)
-    try {
-        await executeWorkspaceQuery(provider, sandboxId,
-            `ALTER TABLE chat_executions ADD COLUMN message_metadata TEXT`);
-    } catch {
-        // Column already exists — expected
-    }
-
     const sessionValue = sessionId ? `'${escapeSQL(sessionId)}'` : 'NULL';
     const responseValue = agentResponse ? `'${escapeSQL(agentResponse)}'` : 'NULL';
     const timeValue = responseTimeMs !== null ? String(responseTimeMs) : 'NULL';
     const metaValue = messageMetadata ? `'${escapeSQL(messageMetadata)}'` : 'NULL';
 
-    const sql = `
-        INSERT INTO chat_executions (conversation_id, session_id, user_message, agent_response, response_time_ms, tokens_used, message_metadata)
-        VALUES ('${escapeSQL(conversationId)}', ${sessionValue}, '${escapeSQL(userMessage)}', ${responseValue}, ${timeValue}, ${tokensUsed}, ${metaValue})
-    `;
+    const sql = sessionId
+        ? `INSERT INTO chat_executions (conversation_id, session_id, user_message, agent_response, response_time_ms, tokens_used, message_metadata)
+           VALUES ('${escapeSQL(conversationId)}', ${sessionValue}, '${escapeSQL(userMessage)}', ${responseValue}, ${timeValue}, ${tokensUsed}, ${metaValue})
+           ON CONFLICT(conversation_id, session_id) DO UPDATE SET
+             agent_response = COALESCE(excluded.agent_response, agent_response),
+             tokens_used = excluded.tokens_used,
+             response_time_ms = excluded.response_time_ms,
+             message_metadata = COALESCE(excluded.message_metadata, message_metadata)`
+        : `INSERT INTO chat_executions (conversation_id, session_id, user_message, agent_response, response_time_ms, tokens_used, message_metadata)
+           VALUES ('${escapeSQL(conversationId)}', ${sessionValue}, '${escapeSQL(userMessage)}', ${responseValue}, ${timeValue}, ${tokensUsed}, ${metaValue})`;
+
     await executeWorkspaceQuery(provider, sandboxId, sql);
 }
 

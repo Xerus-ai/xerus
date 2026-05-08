@@ -40,13 +40,28 @@ export function parseJsonResult<T>(output: string): T[] | null {
     }
 }
 
+const MAX_RETRIES = 3;
+
+function sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 export async function executeWorkspaceQuery(
     provider: DaytonaProvider,
     sandboxId: string,
     sql: string,
 ): Promise<string> {
-    const result = await provider.executeCommand(sandboxId, buildSqliteCommand(sql));
-    return result.result || '';
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        const result = await provider.executeCommand(sandboxId, buildSqliteCommand(sql));
+        const output = result.result || '';
+        if (output.includes('database is locked')) {
+            log.warn('SQLite locked, retrying', { attempt, sandboxId });
+            await sleep(100 * Math.pow(2, attempt));
+            continue;
+        }
+        return output;
+    }
+    throw new Error('Workspace DB query failed after retries: database is locked');
 }
 
 export async function executeWorkspaceJsonQuery<T>(

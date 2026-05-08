@@ -35,6 +35,13 @@ function mapConversation(c: ApiConversation): Conversation {
   }
 }
 
+function mergeConversations(existing: Conversation[], incoming: Conversation[]): Conversation[] {
+  const map = new Map<string, Conversation>()
+  for (const c of existing) map.set(c.id, c)
+  for (const c of incoming) map.set(c.id, c)
+  return Array.from(map.values()).sort((a, b) => b.updatedAt - a.updatedAt)
+}
+
 export function groupConversationsByAgent(
   conversations: Conversation[],
   agents: Agent[],
@@ -306,12 +313,13 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
 
         await executionStream.sendMessage(convId, content, channelContext)
 
-        // Refresh conversation list (non-critical)
+        // Refresh conversation list (non-critical) — merge to preserve existing entries
         try {
           const result = await getConversations(50)
+          const incoming = result.conversations.map(mapConversation)
           setState((prev) => ({
             ...prev,
-            conversations: result.conversations.map(mapConversation),
+            conversations: mergeConversations(prev.conversations, incoming),
           }))
         } catch {
           // sidebar will update on next load

@@ -62,7 +62,11 @@ export class SandboxContextBuilder {
         const triggerFile = this.writeTriggerContext(params.triggerType, params.triggerPayload);
         if (triggerFile) filesWritten.push(triggerFile);
 
-        // 3. Rebuild context/index.md
+        // 3. Build skills context
+        const skillsFile = this.buildSkillsContext();
+        if (skillsFile) filesWritten.push(skillsFile);
+
+        // 4. Rebuild context/index.md
         const indexPath = this.rebuildIndex(params.agentSlug);
         filesWritten.push(indexPath);
 
@@ -156,6 +160,50 @@ export class SandboxContextBuilder {
         const filePath = path.join(triggerDir, 'current.md');
         fs.writeFileSync(filePath, content, 'utf-8');
         return path.relative(this.workspacePath, filePath);
+    }
+
+    // -------------------------------------------------------------------------
+    // Skills Context
+    // -------------------------------------------------------------------------
+
+    private buildSkillsContext(): string | null {
+        const skillsDirs = [
+            path.join(this.workspacePath, '.claude', 'skills'),
+        ];
+        const skills: Array<{ name: string; description: string; path: string }> = [];
+
+        for (const dir of skillsDirs) {
+            if (!fs.existsSync(dir)) continue;
+            const entries = fs.readdirSync(dir, { withFileTypes: true });
+            for (const entry of entries) {
+                if (!entry.isDirectory()) continue;
+                const skillMd = path.join(dir, entry.name, 'SKILL.md');
+                if (!fs.existsSync(skillMd)) continue;
+                const content = fs.readFileSync(skillMd, 'utf-8');
+                const firstLine = content.split('\n').find(l => l.trim().length > 0) || '';
+                const description = firstLine.replace(/^#+\s*/, '').trim() || entry.name;
+                skills.push({
+                    name: entry.name,
+                    description,
+                    path: `.claude/skills/${entry.name}/SKILL.md`,
+                });
+            }
+        }
+
+        if (skills.length === 0) return null;
+
+        const lines = [
+            '# Installed Skills',
+            '',
+            ...skills.map(s => `- **${s.name}**: ${s.description}\n  path: ${s.path}`),
+            '',
+        ];
+
+        const contextDir = path.join(this.workspacePath, 'context');
+        this.ensureDir(contextDir);
+        const filePath = path.join(contextDir, 'skills.md');
+        fs.writeFileSync(filePath, lines.join('\n'), 'utf-8');
+        return 'context/skills.md';
     }
 
     // -------------------------------------------------------------------------

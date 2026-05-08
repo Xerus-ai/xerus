@@ -119,6 +119,13 @@ export class AgentMarketplaceService {
             updated_at: now,
         };
         await fs.putAgentConfig(userId, cloneSlug, cloneConfig);
+
+        // Generate soul files for the clone with correct identity (name, slug, personality)
+        const supplementaryFiles = buildSupplementaryFiles(cloneSlug, cloneConfig);
+        await Promise.all(
+            supplementaryFiles.map(({ path, content }) => fs.writeFile(userId, path, content)),
+        );
+
         await fs.addToIndex(userId, { slug: cloneSlug, name: cloneName, agent_type: 'private' });
 
         if (sourceEntry.agent_type === 'public' && sourceEntry.user_id) {

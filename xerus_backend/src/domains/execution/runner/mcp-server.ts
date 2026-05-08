@@ -1,7 +1,7 @@
 // Xerus Platform MCP Server
-// MCP server with 18 backend-coupled tools that CLIs access
+// MCP server with 38 backend-coupled tools that CLIs access
 //
-// 18 tools that require backend state:
+// 38 tools that require backend state:
 //  1. pause_execution          — Session control (needs backend state machine)
 //  2. resume_execution         — HITL approval (needs backend state)
 //  3. get_session_state        — Distributed state query (needs backend DB)
@@ -20,6 +20,26 @@
 // 16. update_schedule          — Update schedule (workspace.db via sqlite3)
 // 17. delete_schedule          — Delete schedule (workspace.db via sqlite3)
 // 18. get_billing_status       — Billing info (needs backend DB)
+// 19. search_agents            — Agent discovery (needs backend DB + filesystem)
+// 20. clone_agent              — Clone agent template (needs backend DB + filesystem)
+// 21. create_agent             — Create new agent (needs backend DB + filesystem)
+// 22. update_agent             — Update agent config (needs backend DB + filesystem)
+// 23. search_kb                — KB document search (needs workspace filesystem)
+// 24. upload_kb                — KB document upload (needs workspace filesystem)
+// 25. assign_kb                — Assign KB to agent (needs backend DB)
+// 26. create_channel           — Create inbox channel (needs workspace DB)
+// 27. add_to_channel           — Add agent to channel (needs backend DB + filesystem)
+// 28. create_task              — Create task in channel (needs workspace DB)
+// 29. search_skills            — Skill discovery (needs backend DB + filesystem)
+// 30. create_skill             — Create new skill (needs workspace filesystem)
+// 31. write_memory             — Write memory entry (needs pgvector + filesystem)
+// 32. search_outputs           — Search output registry (needs workspace filesystem)
+// 33. delete_agent             — Delete agent (needs backend DB + filesystem)
+// 34. list_agents              — List all agents (needs backend DB + filesystem)
+// 35. list_domains             — List projects/domains (needs workspace DB)
+// 36. install_skill            — Install skill on agent (needs backend DB + filesystem)
+// 37. uninstall_skill          — Remove skill from agent (needs backend DB + filesystem)
+// 38. cancel_execution         — Cancel running execution (needs backend state machine)
 //
 // Reference: Paperclip adapter pattern (agent calls MCP -> MCP calls backend API)
 
@@ -310,6 +330,277 @@ const TOOLS = [
             required: [],
         },
     },
+    // Agent Management (4) — backend DB + sandbox filesystem
+    {
+        name: 'search_agents',
+        description: 'Search agents by name, capability, or category.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                query: { type: 'string', description: 'Search query' },
+                scope: { type: 'string', enum: ['mine', 'marketplace', 'all'], description: 'Search scope' },
+                category: { type: 'string', description: 'Filter by agent category' },
+            },
+            required: ['query'],
+        },
+    },
+    {
+        name: 'clone_agent',
+        description: 'Clone an agent template to create a customized agent.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                source_agent_id: { type: 'string', description: 'ID of the agent to clone' },
+                name: { type: 'string', description: 'Name for the new agent' },
+                customizations: { type: 'object', description: 'Optional customizations for the cloned agent' },
+            },
+            required: ['source_agent_id', 'name'],
+        },
+    },
+    {
+        name: 'create_agent',
+        description: 'Create a new agent with custom configuration.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                name: { type: 'string', description: 'Agent display name' },
+                slug: { type: 'string', description: 'URL-safe identifier (auto-generated if omitted)' },
+                description: { type: 'string', description: 'What this agent does' },
+                system_prompt: { type: 'string', description: 'System prompt defining agent behavior and identity' },
+                model_id: { type: 'string', description: 'LLM model (default: claude-sonnet)' },
+                autonomy_level: { type: 'string', enum: ['supervised', 'semi_autonomous', 'autonomous'], description: 'How much human oversight the agent requires' },
+                tool_slugs: { type: 'array', items: { type: 'string' }, description: 'Pipedream app slugs to assign' },
+                skill_slugs: { type: 'array', items: { type: 'string' }, description: 'Skill slugs to install on the agent' },
+                kb_collection_ids: { type: 'array', items: { type: 'string' }, description: 'KB collections to assign' },
+            },
+            required: ['name', 'description', 'system_prompt'],
+        },
+    },
+    {
+        name: 'update_agent',
+        description: 'Update an existing agent configuration (name, description, system prompt, model, autonomy level).',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                agent_id: { type: 'string', description: 'ID of the agent to update' },
+                name: { type: 'string', description: 'New agent display name' },
+                description: { type: 'string', description: 'New agent description' },
+                system_prompt: { type: 'object', description: 'System prompt fields to update (partial update)' },
+                model_id: { type: 'string', description: 'LLM model override' },
+                autonomy_level: { type: 'string', enum: ['supervised', 'semi_autonomous', 'autonomous'], description: 'Autonomy level override' },
+            },
+            required: ['agent_id'],
+        },
+    },
+    // Knowledge Base (3) — workspace filesystem
+    {
+        name: 'search_kb',
+        description: 'Search knowledge base documents.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                query: { type: 'string', description: 'Search query' },
+                collection_id: { type: 'string', description: 'Limit search to a specific collection' },
+                limit: { type: 'number', description: 'Maximum number of results (default 10)' },
+            },
+            required: ['query'],
+        },
+    },
+    {
+        name: 'upload_kb',
+        description: 'Upload a document to the knowledge base.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                title: { type: 'string', description: 'Document title' },
+                content: { type: 'string', description: 'Document content (text/markdown)' },
+                file_path: { type: 'string', description: 'Path to file in workspace (alternative to content)' },
+                collection_id: { type: 'string', description: 'Target KB collection (uses default if omitted)' },
+            },
+            required: ['title'],
+        },
+    },
+    {
+        name: 'assign_kb',
+        description: 'Assign a knowledge base document or collection to an agent.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                agent_id: { type: 'string', description: 'Target agent ID' },
+                document_id: { type: 'string', description: 'KB document to assign' },
+                collection_id: { type: 'string', description: 'Or assign an entire collection' },
+                permission: { type: 'string', enum: ['read', 'read_write'], description: 'Access permission level' },
+            },
+            required: ['agent_id'],
+        },
+    },
+    // Channels & Tasks (3) — workspace DB
+    {
+        name: 'create_channel',
+        description: 'Create a channel in the inbox for organizing agent work.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                name: { type: 'string', description: 'Channel name (e.g., seo, content, bugs)' },
+                project_id: { type: 'string', description: 'Parent project (uses default if omitted)' },
+                description: { type: 'string', description: 'Channel description' },
+                agent_ids: { type: 'array', items: { type: 'string' }, description: 'Agent IDs to add initially' },
+            },
+            required: ['name'],
+        },
+    },
+    {
+        name: 'add_to_channel',
+        description: 'Add an agent to a channel.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                channel_id: { type: 'string', description: 'Channel ID' },
+                agent_id: { type: 'string', description: 'Agent ID to add' },
+                role: { type: 'string', enum: ['member', 'lead'], description: 'Role in the channel' },
+            },
+            required: ['channel_id', 'agent_id'],
+        },
+    },
+    {
+        name: 'create_task',
+        description: 'Create a task in a channel with agent assignments.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                channel_id: { type: 'string', description: 'Channel to create the task in' },
+                title: { type: 'string', description: 'Task title' },
+                description: { type: 'string', description: 'Task description' },
+                assigned_agent_ids: { type: 'array', items: { type: 'string' }, description: 'Agent IDs to assign' },
+                priority: { type: 'string', enum: ['low', 'medium', 'high', 'critical'], description: 'Task priority' },
+                subtasks: { type: 'array', items: { type: 'string' }, description: 'Checklist items for the task' },
+            },
+            required: ['channel_id', 'title'],
+        },
+    },
+    // Skills (2) — backend DB + workspace filesystem
+    {
+        name: 'search_skills',
+        description: 'Search skills by name, capability, or category.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                query: { type: 'string', description: 'Search query' },
+                scope: { type: 'string', enum: ['system', 'marketplace', 'mine', 'all'], description: 'Search scope' },
+            },
+            required: ['query'],
+        },
+    },
+    {
+        name: 'create_skill',
+        description: 'Create a new skill with instructions and optional scripts.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                name: { type: 'string', description: 'Skill name (lowercase, hyphenated)' },
+                description: { type: 'string', description: 'When to use this skill' },
+                instructions: { type: 'string', description: 'SKILL.md content (full instructions)' },
+                agent_id: { type: 'string', description: 'Assign to a specific agent (optional)' },
+                category: { type: 'string', description: 'Skill category' },
+            },
+            required: ['name', 'description', 'instructions'],
+        },
+    },
+    // Memory (1) — pgvector + filesystem (write_memory; query_memory already exists above)
+    {
+        name: 'write_memory',
+        description: 'Write a memory entry with explicit scope.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                content: { type: 'string', description: 'Memory content to store' },
+                scope: { type: 'string', enum: ['company', 'project', 'channel', 'agent'], description: 'Memory scope' },
+                scope_id: { type: 'string', description: 'ID of the scope entity' },
+                memory_type: { type: 'string', description: 'Type of memory (e.g., session_memory, learned_preference)' },
+                file_path: { type: 'string', description: 'Optional custom file path within .memory/' },
+            },
+            required: ['content', 'scope'],
+        },
+    },
+    // Output Registry (1) — workspace filesystem
+    {
+        name: 'search_outputs',
+        description: 'Search the output registry by task, agent, type, or date range.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                task_id: { type: 'string', description: 'Associate results with this task ID' },
+                agent_id: { type: 'string', description: 'Filter by agent ID' },
+                output_type: { type: 'string', description: 'Filter by output type (e.g., file, artifact, report)' },
+                date_from: { type: 'string', description: 'Start date (ISO 8601 format)' },
+                date_to: { type: 'string', description: 'End date (ISO 8601 format)' },
+                limit: { type: 'number', description: 'Maximum number of results (default 20)' },
+            },
+        },
+    },
+    // Parity Tools (6) — agent lifecycle, skill management, execution control
+    {
+        name: 'delete_agent',
+        description: 'Delete an agent by ID or slug. Removes agent config, soul files, and registry entry.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                agent_id: { type: 'string', description: 'Agent ID to delete' },
+                agent_slug: { type: 'string', description: 'Agent slug to delete (alternative to agent_id)' },
+            },
+        },
+    },
+    {
+        name: 'list_agents',
+        description: 'List all agents accessible to the current user. No search required.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {},
+        },
+    },
+    {
+        name: 'list_domains',
+        description: 'List all projects and domains in the workspace.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {},
+        },
+    },
+    {
+        name: 'install_skill',
+        description: 'Install a marketplace skill onto an agent.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                skill_slug: { type: 'string', description: 'Skill slug to install' },
+                agent_id: { type: 'string', description: 'Agent to install the skill on (optional)' },
+            },
+            required: ['skill_slug'],
+        },
+    },
+    {
+        name: 'uninstall_skill',
+        description: 'Remove a skill from an agent.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                skill_slug: { type: 'string', description: 'Skill slug to uninstall' },
+                agent_id: { type: 'string', description: 'Agent to remove the skill from (optional)' },
+            },
+            required: ['skill_slug'],
+        },
+    },
+    {
+        name: 'cancel_execution',
+        description: 'Cancel a running execution session. Sends termination signal to the agent process.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                session_id: { type: 'string', description: 'Execution session ID to cancel' },
+            },
+            required: ['session_id'],
+        },
+    },
 ];
 
 // -----------------------------------------------------------------------------
@@ -332,8 +623,12 @@ async function callBackendApi(
                 ...(BACKEND_TOKEN ? { Authorization: `Bearer ${BACKEND_TOKEN}` } : {}),
             },
             body: JSON.stringify(enrichedBody),
+            signal: AbortSignal.timeout(30_000),
         });
     } catch (err) {
+        if (err instanceof DOMException && err.name === 'TimeoutError') {
+            throw new BackendApiError(path, 504, `Backend call to ${path} timed out after 30s`);
+        }
         throw new BackendNetworkError(path, err as Error);
     }
 
@@ -395,7 +690,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main(): Promise<void> {
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    process.stderr.write('[mcp-server] Running with 18 backend-coupled tools\n');
+    process.stderr.write('[mcp-server] Running with 38 backend-coupled tools\n');
 }
 
 main().catch((err) => {

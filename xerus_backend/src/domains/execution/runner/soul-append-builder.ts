@@ -16,6 +16,7 @@ const SOUL_SECTIONS: SoulSection[] = [
     { filename: 'USER.md', header: '== Your User ==' },
     { filename: 'RELATIONSHIPS.md', header: '== Your Colleagues ==' },
     { filename: 'OPERATING.md', header: '== Operating Protocol ==' },
+    { filename: 'HEARTBEAT.md', header: '== Scheduled Tasks ==' },
 ];
 
 function readFileContent(filePath: string): string {

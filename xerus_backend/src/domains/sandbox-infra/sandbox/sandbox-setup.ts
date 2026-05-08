@@ -269,6 +269,23 @@ export async function runFullWorkspaceSetup(
         log.info('Initialized workspace databases', { sandbox_id: sandboxId });
     }
 
+    // 4c. Run workspace.db migrations (idempotent — uses PRAGMA user_version)
+    const dbPath = `${basePath}/data/workspace.db`;
+    const versionCheck = await provider.executeCommand(
+        sandboxId,
+        `sqlite3 '${dbPath}' 'PRAGMA user_version' 2>/dev/null || echo '0'`,
+    );
+    const currentVersion = parseInt((versionCheck.result || '0').trim(), 10) || 0;
+    if (currentVersion < 1) {
+        const migrationSql = `${basePath}/data/migrations/001-conversations-set-null.sql`;
+        const migrationCheck = await provider.executeCommand(
+            sandboxId,
+            `[ -f '${migrationSql}' ] && sqlite3 '${dbPath}' < '${migrationSql}' 2>&1 || echo 'migration not found'`,
+        );
+        if (!(migrationCheck.result || '').includes('migration not found')) {
+            log.info('Ran workspace migration 001', { sandbox_id: sandboxId });
+        }
+    }
 
     // 5. Verify Node.js is available (required by agent runner)
     const nodeCheck = await provider.executeCommand(
@@ -370,7 +387,7 @@ export async function startSchedulerDaemon(
         `[ -f '${schedulerScript}' ] && echo EXISTS || echo MISSING`,
     );
     if ((fileCheck.result || '').trim() === 'MISSING') {
-        log.info('Scheduler script not found, skipping', { sandbox_id: sandboxId, path: schedulerScript });
+        log.warn('Scheduler script not found — proactive agents will not run', { sandbox_id: sandboxId, path: schedulerScript });
         return;
     }
 

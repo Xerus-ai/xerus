@@ -19,7 +19,6 @@ import type {
     SearchToolsInput,
     ConnectToolInput,
     GetStatusInput,
-    ConfigureHeartbeatInput,
     PauseExecutionInput,
     ResumeExecutionInput,
     GetSessionStateInput,
@@ -46,7 +45,6 @@ export const TOOL_CATEGORIES = [
     'tools_integrations',
     'notifications',
     'status',
-    'heartbeat',
     'delegation',
     'session_control',
     'memory',
@@ -125,10 +123,6 @@ export interface StatusServicePort {
     getStatus(userId: string, input: GetStatusInput): Promise<unknown>;
 }
 
-export interface HeartbeatServicePort {
-    configureHeartbeat(userId: string, input: ConfigureHeartbeatInput): Promise<unknown>;
-}
-
 export interface SessionControlServicePort {
     pauseExecution(userId: string, input: PauseExecutionInput): Promise<unknown>;
     resumeExecution(userId: string, input: ResumeExecutionInput): Promise<unknown>;
@@ -167,7 +161,6 @@ export interface PlatformToolServices {
     skillService: SkillServicePort;
     toolsService: ToolsServicePort;
     statusService: StatusServicePort;
-    heartbeatService: HeartbeatServicePort;
     sessionControlService: SessionControlServicePort;
     memoryService: MemoryServicePort;
     triggerService: TriggerServicePort;

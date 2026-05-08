@@ -11,6 +11,8 @@ import { handleTriggerIndexing } from './indexing-event-handler';
 import { handleCliStreamEvent } from './cli-stream-router';
 import { dispatchCrossChannelCoordination, dispatchMentionToAgent } from './coordination-router';
 import { handleSseForward, handleAgentOutput } from './sse-forward-handler';
+import { handleScaffoldComplete } from './scaffold-complete-handler';
+import { scheduleIncrementalPersist } from './session-record';
 import { FILE_WRITE_TOOLS, syncFileChangeToNeon, emitFileChangedFromToolCall } from './file-change-handler';
 import { ChannelNotFoundError, MentionParser } from '../inbox';
 import { updateSdkSessionId } from '../conversations/workspace-db.service';
@@ -106,6 +108,7 @@ export async function routeEventToBackend(
                     }
                 }
             }
+            scheduleIncrementalPersist(deps, ctx);
             break;
         }
         case 'session_ended':
@@ -160,13 +163,15 @@ export async function routeEventToBackend(
         case 'session_started':
             await handleSessionStarted(d, ctx, deps);
             break;
+        case 'scaffold_complete':
+            await handleScaffoldComplete(d, ctx, deps);
+            break;
         case 'session_analytics':
         case 'health':
         case 'sessions':
         case 'credit_check':
         case 'ace_reflection':
         case 'skill_suggestion':
-        case 'scaffold_complete':
             logEvent(eventType, d);
             break;
         case 'push_notification':

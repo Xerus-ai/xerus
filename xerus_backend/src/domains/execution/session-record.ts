@@ -38,6 +38,13 @@ type PersistedMessagePart =
         durationMs?: number;
     };
 
+function stringifyFirstArg(args: Record<string, unknown>): string {
+    const first = Object.values(args)[0];
+    if (first == null) return '';
+    if (typeof first === 'string') return first;
+    return JSON.stringify(first);
+}
+
 // -----------------------------------------------------------------------------
 // Create Session Record
 // -----------------------------------------------------------------------------
@@ -100,7 +107,7 @@ export async function updateSessionRecord(
             icon: resolveToolIcon(toolCall.tool_name),
             args: toolCall.arguments,
             result: toolCall.result,
-            target: toolCall.arguments ? String(Object.values(toolCall.arguments)[0] ?? '') : undefined,
+            target: toolCall.arguments ? stringifyFirstArg(toolCall.arguments) : undefined,
             durationMs: toolCall.duration_ms,
         });
     }
@@ -153,6 +160,59 @@ export async function updateSessionRecord(
             log.error('Failed to persist chat execution', { conversation_id: ctx.conversationId, error: (err as Error).message });
         }
     }
+}
+
+// -----------------------------------------------------------------------------
+// Incremental Persistence (debounced)
+// -----------------------------------------------------------------------------
+
+const DEBOUNCE_MS = 5_000;
+const pendingFlushes = new Map<string, NodeJS.Timeout>();
+
+export function scheduleIncrementalPersist(
+    deps: ResolvedExecutionDeps,
+    ctx: PipelineContext,
+): void {
+    if (!ctx.conversationId || !ctx.sandboxId || !ctx.sessionId) return;
+
+    const key = `${ctx.conversationId}:${ctx.sessionId}`;
+
+    const existing = pendingFlushes.get(key);
+    if (existing) clearTimeout(existing);
+
+    const timer = setTimeout(() => {
+        pendingFlushes.delete(key);
+        flushIncrementalPersist(deps, ctx).catch(err =>
+            log.warn('Incremental persist failed (non-critical)', { error: (err as Error).message }),
+        );
+    }, DEBOUNCE_MS);
+
+    pendingFlushes.set(key, timer);
+}
+
+async function flushIncrementalPersist(
+    deps: ResolvedExecutionDeps,
+    ctx: PipelineContext,
+): Promise<void> {
+    if (!ctx.conversationId || !ctx.sandboxId) return;
+
+    const responseText = ctx.responseChunks.length > 0 ? ctx.responseChunks.join('') : ctx.responseText || null;
+    const metadata = ctx.toolCallDetails.length > 0
+        ? JSON.stringify({ parts: [], tool_calls: ctx.toolCallDetails })
+        : null;
+
+    const provider = deps.sandboxService.getDaytonaProvider();
+    await writeChatExecution(
+        provider,
+        ctx.sandboxId,
+        ctx.conversationId,
+        ctx.sessionId || null,
+        ctx.request.task,
+        responseText,
+        ctx.inputTokens + ctx.outputTokens,
+        Date.now() - ctx.startedAt,
+        metadata,
+    );
 }
 
 // -----------------------------------------------------------------------------

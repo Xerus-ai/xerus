@@ -47,9 +47,29 @@ async function addSystemAgentsToChannel(
     sandboxId: string,
     channelSlug: string,
 ): Promise<void> {
+    const basePath = SANDBOX_CONFIG.workspacePath;
     for (const slug of SYSTEM_AGENT_SLUGS) {
+        // 1. Insert into channel_members (SQLite)
         const sql = `INSERT OR IGNORE INTO channel_members (channel_slug, agent_slug, role) VALUES ('${escapeSQL(channelSlug)}', '${escapeSQL(slug)}', 'member')`;
         await execWsMutate(provider, sandboxId, sql).catch(() => {});
+
+        // 2. Update agent config.json channels array
+        try {
+            const configPath = `${basePath}/agents/${slug}/config.json`;
+            const readResult = await provider.executeCommand(sandboxId, `cat '${configPath}' 2>/dev/null`);
+            if (readResult.result) {
+                const config = JSON.parse(readResult.result) as Record<string, unknown>;
+                const channels = Array.isArray(config.channels) ? config.channels as string[] : [];
+                if (!channels.includes(channelSlug)) {
+                    channels.push(channelSlug);
+                    config.channels = channels;
+                    const escaped = JSON.stringify(config, null, 2).replace(/'/g, "'\\''");
+                    await provider.executeCommand(sandboxId, `echo '${escaped}' > '${configPath}'`);
+                }
+            }
+        } catch {
+            log.warn('Failed to update agent config channels', { agent_slug: slug, channel_slug: channelSlug });
+        }
     }
 }
 

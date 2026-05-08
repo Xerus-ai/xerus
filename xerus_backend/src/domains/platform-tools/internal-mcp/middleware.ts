@@ -1,6 +1,7 @@
 // Internal MCP Auth Middleware
 // Validates requests from sandbox MCP server
 
+import crypto from 'crypto';
 import { Response, NextFunction } from 'express';
 import { BadRequestError, UnauthorizedError } from '../../../utils/errors';
 import { InternalMcpRequest } from './types';
@@ -14,6 +15,9 @@ if (!INTERNAL_API_TOKEN) {
 // Expected sandbox owner — set per-sandbox to bind token to a specific user.
 // When set, the middleware validates that client-supplied user_id matches.
 const SANDBOX_USER_ID = process.env.XERUS_SANDBOX_USER_ID;
+if (process.env.NODE_ENV === 'production' && !SANDBOX_USER_ID) {
+    throw new Error('XERUS_SANDBOX_USER_ID must be set in production');
+}
 
 // Strict format: Firebase UIDs are typically 28+ alphanumeric chars
 const USER_ID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
@@ -37,8 +41,9 @@ export async function authenticateInternalMcp(
         }
 
         const token = authHeader.split('Bearer ')[1];
-        // Token is guaranteed to exist due to startup check
-        if (token !== INTERNAL_API_TOKEN) {
+        const tokenBuf = Buffer.from(token);
+        const expectedBuf = Buffer.from(INTERNAL_API_TOKEN!);
+        if (tokenBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(tokenBuf, expectedBuf)) {
             throw new UnauthorizedError('Invalid internal API token');
         }
 

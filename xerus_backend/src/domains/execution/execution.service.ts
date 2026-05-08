@@ -212,6 +212,23 @@ export class ExecutionService {
             const skillSecrets = await skillSecretsService.resolveAllSecrets(daytonaProvider, ctx.sandboxId);
             log.debug('preSecrets resolved', { execution_id: executionId, duration_ms: Date.now() - startedAt, secret_count: Object.keys(skillSecrets).length });
 
+            // Write context/connectors.md with connected tools for this agent
+            try {
+                const agentForContext = requireAgent(ctx);
+                const { executeWorkspaceQuery } = await import('../conversations/workspace-db.helpers');
+                const toolsSql = `SELECT tool_id, enabled FROM agent_tools WHERE agent_slug = '${agentForContext.slug.replace(/'/g, "''")}' AND enabled = 1`;
+                const toolsOutput = await executeWorkspaceQuery(daytonaProvider, ctx.sandboxId, toolsSql);
+                if (toolsOutput.trim() && toolsOutput.trim() !== '[]') {
+                    const contextDir = `${SANDBOX_CONFIG.workspacePath}/context`;
+                    const connectorsContent = `# Connected Tools\n\n${toolsOutput}\n`;
+                    await daytonaProvider.executeCommand(ctx.sandboxId,
+                        `mkdir -p '${contextDir}' && echo '${connectorsContent.replace(/'/g, "'\\''")}' > '${contextDir}/connectors.md'`,
+                    );
+                }
+            } catch (err) {
+                log.warn('Failed to write connectors context (non-critical)', { error: (err as Error).message });
+            }
+
             // Build runner environment with the resolved API key + skill secrets + CLI BYOK keys
             const runnerEnvVars = buildSDKEnvironment(resolvedKey.apiKey, skillSecrets, userCliKeys);
 

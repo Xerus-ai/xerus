@@ -5,10 +5,12 @@ import { AuthenticatedRequest } from '../types';
 
 export const generalRateLimit = rateLimit({
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10),
-    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '500', 10),
+    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '1000', 10),
+    keyGenerator: (req: Request) => (req as AuthenticatedRequest).user?.uid ?? req.ip ?? 'anonymous',
     standardHeaders: true,
     legacyHeaders: false,
-    handler: () => {
+    handler: (_req, res) => {
+        res.set('Retry-After', '60');
         throw new RateLimitError();
     },
     validate: { xForwardedForHeader: false },
@@ -16,10 +18,12 @@ export const generalRateLimit = rateLimit({
 
 export const strictRateLimit = rateLimit({
     windowMs: 60000,
-    max: 60,
+    max: 200,
+    keyGenerator: (req: Request) => (req as AuthenticatedRequest).user?.uid ?? req.ip ?? 'anonymous',
     standardHeaders: true,
     legacyHeaders: false,
-    handler: () => {
+    handler: (_req, res) => {
+        res.set('Retry-After', '30');
         throw new RateLimitError();
     },
     validate: { xForwardedForHeader: false },
@@ -39,7 +43,7 @@ export const inviteCodeRateLimit = rateLimit({
 
 export const uploadRateLimit = rateLimit({
     windowMs: 60000,
-    max: 10,
+    max: 30,
     keyGenerator: (req: Request) => (req as any).user?.uid ?? 'anonymous',
     standardHeaders: true,
     legacyHeaders: false,
