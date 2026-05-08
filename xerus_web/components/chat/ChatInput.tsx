@@ -140,6 +140,9 @@ export function ChatInput({
         case 'kb':
           insertText = `@kb:${item.entry.id} `
           break
+        case 'app':
+          insertText = `@app:${item.app.slug} `
+          break
       }
       const before = value.slice(0, mentionStart)
       const after = value.slice(textareaRef.current?.selectionStart ?? value.length)

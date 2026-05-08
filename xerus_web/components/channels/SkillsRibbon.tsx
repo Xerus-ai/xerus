@@ -18,18 +18,18 @@ export function SkillsRibbon({ channelSlug, onSkillClick }: SkillsRibbonProps) {
   const [processing, setProcessing] = useState<string | null>(null)
 
   const { data: skillsData, mutate } = useSWR(
-    'skills/all',
+    channelSlug ? `skills/channel/${channelSlug}` : 'skills/all',
     () => getSkills({ limit: 100 }),
   )
 
   const allSkills = useMemo(() => skillsData?.skills || [], [skillsData])
-  const installedSkills = useMemo(() => allSkills.filter(s => s.isInstalled), [allSkills])
-  const availableSkills = useMemo(() => allSkills.filter(s => !s.isInstalled), [allSkills])
+  const installedSkills = useMemo(() => allSkills.filter(s => s.isInstalled || s.isGlobal), [allSkills])
+  const availableSkills = useMemo(() => allSkills.filter(s => !s.isInstalled && !s.isGlobal), [allSkills])
 
   const handleInstall = async (skill: Skill) => {
     setProcessing(skill.slug)
     try {
-      await installSkill(skill.slug, { scope: 'global' })
+      await installSkill(skill.slug, { scope: channelSlug ? 'channel' : 'global', channel_id: channelSlug || undefined })
       await mutate()
     } catch {
       toast.error(`Failed to install ${skill.name}`)

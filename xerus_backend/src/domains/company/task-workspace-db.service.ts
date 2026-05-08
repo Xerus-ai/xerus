@@ -4,7 +4,10 @@
 // Reference: xerus-workspace/data/workspace-schema.sql (tasks table)
 
 import type { DaytonaProvider } from '../sandbox-infra/sandbox/providers/daytona.provider';
-import { escapeSQL, executeWorkspaceJsonQuery } from '../conversations/workspace-db.helpers';
+import { escapeSQL, executeWorkspaceJsonQuery, executeWorkspaceQuery } from '../conversations/workspace-db.helpers';
+import { logger } from '../../utils/logger';
+
+const log = logger('TaskWorkspaceDB');
 
 // -----------------------------------------------------------------------------
 // Types (mirror workspace-schema.sql tasks table)
@@ -290,4 +293,104 @@ export async function listChannelDeliverables(
     `;
     const deliverables = await executeWorkspaceJsonQuery<WorkspaceDeliverableRow>(provider, sandboxId, sql);
     return { deliverables };
+}
+
+// -----------------------------------------------------------------------------
+// Beads JSONL → tasks sync
+// -----------------------------------------------------------------------------
+
+interface BeadsIssue {
+    id: string;
+    title?: string;
+    body?: string;
+    state?: string;
+    assignee?: string;
+    priority?: number;
+    labels?: string[];
+    project?: string;
+    created_at?: string;
+    updated_at?: string;
+    closed_at?: string;
+}
+
+const BEADS_STATUS_MAP: Record<string, string> = {
+    open: 'open',
+    in_progress: 'in_progress',
+    blocked: 'blocked',
+    closed: 'completed',
+    cancelled: 'cancelled',
+};
+
+const PRIORITY_MAP: Record<number, string> = {
+    1: 'critical',
+    2: 'high',
+    3: 'medium',
+    4: 'low',
+};
+
+export async function syncBeadsToTasks(
+    provider: DaytonaProvider,
+    sandboxId: string,
+): Promise<{ synced: number; skipped: number }> {
+    const { result: raw } = await provider.executeCommand(
+        sandboxId,
+        'cat /home/xerus/workspace/.beads/issues.jsonl 2>/dev/null || echo ""',
+    );
+
+    if (!raw.trim()) return { synced: 0, skipped: 0 };
+
+    const lines = raw.trim().split('\n');
+    const upserts: string[] = [];
+    let skipped = 0;
+
+    for (const line of lines) {
+        try {
+            const issue = JSON.parse(line) as BeadsIssue;
+            if (!issue.id || !issue.title) { skipped++; continue; }
+
+            const status = BEADS_STATUS_MAP[issue.state ?? 'open'] ?? 'open';
+            const priority = PRIORITY_MAP[issue.priority ?? 3] ?? 'medium';
+            const now = new Date().toISOString();
+
+            upserts.push(`
+                INSERT INTO tasks (id, project_slug, title, description, status, priority, assigned_agent, labels, created_at, updated_at, synced_at)
+                VALUES (
+                    '${escapeSQL(issue.id)}',
+                    '${escapeSQL(issue.project ?? 'default')}',
+                    '${escapeSQL(issue.title)}',
+                    ${issue.body ? `'${escapeSQL(issue.body)}'` : 'NULL'},
+                    '${status}',
+                    '${priority}',
+                    ${issue.assignee ? `'${escapeSQL(issue.assignee)}'` : 'NULL'},
+                    ${issue.labels ? `'${escapeSQL(JSON.stringify(issue.labels))}'` : 'NULL'},
+                    '${issue.created_at ?? now}',
+                    '${issue.updated_at ?? now}',
+                    '${now}'
+                )
+                ON CONFLICT(id) DO UPDATE SET
+                    title = excluded.title,
+                    description = excluded.description,
+                    status = excluded.status,
+                    priority = excluded.priority,
+                    assigned_agent = excluded.assigned_agent,
+                    labels = excluded.labels,
+                    updated_at = excluded.updated_at,
+                    synced_at = excluded.synced_at;
+            `);
+        } catch {
+            skipped++;
+        }
+    }
+
+    if (upserts.length === 0) return { synced: 0, skipped };
+
+    const batchSql = `BEGIN;\n${upserts.join('\n')}\nCOMMIT;`;
+    try {
+        await executeWorkspaceQuery(provider, sandboxId, batchSql);
+    } catch (err) {
+        log.warn('Beads sync failed', { error: (err as Error).message, count: upserts.length });
+        return { synced: 0, skipped: skipped + upserts.length };
+    }
+
+    return { synced: upserts.length, skipped };
 }

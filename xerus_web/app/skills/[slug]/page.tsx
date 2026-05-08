@@ -18,8 +18,9 @@ import { InstallButton } from '@/components/skills/InstallButton';
 import { FloatingPanel } from '@/components/common/FloatingPanel';
 import { FloatingPanelProvider } from '@/components/common/FloatingPanelContext';
 import { SkillSecretsCard } from '@/components/skills/SkillSecretsCard';
-import { parseSkillEnvKeys } from '@/lib/utils/parse-skill-env-keys';
+import { getEnvKeysForSkill } from '@/lib/utils/parse-skill-env-keys';
 import { toast } from '@/lib/toast';
+import { apiCall } from '@/lib/api/client';
 
 export default function SkillDetailPage() {
     const router = useRouter();
@@ -140,7 +141,7 @@ export default function SkillDetailPage() {
     const isInstalled = skill.isInstalled;
     const readmeFile = skill.files.find(f => f.path.toLowerCase() === 'readme.md');
     const otherFiles = skill.files.filter(f => f.path !== 'SKILL.md' && f.path.toLowerCase() !== 'readme.md');
-    const requiredEnvKeys = skillMdContent ? parseSkillEnvKeys(skillMdContent) : [];
+    const requiredEnvKeys = getEnvKeysForSkill(skill.slug, skillMdContent ?? undefined);
 
     return (
         <div className="min-h-screen font-sans text-text">
@@ -470,18 +471,58 @@ interface DomainWithChannels {
     channels: Array<{ id: string; slug: string; name: string; agent_count: number }>;
 }
 
-function SkillChannelsCard({ skillSlug }: {
+function SkillChannelsCard({ skillSlug, onInstall }: {
     skillSlug: string;
-    onInstall: (agentId: number, scope: 'channel' | 'global') => Promise<void>;
+    onInstall: (agentId: number, scope: 'channel' | 'global', channelId?: string) => Promise<void>;
     showPicker: boolean;
     onTogglePicker: () => void;
 }) {
+    const { data: domains } = useSWR<DomainWithChannels[]>('company-domains', async () => {
+        const response = await apiCall('/company/domains', { method: 'GET' });
+        const result = await response.json();
+        const data = result.data || result;
+        return data.domains || [];
+    });
+    const [installing, setInstalling] = useState<string | null>(null);
+
+    const handleChannelInstall = async (channelId: string) => {
+        setInstalling(channelId);
+        try {
+            await onInstall(0, 'channel', channelId);
+        } finally {
+            setInstalling(null);
+        }
+    };
+
     return (
-        <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-6">
-            <p className="text-xs text-text-secondary py-2">
-                Channel-scoped installs are not wired yet for <span className="font-medium text-text">{skillSlug}</span>.
-                Install this skill once and it becomes available from the shared workspace.
-            </p>
+        <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-6 space-y-3">
+            {!domains ? (
+                <div className="flex items-center gap-2 text-xs text-text-muted">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Loading channels...
+                </div>
+            ) : domains.length === 0 ? (
+                <p className="text-xs text-text-secondary">No projects found. Create a project to install skills per channel.</p>
+            ) : (
+                domains.map(domain => (
+                    <div key={domain.id} className="space-y-1.5">
+                        <h4 className="text-xs font-medium text-text-muted uppercase tracking-wide">{domain.name}</h4>
+                        {domain.channels.map(channel => (
+                            <div key={channel.id} className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-surface-hover">
+                                <span className="text-sm text-text">{channel.name}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => handleChannelInstall(channel.id)}
+                                    disabled={installing === channel.id}
+                                    className="px-3 py-1 text-xs font-medium rounded-lg bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50"
+                                >
+                                    {installing === channel.id ? 'Installing...' : 'Install'}
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                ))
+            )}
         </div>
     );
 }
