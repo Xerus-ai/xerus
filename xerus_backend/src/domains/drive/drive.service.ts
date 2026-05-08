@@ -222,6 +222,8 @@ export class DriveService {
         const sandboxId = await this.resolveSandboxId(userId);
         const provider = this.getDaytonaProvider();
         const sandboxPath = `${SANDBOX_CONFIG.workspacePath}/${fullPath}`;
+        const parentDir = path.dirname(sandboxPath);
+        await provider.executeCommand(sandboxId, `mkdir -p "${parentDir}"`);
         await provider.uploadFile(sandboxId, fileBuffer.toString('base64'), sandboxPath);
     }
 

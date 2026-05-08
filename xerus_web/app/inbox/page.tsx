@@ -170,7 +170,7 @@ function MiniMessage({
 // ---------------------------------------------------------------------------
 
 function InboxPageContent() {
-  const { domains, isLoading, refetch } = useDomains()
+  const { domains, isLoading, isAuthReady, refetch } = useDomains()
   const router = useRouter()
   const hasProjects = domains.length > 0
   const [showCreate, setShowCreate] = useState(false)
@@ -201,7 +201,7 @@ function InboxPageContent() {
     }
   }
 
-  if (isLoading) {
+  if (isLoading || !isAuthReady) {
     return (
       <div className="flex-1 h-full flex items-center justify-center">
         <XerusLoader variant="inline" />

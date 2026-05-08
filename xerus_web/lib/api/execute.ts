@@ -164,6 +164,14 @@ export async function respondToGuidance(
 }
 
 // -----------------------------------------------------------------------------
+// Cancel Execution
+// -----------------------------------------------------------------------------
+
+export async function cancelExecution(executionId: string): Promise<void> {
+  await apiCall(`/execute/${executionId}/cancel`, { method: 'POST' });
+}
+
+// -----------------------------------------------------------------------------
 // Execution Sessions (Neon PostgreSQL — manual/chat runs)
 // -----------------------------------------------------------------------------
 

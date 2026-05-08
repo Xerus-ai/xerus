@@ -91,6 +91,7 @@ export function UnifiedMentionPicker({
       className="absolute bottom-full left-0 w-[280px] mb-2 bg-card border border-border rounded-xl shadow-lg backdrop-blur-sm overflow-hidden max-h-[280px] overflow-y-auto z-10"
       role="listbox"
       aria-label="Mention picker"
+      onMouseDown={(e) => e.preventDefault()}
     >
       {/* Agents section */}
       {filteredAgents.length > 0 && (

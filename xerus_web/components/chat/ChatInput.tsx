@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { ArrowUp, AtSign, Paperclip, Monitor, TerminalSquare } from 'lucide-react'
+import { ArrowUp, Square, AtSign, Paperclip, Monitor, TerminalSquare } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Agent } from './types'
 import { AgentDropdown } from './AgentDropdown'
@@ -27,6 +27,8 @@ interface ChatInputProps {
   isBrowserOpen?: boolean
   conversationId?: string
   headerContent?: React.ReactNode
+  isExecuting?: boolean
+  onStop?: () => void
 }
 
 export function ChatInput({
@@ -45,6 +47,8 @@ export function ChatInput({
   isBrowserOpen,
   conversationId,
   headerContent,
+  isExecuting = false,
+  onStop,
 }: ChatInputProps) {
   const [value, setValue] = useState('')
   const [focused, setFocused] = useState(false)
@@ -471,30 +475,47 @@ export function ChatInput({
               </span>
             </div>
 
-            {/* Right: send button */}
-            <div
-              className={cn(
-                'transition-all duration-200 overflow-hidden',
-                hasContent ? 'w-8 opacity-100 scale-100' : 'w-0 opacity-0 scale-75'
-              )}
-            >
+            {/* Right: send or stop button */}
+            {isExecuting && onStop ? (
               <button
                 type="button"
-                onClick={handleSend}
-                disabled={!hasContent || disabled}
-                aria-label="Send message"
+                onClick={onStop}
+                aria-label="Stop agent"
                 className={cn(
                   'flex items-center justify-center w-8 h-8 rounded-xl',
-                  'bg-primary text-white',
-                  'hover:bg-primary/90 active:scale-90',
+                  'bg-red-500 text-white',
+                  'hover:bg-red-600 active:scale-90',
                   'transition-all duration-150',
-                  'disabled:opacity-40 disabled:cursor-not-allowed',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1'
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-1'
                 )}
               >
-                <ArrowUp className="w-4 h-4" strokeWidth={2.5} />
+                <Square className="w-3.5 h-3.5" fill="currentColor" />
               </button>
-            </div>
+            ) : (
+              <div
+                className={cn(
+                  'transition-all duration-200 overflow-hidden',
+                  hasContent ? 'w-8 opacity-100 scale-100' : 'w-0 opacity-0 scale-75'
+                )}
+              >
+                <button
+                  type="button"
+                  onClick={handleSend}
+                  disabled={!hasContent || disabled}
+                  aria-label="Send message"
+                  className={cn(
+                    'flex items-center justify-center w-8 h-8 rounded-xl',
+                    'bg-primary text-white',
+                    'hover:bg-primary/90 active:scale-90',
+                    'transition-all duration-150',
+                    'disabled:opacity-40 disabled:cursor-not-allowed',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1'
+                  )}
+                >
+                  <ArrowUp className="w-4 h-4" strokeWidth={2.5} />
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

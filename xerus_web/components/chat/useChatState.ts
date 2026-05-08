@@ -12,6 +12,7 @@ import {
   getConversationDetail,
   deleteConversationApi,
   createConversationApi,
+  cancelExecution,
 } from '@/lib/api/execute'
 import type { Conversation as ApiConversation } from '@/lib/api/execute'
 import { Agent, Conversation, ChatState, SelectedChannel, SessionEntry, ProjectGroup, SessionStatus } from './types'
@@ -118,6 +119,7 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
 
   const [agents, setAgents] = useState<Agent[]>([])
   const [isLoadingAgents, setIsLoadingAgents] = useState(true)
+  const activeExecutionIdRef = useRef<string | null>(null)
 
   // Execution stream (v3: long-lived SSE + POST messages)
   const executionStream = useChatExecution({ setState })
@@ -311,7 +313,8 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
             }
           : undefined
 
-        await executionStream.sendMessage(convId, content, channelContext)
+        const sendResult = await executionStream.sendMessage(convId, content, channelContext)
+        activeExecutionIdRef.current = sendResult.execution_id
 
         // Refresh conversation list (non-critical) — merge to preserve existing entries
         try {
@@ -410,6 +413,23 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
     setState((prev) => ({ ...prev, pendingToolAuth: null }))
   }, [])
 
+  const handleStopExecution = useCallback(async () => {
+    const execId = activeExecutionIdRef.current
+    if (!execId) return
+    try {
+      await cancelExecution(execId)
+    } catch {
+      // Best-effort — stream close below handles UI reset
+    }
+    activeExecutionIdRef.current = null
+    setState((prev) => ({
+      ...prev,
+      isLoading: false,
+      streamingTurn: null,
+      executionState: null,
+    }))
+  }, [])
+
   const projects = useMemo(
     () => groupConversationsByAgent(state.conversations, agents),
     [state.conversations, agents]
@@ -435,5 +455,6 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
     handleClearChannel,
     handleAgentChange,
     handleDismissToolAuth,
+    handleStopExecution,
   }
 }

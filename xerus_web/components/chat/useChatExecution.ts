@@ -99,12 +99,13 @@ export function useChatExecution({ setState }: UseChatExecutionOptions) {
     }, [setState]),
     onProgress: useCallback((event: StreamEvent<'progress'>) => {
       const content = event.content as ProgressEventContent
+      const INFRA_NOISE = new Set(['sandbox', 'executing', 'provisioning', 'connecting'])
+      const isNoise = INFRA_NOISE.has(content.phase.toLowerCase())
       setState(prev => {
         let streamingTurn = prev.streamingTurn
-        if (streamingTurn) {
+        if (streamingTurn && !isNoise) {
           streamingTurn = addStatus(streamingTurn, content.phase)
-        } else {
-          // Buffer status labels until streamingTurn is created by onMeta
+        } else if (!streamingTurn && !isNoise) {
           pendingStatusLabelsRef.current.push(content.phase)
         }
         return {

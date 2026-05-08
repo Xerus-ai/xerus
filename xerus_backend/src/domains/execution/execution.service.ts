@@ -272,10 +272,14 @@ export class ExecutionService {
             // Meta event with agentName triggers streamingTurn creation on frontend.
             // Without agentName, all streaming events (token, tool_call, reasoning)
             // are silently dropped because streamingTurn is null.
+            const DISPLAY_NAMES: Record<string, string> = {
+                'xerus-master': 'Xerus',
+                'xerus-cto': 'Claude Code',
+            };
             stream.send('meta', {
                 conversationId: ctx.conversationId,
                 agentSlug: agentForTracking.slug,
-                agentName: agentForTracking.name || agentForTracking.slug,
+                agentName: DISPLAY_NAMES[agentForTracking.slug] || agentForTracking.name || agentForTracking.slug,
             });
             ctx.status = 'running';
 

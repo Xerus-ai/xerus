@@ -65,6 +65,7 @@ export function SlashCommandPicker({
       className="absolute bottom-full left-0 w-[320px] mb-2 bg-card border border-border rounded-xl shadow-lg backdrop-blur-sm overflow-hidden max-h-[280px] overflow-y-auto z-10"
       role="listbox"
       aria-label="Slash commands"
+      onMouseDown={(e) => e.preventDefault()}
     >
       {grouped.map((group) => (
         <div key={group.category}>
