@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
-import { Bot, FileText, BookOpen, Loader2, Folder } from 'lucide-react'
+import { Bot, FileText, BookOpen, Loader2, Folder, Puzzle } from 'lucide-react'
 import type { Agent } from './types'
 import { isMascotConfig } from '@/lib/mascot-config'
 import { MascotAvatar } from '@/components/agents/MascotAvatar'
@@ -19,16 +19,24 @@ export interface KBEntry {
   summary?: string
 }
 
+export interface AppItem {
+  slug: string
+  name: string
+  icon?: string
+}
+
 export type MentionItem =
   | { type: 'agent'; agent: Agent }
   | { type: 'file'; file: FileItem }
   | { type: 'kb'; entry: KBEntry }
+  | { type: 'app'; app: AppItem }
 
 interface UnifiedMentionPickerProps {
   query: string
   agents: Agent[]
   files: FileItem[]
   kbEntries: KBEntry[]
+  apps?: AppItem[]
   filesLoading?: boolean
   kbLoading?: boolean
   selectedIdx: number
@@ -42,6 +50,7 @@ export function UnifiedMentionPicker({
   agents,
   files,
   kbEntries,
+  apps = [],
   filesLoading,
   kbLoading,
   selectedIdx,
@@ -53,8 +62,9 @@ export function UnifiedMentionPicker({
 
   const isFileMode = query.startsWith('/')
   const isKBMode = query.startsWith('kb:')
+  const isAppMode = query.startsWith('#')
 
-  const filteredAgents = isFileMode || isKBMode ? [] : agents.filter(
+  const filteredAgents = isFileMode || isKBMode || isAppMode ? [] : agents.filter(
     (a) =>
       a.name.toLowerCase().includes(query.toLowerCase()) ||
       (a.domain ?? '').toLowerCase().includes(query.toLowerCase()),
@@ -68,10 +78,17 @@ export function UnifiedMentionPicker({
     ? kbEntries.filter((e) => e.title.toLowerCase().includes(query.slice(3).toLowerCase())).slice(0, 6)
     : []
 
+  const filteredApps = isAppMode
+    ? apps.filter((a) => a.name.toLowerCase().includes(query.slice(1).toLowerCase())).slice(0, 6)
+    : !isFileMode && !isKBMode
+      ? apps.filter((a) => a.name.toLowerCase().includes(query.toLowerCase())).slice(0, 3)
+      : []
+
   const allItems: MentionItem[] = [
     ...filteredAgents.map((a): MentionItem => ({ type: 'agent', agent: a })),
     ...filteredFiles.map((f): MentionItem => ({ type: 'file', file: f })),
     ...filteredKB.map((e): MentionItem => ({ type: 'kb', entry: e })),
+    ...filteredApps.map((a): MentionItem => ({ type: 'app', app: a })),
   ]
 
   useEffect(() => {
@@ -91,6 +108,7 @@ export function UnifiedMentionPicker({
       className="absolute bottom-full left-0 w-[280px] mb-2 bg-card border border-border rounded-xl shadow-lg backdrop-blur-sm overflow-hidden max-h-[280px] overflow-y-auto z-10"
       role="listbox"
       aria-label="Mention picker"
+      onMouseDown={(e) => e.preventDefault()}
     >
       {/* Agents section */}
       {filteredAgents.length > 0 && (
@@ -201,6 +219,44 @@ export function UnifiedMentionPicker({
                       <span className="text-[11px] text-text-muted truncate block">{entry.summary}</span>
                     )}
                   </div>
+                </button>
+              )
+            })}
+          </div>
+        </>
+      )}
+
+      {/* Apps section */}
+      {filteredApps.length > 0 && (
+        <>
+          <div className="px-3 py-1.5 border-b border-border">
+            <span className="text-[11px] font-medium uppercase tracking-wide text-text-muted">Apps</span>
+          </div>
+          <div className="p-1">
+            {filteredApps.map((app) => {
+              const idx = globalIdx++
+              return (
+                <button
+                  key={app.slug}
+                  type="button"
+                  role="option"
+                  aria-selected={idx === selectedIdx}
+                  className={cn(
+                    'flex items-center gap-2.5 w-full px-2 py-1.5 text-left text-sm rounded-md transition-colors duration-100',
+                    idx === selectedIdx ? 'bg-surface-hover text-text' : 'text-text hover:bg-surface-hover',
+                  )}
+                  onMouseDown={(e) => { e.preventDefault(); onSelect({ type: 'app', app }) }}
+                  onMouseEnter={() => onSelectedIdxChange(idx)}
+                >
+                  <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 bg-green-500/10 text-green-600">
+                    {app.icon ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={app.icon} alt={app.name} className="w-4 h-4 object-contain" />
+                    ) : (
+                      <Puzzle className="w-3.5 h-3.5" />
+                    )}
+                  </div>
+                  <span className="font-medium truncate">{app.name}</span>
                 </button>
               )
             })}

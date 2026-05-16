@@ -122,9 +122,9 @@ export interface ToolFilterResult {
 // -----------------------------------------------------------------------------
 
 function isPlatformTool(toolName: string): boolean {
-    // Match canonical names (platform.*) and MCP-registered names (mcp__xerus-platform__platform_*)
+    // Match canonical names (platform.*) and MCP-registered names (mcp__platform__*)
     return PLATFORM_TOOL_PREFIXES.some(prefix => toolName.startsWith(prefix))
-        || toolName.startsWith('mcp__xerus-platform__');
+        || toolName.startsWith('mcp__platform__');
 }
 
 function isOrchestratorOnlyTool(toolName: string): boolean {

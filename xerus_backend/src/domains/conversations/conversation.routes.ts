@@ -177,4 +177,45 @@ router.delete('/:id', auth, async (req: AuthenticatedRequest, res: Response, nex
     }
 });
 
+// GET /api/v1/execute/conversations/:id/workspace/files - Search workspace files
+router.get('/:id/workspace/files', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const startTime = res.locals.startTime || Date.now();
+    try {
+        if (!req.user) throw new UnauthorizedError();
+        validateConversationId(req.params.id);
+
+        const query = (req.query.q as string || '').trim();
+        if (!query) {
+            sendResponse(res, 200, { files: [] }, startTime);
+            return;
+        }
+
+        const { sandboxService } = getDeps();
+        const sandboxId = await requireRunningSandbox(sandboxService, req.user.uid);
+        const provider = getDaytonaProvider(sandboxService);
+
+        const sanitizedQuery = query.replace(/[\n\r\t\0'"\\;|&$`]/g, '');
+        if (!sanitizedQuery) {
+            sendResponse(res, 200, { files: [] }, startTime);
+            return;
+        }
+        const cmd = `find /home/xerus/workspace -maxdepth 5 -type f -iname "*${sanitizedQuery}*" 2>/dev/null | head -30`;
+        const { result: output } = await provider.executeCommand(sandboxId, cmd);
+
+        const files = output
+            .split('\n')
+            .filter(Boolean)
+            .map((fullPath: string) => {
+                const relativePath = fullPath.replace('/home/xerus/workspace/', '');
+                const name = relativePath.split('/').pop() ?? relativePath;
+                const ext = name.includes('.') ? name.split('.').pop() ?? '' : '';
+                return { path: relativePath, name, type: ext, size: 0 };
+            });
+
+        sendResponse(res, 200, { files }, startTime);
+    } catch (err) {
+        next(err);
+    }
+});
+
 export default router;

@@ -43,7 +43,7 @@ function getPipedreamMcpBaseUrl(): string {
 /**
  * Detect whether an MCP server entry was created by this service.
  * Pipedream entries have a URL starting with the configured PIPEDREAM_MCP_URL.
- * Static entries (xerus-platform, ipc) use command/args (stdio transport).
+ * Static entries (platform, ipc) use command/args (stdio transport).
  */
 function isPipedreamEntry(entry: McpServerEntry): boolean {
     if (!entry.url) return false;

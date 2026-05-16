@@ -384,12 +384,13 @@ export class SandboxService {
         systemPrompt?: string,
         model?: string,
         sdkSessionId?: string,
+        conversationId?: string,
     ): Promise<SessionHandle> {
         const session = this.sessions.get(userId);
         if (!session || session.status !== 'running') {
             throw new Error('No running sandbox for user');
         }
-        return getOrCreateRunnerSession(session, sandboxId, envVars, this.getDaytonaProvider(), agentSlug, adapterType, systemPrompt, model, sdkSessionId);
+        return getOrCreateRunnerSession(session, sandboxId, envVars, this.getDaytonaProvider(), agentSlug, adapterType, systemPrompt, model, sdkSessionId, conversationId);
     }
 
     /**

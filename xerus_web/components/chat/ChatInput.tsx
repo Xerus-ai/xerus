@@ -1,22 +1,34 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { ArrowUp, AtSign, Paperclip, Monitor, TerminalSquare } from 'lucide-react'
+import { ArrowUp, Square, AtSign, Paperclip, Monitor, TerminalSquare, X, FileIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Agent } from './types'
 import { AgentDropdown } from './AgentDropdown'
 import { SlashCommandPicker } from './SlashCommandPicker'
 import { useSlashCommands } from './useSlashCommands'
-import { UnifiedMentionPicker, type MentionItem } from './UnifiedMentionPicker'
+import { UnifiedMentionPicker, type MentionItem, type AppItem } from './UnifiedMentionPicker'
 import { useWorkspaceFiles } from '@/hooks/useWorkspaceFiles'
 import { useKBSearch } from '@/hooks/useKBSearch'
+import { uploadFile } from '@/lib/api/workspace'
+import { toast } from '@/lib/toast'
+import { TokenCounter } from './TokenCounter'
+
+interface AttachedFile {
+  id: string
+  name: string
+  size: number
+  path: string
+  uploading: boolean
+}
 
 interface ChatInputProps {
-  onSendMessage: (message: string) => void
+  onSendMessage: (message: string, metadata?: { attachedFiles?: string[] }) => void
   disabled?: boolean
   placeholder?: string
   className?: string
   agents?: Agent[]
+  apps?: AppItem[]
   selectedAgent?: Agent | null
   onAgentChange?: (agent: Agent | null) => void
   onOpenTerminal?: () => void
@@ -27,6 +39,9 @@ interface ChatInputProps {
   isBrowserOpen?: boolean
   conversationId?: string
   headerContent?: React.ReactNode
+  isExecuting?: boolean
+  onStop?: () => void
+  tokenUsage?: { used: number; total: number } | null
 }
 
 export function ChatInput({
@@ -35,6 +50,7 @@ export function ChatInput({
   placeholder = 'Type your message...',
   className,
   agents = [],
+  apps = [],
   selectedAgent,
   onAgentChange,
   onOpenTerminal,
@@ -45,11 +61,16 @@ export function ChatInput({
   isBrowserOpen,
   conversationId,
   headerContent,
+  isExecuting = false,
+  onStop,
+  tokenUsage,
 }: ChatInputProps) {
   const [value, setValue] = useState('')
   const [focused, setFocused] = useState(false)
   const [isComposing, setIsComposing] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([])
 
   // @mention state
   const [showPicker, setShowPicker] = useState(false)
@@ -120,6 +141,9 @@ export function ChatInput({
           break
         case 'kb':
           insertText = `@kb:${item.entry.id} `
+          break
+        case 'app':
+          insertText = `@app:${item.app.slug} `
           break
       }
       const before = value.slice(0, mentionStart)
@@ -197,13 +221,15 @@ export function ChatInput({
   const handleSend = useCallback(() => {
     const trimmed = value.trim()
     if (!trimmed || disabled) return
-    onSendMessage(trimmed)
+    const uploadedPaths = attachedFiles.filter(f => !f.uploading && f.path).map(f => f.path)
+    onSendMessage(trimmed, uploadedPaths.length > 0 ? { attachedFiles: uploadedPaths } : undefined)
     setValue('')
+    setAttachedFiles([])
     closePicker()
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
     }
-  }, [value, disabled, onSendMessage, closePicker])
+  }, [value, disabled, onSendMessage, closePicker, attachedFiles])
 
   const handleSelectSlashCommand = useCallback(
     (cmd: (typeof commands)[number]) => {
@@ -288,6 +314,39 @@ export function ChatInput({
      showPicker, mentionItems, selectedIdx, insertMentionItem, closePicker, isComposing, handleSend]
   )
 
+  const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+
+    for (const file of Array.from(files)) {
+      const id = `file_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+      const placeholder: AttachedFile = {
+        id,
+        name: file.name,
+        size: file.size,
+        path: '',
+        uploading: true,
+      }
+      setAttachedFiles(prev => [...prev, placeholder])
+
+      try {
+        const result = await uploadFile(file, `uploads/${file.name}`)
+        setAttachedFiles(prev =>
+          prev.map(f => f.id === id ? { ...f, path: result.path, uploading: false } : f)
+        )
+      } catch {
+        setAttachedFiles(prev => prev.filter(f => f.id !== id))
+        toast.error(`Failed to upload ${file.name}`)
+      }
+    }
+
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }, [])
+
+  const removeAttachedFile = useCallback((id: string) => {
+    setAttachedFiles(prev => prev.filter(f => f.id !== id))
+  }, [])
+
   const triggerMention = useCallback(() => {
     const textarea = textareaRef.current
     if (!textarea) return
@@ -328,6 +387,7 @@ export function ChatInput({
             agents={agents}
             files={workspaceFiles}
             kbEntries={kbEntries}
+            apps={apps}
             filesLoading={filesLoading}
             kbLoading={kbLoading}
             selectedIdx={selectedIdx}
@@ -348,6 +408,37 @@ export function ChatInput({
         >
           {/* Dynamic header content (task dock, etc.) */}
           {headerContent}
+
+          {/* Attached file chips */}
+          {attachedFiles.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 px-4 pt-3 pb-0">
+              {attachedFiles.map(file => (
+                <span
+                  key={file.id}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs',
+                    'bg-surface-hover text-text-secondary border border-border',
+                    file.uploading && 'opacity-60'
+                  )}
+                >
+                  <FileIcon className="w-3 h-3 shrink-0" />
+                  <span className="truncate max-w-[120px]">{file.name}</span>
+                  {file.uploading ? (
+                    <span className="w-3 h-3 border-2 border-text-muted/30 border-t-text-muted rounded-full animate-spin shrink-0" />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => removeAttachedFile(file.id)}
+                      className="p-0.5 rounded hover:bg-surface-hover text-text-muted hover:text-text-secondary"
+                      aria-label={`Remove ${file.name}`}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </span>
+              ))}
+            </div>
+          )}
 
           {/* Textarea */}
           <textarea
@@ -406,8 +497,17 @@ export function ChatInput({
               </button>
 
               {/* Attach file */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                onChange={handleFileUpload}
+                className="hidden"
+                aria-hidden="true"
+              />
               <button
                 type="button"
+                onClick={() => fileInputRef.current?.click()}
                 disabled={disabled}
                 aria-label="Attach file"
                 className={cn(
@@ -471,37 +571,59 @@ export function ChatInput({
               </span>
             </div>
 
-            {/* Right: send button */}
-            <div
-              className={cn(
-                'transition-all duration-200 overflow-hidden',
-                hasContent ? 'w-8 opacity-100 scale-100' : 'w-0 opacity-0 scale-75'
-              )}
-            >
+            {/* Right: send or stop button */}
+            {isExecuting && onStop ? (
               <button
                 type="button"
-                onClick={handleSend}
-                disabled={!hasContent || disabled}
-                aria-label="Send message"
+                onClick={onStop}
+                aria-label="Stop agent"
                 className={cn(
                   'flex items-center justify-center w-8 h-8 rounded-xl',
-                  'bg-primary text-white',
-                  'hover:bg-primary/90 active:scale-90',
+                  'bg-text text-white',
+                  'hover:bg-primary active:scale-90',
                   'transition-all duration-150',
-                  'disabled:opacity-40 disabled:cursor-not-allowed',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1'
                 )}
               >
-                <ArrowUp className="w-4 h-4" strokeWidth={2.5} />
+                <Square className="w-3 h-3" fill="currentColor" />
               </button>
-            </div>
+            ) : (
+              <div
+                className={cn(
+                  'transition-all duration-200 overflow-hidden',
+                  hasContent ? 'w-8 opacity-100 scale-100' : 'w-0 opacity-0 scale-75'
+                )}
+              >
+                <button
+                  type="button"
+                  onClick={handleSend}
+                  disabled={!hasContent || disabled}
+                  aria-label="Send message"
+                  className={cn(
+                    'flex items-center justify-center w-8 h-8 rounded-xl',
+                    'bg-primary text-white',
+                    'hover:bg-primary/90 active:scale-90',
+                    'transition-all duration-150',
+                    'disabled:opacity-40 disabled:cursor-not-allowed',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1'
+                  )}
+                >
+                  <ArrowUp className="w-4 h-4" strokeWidth={2.5} />
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Disclaimer */}
-        <p className="text-center text-[11px] text-text-muted/40 mt-1 select-none">
-          AI can make mistakes. Verify important information.
-        </p>
+        {/* Disclaimer + Token counter */}
+        <div className="flex items-center justify-center gap-3 mt-1 px-1">
+          <p className="text-[11px] text-text-muted/40 select-none">
+            AI can make mistakes. Verify important information.
+          </p>
+          {tokenUsage && tokenUsage.used > 0 && (
+            <TokenCounter used={tokenUsage.used} total={tokenUsage.total} />
+          )}
+        </div>
       </div>
     </div>
   )

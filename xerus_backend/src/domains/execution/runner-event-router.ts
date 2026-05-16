@@ -3,6 +3,7 @@
 
 import { logger } from '../../utils/logger';
 import type { PipelineContext, ResolvedExecutionDeps } from './execution-pipeline.types';
+import { PipelineInvariantError } from './errors';
 import { requireAgent } from './pipeline-guards';
 import { STREAM_EVENT_TYPES, type RunnerEventType, type StreamEventType } from './types';
 import type { HITLRequest } from './hitl/hitl.types';
@@ -11,6 +12,8 @@ import { handleTriggerIndexing } from './indexing-event-handler';
 import { handleCliStreamEvent } from './cli-stream-router';
 import { dispatchCrossChannelCoordination, dispatchMentionToAgent } from './coordination-router';
 import { handleSseForward, handleAgentOutput } from './sse-forward-handler';
+import { handleScaffoldComplete } from './scaffold-complete-handler';
+import { scheduleIncrementalPersist } from './session-record';
 import { FILE_WRITE_TOOLS, syncFileChangeToNeon, emitFileChangedFromToolCall } from './file-change-handler';
 import { ChannelNotFoundError, MentionParser } from '../inbox';
 import { updateSdkSessionId } from '../conversations/workspace-db.service';
@@ -106,6 +109,7 @@ export async function routeEventToBackend(
                     }
                 }
             }
+            scheduleIncrementalPersist(deps, ctx);
             break;
         }
         case 'session_ended':
@@ -160,13 +164,15 @@ export async function routeEventToBackend(
         case 'session_started':
             await handleSessionStarted(d, ctx, deps);
             break;
+        case 'scaffold_complete':
+            await handleScaffoldComplete(d, ctx, deps);
+            break;
         case 'session_analytics':
         case 'health':
         case 'sessions':
         case 'credit_check':
         case 'ace_reflection':
         case 'skill_suggestion':
-        case 'scaffold_complete':
             logEvent(eventType, d);
             break;
         case 'push_notification':
@@ -308,11 +314,11 @@ async function handleAgentMessage(
     const data = assertAgentMessageData(d);
 
     if (!deps.messageBridge) {
-        throw new Error(`${EVENT_ROUTER_LOG_PREFIX} agent_message: messageBridge not initialized`);
+        throw new PipelineInvariantError(`${EVENT_ROUTER_LOG_PREFIX} agent_message: messageBridge not initialized`);
     }
 
     if (!ctx.sandboxId) {
-        throw new Error(`${EVENT_ROUTER_LOG_PREFIX} agent_message: sandboxId not set`);
+        throw new PipelineInvariantError(`${EVENT_ROUTER_LOG_PREFIX} agent_message: sandboxId not set`);
     }
     const provider = deps.sandboxService.getDaytonaProvider();
 
@@ -416,7 +422,7 @@ async function handleHitlRequest(
     d: Record<string, unknown>, ctx: PipelineContext, deps: ResolvedExecutionDeps,
 ): Promise<void> {
     if (!ctx.sessionId) {
-        throw new Error(`${EVENT_ROUTER_LOG_PREFIX} hitl_request: sessionId not set -- pipeline invariant violated`);
+        throw new PipelineInvariantError(`${EVENT_ROUTER_LOG_PREFIX} hitl_request: sessionId not set -- pipeline invariant violated`);
     }
 
     const data = assertHitlRequestData(d);

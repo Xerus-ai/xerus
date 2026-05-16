@@ -149,6 +149,19 @@ export class SDKExecutionError extends DomainError {
 }
 
 // -----------------------------------------------------------------------------
+// Pipeline Invariant Errors
+// Fatal violations of pipeline invariants (missing required deps, missing
+// required state). The execution event loop re-throws these; non-fatal
+// handler failures are caught and degraded into notifications.
+// -----------------------------------------------------------------------------
+
+export class PipelineInvariantError extends DomainError {
+    constructor(message: string) {
+        super(message, 500, 'PIPELINE_INVARIANT');
+    }
+}
+
+// -----------------------------------------------------------------------------
 // Streaming Errors
 // -----------------------------------------------------------------------------
 

@@ -155,6 +155,8 @@ export function mapSkillDetailToFrontend(
   data: BackendSkill & {
     files?: Array<{ path: string; size: number }>;
     installed_by_agents?: number[];
+    installed_channels?: string[];
+    is_globally_installed?: boolean;
     is_installed?: boolean;
   }
 ): SkillDetail {
@@ -163,5 +165,7 @@ export function mapSkillDetailToFrontend(
     files: data.files || [],
     isInstalled: Boolean(data.is_installed) || Boolean(data.installed_by_agents?.length),
     installedByAgents: data.installed_by_agents || [],
+    isGloballyInstalled: Boolean(data.is_globally_installed),
+    installedChannels: data.installed_channels || [],
   };
 }

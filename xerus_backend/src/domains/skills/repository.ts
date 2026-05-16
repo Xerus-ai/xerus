@@ -19,6 +19,15 @@ import type { SkillWorkspaceService } from './workspace.service';
 import { slugify } from '../../shared/slugify';
 import { generatePuzzleConfig } from './skill-avatar';
 
+// 30s TTL cache for listInstalled — the detail view, ribbon, and dropdown all
+// trigger this within seconds of each other; one SSH scan is enough.
+const INSTALLED_CACHE_TTL_MS = 30_000;
+interface InstalledCacheEntry {
+    skills: Skill[];
+    expiresAt: number;
+}
+const installedCache = new Map<string, InstalledCacheEntry>();
+
 export class SkillRepository {
     private workspaceService: SkillWorkspaceService | undefined;
 
@@ -31,6 +40,21 @@ export class SkillRepository {
             throw new Error('Workspace service not configured');
         }
         return this.workspaceService;
+    }
+
+    async listInstalledCached(userId: string): Promise<Skill[]> {
+        const now = Date.now();
+        const cached = installedCache.get(userId);
+        if (cached && cached.expiresAt > now) {
+            return cached.skills;
+        }
+        const skills = await this.listInstalled(userId);
+        installedCache.set(userId, { skills, expiresAt: now + INSTALLED_CACHE_TTL_MS });
+        return skills;
+    }
+
+    invalidateInstalledCache(userId: string): void {
+        installedCache.delete(userId);
     }
 
     // ===== SKILL LOOKUP =====
@@ -149,7 +173,7 @@ export class SkillRepository {
     async list(userId: string, options: SkillListOptions): Promise<PaginatedSkills> {
         const [marketplaceSkills, installedSkills] = await Promise.all([
             this.listMarketplaceSkillsAll(userId),
-            this.listInstalled(userId),
+            this.listInstalledCached(userId),
         ]);
         const installedSlugs = new Set(installedSkills.map(s => s.slug));
 
@@ -167,6 +191,56 @@ export class SkillRepository {
         }
 
         // Compute categories from full set
+        const categoryMap = new Map<string, number>();
+        for (const s of all) {
+            if (s.category) {
+                categoryMap.set(s.category, (categoryMap.get(s.category) || 0) + 1);
+            }
+        }
+        const categories = Array.from(categoryMap.entries())
+            .map(([category, count]) => ({ category, count }))
+            .sort((a, b) => b.count - a.count);
+
+        const filtered = this.applyFilters(all, options.filters);
+        const result = this.paginate(filtered, options);
+        result.categories = categories;
+        return result;
+    }
+
+    // Channel-scoped list: marks is_installed = true only when a skill is installed
+    // globally OR at the requested channel path. Skills installed at other channels
+    // appear as not-installed for this channel so the user can install them here.
+    async listByChannel(userId: string, channelPath: string, options: SkillListOptions): Promise<PaginatedSkills> {
+        const [marketplaceSkills, installedSkills] = await Promise.all([
+            this.listMarketplaceSkillsAll(userId),
+            this.listInstalledCached(userId),
+        ]);
+
+        const isVisibleHere = (s: Skill): boolean =>
+            s.installed_scope === 'global' || s.channel_path === channelPath;
+
+        const installedHereBySlug = new Map<string, Skill>();
+        for (const s of installedSkills) {
+            if (isVisibleHere(s)) {
+                installedHereBySlug.set(s.slug, s);
+            }
+        }
+
+        const all: Skill[] = marketplaceSkills.map(s => {
+            const here = installedHereBySlug.get(s.slug);
+            return here
+                ? { ...s, is_installed: true, installed_scope: here.installed_scope, channel_path: here.channel_path }
+                : { ...s, is_installed: false };
+        });
+
+        // Add user-created and channel-scoped installed skills not in marketplace
+        for (const s of installedSkills) {
+            if (!isVisibleHere(s)) continue;
+            if (!all.some(m => m.slug === s.slug)) {
+                all.push({ ...s, is_installed: true });
+            }
+        }
+
         const categoryMap = new Map<string, number>();
         for (const s of all) {
             if (s.category) {

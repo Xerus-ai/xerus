@@ -4,6 +4,7 @@
 // Reference: xerus-workspace/data/workspace-schema.sql
 
 import type { DaytonaProvider } from '../sandbox-infra/sandbox/providers/daytona.provider';
+import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
 import { escapeSQL, executeWorkspaceQuery, executeWorkspaceJsonQuery } from './workspace-db.helpers';
 
 // Re-export helpers for other domain services
@@ -15,7 +16,7 @@ export { escapeSQL, executeWorkspaceQuery, executeWorkspaceJsonQuery } from './w
 
 export interface ConversationRow {
     id: string;
-    agent_slug: string;
+    agent_slug: string | null;
     title: string | null;
     summary: string | null;
     message_count: number;
@@ -304,8 +305,11 @@ export async function incrementConversationMessageCount(
 
 /**
  * Persist a chat turn (user message + agent response) to workspace.db chat_executions.
- * Called at the end of each execution so conversation history survives page reloads.
+ * Uses upsert on (conversation_id, session_id) so incremental writes during streaming
+ * update the same row instead of creating duplicates.
  */
+const LARGE_VALUE_THRESHOLD = 4000;
+
 export async function writeChatExecution(
     provider: DaytonaProvider,
     sandboxId: string,
@@ -317,12 +321,13 @@ export async function writeChatExecution(
     responseTimeMs: number | null,
     messageMetadata: string | null,
 ): Promise<void> {
-    // Ensure message_metadata column exists (added after initial schema)
-    try {
-        await executeWorkspaceQuery(provider, sandboxId,
-            `ALTER TABLE chat_executions ADD COLUMN message_metadata TEXT`);
-    } catch {
-        // Column already exists — expected
+    const hasLargePayload = (agentResponse && agentResponse.length > LARGE_VALUE_THRESHOLD)
+        || (messageMetadata && messageMetadata.length > LARGE_VALUE_THRESHOLD)
+        || (userMessage.length > LARGE_VALUE_THRESHOLD);
+
+    if (hasLargePayload) {
+        await writeChatExecutionViaFiles(provider, sandboxId, conversationId, sessionId, userMessage, agentResponse, tokensUsed, responseTimeMs, messageMetadata);
+        return;
     }
 
     const sessionValue = sessionId ? `'${escapeSQL(sessionId)}'` : 'NULL';
@@ -330,11 +335,56 @@ export async function writeChatExecution(
     const timeValue = responseTimeMs !== null ? String(responseTimeMs) : 'NULL';
     const metaValue = messageMetadata ? `'${escapeSQL(messageMetadata)}'` : 'NULL';
 
-    const sql = `
-        INSERT INTO chat_executions (conversation_id, session_id, user_message, agent_response, response_time_ms, tokens_used, message_metadata)
-        VALUES ('${escapeSQL(conversationId)}', ${sessionValue}, '${escapeSQL(userMessage)}', ${responseValue}, ${timeValue}, ${tokensUsed}, ${metaValue})
-    `;
+    const sql = `INSERT INTO chat_executions (conversation_id, session_id, user_message, agent_response, response_time_ms, tokens_used, message_metadata)
+           VALUES ('${escapeSQL(conversationId)}', ${sessionValue}, '${escapeSQL(userMessage)}', ${responseValue}, ${timeValue}, ${tokensUsed}, ${metaValue})`;
+
     await executeWorkspaceQuery(provider, sandboxId, sql);
+}
+
+async function writeChatExecutionViaFiles(
+    provider: DaytonaProvider,
+    sandboxId: string,
+    conversationId: string,
+    sessionId: string | null,
+    userMessage: string,
+    agentResponse: string | null,
+    tokensUsed: number,
+    responseTimeMs: number | null,
+    messageMetadata: string | null,
+): Promise<void> {
+    const tmpDir = '/tmp/chat-exec';
+    const ts = Date.now();
+    await provider.executeCommand(sandboxId, `mkdir -p ${tmpDir}`);
+
+    const record = {
+        conversation_id: conversationId,
+        session_id: sessionId,
+        user_message: userMessage,
+        agent_response: agentResponse,
+        tokens_used: tokensUsed,
+        response_time_ms: responseTimeMs,
+        message_metadata: messageMetadata,
+    };
+    const jsonPath = `${tmpDir}/${ts}.json`;
+    await provider.writeFile(sandboxId, jsonPath, JSON.stringify(record));
+
+    const pythonScript = `
+import json, sqlite3, sys
+with open('${jsonPath}') as f:
+    r = json.load(f)
+conn = sqlite3.connect('${SANDBOX_CONFIG.workspacePath}/data/workspace.db')
+conn.execute(
+    '''INSERT INTO chat_executions (conversation_id, session_id, user_message, agent_response, response_time_ms, tokens_used, message_metadata)
+       VALUES (?, ?, ?, ?, ?, ?, ?)''',
+    (r['conversation_id'], r['session_id'], r['user_message'], r['agent_response'],
+     r['response_time_ms'], r['tokens_used'], r['message_metadata'])
+)
+conn.commit()
+conn.close()
+`;
+    const scriptPath = `${tmpDir}/${ts}.py`;
+    await provider.writeFile(sandboxId, scriptPath, pythonScript);
+    await provider.executeCommand(sandboxId, `python3 ${scriptPath} && rm -f ${jsonPath} ${scriptPath}`);
 }
 
 export async function updateSdkSessionId(

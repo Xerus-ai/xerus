@@ -16,6 +16,7 @@ const SOUL_SECTIONS: SoulSection[] = [
     { filename: 'USER.md', header: '== Your User ==' },
     { filename: 'RELATIONSHIPS.md', header: '== Your Colleagues ==' },
     { filename: 'OPERATING.md', header: '== Operating Protocol ==' },
+    { filename: 'HEARTBEAT.md', header: '== Scheduled Tasks ==' },
 ];
 
 function readFileContent(filePath: string): string {
@@ -77,6 +78,42 @@ export function buildSoulAppend(agentDir: string): string {
     const agentMdContent = readFileContent(path.join(agentDir, 'agent.md'));
     if (agentMdContent.trim()) {
         parts.push(`---\n${agentMdContent.trim()}`);
+    }
+
+    return parts.join('\n\n');
+}
+
+/**
+ * Inject agent memory (working state + expertise) directly into the system prompt.
+ * This ensures the agent has access to its prior knowledge without relying on
+ * it proactively reading context/index.md files.
+ */
+export function buildMemoryAppend(workspacePath: string, agentSlug: string): string {
+    const memoryDir = path.join(workspacePath, '.memory', 'agents', agentSlug);
+    const parts: string[] = [];
+
+    const working = readFileContent(path.join(memoryDir, 'working.md'));
+    const workingContent = working.trim();
+    if (workingContent.length > 80 && !workingContent.includes('No previous session state')) {
+        const lastNewline = workingContent.lastIndexOf('\n', 4000);
+        const trimmed = lastNewline > 0 ? workingContent.slice(0, lastNewline) : workingContent.slice(0, 4000);
+        parts.push(`== Working Memory (from previous session) ==\n${trimmed}`);
+    }
+
+    const expertise = readFileContent(path.join(memoryDir, 'expertise.md'));
+    const expertiseContent = expertise.trim();
+    if (expertiseContent.length > 40) {
+        const lastNl = expertiseContent.lastIndexOf('\n', 2000);
+        const trimmed = lastNl > 0 ? expertiseContent.slice(0, lastNl) : expertiseContent.slice(0, 2000);
+        parts.push(`== Expertise ==\n${trimmed}`);
+    }
+
+    const userPrefs = readFileContent(path.join(workspacePath, '.memory', 'user', 'preferences.md'));
+    const prefsContent = userPrefs.trim();
+    if (prefsContent.length > 20) {
+        const lastNl = prefsContent.lastIndexOf('\n', 1000);
+        const trimmed = lastNl > 0 ? prefsContent.slice(0, lastNl) : prefsContent.slice(0, 1000);
+        parts.push(`== User Preferences ==\n${trimmed}`);
     }
 
     return parts.join('\n\n');

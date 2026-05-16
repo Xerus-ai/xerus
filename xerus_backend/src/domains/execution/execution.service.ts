@@ -212,6 +212,24 @@ export class ExecutionService {
             const skillSecrets = await skillSecretsService.resolveAllSecrets(daytonaProvider, ctx.sandboxId);
             log.debug('preSecrets resolved', { execution_id: executionId, duration_ms: Date.now() - startedAt, secret_count: Object.keys(skillSecrets).length });
 
+            // Write context/connectors.md with connected tools for this agent
+            try {
+                const agentForContext = requireAgent(ctx);
+                const { executeWorkspaceQuery } = await import('../conversations/workspace-db.helpers');
+                const toolsSql = `SELECT tool_id, enabled FROM agent_tools WHERE agent_slug = '${agentForContext.slug.replace(/'/g, "''")}' AND enabled = 1`;
+                const toolsOutput = await executeWorkspaceQuery(daytonaProvider, ctx.sandboxId, toolsSql);
+                if (toolsOutput.trim() && toolsOutput.trim() !== '[]') {
+                    const contextDir = `${SANDBOX_CONFIG.workspacePath}/context`;
+                    const connectorsContent = `# Connected Tools\n\n${toolsOutput}\n`;
+                    await daytonaProvider.executeCommand(ctx.sandboxId,
+                        `mkdir -p '${contextDir}' && echo '${connectorsContent.replace(/'/g, "'\\''")}' > '${contextDir}/connectors.md'`,
+                    );
+                }
+            } catch (err) {
+                // Context files are supplementary — execution continues without them
+                log.error('Failed to write connectors context', { error: (err as Error).message });
+            }
+
             // Build runner environment with the resolved API key + skill secrets + CLI BYOK keys
             const runnerEnvVars = buildSDKEnvironment(resolvedKey.apiKey, skillSecrets, userCliKeys);
 
@@ -239,7 +257,7 @@ export class ExecutionService {
             const handle = await resolved.sandboxService.getOrCreateRunner(
                 request.userId, ctx.sandboxId, runnerEnvVars,
                 agentForTracking.slug, agentConfig.adapterType, agentIdentity || undefined,
-                agentConfig.model, ctx.sdkSessionId || undefined,
+                agentConfig.model, ctx.sdkSessionId || undefined, ctx.conversationId,
             );
             ctx.sessionHandle = handle;
             log.debug('Agent session ready', { execution_id: executionId, duration_ms: Date.now() - startedAt, session_id: handle.sessionId });
@@ -255,10 +273,14 @@ export class ExecutionService {
             // Meta event with agentName triggers streamingTurn creation on frontend.
             // Without agentName, all streaming events (token, tool_call, reasoning)
             // are silently dropped because streamingTurn is null.
+            const DISPLAY_NAMES: Record<string, string> = {
+                'xerus-master': 'Xerus',
+                'xerus-cto': 'Claude Code',
+            };
             stream.send('meta', {
                 conversationId: ctx.conversationId,
                 agentSlug: agentForTracking.slug,
-                agentName: agentForTracking.name || agentForTracking.slug,
+                agentName: DISPLAY_NAMES[agentForTracking.slug] || agentForTracking.name || agentForTracking.slug,
             });
             ctx.status = 'running';
 

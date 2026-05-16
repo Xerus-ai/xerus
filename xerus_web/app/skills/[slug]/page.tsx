@@ -6,7 +6,7 @@ import Image from 'next/image';
 import useSWR from 'swr';
 import { MarkdownPreview } from '@/components/workspace/MarkdownPreview';
 import {
-    ArrowLeft, FileText, Trash2,
+    ArrowLeft, FileText, Trash2, Plus, MessageSquare,
     Pencil, Loader2, Hash, Bot, X, Minus, Eye, Sparkles, ArrowUp, Shield,
 } from 'lucide-react';
 import { getSkill, installSkill, uninstallSkill, deleteSkill } from '@/lib/api/skills';
@@ -18,8 +18,9 @@ import { InstallButton } from '@/components/skills/InstallButton';
 import { FloatingPanel } from '@/components/common/FloatingPanel';
 import { FloatingPanelProvider } from '@/components/common/FloatingPanelContext';
 import { SkillSecretsCard } from '@/components/skills/SkillSecretsCard';
-import { parseSkillEnvKeys } from '@/lib/utils/parse-skill-env-keys';
+import { getSkillConfigRequirements } from '@/lib/utils/parse-skill-env-keys';
 import { toast } from '@/lib/toast';
+import { apiCall } from '@/lib/api/client';
 
 export default function SkillDetailPage() {
     const router = useRouter();
@@ -33,7 +34,7 @@ export default function SkillDetailPage() {
         () => getSkill(slug),
     );
 
-    const { data: agents = [] } = useSWR<Assistant[]>(
+    const { data: agents = [], isLoading: agentsLoading } = useSWR<Assistant[]>(
         user ? 'agents-list' : null,
         async () => {
             const result = await getAssistants();
@@ -140,7 +141,7 @@ export default function SkillDetailPage() {
     const isInstalled = skill.isInstalled;
     const readmeFile = skill.files.find(f => f.path.toLowerCase() === 'readme.md');
     const otherFiles = skill.files.filter(f => f.path !== 'SKILL.md' && f.path.toLowerCase() !== 'readme.md');
-    const requiredEnvKeys = skillMdContent ? parseSkillEnvKeys(skillMdContent) : [];
+    const skillConfig = getSkillConfigRequirements(skill.slug, skillMdContent ?? undefined);
 
     return (
         <div className="min-h-screen font-sans text-text">
@@ -192,14 +193,46 @@ export default function SkillDetailPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Left column */}
                     <div className="lg:col-span-2 space-y-8">
-                        {/* Configure — secrets for skills that need API keys */}
-                        {isInstalled && requiredEnvKeys.length > 0 && (
+                        {/* Configure — secrets + CLI tools for skills that need auth */}
+                        {isInstalled && skillConfig.hasAuth && (
                             <div className="space-y-2">
                                 <h3 className="font-serif text-xl flex items-center gap-2 px-1">
                                     <Shield className="w-5 h-5 text-secondary" />
-                                    Authentication
+                                    Configuration
                                 </h3>
-                                <SkillSecretsCard skillSlug={skill.slug} envKeys={requiredEnvKeys} />
+                                <div className="space-y-3">
+                                    {skillConfig.envKeys.length > 0 && (
+                                        <SkillSecretsCard skillSlug={skill.slug} envKeys={skillConfig.envKeys} />
+                                    )}
+                                    {skillConfig.bins.length > 0 && (
+                                        <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-6 space-y-3">
+                                            <p className="text-sm text-text-secondary">
+                                                This skill uses the <code className="px-1.5 py-0.5 bg-surface-hover rounded text-sm font-mono">{skillConfig.bins.join(', ')}</code> CLI {skillConfig.bins.length === 1 ? 'tool' : 'tools'} which needs to be authenticated in your workspace.
+                                            </p>
+                                            <button
+                                                onClick={() => router.push(`/chat?q=${encodeURIComponent(`Set up authentication for the "${skill.name}" skill. It needs the ${skillConfig.bins.join(', ')} CLI tool authenticated. Run the auth flow and guide me through it.`)}`)}
+                                                className="flex items-center gap-2 px-4 py-2.5 bg-primary hover:bg-primary/90 text-white font-medium rounded-xl text-sm transition-colors"
+                                            >
+                                                <MessageSquare className="w-4 h-4" />
+                                                Ask agent to set up
+                                            </button>
+                                        </div>
+                                    )}
+                                    {skillConfig.envKeys.length === 0 && skillConfig.bins.length === 0 && (
+                                        <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-6 space-y-3">
+                                            <p className="text-sm text-text-secondary">
+                                                This skill requires authentication. Check the SKILL.md file for setup instructions, or ask your agent to configure it.
+                                            </p>
+                                            <button
+                                                onClick={() => router.push(`/chat?q=${encodeURIComponent(`Set up authentication for the "${skill.name}" skill. Check its SKILL.md for what credentials are needed and guide me through the process.`)}`)}
+                                                className="flex items-center gap-2 px-4 py-2.5 bg-primary hover:bg-primary/90 text-white font-medium rounded-xl text-sm transition-colors"
+                                            >
+                                                <MessageSquare className="w-4 h-4" />
+                                                Ask agent to set up
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         )}
 
@@ -405,24 +438,16 @@ export default function SkillDetailPage() {
                                 isInstalled={isInstalled}
                                 agents={agents}
                                 installedByAgents={skill.installedByAgents || []}
+                                loading={agentsLoading}
                             />
                         </div>
 
                         {/* Channels */}
-                        <div className="space-y-2">
-                            <div className="flex items-center gap-2 px-1">
-                                <div className="flex items-center gap-2">
-                                    <Hash className="w-5 h-5 text-secondary" />
-                                    <h3 className="text-2xl font-serif text-text">Channels</h3>
-                                </div>
-                            </div>
-                            <SkillChannelsCard
-                                skillSlug={skill.slug}
-                                onInstall={handleInstall}
-                                showPicker={false}
-                                onTogglePicker={() => undefined}
-                            />
-                        </div>
+                        <SkillChannelsCard
+                            skillSlug={skill.slug}
+                            onInstall={handleInstall}
+                            isInstalled={isInstalled}
+                        />
 
                     </div>
                 </div>
@@ -460,28 +485,164 @@ function SkillFileViewer({ slug, filePath, onContentLoaded }: { slug: string; fi
 }
 
 // -------------------------------------------------------------------
-// Skill Channels Card — add/remove skill to channels
+// Skill Channels Card — install/uninstall skill to channels (mirrors AgentChannelsCard)
 // -------------------------------------------------------------------
 
-interface DomainWithChannels {
-    id: string;
-    slug: string;
-    name: string;
-    channels: Array<{ id: string; slug: string; name: string; agent_count: number }>;
-}
-
-function SkillChannelsCard({ skillSlug }: {
+function SkillChannelsCard({ skillSlug, onInstall, isInstalled }: {
     skillSlug: string;
-    onInstall: (agentId: number, scope: 'channel' | 'global') => Promise<void>;
-    showPicker: boolean;
-    onTogglePicker: () => void;
+    onInstall: (agentId: number, scope: 'channel' | 'global', channelId?: string) => Promise<void>;
+    isInstalled: boolean;
 }) {
+    const [showPicker, setShowPicker] = useState(false);
+    const [processing, setProcessing] = useState<string | null>(null);
+
+    const { data: skillDetail, mutate: mutateSkill } = useSWR<SkillDetail | null>(
+        skillSlug ? `skill-${skillSlug}` : null,
+    );
+
+    const { data: domainsData } = useSWR('company-domains-for-skill', async () => {
+        const response = await apiCall('/company/domains', { method: 'GET' });
+        const result = await response.json();
+        const data = result.data || result;
+        return (data.domains || []) as Array<{
+            id: string; slug: string; name: string;
+            channels: Array<{ id: string; slug: string; name: string; agent_count: number }>;
+        }>;
+    });
+
+    const installedChannels = skillDetail?.installedChannels ?? [];
+    const isGloballyInstalled = skillDetail?.isGloballyInstalled ?? false;
+    const installedSet = new Set(installedChannels);
+
+    const allChannels = (domainsData || []).flatMap(d =>
+        d.channels.map(ch => ({ ...ch, domainName: d.name, domainSlug: d.slug }))
+    );
+    const availableChannels = allChannels.filter(ch => !installedSet.has(`${ch.domainSlug}/${ch.slug}`));
+
+    const handleAdd = async (channel: { slug: string; domainSlug: string }) => {
+        const channelId = `${channel.domainSlug}/${channel.slug}`;
+        setProcessing(channelId);
+        try {
+            await onInstall(0, 'channel', channelId);
+            await mutateSkill();
+        } finally {
+            setProcessing(null);
+        }
+    };
+
+    const handleRemove = async (channelId: string) => {
+        setProcessing(channelId);
+        try {
+            await uninstallSkill(skillSlug, 'channel', channelId);
+            await mutateSkill();
+        } finally {
+            setProcessing(null);
+        }
+    };
+
     return (
-        <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-6">
-            <p className="text-xs text-text-secondary py-2">
-                Channel-scoped installs are not wired yet for <span className="font-medium text-text">{skillSlug}</span>.
-                Install this skill once and it becomes available from the shared workspace.
-            </p>
+        <div className="space-y-2">
+            <div className="flex items-center justify-between px-1">
+                <div className="flex items-center gap-2">
+                    <Hash className="w-5 h-5 text-secondary" />
+                    <h3 className="text-2xl font-serif text-text">Channels</h3>
+                </div>
+                {isInstalled && (
+                    <button
+                        onClick={() => setShowPicker(!showPicker)}
+                        className="p-2 hover:bg-primary/5 text-primary rounded-full transition-colors"
+                        aria-label={showPicker ? 'Close picker' : 'Add to channel'}
+                    >
+                        {showPicker ? <X className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+                    </button>
+                )}
+            </div>
+
+            <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-6">
+                {isGloballyInstalled ? (
+                    <p className="text-xs text-text-secondary py-2">
+                        Installed globally. Available in every channel for <span className="font-medium text-text">{skillSlug}</span>.
+                    </p>
+                ) : installedChannels.length > 0 ? (
+                    <div className="space-y-1">
+                        {installedChannels.map(channelId => (
+                            <div key={channelId} className="flex items-center gap-2.5 py-1.5 px-2 rounded-xl hover:bg-surface-hover group transition-colors">
+                                <div className="w-7 h-7 rounded-lg bg-secondary/10 flex items-center justify-center shrink-0">
+                                    <Hash className="w-3.5 h-3.5 text-secondary" />
+                                </div>
+                                <span className="text-sm text-text truncate flex-1">{channelId}</span>
+                                {processing === channelId ? (
+                                    <Loader2 className="w-3.5 h-3.5 text-text-secondary animate-spin shrink-0" />
+                                ) : (
+                                    <button
+                                        onClick={() => handleRemove(channelId)}
+                                        className="w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive text-text-secondary transition-all"
+                                        title="Remove from channel"
+                                    >
+                                        <X className="w-3 h-3" />
+                                    </button>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="text-center py-6 border-2 border-dashed border-surface-active rounded-xl">
+                        <p className="text-xs text-text-secondary italic">
+                            {isInstalled ? 'Not installed in any channel yet' : 'Install this skill first to add it to channels'}
+                        </p>
+                    </div>
+                )}
+
+                {showPicker && availableChannels.length === 0 && (
+                    <div className="mt-3 pt-3 border-t border-surface-active">
+                        <p className="text-xs text-text-secondary italic text-center py-2">
+                            {allChannels.length === 0
+                                ? 'No channels exist yet. Create one in a project first.'
+                                : 'This skill is already in every channel.'}
+                        </p>
+                    </div>
+                )}
+
+                {showPicker && availableChannels.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-surface-active">
+                        <p className="text-[10px] font-medium text-text-secondary mb-1.5">Add to channel</p>
+                        <div className="space-y-0.5 max-h-48 overflow-y-auto">
+                            {(domainsData || []).map(domain => {
+                                const domainChannels = domain.channels.filter(ch =>
+                                    !installedSet.has(`${domain.slug}/${ch.slug}`)
+                                );
+                                if (domainChannels.length === 0) return null;
+                                return (
+                                    <div key={domain.id}>
+                                        <p className="text-[9px] font-semibold text-text-secondary uppercase tracking-wider px-2 py-1 mt-1">
+                                            {domain.name}
+                                        </p>
+                                        {domainChannels.map(ch => {
+                                            const channelId = `${domain.slug}/${ch.slug}`;
+                                            return (
+                                                <button
+                                                    key={ch.id}
+                                                    onClick={() => handleAdd({ slug: ch.slug, domainSlug: domain.slug })}
+                                                    disabled={processing === channelId}
+                                                    className="w-full flex items-center gap-2.5 py-1.5 px-2 rounded-xl hover:bg-surface-hover transition-colors text-left disabled:opacity-50"
+                                                >
+                                                    <Hash className="w-3.5 h-3.5 text-text-secondary shrink-0" />
+                                                    <span className="text-sm text-text truncate flex-1">{ch.name}</span>
+                                                    {processing === channelId ? (
+                                                        <Loader2 className="w-3.5 h-3.5 text-text-secondary animate-spin shrink-0" />
+                                                    ) : (
+                                                        <Plus className="w-3.5 h-3.5 text-primary shrink-0" />
+                                                    )}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
@@ -490,13 +651,22 @@ function SkillChannelsCard({ skillSlug }: {
 // Skill Agents Card — add/remove agents, similar to ConnectorsSection
 // -------------------------------------------------------------------
 
-function SkillAgentsCard({ isInstalled, agents, installedByAgents }: { isInstalled: boolean; agents: Assistant[]; installedByAgents: number[] }) {
+function SkillAgentsCard({ isInstalled, agents, installedByAgents, loading }: { isInstalled: boolean; agents: Assistant[]; installedByAgents: number[]; loading?: boolean }) {
     const installedSet = new Set(installedByAgents);
     const assignedAgents = agents.filter(a => installedSet.has(a.id));
 
     return (
         <div className="bg-surface rounded-3xl border border-surface-active shadow-sm p-6">
-            {assignedAgents.length > 0 ? (
+            {loading ? (
+                <div className="space-y-2">
+                    {[1, 2, 3].map(i => (
+                        <div key={i} className="flex items-center gap-2.5 py-1.5 animate-pulse">
+                            <div className="w-7 h-7 rounded-lg bg-surface-hover" />
+                            <div className="h-4 w-24 rounded bg-surface-hover" />
+                        </div>
+                    ))}
+                </div>
+            ) : assignedAgents.length > 0 ? (
                 <div className="space-y-2">
                     {assignedAgents.map(agent => (
                         <div key={agent.id} className="flex items-center gap-2.5 py-1.5">

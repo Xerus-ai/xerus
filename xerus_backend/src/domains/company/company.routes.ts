@@ -20,7 +20,7 @@ import { shellEscapePath } from '../../utils/shell-safety';
 import { slugify, sanitizeSlug } from '../../shared/slugify';
 import { strictRateLimit } from '../../middleware/rate-limit';
 import { scaffoldProject, scaffoldChannel } from './workspace-scaffold.service';
-import { executeWorkspaceJsonQuery as execWsQuery, executeWorkspaceQuery as execWsMutate, escapeSQL } from '../conversations/workspace-db.helpers';
+import { executeWorkspaceJsonQuery as execWsQuery } from '../conversations/workspace-db.helpers';
 import {
     listDomainsWithChannels,
     createDomain,
@@ -32,6 +32,7 @@ import {
     updateChannel,
     getProjectOverview,
 } from './company-workspace-db.service';
+import { addSystemAgentsToChannel } from './system-agent-assignment.service';
 import { logger } from '../../utils/logger';
 
 const log = logger('CompanyRoutes');
@@ -39,19 +40,6 @@ const log = logger('CompanyRoutes');
 const MAX_NAME_LENGTH = 100;
 const MAX_DESCRIPTION_LENGTH = 500;
 const MAX_MESSAGE_CONTENT_LENGTH = 50000;
-
-const SYSTEM_AGENT_SLUGS = ['xerus-master', 'xerus-cto'];
-
-async function addSystemAgentsToChannel(
-    provider: import('../sandbox-infra/sandbox/providers/daytona.provider').DaytonaProvider,
-    sandboxId: string,
-    channelSlug: string,
-): Promise<void> {
-    for (const slug of SYSTEM_AGENT_SLUGS) {
-        const sql = `INSERT OR IGNORE INTO channel_members (channel_slug, agent_slug, role) VALUES ('${escapeSQL(channelSlug)}', '${escapeSQL(slug)}', 'member')`;
-        await execWsMutate(provider, sandboxId, sql).catch(() => {});
-    }
-}
 
 const router = Router();
 const auth = authenticateFirebaseToken;
@@ -456,8 +444,8 @@ router.get('/channels/:channelId/agents', auth, async (req: AuthenticatedRequest
                         skills,
                     });
                 }
-            } catch {
-                // Agent config not found on sandbox — skip
+            } catch (err) {
+                log.error('Failed to read agent config from sandbox', { error: (err as Error).message, slug: row.slug });
             }
         }
 

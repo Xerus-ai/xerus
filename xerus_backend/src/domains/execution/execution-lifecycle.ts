@@ -4,7 +4,7 @@
 import { logger } from '../../utils/logger';
 import type { ResolvedExecutionDeps, PipelineContext, ExecutionServiceDeps } from './execution-pipeline.types';
 import { DomainError } from '../../utils/errors';
-import { getConversation, deleteConversation } from '../conversations/workspace-db.service';
+// getConversation/deleteConversation removed — orphan cleanup now logs instead of deleting
 
 const log = logger('ExecutionLifecycle');
 
@@ -33,18 +33,8 @@ export async function handleExecutionError(
         }
     } else if (ctx.conversationId && ctx.conversationId !== ctx.request.conversationId) {
         // Conversation was created by this execution but session record was never inserted.
-        // Delete the orphan to avoid ghost conversations in the sidebar.
-        try {
-            if (ctx.sandboxId && deps.sandboxService) {
-                const provider = (deps as ResolvedExecutionDeps).sandboxService.getDaytonaProvider();
-                const conv = await getConversation(provider, ctx.sandboxId, ctx.conversationId);
-                if (conv && conv.message_count === 0) {
-                    await deleteConversation(provider, ctx.sandboxId, ctx.conversationId);
-                }
-            }
-        } catch (dbErr) {
-            log.error('Failed to clean up orphaned conversation', { conversation_id: ctx.conversationId, error: (dbErr as Error).message });
-        }
+        // A conversation with 0 messages is better than a deleted conversation — log and leave it.
+        log.warn('Orphaned conversation (0 messages, no session)', { conversation_id: ctx.conversationId });
     }
 
     if (!ctx.stream.isClosed()) {

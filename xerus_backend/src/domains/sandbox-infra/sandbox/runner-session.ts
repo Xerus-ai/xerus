@@ -48,6 +48,7 @@ export async function getOrCreateRunnerSession(
     systemPrompt?: string,
     model?: string,
     sdkSessionId?: string,
+    conversationId?: string,
 ): Promise<SessionHandle> {
     const userId = session.userId;
     const slug = agentSlug || 'default';
@@ -57,8 +58,15 @@ export async function getOrCreateRunnerSession(
     const existing = session.agentSessions.get(slug);
     if (existing) {
         const envChanged = !envVarsEqual(existing.envVars, envVars);
-        if (envChanged) {
-            log.info('Env vars changed, restarting session', { agent_slug: slug, user_id: userId });
+        const convChanged = conversationId != null && existing.conversationId != null
+            && existing.conversationId !== conversationId;
+        if (envChanged || convChanged) {
+            log.info('Session invalidated, restarting', {
+                agent_slug: slug, user_id: userId,
+                reason: envChanged ? 'env_changed' : 'conversation_changed',
+                old_conv: existing.conversationId?.slice(0, 8),
+                new_conv: conversationId?.slice(0, 8),
+            });
             session.agentSessions.delete(slug);
         } else {
             const lastUsed = existing.handle.lastUsedAt ?? 0;
@@ -67,6 +75,7 @@ export async function getOrCreateRunnerSession(
             const healthy = withinGrace || checkRunnerHealth(existing.handle);
             if (healthy) {
                 existing.handle.lastUsedAt = Date.now();
+                if (conversationId) existing.conversationId = conversationId;
                 log.debug('Reusing existing session', { agent_slug: slug, grace: withinGrace });
                 return existing.handle;
             }
@@ -119,7 +128,7 @@ export async function getOrCreateRunnerSession(
     handle.lastUsedAt = Date.now();
 
     // Cache in per-agent map
-    session.agentSessions.set(slug, { handle, envVars: { ...envVars } });
+    session.agentSessions.set(slug, { handle, envVars: { ...envVars }, conversationId });
 
     // Also set legacy handle for backward compat
     session.runnerHandle = handle;

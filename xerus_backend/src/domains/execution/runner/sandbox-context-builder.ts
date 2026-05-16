@@ -62,7 +62,11 @@ export class SandboxContextBuilder {
         const triggerFile = this.writeTriggerContext(params.triggerType, params.triggerPayload);
         if (triggerFile) filesWritten.push(triggerFile);
 
-        // 3. Rebuild context/index.md
+        // 3. Build skills context
+        const skillsFile = this.buildSkillsContext();
+        if (skillsFile) filesWritten.push(skillsFile);
+
+        // 4. Rebuild context/index.md
         const indexPath = this.rebuildIndex(params.agentSlug);
         filesWritten.push(indexPath);
 
@@ -77,30 +81,53 @@ export class SandboxContextBuilder {
      * Copy memory files from .memory/agents/{slug}/ to context/memory/.
      * The agent's prompt tells it to read context/index.md — having memory
      * files listed there makes them discoverable without hardcoded paths.
+     *
+     * Also copies company-level and user-level memory for broader context.
      */
     private syncMemoryFiles(agentSlug: string): string[] {
-        const memorySource = path.join(this.workspacePath, '.memory', 'agents', agentSlug);
         const memoryDest = path.join(this.workspacePath, 'context', 'memory');
         const written: string[] = [];
 
-        if (!fs.existsSync(memorySource)) return written;
-
         this.ensureDir(memoryDest);
 
-        const memoryFiles = ['working.md', 'episodic.md', 'semantic.md', 'procedural.md'];
-        for (const file of memoryFiles) {
-            const src = path.join(memorySource, file);
-            if (!fs.existsSync(src)) continue;
+        // Agent-scoped memory — copied to context/memory/ (flat, preserving existing path contract)
+        const agentMemory = path.join(this.workspacePath, '.memory', 'agents', agentSlug);
+        if (fs.existsSync(agentMemory)) {
+            const agentFiles = ['working.md', 'expertise.md', 'episodic.md', 'semantic.md', 'procedural.md'];
+            for (const file of agentFiles) {
+                written.push(...this.copyIfExists(path.join(agentMemory, file), path.join(memoryDest, file)));
+            }
+        }
 
-            const content = fs.readFileSync(src, 'utf-8');
-            if (content.trim().length === 0) continue;
+        // Company-level memory — copied to context/memory/company/
+        const companyMemory = path.join(this.workspacePath, '.memory', 'company');
+        if (fs.existsSync(companyMemory)) {
+            const companyDest = path.join(memoryDest, 'company');
+            this.ensureDir(companyDest);
+            for (const file of ['vision.md', 'decisions.md', 'standup.md']) {
+                written.push(...this.copyIfExists(path.join(companyMemory, file), path.join(companyDest, file)));
+            }
+        }
 
-            const dest = path.join(memoryDest, file);
-            fs.writeFileSync(dest, content, 'utf-8');
-            written.push(path.relative(this.workspacePath, dest));
+        // User-level memory — copied to context/memory/user/
+        const userMemory = path.join(this.workspacePath, '.memory', 'user');
+        if (fs.existsSync(userMemory)) {
+            const userDest = path.join(memoryDest, 'user');
+            this.ensureDir(userDest);
+            for (const file of ['preferences.md', 'context.md']) {
+                written.push(...this.copyIfExists(path.join(userMemory, file), path.join(userDest, file)));
+            }
         }
 
         return written;
+    }
+
+    private copyIfExists(src: string, dest: string): string[] {
+        if (!fs.existsSync(src)) return [];
+        const content = fs.readFileSync(src, 'utf-8');
+        if (content.trim().length === 0) return [];
+        fs.writeFileSync(dest, content, 'utf-8');
+        return [path.relative(this.workspacePath, dest)];
     }
 
     // -------------------------------------------------------------------------
@@ -156,6 +183,50 @@ export class SandboxContextBuilder {
         const filePath = path.join(triggerDir, 'current.md');
         fs.writeFileSync(filePath, content, 'utf-8');
         return path.relative(this.workspacePath, filePath);
+    }
+
+    // -------------------------------------------------------------------------
+    // Skills Context
+    // -------------------------------------------------------------------------
+
+    private buildSkillsContext(): string | null {
+        const skillsDirs = [
+            path.join(this.workspacePath, '.claude', 'skills'),
+        ];
+        const skills: Array<{ name: string; description: string; path: string }> = [];
+
+        for (const dir of skillsDirs) {
+            if (!fs.existsSync(dir)) continue;
+            const entries = fs.readdirSync(dir, { withFileTypes: true });
+            for (const entry of entries) {
+                if (!entry.isDirectory()) continue;
+                const skillMd = path.join(dir, entry.name, 'SKILL.md');
+                if (!fs.existsSync(skillMd)) continue;
+                const content = fs.readFileSync(skillMd, 'utf-8');
+                const firstLine = content.split('\n').find(l => l.trim().length > 0) || '';
+                const description = firstLine.replace(/^#+\s*/, '').trim() || entry.name;
+                skills.push({
+                    name: entry.name,
+                    description,
+                    path: `.claude/skills/${entry.name}/SKILL.md`,
+                });
+            }
+        }
+
+        if (skills.length === 0) return null;
+
+        const lines = [
+            '# Installed Skills',
+            '',
+            ...skills.map(s => `- **${s.name}**: ${s.description}\n  path: ${s.path}`),
+            '',
+        ];
+
+        const contextDir = path.join(this.workspacePath, 'context');
+        this.ensureDir(contextDir);
+        const filePath = path.join(contextDir, 'skills.md');
+        fs.writeFileSync(filePath, lines.join('\n'), 'utf-8');
+        return 'context/skills.md';
     }
 
     // -------------------------------------------------------------------------

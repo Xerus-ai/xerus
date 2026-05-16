@@ -78,6 +78,7 @@ export function useExecutionStream(
 ): UseExecutionStreamReturn & {
   connectStream: (conversationId: string) => Promise<void>;
   sendMessage: (conversationId: string, task: string, context?: Record<string, unknown>) => Promise<{ execution_id: string | null }>;
+  getConnectedConversationId: () => string | null;
 } {
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
   const [lastEvent, setLastEvent] = useState<StreamEvent | null>(null);
@@ -435,6 +436,11 @@ export function useExecutionStream(
     };
   }, []);
 
+  // Live ref to the conversation currently bound to the SSE stream. Consumers
+  // use this to scope per-conversation state during event handlers — the event
+  // itself (other than `meta`) doesn't carry the conversation id.
+  const getConnectedConversationId = useCallback(() => connectedConvRef.current, []);
+
   return {
     isConnected: connectionState === 'connected',
     connectionState,
@@ -444,5 +450,6 @@ export function useExecutionStream(
     close,
     connectStream,
     sendMessage,
+    getConnectedConversationId,
   };
 }

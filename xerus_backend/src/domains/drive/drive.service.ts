@@ -142,23 +142,50 @@ export class DriveService {
         return result;
     }
 
-    // Fetch previews from Daytona sandbox (parallel, best-effort)
+    private static readonly PREVIEW_TIMEOUT_MS = 10_000;
+
     private async populatePreviewsDaytona(root: FileNode, sandboxId: string, provider: DaytonaProvider): Promise<void> {
         const files = this.collectPreviewableFiles(root);
         if (files.length === 0) return;
 
-        const results = await Promise.allSettled(
-            files.map(async (node) => {
-                const fullPath = `${SANDBOX_CONFIG.workspacePath}/${node.path}`;
-                const content = await provider.readFile(sandboxId, fullPath);
-                node.preview = content.slice(0, DriveService.MAX_PREVIEW_BYTES);
-            }),
-        );
+        const basePath = SANDBOX_CONFIG.workspacePath;
+        const paths = files.map(f => `${basePath}/${f.path}`);
 
-        // Log failures but don't throw — previews are best-effort
-        const failures = results.filter((r) => r.status === 'rejected');
-        if (failures.length > 0) {
-            log.warn('Preview fetches failed', { failed: failures.length, total: files.length });
+        try {
+            const script = paths
+                .map(p => `echo "---XERUS_PREVIEW_SEP---"; head -c ${DriveService.MAX_PREVIEW_BYTES} '${p.replace(/'/g, "'\\''")}' 2>/dev/null || echo "---XERUS_PREVIEW_FAIL---"`)
+                .join('; ');
+
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), DriveService.PREVIEW_TIMEOUT_MS);
+
+            let result: { result?: string };
+            try {
+                result = await provider.executeCommand(sandboxId, script);
+            } finally {
+                clearTimeout(timeout);
+            }
+
+            if (!result.result) {
+                log.warn('Preview batch returned empty', { file_count: files.length });
+                return;
+            }
+
+            const chunks = result.result.split('---XERUS_PREVIEW_SEP---').slice(1);
+            for (let i = 0; i < Math.min(chunks.length, files.length); i++) {
+                const content = chunks[i].trim();
+                if (content === '---XERUS_PREVIEW_FAIL---' || content === '') continue;
+                if (content.includes('\x00')) {
+                    files[i].preview = '[Binary file]';
+                } else {
+                    files[i].preview = content;
+                }
+            }
+        } catch (err: unknown) {
+            log.warn('Preview batch command failed', {
+                file_count: files.length,
+                error: err instanceof Error ? err.message : String(err),
+            });
         }
     }
 
@@ -222,6 +249,8 @@ export class DriveService {
         const sandboxId = await this.resolveSandboxId(userId);
         const provider = this.getDaytonaProvider();
         const sandboxPath = `${SANDBOX_CONFIG.workspacePath}/${fullPath}`;
+        const parentDir = path.dirname(sandboxPath);
+        await provider.executeCommand(sandboxId, `mkdir -p "${parentDir}"`);
         await provider.uploadFile(sandboxId, fileBuffer.toString('base64'), sandboxPath);
     }
 

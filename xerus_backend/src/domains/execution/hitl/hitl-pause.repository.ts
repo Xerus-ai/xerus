@@ -99,6 +99,18 @@ export class HITLPauseRepositoryImpl implements HITLPauseRepository {
             resolved_at: result.rows[0].resolved_at.toISOString(),
         };
     }
+
+    async resolveExpiredPauseStates(timeoutSeconds: number): Promise<string[]> {
+        const result = await query<{ id: string }>(
+            `UPDATE execution_pause_states
+             SET resolved_at = NOW(), resolution = 'timeout', resolved_by = 'system'
+             WHERE resolved_at IS NULL
+               AND paused_at < NOW() - ($1 || ' seconds')::interval
+             RETURNING id`,
+            [timeoutSeconds]
+        );
+        return result.rows.map(r => r.id);
+    }
 }
 
 // -----------------------------------------------------------------------------

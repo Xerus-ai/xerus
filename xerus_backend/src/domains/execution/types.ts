@@ -34,6 +34,7 @@ export const NATIVE_SDK_TOOLS = [
     'Task', 'Agent', 'WebSearch', 'WebFetch',
     'TodoWrite', 'AskUserQuestion', 'NotebookEdit', 'ToolSearch',
     'SendMessage', 'TaskList', 'TaskGet', 'TaskUpdate', 'TaskCreate',
+    'TeamCreate',
 ] as const;
 
 

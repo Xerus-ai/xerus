@@ -28,6 +28,7 @@ const SWR_KEY = '/company/domains?include=channels'
 interface UseDomainReturn {
   domains: Domain[]
   isLoading: boolean
+  isAuthReady: boolean
   error: string | null
   refetch: () => Promise<void>
 }
@@ -49,6 +50,7 @@ export function useDomains(): UseDomainReturn {
   return {
     domains,
     isLoading,
+    isAuthReady,
     error: error ? (error instanceof Error ? error.message : 'Failed to load channels') : null,
     refetch,
   }

@@ -14,17 +14,36 @@ import { logger } from '../../utils/logger';
 const log = logger('SkillWorkspaceService');
 
 /**
- * Translate frontend channel_id (e.g. "marketing/seo") to workspace-relative path
- * (e.g. "projects/marketing/channels/seo").
- * The MCP handler resolveAgentChannelPath() does this from agents/index.json;
- * this helper does the same translation for the REST API path.
+ * Translate frontend channel_id to workspace-relative path.
+ * Accepts both "domain/channel" and "domain--channel" formats (frontend uses double-dash).
+ * Returns e.g. "projects/marketing/channels/seo".
  */
 export function channelIdToWorkspacePath(channelId: string): string {
-    const parts = channelId.split('/');
-    if (parts.length !== 2 || !parts[0] || !parts[1]) {
-        throw new Error(`Invalid channel_id format: "${channelId}". Expected "domain/channel".`);
+    let domain: string;
+    let channel: string;
+    if (channelId.includes('--')) {
+        const idx = channelId.indexOf('--');
+        domain = channelId.slice(0, idx);
+        channel = channelId.slice(idx + 2);
+    } else {
+        const parts = channelId.split('/');
+        domain = parts[0];
+        channel = parts[1];
     }
-    return `projects/${parts[0]}/channels/${parts[1]}`;
+    if (!domain || !channel) {
+        throw new Error(`Invalid channel_id format: "${channelId}". Expected "domain/channel" or "domain--channel".`);
+    }
+    return `projects/${domain}/channels/${channel}`;
+}
+
+/**
+ * Inverse of channelIdToWorkspacePath: "projects/marketing/channels/seo" -> "marketing/seo".
+ * Returns null if the path does not match the expected shape.
+ */
+export function workspacePathToChannelId(channelPath: string): string | null {
+    const match = channelPath.match(/^projects\/([^/]+)\/channels\/([^/]+)$/);
+    if (!match) return null;
+    return `${match[1]}/${match[2]}`;
 }
 
 export function resolveSkillPath(

@@ -251,10 +251,10 @@ export const CONNECT_TOOL_SCHEMA: ToolSchema = {
     inputSchema: {
         type: 'object',
         properties: {
-            agent_id: { type: 'string', description: 'Agent to connect tool for' },
-            app_slug: { type: 'string', description: 'Pipedream app slug (e.g., gmail, slack)' },
+            tool_slug: { type: 'string', description: 'Tool identifier to connect (e.g., gmail, slack)' },
+            agent_slug: { type: 'string', description: 'Agent requesting the connection' },
         },
-        required: ['agent_id', 'app_slug'],
+        required: ['tool_slug'],
     },
 };
 
@@ -278,15 +278,14 @@ export const SEND_NOTIFICATION_SCHEMA: ToolSchema = {
 
 export const GET_STATUS_SCHEMA: ToolSchema = {
     name: PLATFORM_TOOLS.GET_STATUS,
-    description: 'Get status of agents, teams, tasks, or the workspace.',
+    description: 'Get current platform status including active agents, sandbox state, and system health.',
     inputSchema: {
         type: 'object',
         properties: {
-            scope: { type: 'string', description: 'What to get status for', enum: ['agent', 'team', 'task', 'channel', 'workspace'] },
-            id: { type: 'string', description: 'Specific entity ID (returns overview if omitted)' },
-            include_activity: { type: 'boolean', description: 'Include recent activity log', default: false },
+            include_agents: { type: 'boolean', description: 'Include agent status details' },
+            include_sandbox: { type: 'boolean', description: 'Include sandbox resource info' },
         },
-        required: ['scope'],
+        required: [],
     },
 };
 
@@ -393,12 +392,11 @@ export const REGISTER_TRIGGER_SCHEMA: ToolSchema = {
     inputSchema: {
         type: 'object',
         properties: {
-            agent_id: { type: 'string', description: 'Agent ID to receive trigger events' },
-            app_slug: { type: 'string', description: 'External app identifier (e.g., "stripe", "github", "slack")' },
-            event_type: { type: 'string', description: 'Event type to listen for (e.g., "invoice.created", "push")' },
-            filter_config: { type: 'object', description: 'Event filtering rules', properties: {} },
+            agent_slug: { type: 'string', description: 'Agent to trigger' },
+            trigger_type: { type: 'string', description: 'Type of trigger (webhook, schedule, event)' },
+            config: { type: 'object', description: 'Trigger configuration', properties: {} },
         },
-        required: ['agent_id', 'app_slug', 'event_type'],
+        required: ['agent_slug', 'trigger_type'],
     },
 };
 
@@ -417,11 +415,11 @@ export const LIST_TRIGGERS_SCHEMA: ToolSchema = {
 
 export const DEREGISTER_TRIGGER_SCHEMA: ToolSchema = {
     name: PLATFORM_TOOLS.DEREGISTER_TRIGGER,
-    description: 'Remove a trigger and cleanup its webhook endpoint.',
+    description: 'Remove a registered webhook trigger.',
     inputSchema: {
         type: 'object',
         properties: {
-            trigger_id: { type: 'number', description: 'ID of the trigger to remove' },
+            trigger_id: { type: 'string', description: 'Trigger ID to remove' },
         },
         required: ['trigger_id'],
     },
@@ -462,15 +460,14 @@ export const GET_BILLING_STATUS_SCHEMA: ToolSchema = {
 
 export const COMPLETE_SESSION_SCHEMA: ToolSchema = {
     name: PLATFORM_TOOLS.COMPLETE_SESSION,
-    description: 'Signal that the current agent session is complete with an optional reason and status.',
+    description: 'Signal that the current session is complete. Triggers backend cleanup and finalization.',
     inputSchema: {
         type: 'object',
         properties: {
-            reason: { type: 'string', description: 'Why the session is complete (e.g. "Report delivered")' },
-            status: { type: 'string', enum: ['success', 'failure', 'partial'], description: 'Outcome status. Defaults to success.' },
-            summary: { type: 'string', description: 'Brief summary of work accomplished' },
+            session_id: { type: 'string', description: 'Session ID to complete' },
+            summary: { type: 'string', description: 'Completion summary' },
         },
-        required: [],
+        required: ['session_id'],
     },
 };
 

@@ -14,6 +14,8 @@ import {
     incrementConversationMessageCount,
     writeChatExecution,
 } from '../conversations/workspace-db.service';
+import { syncBeadsToTasks } from '../company/task-workspace-db.service';
+import { syncPostsJsonlToChannelMessages, syncDeliverablesFromFilesystem } from '../company/company-workspace-db.service';
 import type { ResolvedExecutionDeps, PipelineContext } from './execution-pipeline.types';
 
 const log = logger('SessionRecord');
@@ -37,6 +39,13 @@ type PersistedMessagePart =
         target?: string;
         durationMs?: number;
     };
+
+function stringifyFirstArg(args: Record<string, unknown>): string {
+    const first = Object.values(args)[0];
+    if (first == null) return '';
+    if (typeof first === 'string') return first;
+    return JSON.stringify(first);
+}
 
 // -----------------------------------------------------------------------------
 // Create Session Record
@@ -73,6 +82,16 @@ export async function updateSessionRecord(
         throw new SDKExecutionError('Cannot update session: sessionId is missing (pipeline invariant violated)');
     }
 
+    // Clear any pending incremental flush to prevent stale data overwrite after final write
+    if (ctx.conversationId) {
+        const key = `${ctx.conversationId}:${ctx.sessionId}`;
+        const existingTimer = pendingFlushes.get(key);
+        if (existingTimer) {
+            clearTimeout(existingTimer);
+            pendingFlushes.delete(key);
+        }
+    }
+
     // Join accumulated response chunks into final responseText (avoids O(n^2) string concat during streaming)
     if (ctx.responseChunks.length > 0 && !ctx.responseText) {
         ctx.responseText = ctx.responseChunks.join('');
@@ -100,7 +119,7 @@ export async function updateSessionRecord(
             icon: resolveToolIcon(toolCall.tool_name),
             args: toolCall.arguments,
             result: toolCall.result,
-            target: toolCall.arguments ? String(Object.values(toolCall.arguments)[0] ?? '') : undefined,
+            target: toolCall.arguments ? stringifyFirstArg(toolCall.arguments) : undefined,
             durationMs: toolCall.duration_ms,
         });
     }
@@ -132,27 +151,101 @@ export async function updateSessionRecord(
 
     // Persist chat turn to workspace.db for conversation history reload.
     // Non-critical — don't fail the session if it errors.
+    // Write message first, then increment count so they stay in sync.
     if (ctx.conversationId && ctx.sandboxId) {
         try {
             const provider = deps.sandboxService.getDaytonaProvider();
-            await Promise.all([
-                incrementConversationMessageCount(provider, ctx.sandboxId, ctx.conversationId),
-                writeChatExecution(
-                    provider,
-                    ctx.sandboxId,
-                    ctx.conversationId,
-                    ctx.sessionId || null,
-                    ctx.request.task,
-                    ctx.responseText || null,
-                    ctx.inputTokens + ctx.outputTokens,
-                    Date.now() - ctx.startedAt,
-                    messageMetadata,
-                ),
-            ]);
+            await writeChatExecution(
+                provider,
+                ctx.sandboxId,
+                ctx.conversationId,
+                ctx.sessionId || null,
+                ctx.request.task,
+                ctx.responseText || null,
+                ctx.inputTokens + ctx.outputTokens,
+                Date.now() - ctx.startedAt,
+                messageMetadata,
+            );
+            await incrementConversationMessageCount(provider, ctx.sandboxId, ctx.conversationId);
         } catch (err) {
-            log.error('Failed to persist chat execution', { conversation_id: ctx.conversationId, error: (err as Error).message });
+            log.error('Failed to persist chat execution', {
+                conversation_id: ctx.conversationId,
+                response_length: ctx.responseText?.length ?? 0,
+                error: (err as Error).message,
+            });
         }
     }
+
+    // Post-execution syncs: bridge agent-created data to workspace.db for frontend visibility.
+    // Non-critical — fire and forget so session completion isn't blocked.
+    if (ctx.sandboxId) {
+        const provider = deps.sandboxService.getDaytonaProvider();
+
+        syncBeadsToTasks(provider, ctx.sandboxId).catch(err =>
+            log.warn('Post-execution beads sync failed', { error: (err as Error).message }),
+        );
+
+        syncPostsJsonlToChannelMessages(provider, ctx.sandboxId).catch(err =>
+            log.warn('Post-execution posts sync failed', { error: (err as Error).message }),
+        );
+
+        syncDeliverablesFromFilesystem(provider, ctx.sandboxId).catch(err =>
+            log.warn('Post-execution deliverables sync failed', { error: (err as Error).message }),
+        );
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Incremental Persistence (debounced)
+// -----------------------------------------------------------------------------
+
+const DEBOUNCE_MS = 5_000;
+const pendingFlushes = new Map<string, NodeJS.Timeout>();
+
+export function scheduleIncrementalPersist(
+    deps: ResolvedExecutionDeps,
+    ctx: PipelineContext,
+): void {
+    if (!ctx.conversationId || !ctx.sandboxId || !ctx.sessionId) return;
+
+    const key = `${ctx.conversationId}:${ctx.sessionId}`;
+
+    const existing = pendingFlushes.get(key);
+    if (existing) clearTimeout(existing);
+
+    const timer = setTimeout(() => {
+        pendingFlushes.delete(key);
+        flushIncrementalPersist(deps, ctx).catch(err =>
+            log.warn('Incremental persist failed (non-critical)', { error: (err as Error).message }),
+        );
+    }, DEBOUNCE_MS);
+
+    pendingFlushes.set(key, timer);
+}
+
+async function flushIncrementalPersist(
+    deps: ResolvedExecutionDeps,
+    ctx: PipelineContext,
+): Promise<void> {
+    if (!ctx.conversationId || !ctx.sandboxId) return;
+
+    const responseText = ctx.responseChunks.length > 0 ? ctx.responseChunks.join('') : ctx.responseText || null;
+    const metadata = ctx.toolCallDetails.length > 0
+        ? JSON.stringify({ parts: [], tool_calls: ctx.toolCallDetails })
+        : null;
+
+    const provider = deps.sandboxService.getDaytonaProvider();
+    await writeChatExecution(
+        provider,
+        ctx.sandboxId,
+        ctx.conversationId,
+        ctx.sessionId || null,
+        ctx.request.task,
+        responseText,
+        ctx.inputTokens + ctx.outputTokens,
+        Date.now() - ctx.startedAt,
+        metadata,
+    );
 }
 
 // -----------------------------------------------------------------------------

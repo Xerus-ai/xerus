@@ -257,6 +257,23 @@ export async function runFullWorkspaceSetup(
         log.info('Installed sqlite3', { sandbox_id: sandboxId });
     }
 
+    // 4a2. Install Python packages required by workspace hooks (pyyaml for shift.yaml, mcp for IPC)
+    const pipCheck = await provider.executeCommand(
+        sandboxId,
+        `python3 -c "import yaml, mcp" 2>/dev/null && echo FOUND || echo MISSING`,
+    );
+    if ((pipCheck.result || '').trim().endsWith('MISSING')) {
+        const pipResult = await provider.executeCommand(
+            sandboxId,
+            `pip3 install --break-system-packages --quiet pyyaml mcp 2>&1 || echo 'WARN: pip install failed'`,
+        );
+        if ((pipResult.result || '').includes('WARN')) {
+            log.warn('Python package install failed (non-blocking)', { sandbox_id: sandboxId, output: (pipResult.result || '').slice(-200) });
+        } else {
+            log.info('Installed Python packages (pyyaml, mcp)', { sandbox_id: sandboxId });
+        }
+    }
+
     // 4b. Initialize workspace databases (company.db + workspace.db)
     // Run init-db.sh explicitly since CLI prompts mode may not trigger SessionStart hooks
     const initDbScript = `${basePath}/.claude/hooks/scripts/init-db.sh`;
@@ -269,6 +286,23 @@ export async function runFullWorkspaceSetup(
         log.info('Initialized workspace databases', { sandbox_id: sandboxId });
     }
 
+    // 4c. Run workspace.db migrations (idempotent — uses PRAGMA user_version)
+    const dbPath = `${basePath}/data/workspace.db`;
+    const versionCheck = await provider.executeCommand(
+        sandboxId,
+        `sqlite3 '${dbPath}' 'PRAGMA user_version' 2>/dev/null || echo '0'`,
+    );
+    const currentVersion = parseInt((versionCheck.result || '0').trim(), 10) || 0;
+    if (currentVersion < 1) {
+        const migrationSql = `${basePath}/data/migrations/001-conversations-set-null.sql`;
+        const migrationCheck = await provider.executeCommand(
+            sandboxId,
+            `[ -f '${migrationSql}' ] && sqlite3 '${dbPath}' < '${migrationSql}' 2>&1 || echo 'migration not found'`,
+        );
+        if (!(migrationCheck.result || '').includes('migration not found')) {
+            log.info('Ran workspace migration 001', { sandbox_id: sandboxId });
+        }
+    }
 
     // 5. Verify Node.js is available (required by agent runner)
     const nodeCheck = await provider.executeCommand(
@@ -370,7 +404,7 @@ export async function startSchedulerDaemon(
         `[ -f '${schedulerScript}' ] && echo EXISTS || echo MISSING`,
     );
     if ((fileCheck.result || '').trim() === 'MISSING') {
-        log.info('Scheduler script not found, skipping', { sandbox_id: sandboxId, path: schedulerScript });
+        log.warn('Scheduler script not found — proactive agents will not run', { sandbox_id: sandboxId, path: schedulerScript });
         return;
     }
 

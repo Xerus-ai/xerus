@@ -119,11 +119,14 @@ export function AgentDropdown({
           aria-expanded={open}
           aria-label="Select agent"
           data-testid="agent-dropdown"
-          className={cn("w-auto justify-between h-9 px-2 bg-transparent border-transparent hover:bg-surface-hover text-sm font-normal", className)}
+          className={cn("w-auto min-w-[120px] max-w-[160px] justify-between h-8 px-2 bg-transparent border-transparent hover:bg-surface-hover text-sm font-normal", className)}
           disabled={disabled}
         >
           {(() => {
-            const display = selectedAgent ?? XERUS_AGENT
+            const raw = selectedAgent ?? XERUS_AGENT
+            const display = raw.slug === XERUS_MASTER_SLUG ? { ...raw, ...XERUS_AGENT, id: raw.id || XERUS_AGENT.id }
+              : raw.slug === XERUS_CTO_SLUG ? { ...raw, ...CTO_AGENT, id: raw.id || CTO_AGENT.id }
+              : raw
             return (
               <div className="flex items-center gap-2 overflow-hidden">
                 <div className="shrink-0 w-6 h-6 rounded-lg overflow-hidden">

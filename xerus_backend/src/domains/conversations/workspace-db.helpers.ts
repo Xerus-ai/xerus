@@ -14,20 +14,33 @@ export const WORKSPACE_DB_PATH = `${SANDBOX_CONFIG.workspacePath}/data/workspace
 // Shell-safe version of the DB path (escapes single quotes for use in shell commands)
 const ESCAPED_DB_PATH = shellEscapePath(WORKSPACE_DB_PATH);
 
+const HEREDOC_DELIM = 'XERUS_SQL_EOF_7f3a';
+
 export function escapeSQL(value: string): string {
-    // Reject newlines to prevent heredoc termination injection
-    if (/[\n\r]/.test(value)) {
-        throw new Error('SQL value must not contain newlines');
+    if (value.includes(HEREDOC_DELIM)) {
+        throw new Error('SQL value contains reserved delimiter');
     }
-    // Strip null bytes (prevents SQLite string literal termination), then escape single quotes
+    // Strip null bytes (prevents SQLite string literal termination), then escape single quotes.
+    // Newlines are safe inside single-quoted heredoc + SQLite string literals.
     return value.replace(/\0/g, '').replace(/'/g, "''");
+}
+
+/**
+ * Escape SQL LIKE pattern wildcards (% and _) in addition to standard escapeSQL.
+ * Use with `ESCAPE '\\'` clause in LIKE queries to prevent user input from
+ * wildcard-matching unintended rows.
+ */
+export function escapeLikePattern(value: string): string {
+    return escapeSQL(value).replace(/%/g, '\\%').replace(/_/g, '\\_');
 }
 
 export function buildSqliteCommand(sql: string): string {
     // Pipe SQL via stdin using a single-quoted heredoc to prevent shell injection.
-    // <<'EOSQL' disables all shell expansion (no $(), backticks, variable interpolation).
-    // ESCAPED_DB_PATH is shell-escaped to prevent injection if workspace root has single quotes.
-    return `sqlite3 -json ${ESCAPED_DB_PATH} <<'EOSQL'\n${sql}\nEOSQL`;
+    // Single-quoted heredoc disables all shell expansion (no $(), backticks, variable interpolation).
+    // Delimiter is unique enough that agent content won't contain it (escapeSQL guards this).
+    // Prepend PRAGMA foreign_keys=ON so FK constraints are enforced on every connection.
+    const fullSql = `PRAGMA foreign_keys=ON;\n${sql}`;
+    return `sqlite3 -json ${ESCAPED_DB_PATH} <<'${HEREDOC_DELIM}'\n${fullSql}\n${HEREDOC_DELIM}`;
 }
 
 export function parseJsonResult<T>(output: string): T[] | null {
@@ -40,13 +53,28 @@ export function parseJsonResult<T>(output: string): T[] | null {
     }
 }
 
+const MAX_RETRIES = 3;
+
+function sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 export async function executeWorkspaceQuery(
     provider: DaytonaProvider,
     sandboxId: string,
     sql: string,
 ): Promise<string> {
-    const result = await provider.executeCommand(sandboxId, buildSqliteCommand(sql));
-    return result.result || '';
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        const result = await provider.executeCommand(sandboxId, buildSqliteCommand(sql));
+        const output = result.result || '';
+        if (output.includes('database is locked')) {
+            log.warn('SQLite locked, retrying', { attempt, sandboxId });
+            await sleep(100 * Math.pow(2, attempt));
+            continue;
+        }
+        return output;
+    }
+    throw new Error('Workspace DB query failed after retries: database is locked');
 }
 
 export async function executeWorkspaceJsonQuery<T>(

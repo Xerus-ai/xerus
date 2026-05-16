@@ -21,6 +21,7 @@ export class AgentRegistryRepository {
         const result = await query<AgentRegistryEntry>(
             `INSERT INTO agent_registry (slug, user_id, agent_type)
              VALUES ($1, $2, $3)
+             ON CONFLICT (slug, user_id) DO UPDATE SET agent_type = EXCLUDED.agent_type
              RETURNING *`,
             [slug, userId, agentType],
         );

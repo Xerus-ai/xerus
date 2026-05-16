@@ -41,7 +41,12 @@ export class TaskCompletedHandler {
         // 2. Emit push notification for task completion
         this.emitCompletionNotification(input);
 
-        // 3. Log hook execution
+        // 3. Index deliverables if present
+        if (input.deliverables?.length) {
+            this.emitDeliverableIndex(input);
+        }
+
+        // 4. Log hook execution
         const durationMs = Date.now() - startMs;
         this.deps.emitter.hookLog('TaskCompleted', this.context.agent_slug, durationMs, true);
 
@@ -69,6 +74,25 @@ export class TaskCompletedHandler {
             content,
             'medium',
         );
+    }
+
+    private emitDeliverableIndex(input: TaskCompletedInput): void {
+        const date = new Date().toISOString().slice(0, 10);
+        for (const deliverable of input.deliverables ?? []) {
+            const filename = `${date}-${deliverable.replace(/[^a-zA-Z0-9._-]/g, '-')}`;
+            this.deps.emitter.emit({
+                event: 'agent_output',
+                agent_slug: this.context.agent_slug,
+                data: {
+                    output_type: 'deliverable',
+                    task_id: input.task_id,
+                    task_title: input.task_title,
+                    file_path: deliverable,
+                    output_filename: filename,
+                    channel_id: this.context.primary_channel_id,
+                },
+            });
+        }
     }
 
     private emitCompletionNotification(input: TaskCompletedInput): void {

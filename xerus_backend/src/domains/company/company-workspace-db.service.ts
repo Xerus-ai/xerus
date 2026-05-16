@@ -4,7 +4,11 @@
 // Reference: xerus-workspace/data/workspace-schema.sql
 
 import type { DaytonaProvider } from '../sandbox-infra/sandbox/providers/daytona.provider';
-import { escapeSQL, executeWorkspaceJsonQuery } from '../conversations/workspace-db.helpers';
+import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
+import { escapeSQL, executeWorkspaceJsonQuery, executeWorkspaceQuery } from '../conversations/workspace-db.helpers';
+import { logger } from '../../utils/logger';
+
+const log = logger('CompanyWorkspaceDB');
 
 // -----------------------------------------------------------------------------
 // Types (mirror workspace-schema.sql)
@@ -371,4 +375,178 @@ export async function getProjectOverview(
     const cost_summary = costRows.length > 0 ? costRows[0] : { total_cost: 0, session_count: 0 };
 
     return { domain: domains[0], channels, agents, recent_sessions, cost_summary };
+}
+
+// -----------------------------------------------------------------------------
+// posts.jsonl → channel_messages sync
+// Agents write to output/posts.jsonl on the filesystem. The frontend reads
+// channel_messages from workspace.db. This function bridges the gap.
+// -----------------------------------------------------------------------------
+
+interface PostsJsonlEntry {
+    agent_slug: string;
+    content: string;
+    message_type: string;
+    metadata?: Record<string, unknown>;
+    posted_at: string;
+}
+
+export async function syncPostsJsonlToChannelMessages(
+    provider: DaytonaProvider,
+    sandboxId: string,
+): Promise<{ synced: number }> {
+    const wp = SANDBOX_CONFIG.workspacePath;
+
+    const { result: findResult } = await provider.executeCommand(
+        sandboxId,
+        `find ${wp}/projects -path '*/output/posts.jsonl' -type f 2>/dev/null; echo ""`,
+    );
+
+    const jsonlPaths = findResult.trim().split('\n').filter(p => p.trim());
+    if (jsonlPaths.length === 0) return { synced: 0 };
+
+    let totalSynced = 0;
+
+    for (const jsonlPath of jsonlPaths) {
+        // Extract channel slug from path: projects/{domain}/channels/{channel}/output/posts.jsonl
+        const pathMatch = jsonlPath.match(/projects\/([^/]+)\/channels\/([^/]+)\/output/);
+        if (!pathMatch) continue;
+        const channelSlug = pathMatch[2];
+
+        const { result: raw } = await provider.executeCommand(
+            sandboxId,
+            `cat '${jsonlPath}' 2>/dev/null || echo ""`,
+        );
+        if (!raw.trim()) continue;
+
+        const lines = raw.trim().split('\n');
+        const inserts: string[] = [];
+
+        for (const line of lines) {
+            try {
+                const entry = JSON.parse(line) as PostsJsonlEntry;
+                if (!entry.agent_slug || !entry.content || !entry.posted_at) continue;
+
+                const metadataJson = entry.metadata ? JSON.stringify(entry.metadata) : '{}';
+                // Use SELECT WHERE NOT EXISTS to prevent duplicates (no unique constraint on table)
+                inserts.push(`
+                    INSERT INTO channel_messages (channel_slug, agent_slug, content, message_type, metadata, posted_at)
+                    SELECT
+                        '${escapeSQL(channelSlug)}',
+                        '${escapeSQL(entry.agent_slug)}',
+                        '${escapeSQL(entry.content)}',
+                        '${escapeSQL(entry.message_type || 'post')}',
+                        '${escapeSQL(metadataJson)}',
+                        '${escapeSQL(entry.posted_at)}'
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM channel_messages
+                        WHERE channel_slug = '${escapeSQL(channelSlug)}'
+                          AND agent_slug = '${escapeSQL(entry.agent_slug)}'
+                          AND posted_at = '${escapeSQL(entry.posted_at)}'
+                          AND content = '${escapeSQL(entry.content)}'
+                    )
+                `);
+            } catch {
+                continue;
+            }
+        }
+
+        if (inserts.length > 0) {
+            try {
+                await executeWorkspaceQuery(provider, sandboxId, `BEGIN;\n${inserts.join(';\n')};\nCOMMIT;`);
+                totalSynced += inserts.length;
+            } catch (err) {
+                log.warn('Posts sync failed for channel', { channel: channelSlug, error: (err as Error).message });
+            }
+        }
+    }
+
+    return { synced: totalSynced };
+}
+
+// -----------------------------------------------------------------------------
+// Deliverables sync: scan output/deliverables/ → agent_outputs table
+// -----------------------------------------------------------------------------
+
+export async function syncDeliverablesFromFilesystem(
+    provider: DaytonaProvider,
+    sandboxId: string,
+): Promise<{ synced: number }> {
+    const wp = SANDBOX_CONFIG.workspacePath;
+
+    const { result: findResult } = await provider.executeCommand(
+        sandboxId,
+        `find ${wp}/projects -path '*/output/deliverables/*' -type f 2>/dev/null; echo ""`,
+    );
+
+    const filePaths = findResult.trim().split('\n').filter(p => p.trim());
+    if (filePaths.length === 0) return { synced: 0 };
+
+    const inserts: string[] = [];
+
+    for (const filePath of filePaths) {
+        // Extract agent info from path: projects/{domain}/channels/{channel}/output/deliverables/{filename}
+        const pathMatch = filePath.match(/projects\/([^/]+)\/channels\/([^/]+)\/output\/deliverables\/(.+)$/);
+        if (!pathMatch) continue;
+        const channelSlug = pathMatch[2];
+        const filename = pathMatch[3];
+
+        // Get file info
+        const { result: stat } = await provider.executeCommand(
+            sandboxId,
+            `stat --format='%s %Y' '${filePath}' 2>/dev/null || echo "0 0"`,
+        );
+        const [sizeStr, mtimeStr] = stat.trim().split(' ');
+        const size = parseInt(sizeStr, 10) || 0;
+        const mtime = parseInt(mtimeStr, 10) || 0;
+        const createdAt = mtime > 0 ? new Date(mtime * 1000).toISOString() : new Date().toISOString();
+
+        // Read first 500 chars as preview
+        const { result: preview } = await provider.executeCommand(
+            sandboxId,
+            `head -c 500 '${filePath}' 2>/dev/null || echo ""`,
+        );
+
+        // Determine output type from extension
+        const ext = filename.split('.').pop()?.toLowerCase() ?? '';
+        const outputType = ['ts', 'js', 'py', 'sh'].includes(ext) ? 'code'
+            : ['md', 'txt'].includes(ext) ? 'report'
+            : ['json', 'csv', 'jsonl'].includes(ext) ? 'data'
+            : 'file';
+
+        // Get channel lead as the likely author
+        const agentSql = `
+            SELECT cm.agent_slug FROM channel_members cm
+            WHERE cm.channel_slug = '${escapeSQL(channelSlug)}'
+            ORDER BY cm.role ASC LIMIT 1
+        `;
+        const agentRows = await executeWorkspaceJsonQuery<{ agent_slug: string }>(provider, sandboxId, agentSql);
+        const agentSlug = agentRows[0]?.agent_slug ?? 'unknown';
+
+        const relPath = filePath.replace(wp + '/', '');
+
+        inserts.push(`
+            INSERT INTO agent_outputs (agent_slug, output_type, title, file_path, content_preview, metadata, created_at)
+            SELECT
+                '${escapeSQL(agentSlug)}',
+                '${escapeSQL(outputType)}',
+                '${escapeSQL(filename)}',
+                '${escapeSQL(relPath)}',
+                '${escapeSQL(preview.trim())}',
+                '${escapeSQL(JSON.stringify({ size, channel: channelSlug }))}',
+                '${escapeSQL(createdAt)}'
+            WHERE NOT EXISTS (SELECT 1 FROM agent_outputs WHERE file_path = '${escapeSQL(relPath)}')
+        `);
+    }
+
+    if (inserts.length === 0) return { synced: 0 };
+
+    try {
+        await executeWorkspaceQuery(provider, sandboxId, `BEGIN;\n${inserts.join(';\n')};\nCOMMIT;`);
+    } catch (err) {
+        log.warn('Deliverables sync failed', { error: (err as Error).message });
+        return { synced: 0 };
+    }
+
+    return { synced: inserts.length };
 }

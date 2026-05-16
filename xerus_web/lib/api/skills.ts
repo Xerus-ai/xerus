@@ -28,6 +28,7 @@ export const getSkills = async (options?: {
   category?: string;
   search?: string;
   tags?: string[];
+  channel_id?: string;
 }): Promise<{ skills: Skill[]; categories: string[]; pagination: { page: number; limit: number; total: number; total_pages: number } }> => {
   const params = new URLSearchParams();
   if (options?.page) params.set('page', options.page.toString());
@@ -37,6 +38,7 @@ export const getSkills = async (options?: {
   if (options?.category) params.set('category', options.category);
   if (options?.search) params.set('search', options.search);
   if (options?.tags) options.tags.forEach(tag => params.append('tags', tag));
+  if (options?.channel_id) params.set('channel_id', options.channel_id);
 
   const queryString = params.toString();
   const endpoint = queryString ? `/skills?${queryString}` : '/skills';

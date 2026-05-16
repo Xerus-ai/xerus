@@ -50,6 +50,11 @@ export interface Skill {
 export interface SkillDetail extends Skill {
     files: SkillFile[];
     is_installed: boolean;
+    // True if this skill is installed at global scope (visible workspace-wide).
+    is_globally_installed: boolean;
+    // Channel IDs ("domain/channel") where this skill is installed at channel scope.
+    // Empty when only globally installed or not installed at all.
+    installed_channels: string[];
 }
 
 // File listing

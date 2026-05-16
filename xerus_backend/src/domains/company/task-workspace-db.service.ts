@@ -4,7 +4,11 @@
 // Reference: xerus-workspace/data/workspace-schema.sql (tasks table)
 
 import type { DaytonaProvider } from '../sandbox-infra/sandbox/providers/daytona.provider';
-import { escapeSQL, executeWorkspaceJsonQuery } from '../conversations/workspace-db.helpers';
+import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
+import { escapeSQL, executeWorkspaceJsonQuery, executeWorkspaceQuery } from '../conversations/workspace-db.helpers';
+import { logger } from '../../utils/logger';
+
+const log = logger('TaskWorkspaceDB');
 
 // -----------------------------------------------------------------------------
 // Types (mirror workspace-schema.sql tasks table)
@@ -290,4 +294,129 @@ export async function listChannelDeliverables(
     `;
     const deliverables = await executeWorkspaceJsonQuery<WorkspaceDeliverableRow>(provider, sandboxId, sql);
     return { deliverables };
+}
+
+// -----------------------------------------------------------------------------
+// Beads JSONL → tasks sync
+// -----------------------------------------------------------------------------
+
+interface BeadsIssue {
+    id: string;
+    title?: string;
+    body?: string;
+    state?: string;
+    assignee?: string;
+    priority?: number;
+    labels?: string[];
+    project?: string;
+    created_at?: string;
+    updated_at?: string;
+    closed_at?: string;
+}
+
+const BEADS_STATUS_MAP: Record<string, string> = {
+    open: 'open',
+    in_progress: 'in_progress',
+    blocked: 'blocked',
+    closed: 'completed',
+    cancelled: 'cancelled',
+};
+
+const PRIORITY_MAP: Record<number, string> = {
+    1: 'critical',
+    2: 'high',
+    3: 'medium',
+    4: 'low',
+};
+
+export async function syncBeadsToTasks(
+    provider: DaytonaProvider,
+    sandboxId: string,
+): Promise<{ synced: number; skipped: number }> {
+    const wp = SANDBOX_CONFIG.workspacePath;
+
+    // Find ALL .beads/issues.jsonl files across channel directories
+    const { result: findResult } = await provider.executeCommand(
+        sandboxId,
+        `find ${wp}/projects -path '*/.beads/issues.jsonl' -type f 2>/dev/null; echo ""`,
+    );
+
+    const jsonlPaths = findResult.trim().split('\n').filter(p => p.trim());
+    if (jsonlPaths.length === 0) return { synced: 0, skipped: 0 };
+
+    const upserts: string[] = [];
+    let skipped = 0;
+
+    for (const jsonlPath of jsonlPaths) {
+        // Extract channel slug from path: projects/{domain}/channels/{channel}/.beads/issues.jsonl
+        const pathMatch = jsonlPath.match(/projects\/([^/]+)\/channels\/([^/]+)\/.beads/);
+        const projectSlug = pathMatch ? `${pathMatch[1]}/${pathMatch[2]}` : 'default';
+
+        const { result: raw } = await provider.executeCommand(
+            sandboxId,
+            `cat '${jsonlPath}' 2>/dev/null || echo ""`,
+        );
+        if (!raw.trim()) continue;
+
+        const lines = raw.trim().split('\n');
+        for (const line of lines) {
+            try {
+                const issue = JSON.parse(line) as BeadsIssue;
+                if (!issue.id || !issue.title) { skipped++; continue; }
+
+                const status = BEADS_STATUS_MAP[issue.state ?? 'open'] ?? 'open';
+                const priority = PRIORITY_MAP[issue.priority ?? 3] ?? 'medium';
+                const now = new Date().toISOString();
+                const issueProject = issue.project ?? projectSlug;
+
+                upserts.push(`
+                    INSERT INTO tasks (id, project_slug, title, description, status, priority, assigned_agent, labels, created_at, updated_at, synced_at)
+                    VALUES (
+                        '${escapeSQL(issue.id)}',
+                        '${escapeSQL(issueProject)}',
+                        '${escapeSQL(issue.title)}',
+                        ${issue.body ? `'${escapeSQL(issue.body)}'` : 'NULL'},
+                        '${status}',
+                        '${priority}',
+                        ${issue.assignee ? `'${escapeSQL(issue.assignee)}'` : 'NULL'},
+                        ${issue.labels ? `'${escapeSQL(JSON.stringify(issue.labels))}'` : 'NULL'},
+                        '${issue.created_at ?? now}',
+                        '${issue.updated_at ?? now}',
+                        '${now}'
+                    )
+                    ON CONFLICT(id) DO UPDATE SET
+                        title = excluded.title,
+                        description = excluded.description,
+                        status = excluded.status,
+                        priority = excluded.priority,
+                        assigned_agent = excluded.assigned_agent,
+                        labels = excluded.labels,
+                        updated_at = excluded.updated_at,
+                        synced_at = excluded.synced_at;
+                `);
+            } catch (err) {
+                log.debug('Skipping malformed beads line', { error: (err as Error).message });
+                skipped++;
+            }
+        }
+    }
+
+    if (upserts.length === 0) return { synced: 0, skipped };
+
+    // Batch into chunks of 50 to avoid exceeding shell argument limits at scale
+    const BATCH_SIZE = 50;
+    let synced = 0;
+    for (let i = 0; i < upserts.length; i += BATCH_SIZE) {
+        const batch = upserts.slice(i, i + BATCH_SIZE);
+        const batchSql = `BEGIN;\n${batch.join('\n')}\nCOMMIT;`;
+        try {
+            await executeWorkspaceQuery(provider, sandboxId, batchSql);
+            synced += batch.length;
+        } catch (err) {
+            log.warn('Beads sync batch failed', { error: (err as Error).message, batchStart: i, batchSize: batch.length });
+            skipped += batch.length;
+        }
+    }
+
+    return { synced, skipped };
 }

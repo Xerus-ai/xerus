@@ -23,6 +23,7 @@ export interface AgentRoutesDeps {
 }
 
 let sharedFsRepo: AgentFilesystemRepository | null = null;
+let sharedSandboxService: SandboxService | null = null;
 
 export function getSharedFsRepo(): AgentFilesystemRepository {
     if (!sharedFsRepo) {
@@ -31,8 +32,15 @@ export function getSharedFsRepo(): AgentFilesystemRepository {
     return sharedFsRepo;
 }
 
+export function getAgentSandboxService(): SandboxService {
+    if (!sharedSandboxService) {
+        throw new Error('SandboxService not initialized. Call setAgentRoutesDeps() first.');
+    }
+    return sharedSandboxService;
+}
+
 export function setAgentRoutesDeps(d: AgentRoutesDeps): void {
-    // Initialize the shared filesystem repository for all agent services
+    sharedSandboxService = d.sandboxService;
     const driveService = new DriveService(d.sandboxService);
     sharedFsRepo = new AgentFilesystemRepository(driveService);
     agentService.setFilesystemRepo(sharedFsRepo);

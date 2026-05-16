@@ -18,8 +18,9 @@ export function SkillsRibbon({ channelSlug, onSkillClick }: SkillsRibbonProps) {
   const [processing, setProcessing] = useState<string | null>(null)
 
   const { data: skillsData, mutate } = useSWR(
-    'skills/all',
-    () => getSkills({ limit: 100 }),
+    channelSlug ? `skills/channel/${channelSlug}` : 'skills/all',
+    () => getSkills({ limit: 100, channel_id: channelSlug || undefined }),
+    { dedupingInterval: 30_000, revalidateOnFocus: false },
   )
 
   const allSkills = useMemo(() => skillsData?.skills || [], [skillsData])
@@ -29,7 +30,7 @@ export function SkillsRibbon({ channelSlug, onSkillClick }: SkillsRibbonProps) {
   const handleInstall = async (skill: Skill) => {
     setProcessing(skill.slug)
     try {
-      await installSkill(skill.slug, { scope: 'global' })
+      await installSkill(skill.slug, { scope: channelSlug ? 'channel' : 'global', channel_id: channelSlug || undefined })
       await mutate()
     } catch {
       toast.error(`Failed to install ${skill.name}`)
@@ -87,7 +88,12 @@ export function SkillsRibbon({ channelSlug, onSkillClick }: SkillsRibbonProps) {
                 {installedSkills.map((skill) => {
                   const isProcessing = processing === skill.slug
                   return (
-                    <div key={skill.slug} className="flex items-center gap-2 py-1.5 px-2 rounded-xl hover:bg-surface-hover group transition-colors">
+                    <div key={skill.slug} className="flex items-center gap-2 py-1.5 px-2 rounded-xl hover:bg-surface-hover group transition-colors cursor-pointer"
+                      onClick={() => {
+                        onSkillClick?.(skill.slug)
+                        setPopoverOpen(false)
+                      }}
+                    >
                       <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                         <Puzzle className="w-3 h-3 text-primary" />
                       </div>
@@ -96,7 +102,10 @@ export function SkillsRibbon({ channelSlug, onSkillClick }: SkillsRibbonProps) {
                         <Loader2 className="w-3 h-3 text-text-muted animate-spin shrink-0" />
                       ) : (
                         <button
-                          onClick={() => handleUninstall(skill)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleUninstall(skill)
+                          }}
                           className="w-4 h-4 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:text-destructive text-text-muted transition-all shrink-0"
                         >
                           <X className="w-3 h-3" />
@@ -131,7 +140,7 @@ export function SkillsRibbon({ channelSlug, onSkillClick }: SkillsRibbonProps) {
                         {isProcessing ? (
                           <Loader2 className="w-3 h-3 text-text-muted animate-spin shrink-0" />
                         ) : (
-                          <Plus className="w-3 h-3 text-text-muted shrink-0" />
+                          <Plus className="w-3 h-3 text-primary shrink-0" />
                         )}
                       </button>
                     )

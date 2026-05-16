@@ -31,6 +31,8 @@ import { toolsRepository } from '../tools/repository';
 import { generateMascotConfig } from './avatar';
 import { slugify } from '../../shared/slugify';
 import { configToAgent, canUserView, canUserModify } from './agent-helpers';
+import { buildAllSoulFiles } from '../sandbox-infra/workspace/soul-file-templates';
+import { generateOperatingMd } from '../sandbox-infra/workspace/operating-md.template';
 
 // Re-export extracted services for convenience
 export { agentToolsService, AgentToolsService } from './agent-tools.service';
@@ -130,6 +132,33 @@ export class AgentService {
         if (validatedData.system_prompt !== undefined) {
             await fs.writeFile(userId, `agents/${slug}/agent.md`, validatedData.system_prompt);
         }
+
+        // Generate soul files (identity, status, relationships, operating protocol)
+        const soulFiles = buildAllSoulFiles({
+            name: config.name,
+            role: config.personality_type || '',
+            domain: config.domain || '',
+            personalityType: config.personality_type || '',
+            description: config.description,
+        });
+        const operatingMd = generateOperatingMd({
+            agentSlug: slug,
+            agentName: config.name,
+            agentType: 'reactive',
+            autonomyLevel: config.autonomy_level || 'supervised',
+            hasHeartbeat: false,
+        });
+        await Promise.all([
+            fs.writeFile(userId, `agents/${slug}/SOUL.md`, soulFiles.soul),
+            fs.writeFile(userId, `agents/${slug}/STATUS.md`, soulFiles.status),
+            fs.writeFile(userId, `agents/${slug}/USER.md`, soulFiles.user),
+            fs.writeFile(userId, `agents/${slug}/RELATIONSHIPS.md`, soulFiles.relationships),
+            fs.writeFile(userId, `agents/${slug}/BOOTSTRAP.md`, soulFiles.bootstrap),
+            fs.writeFile(userId, `agents/${slug}/OPERATING.md`, operatingMd),
+            fs.writeFile(userId, `agents/${slug}/HEARTBEAT.md`, `# ${config.name} Heartbeat\n\n## Scheduled\n\nNo schedule configured.\n\n## Events\n`),
+            fs.writeFile(userId, `.memory/agents/${slug}/working.md`, `# ${config.name} Working Context\n\n`),
+            fs.writeFile(userId, `.memory/agents/${slug}/expertise.md`, `# ${config.name} Expertise\n\n`),
+        ]);
 
         // Update index.json
         await fs.addToIndex(userId, { slug, name: config.name, agent_type: 'private' });

@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import { logger } from '../../../utils/logger';
 import { StdoutEmitter } from './stdout-emitter';
-import { buildSoulAppend } from './soul-append-builder';
+import { buildSoulAppend, buildMemoryAppend } from './soul-append-builder';
 import { buildHookHandlers } from '../hooks/hooks.registry';
 import { buildRuntimeHookHandlers } from './runtime-hook-factory';
 import type { HookAgentContext, HookTriggerContext } from '../hooks/hooks.types';
@@ -82,15 +82,22 @@ export class AgentConfigLoader {
             const isMaster = agentSlug === XERUS_MASTER_SLUG;
             const isCTO = agentSlug === XERUS_CTO_SLUG;
 
-            // Only build soul append for agents that use it (master + domain agents)
-            const append = isCTO ? '' : buildSoulAppend(agentDir);
+            // Build soul append (identity + operational protocol) + memory append (prior knowledge)
+            const soulAppend = isCTO ? '' : buildSoulAppend(agentDir);
+            const memoryAppend = buildMemoryAppend(this.workspacePath, agentSlug);
+            const append = [soulAppend, memoryAppend].filter(Boolean).join('\n\n');
             const cwd = this.resolveAgentCwd(agentSlug, parsed);
 
             // Native SDK tools that every agent needs (Read, Write, etc.)
             // Config tools are MCP/Pipedream app slugs from workspace config.json
             // Merge both so PreToolUse allows native tools + agent-specific MCP tools
             const configTools = Array.isArray(parsed.tools) ? parsed.tools as string[] : [];
-            const tools = [...new Set([...NATIVE_SDK_TOOLS, ...configTools])];
+            const mergedTools = [...new Set([...NATIVE_SDK_TOOLS, ...configTools])];
+            const modelStr = String(parsed.ai_model || parsed.model || DEFAULT_SDK_MODEL).toLowerCase();
+            const isAnthropicDirect = modelStr.includes('claude') && !modelStr.includes('openrouter');
+            const tools = isAnthropicDirect
+                ? mergedTools
+                : mergedTools.filter(t => t !== 'WebFetch');
 
             // Build runtime hook handlers with runner-compatible deps
             const runtimeHandlers = buildRuntimeHookHandlers(
@@ -144,7 +151,7 @@ export class AgentConfigLoader {
             // by ProcessManager.resolveMcpServers() at execution time.
             const baseMcpServers = parsed.mcp_servers as Record<string, unknown> | undefined;
             const mcp_servers = isMaster
-                ? { ...baseMcpServers, 'xerus-platform': { type: 'stdio' } }
+                ? { ...baseMcpServers, 'platform': { type: 'stdio' } }
                 : baseMcpServers;
 
             return {
