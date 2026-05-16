@@ -52,6 +52,13 @@ export const PLATFORM_TOOLS = {
     LIST_SCHEDULES: 'list_schedules',
     UPDATE_SCHEDULE: 'update_schedule',
     DELETE_SCHEDULE: 'delete_schedule',
+    // MCP-only tools (6) — exposed via internal MCP routes
+    DELETE_AGENT: 'delete_agent',
+    LIST_AGENTS: 'list_agents',
+    LIST_DOMAINS: 'list_domains',
+    INSTALL_SKILL: 'install_skill',
+    UNINSTALL_SKILL: 'uninstall_skill',
+    CANCEL_EXECUTION: 'cancel_execution',
 } as const;
 
 export type PlatformTool = (typeof PLATFORM_TOOLS)[keyof typeof PLATFORM_TOOLS];
@@ -110,6 +117,13 @@ export const PLATFORM_TOOL_HITL: Record<PlatformTool, HITLRequirement> = {
     [PLATFORM_TOOLS.LIST_SCHEDULES]: 'auto',
     [PLATFORM_TOOLS.UPDATE_SCHEDULE]: 'auto',
     [PLATFORM_TOOLS.DELETE_SCHEDULE]: 'auto',
+    // MCP-only tools
+    [PLATFORM_TOOLS.DELETE_AGENT]: 'always',
+    [PLATFORM_TOOLS.LIST_AGENTS]: 'auto',
+    [PLATFORM_TOOLS.LIST_DOMAINS]: 'auto',
+    [PLATFORM_TOOLS.INSTALL_SKILL]: 'conditional',
+    [PLATFORM_TOOLS.UNINSTALL_SKILL]: 'conditional',
+    [PLATFORM_TOOLS.CANCEL_EXECUTION]: 'auto',
 };
 
 // -----------------------------------------------------------------------------

@@ -1,659 +1,268 @@
 /**
- * useChatExecution - Bridges useExecutionStream with ChatContainer state.
+ * useChatExecution — bridges useExecutionStream events to the chat reducer.
  *
- * Handles token accumulation, progress tracking, tool call/result updates,
- * and final message assembly when the execution stream completes.
+ * Per-conversation scoping: every handler reads getConvId so events from a
+ * previous send never leak into a different conversation when the user has
+ * switched away mid-stream.
  *
- * v5: Removed deprecated parallel state (streamingMessage, activeTools,
- * streamingThinking). All streaming state lives in streamingTurn.parts.
+ * Token batching: high-frequency token events accumulate per-conv text and
+ * flush via requestAnimationFrame so the reducer dispatches at most once/frame.
  */
-import { useCallback, useRef } from 'react'
+import { useCallback, useRef, useEffect, useMemo } from 'react'
 import { useExecutionStream } from '@/hooks/useExecutionStream'
-import type {
-  StreamEvent,
-  TokenEventContent,
-  DoneEventContent,
-  ToolCallEventContent,
-  ToolResultEventContent,
-  ProgressEventContent,
-  MetaEventContent,
-  ReasoningEventContent,
-  SubagentStartEventContent,
-  SubagentStopEventContent,
-  DelegationEventContent,
-  NotificationEventContent,
-  ToolAuthRequiredEventContent,
-  GuidanceEventContent,
-  StopEventContent,
-  PreviewEventContent,
-  CreditWarningEventContent,
-  InsufficientCreditsEventContent,
-  ProviderUnavailableEventContent,
-  TaskStartedEventContent,
-  TaskUpdatedEventContent,
-  TaskProgressEventContent,
-  TaskNotificationEventContent,
-  ToolProgressEventContent,
-  ToolUseSummaryEventContent,
-} from '@/hooks/useExecutionStream'
-import type { ChatState } from './types'
+import type { StreamEvent, DoneEventContent, StopEventContent } from '@/hooks/useExecutionStream'
 import type { ChatMessageExtended } from './chat-message.types'
-import { resolveToolIcon } from './tool-icon.utils'
-import {
-  createStreamingTurn,
-  appendToken,
-  appendReasoning,
-  startToolCall,
-  completeToolCall,
-  updateToolProgress,
-  enrichToolSummary,
-  addStatus,
-  commitTurn,
-} from './streaming-turn-reducer'
+import { commitTurn, appendToken } from './streaming-turn-reducer'
 import { extractTextFromParts } from './streaming-turn.utils'
 import { toast } from '@/lib/toast'
+import type { ChatAction } from './chatReducer'
+import { type PerConvRefs, emptyRefs } from './useChatExecution.helpers'
+import {
+  type HandlerCtx,
+  makeOnToken, makeOnProgress, makeOnToolCall, makeOnToolResult, makeOnMeta,
+  makeOnReasoning, makeOnSubagentStart, makeOnSubagentStop, makeOnDelegation,
+  makeOnNotification,
+} from './useChatExecution.handlers'
+import {
+  makeOnToolAuthRequired, makeOnGuidance, makeOnPreview,
+  makeOnCreditWarning, makeOnInsufficientCredits, makeOnProviderUnavailable,
+  makeOnTaskStarted, makeOnTaskUpdated, makeOnTaskProgress, makeOnTaskNotification,
+  makeOnToolProgress, makeOnToolUseSummary,
+} from './useChatExecution.task-handlers'
 
-type SetState = React.Dispatch<React.SetStateAction<ChatState>>
+type Dispatch = React.Dispatch<ChatAction>
 
 interface UseChatExecutionOptions {
-  setState: SetState
+  dispatch: Dispatch
 }
 
-export function useChatExecution({ setState }: UseChatExecutionOptions) {
-  // Accumulate raw text for onDone fallback (if finalResponse is absent)
-  const rawTextRef = useRef('')
-  const respondingAgentRef = useRef<{ agentSlug?: string; agentName?: string }>({})
-  // Track tool start times for duration computation
-  const toolStartTimesRef = useRef<Map<string, number>>(new Map())
-  // Track tool names/paths by callId for artifact auto-open
-  const toolMetaRef = useRef<Map<string, { toolName: string; filePath?: string }>>(new Map())
-  // Buffer status labels that arrive before streamingTurn is created (e.g., plan mode, skills)
-  const pendingStatusLabelsRef = useRef<string[]>([])
-  // Debounce disconnect reset to allow EventSource auto-reconnect
+export function useChatExecution({ dispatch }: UseChatExecutionOptions) {
+  const dispatchRef = useRef(dispatch)
+  dispatchRef.current = dispatch
+
+  const refsByConv = useRef<Map<string, PerConvRefs>>(new Map())
+  const getRefs = useCallback((convId: string): PerConvRefs => {
+    let r = refsByConv.current.get(convId)
+    if (!r) { r = emptyRefs(); refsByConv.current.set(convId, r) }
+    return r
+  }, [])
+
   const disconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // Prevent duplicate onDone processing from SSE reconnect replays
-  const doneReceivedRef = useRef(false)
+  const getConvIdRef = useRef<() => string | null>(() => null)
 
-  const tokenCountRef = useRef(0)
+  const flushTokens = useCallback((convId: string) => {
+    const refs = getRefs(convId)
+    refs.pendingTokenFrame = null
+    if (!refs.turn || !refs.pendingTokenText) return
+    refs.turn = appendToken(refs.turn, refs.pendingTokenText)
+    refs.pendingTokenText = ''
+    dispatchRef.current({ type: 'SET_STREAMING_TURN', convId, turn: refs.turn })
+    dispatchRef.current({
+      type: 'SET_TOKEN_USAGE',
+      convId,
+      tokenUsage: { used: refs.tokenCount, total: refs.modelContextSize },
+    })
+  }, [getRefs])
 
-  const resetStreamContent = useCallback(() => {
-    rawTextRef.current = ''
-    respondingAgentRef.current = {}
-    toolStartTimesRef.current.clear()
-    toolMetaRef.current.clear()
-    pendingStatusLabelsRef.current = []
-    doneReceivedRef.current = false
-    tokenCountRef.current = 0
+  const resetStreamContent = useCallback((convId: string) => {
+    const refs = getRefs(convId)
+    if (refs.pendingTokenFrame !== null) cancelAnimationFrame(refs.pendingTokenFrame)
+    refsByConv.current.set(convId, emptyRefs())
     if (disconnectTimerRef.current) {
       clearTimeout(disconnectTimerRef.current)
       disconnectTimerRef.current = null
     }
+  }, [getRefs])
+
+  // Build the handler context once. dispatchRef and getConvIdRef carry live values.
+  const ctx: HandlerCtx = useMemo(() => ({
+    getRefs,
+    getConvId: () => getConvIdRef.current(),
+    dispatch: (action) => dispatchRef.current(action),
+    scheduleTokenFlush: flushTokens,
+  }), [getRefs, flushTokens])
+
+  // Drain any pending tokens before committing/finalizing the turn.
+  const drainTokens = useCallback((refs: PerConvRefs) => {
+    if (refs.pendingTokenFrame !== null) {
+      cancelAnimationFrame(refs.pendingTokenFrame)
+      refs.pendingTokenFrame = null
+      if (refs.turn && refs.pendingTokenText) {
+        refs.turn = appendToken(refs.turn, refs.pendingTokenText)
+        refs.pendingTokenText = ''
+      }
+    }
   }, [])
 
-  const stream = useExecutionStream({
-    onToken: useCallback((event: StreamEvent<'token'>) => {
-      const content = event.content as TokenEventContent
-      const text = content.text
-      // Skip raw error JSON chunks from upstream LLM providers
-      if (text.includes('"type":"error"') && text.includes('"api_error"')) return
-      rawTextRef.current += text
-      tokenCountRef.current += Math.ceil(text.length / 4)
-      setState(prev => {
-        const turn = prev.streamingTurn
-        if (!turn) return prev
-        const tokenUsage = prev.tokenUsage
-          ? { ...prev.tokenUsage, used: tokenCountRef.current }
-          : prev.tokenUsage
-        return { ...prev, streamingTurn: appendToken(turn, text), tokenUsage }
+  // ---- Terminal handlers (kept here because they coordinate finalization) ----
+
+  const onDone = useCallback((event: StreamEvent<'done'>) => {
+    const convId = getConvIdRef.current()
+    if (!convId) return
+    const refs = getRefs(convId)
+    if (refs.doneReceived) return
+    refs.doneReceived = true
+    drainTokens(refs)
+
+    const content = event.content as DoneEventContent
+    const isError = event.success === false || !!content.error
+
+    let finalText = content.finalResponse ?? refs.rawText
+    if (finalText) {
+      finalText = finalText.replace(/\{"type"\s*:\s*"error"[^}]*\{[^}]*\}\s*\}/g, '').trim()
+    }
+    if (isError) {
+      toast.error('Response interrupted', {
+        description: content.error?.message ?? 'The AI provider encountered an error',
       })
-    }, [setState]),
-    onProgress: useCallback((event: StreamEvent<'progress'>) => {
-      const content = event.content as ProgressEventContent
-      const INFRA_NOISE = new Set(['sandbox', 'executing', 'provisioning', 'connecting'])
-      const isNoise = INFRA_NOISE.has(content.phase.toLowerCase())
-      setState(prev => {
-        let streamingTurn = prev.streamingTurn
-        if (streamingTurn && !isNoise) {
-          streamingTurn = addStatus(streamingTurn, content.phase)
-        } else if (!streamingTurn && !isNoise) {
-          pendingStatusLabelsRef.current.push(content.phase)
-        }
-        return {
-          ...prev,
-          streamingTurn,
-          executionState: {
-            mode: prev.executionState?.mode ?? 'simple',
-            currentNode: content.phase,
-            steps: [
-              ...(prev.executionState?.steps ?? []).map(s =>
-                s.status === 'active' ? { ...s, status: 'completed' as const, endTime: Date.now() } : s
-              ),
-              {
-                id: `step-${Date.now()}`,
-                name: content.phase,
-                status: 'active' as const,
-                startTime: Date.now(),
-              },
-            ],
-            completedSteps: (prev.executionState?.completedSteps ?? 0) + 1,
-          },
-        }
-      })
-    }, [setState]),
-    onToolCall: useCallback((event: StreamEvent<'tool_call'>) => {
-      const content = event.content as ToolCallEventContent
-      toolStartTimesRef.current.set(content.callId, Date.now())
-      const filePath = content.arguments?.file_path as string | undefined
-      toolMetaRef.current.set(content.callId, { toolName: content.toolName, filePath })
-      setState(prev => {
-        const turn = prev.streamingTurn
-        return {
-          ...prev,
-          streamingTurn: turn
-            ? startToolCall(turn, content.callId, content.toolName, resolveToolIcon(content.toolName), content.arguments)
-            : turn,
-        }
-      })
-    }, [setState]),
-    onToolResult: useCallback((event: StreamEvent<'tool_result'>) => {
-      const content = event.content as ToolResultEventContent
-      const now = Date.now()
-      const startTime = toolStartTimesRef.current.get(content.callId)
-      const durationMs = startTime ? now - startTime : undefined
-      toolStartTimesRef.current.delete(content.callId)
+    }
 
-      const meta = toolMetaRef.current.get(content.callId)
-      toolMetaRef.current.delete(content.callId)
+    const metadata = {
+      executionId: event.execution_id,
+      tokenCount: content.summary?.totalTokens ?? 0,
+      processingTime: content.summary?.durationMs ?? 0,
+    }
+    const committedTurn = refs.turn ? commitTurn(refs.turn, finalText, metadata) : null
+    const message: ChatMessageExtended = {
+      id: committedTurn?.id ?? `msg_${Date.now()}_assistant`,
+      role: 'assistant',
+      content: committedTurn ? extractTextFromParts(committedTurn.parts) : finalText,
+      agentSlug: refs.respondingAgent.agentSlug,
+      agentName: refs.respondingAgent.agentName,
+      timestamp: committedTurn?.timestamp ?? Date.now(),
+      parts: committedTurn?.parts,
+      metadata,
+    }
 
-      const VIEWABLE_EXTS = new Set(['.md', '.html', '.htm', '.svg', '.json', '.txt', '.css', '.csv'])
-      const WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'write_file', 'edit_file'])
-      const isWriteTool = meta && WRITE_TOOLS.has(meta.toolName)
-      const filePath = meta?.filePath ?? ''
-      const ext = filePath.includes('.') ? '.' + filePath.split('.').pop()!.toLowerCase() : ''
-      const isViewable = isWriteTool && content.success && VIEWABLE_EXTS.has(ext)
+    dispatchRef.current({ type: 'APPEND_ASSISTANT_MESSAGE', convId, message })
+    dispatchRef.current({
+      type: 'EXECUTION_FINISHED',
+      convId,
+      result: isError ? 'error' : 'success',
+      errorMessage: isError ? content.error?.message : undefined,
+    })
+    if (content.conversationId && convId !== content.conversationId) {
+      dispatchRef.current({ type: 'SET_CONVERSATION_ID', convId: content.conversationId })
+    }
+    refsByConv.current.delete(convId)
+  }, [drainTokens, getRefs])
 
-      setState(prev => {
-        const turn = prev.streamingTurn
-        const updates: Partial<import('./types').ChatState> = {
-          streamingTurn: turn
-            ? completeToolCall(turn, content.callId, content.result, content.success, durationMs)
-            : turn,
-        }
-        if (isViewable) {
-          const name = filePath.split('/').pop() ?? filePath
-          updates.pendingArtifactFile = { name, path: filePath, extension: ext, ts: now }
-        }
-        return { ...prev, ...updates }
-      })
-    }, [setState]),
-    onMeta: useCallback((event: StreamEvent<'meta'>) => {
-      const content = event.content as MetaEventContent & { conversationId?: string }
-      if (content.agentSlug || content.agentName) {
-        respondingAgentRef.current = {
-          agentSlug: content.agentSlug ?? respondingAgentRef.current.agentSlug,
-          agentName: content.agentName ?? respondingAgentRef.current.agentName,
-        }
-      }
-      const MODEL_CONTEXT: Record<string, number> = {
-        'claude-opus-4': 200000,
-        'claude-sonnet-4': 200000,
-        'claude-3.5-sonnet': 200000,
-        'claude-3-opus': 200000,
-        'claude-3-haiku': 200000,
-        'gpt-4o': 128000,
-        'gpt-4-turbo': 128000,
-        'gpt-4': 8192,
-        'gemini-pro': 1000000,
-        'gemini-1.5-pro': 2000000,
-        'deepseek-chat': 128000,
-      }
-      setState(prev => {
-        const updates: Partial<ChatState> = {}
-        if (content.model) {
-          const modelKey = Object.keys(MODEL_CONTEXT).find(k => (content.model ?? '').toLowerCase().includes(k))
-          const contextSize = modelKey ? MODEL_CONTEXT[modelKey] : 200000
-          tokenCountRef.current = 0
-          updates.tokenUsage = { used: 0, total: contextSize }
-        }
-        if (content.agentName) {
-          updates.executionState = {
-            mode: 'simple',
-            steps: [],
-            completedSteps: 0,
-            currentNode: `Running ${content.agentName}`,
-          }
-          let turn = createStreamingTurn(
-            content.agentSlug ?? respondingAgentRef.current.agentSlug,
-            content.agentName ?? respondingAgentRef.current.agentName,
-          )
-          // Flush any status labels buffered before the turn was created (plan mode, skills)
-          for (const label of pendingStatusLabelsRef.current) {
-            turn = addStatus(turn, label)
-          }
-          pendingStatusLabelsRef.current = []
-          updates.streamingTurn = turn
-        }
-        if (content.conversationId && !prev.conversationId) {
-          updates.conversationId = content.conversationId
-        }
-        return { ...prev, ...updates }
-      })
-    }, [setState]),
-    onReasoning: useCallback((event: StreamEvent<'reasoning'>) => {
-      const content = event.content as ReasoningEventContent
-      setState(prev => {
-        const turn = prev.streamingTurn
-        return {
-          ...prev,
-          streamingTurn: turn ? appendReasoning(turn, content.thought + '\n') : turn,
-        }
-      })
-    }, [setState]),
-    onSubagentStart: useCallback((event: StreamEvent<'subagent_start'>) => {
-      const content = event.content as SubagentStartEventContent
-      if (content) {
-        setState(prev => {
-          // Add to executionState for progress tracking
-          const executionState = prev.executionState ? {
-            ...prev.executionState,
-            steps: [
-              ...(prev.executionState.steps ?? []),
-              {
-                id: `subagent-${Date.now()}`,
-                name: content.taskDescription || content.subagentType,
-                status: 'active' as const,
-                startTime: Date.now(),
-              },
-            ],
-          } : prev.executionState
+  const onStop = useCallback((event: StreamEvent<'stop'>) => {
+    const convId = getConvIdRef.current()
+    if (!convId) return
+    const refs = getRefs(convId)
+    drainTokens(refs)
 
-          // Also add to streamingTurn as a status part so it's visible during streaming
-          const streamingTurn = prev.streamingTurn
-            ? addStatus(prev.streamingTurn, `${content.subagentType}: ${content.taskDescription || 'working...'}`)
-            : prev.streamingTurn
-
-          return { ...prev, executionState, streamingTurn }
-        })
-      }
-    }, [setState]),
-    onSubagentStop: useCallback((event: StreamEvent<'subagent_stop'>) => {
-      const content = event.content as SubagentStopEventContent
-      if (content) {
-        setState(prev => {
-          const executionState = prev.executionState ? {
-            ...prev.executionState,
-            steps: (prev.executionState.steps ?? []).map(s =>
-              s.name?.includes(content.subagentType)
-                ? {
-                    ...s,
-                    name: content.success ? s.name : `${s.name} (failed)`,
-                    status: 'completed' as const,
-                    endTime: Date.now(),
-                  }
-                : s
-            ),
-            completedSteps: (prev.executionState.completedSteps ?? 0) + 1,
-          } : prev.executionState
-
-          const label = content.success
-            ? `${content.subagentType} completed`
-            : `${content.subagentType} failed${content.error ? `: ${content.error}` : ''}`
-          const streamingTurn = prev.streamingTurn
-            ? addStatus(prev.streamingTurn, label)
-            : prev.streamingTurn
-
-          return { ...prev, executionState, streamingTurn }
-        })
-      }
-    }, [setState]),
-    onDelegation: useCallback((event: StreamEvent<'delegation'>) => {
-      const content = event.content as DelegationEventContent
-      if (content) {
-        setState(prev => {
-          const delegationStep = {
-            id: `delegation-${Date.now()}`,
-            name: content.task || `Delegating to ${content.toAgent}`,
-            status: 'active' as const,
-            startTime: Date.now(),
-            metadata: { toAgent: content.toAgent, fromAgent: content.fromAgent },
-          }
-          return {
-            ...prev,
-            executionState: prev.executionState ? {
-              ...prev.executionState,
-              currentNode: `Delegating to ${content.toAgent}`,
-              steps: [...(prev.executionState.steps ?? []), delegationStep],
-            } : {
-              mode: 'coordinated' as const,
-              steps: [delegationStep],
-              completedSteps: 0,
-              currentNode: `Delegating to ${content.toAgent}`,
-              agents: [content.toAgent],
-            },
-          }
-        })
-      }
-    }, [setState]),
-    onNotification: useCallback((event: StreamEvent<'notification'>) => {
-      const content = event.content as NotificationEventContent
-      if (content) {
-        setState(prev => ({
-          ...prev,
-          executionState: {
-            ...prev.executionState,
-            mode: prev.executionState?.mode ?? 'simple',
-            steps: [...(prev.executionState?.steps ?? []), {
-              id: `notification-${Date.now()}`,
-              name: `Notification: ${content.message}`,
-              status: 'completed' as const,
-              startTime: Date.now(),
-              endTime: Date.now(),
-            }],
-          },
-        }))
-      }
-    }, [setState]),
-    onToolAuthRequired: useCallback((event: StreamEvent<'tool_auth_required'>) => {
-      const content = event.content as ToolAuthRequiredEventContent
-      if (content) {
-        setState(prev => ({
-          ...prev,
-          pendingToolAuth: { app_slug: content.app_slug, agent_slug: content.agent_slug },
-        }))
-      }
-    }, [setState]),
-    onGuidance: useCallback((event: StreamEvent<'guidance'>) => {
-      const content = event.content as GuidanceEventContent
-      if (content) {
-        setState(prev => ({
-          ...prev,
-          pendingGuidance: {
-            question: content.question,
-            options: content.options,
-            timeout_seconds: content.timeout_seconds,
-            pause_id: content.pause_id,
-            scenario: content.scenario,
-            tool_name: content.tool_name,
-            agent_slug: content.agent_slug,
-            requires_auth: content.requires_auth,
-            execution_id: content.execution_id || event.execution_id,
-            ui_hint: content.ui_hint,
-            browser_url: content.browser_url,
-            preview_url: content.preview_url,
-            artifact_path: content.artifact_path,
-          },
-        }))
-      }
-    }, [setState]),
-    onPreview: useCallback((event: StreamEvent<'preview'>) => {
-      const content = event.content as PreviewEventContent | undefined
-      if (!content || !content.url) return
-      setState(prev => ({
-        ...prev,
-        pendingPreview: {
-          port: content.port,
-          url: content.url,
-          label: content.label,
-          ts: Date.now(),
-        },
-      }))
-    }, [setState]),
-    onCreditWarning: useCallback((event: StreamEvent<'credit_warning'>) => {
-      const content = event.content as CreditWarningEventContent | undefined
-      if (!content) return
-      toast.warning(`Credits running low — ${content.credits_available} of ${content.credits_total} remaining`)
-    }, []),
-    onInsufficientCredits: useCallback((event: StreamEvent<'insufficient_credits'>) => {
-      const content = event.content as InsufficientCreditsEventContent | undefined
-      if (!content) return
-      toast.error('Insufficient credits — connect your own API key for unlimited usage')
-    }, []),
-    onProviderUnavailable: useCallback((event: StreamEvent<'provider_unavailable'>) => {
-      const content = event.content as ProviderUnavailableEventContent | undefined
-      if (!content) return
-      toast.error('AI provider temporarily unavailable', { description: content.message })
-    }, []),
-    onTaskStarted: useCallback((event: StreamEvent<'task_started'>) => {
-      const content = event.content as TaskStartedEventContent
-      setState(prev => {
-        const turn = prev.streamingTurn
-        const bgTask = {
-          id: content.taskId,
-          name: content.taskName,
-          description: content.taskDescription,
-          status: 'running' as const,
-          startedAt: Date.now(),
-        }
-        return {
-          ...prev,
-          streamingTurn: turn ? addStatus(turn, `Started: ${content.taskName}`) : turn,
-          backgroundTasks: [...(prev.backgroundTasks ?? []), bgTask],
-        }
-      })
-    }, [setState]),
-    onTaskUpdated: useCallback((event: StreamEvent<'task_updated'>) => {
-      const content = event.content as TaskUpdatedEventContent
-      setState(prev => {
-        const turn = prev.streamingTurn
-        const statusLabel = content.status === 'completed' ? 'Completed task' : content.status === 'failed' ? 'Task failed' : null
-        const bgTasks = (prev.backgroundTasks ?? []).map(t =>
-          t.id === content.taskId ? { ...t, status: content.status } : t
-        )
-        return {
-          ...prev,
-          streamingTurn: turn && statusLabel ? addStatus(turn, statusLabel) : turn,
-          backgroundTasks: bgTasks,
-        }
-      })
-    }, [setState]),
-    onTaskProgress: useCallback((event: StreamEvent<'task_progress'>) => {
-      const content = event.content as TaskProgressEventContent
-      if (content.message) {
-        setState(prev => {
-          const turn = prev.streamingTurn
-          if (!turn) return prev
-          return {
-            ...prev,
-            streamingTurn: addStatus(turn, content.message!),
-          }
-        })
-      }
-    }, [setState]),
-    onTaskNotification: useCallback((event: StreamEvent<'task_notification'>) => {
-      const content = event.content as TaskNotificationEventContent
-      const statusText = content.status === 'completed'
-        ? `Finished: ${content.taskSubject}`
-        : content.status === 'failed'
-          ? `Failed: ${content.taskSubject}`
-          : content.taskSubject
-      setState(prev => {
-        const turn = prev.streamingTurn
-        if (!turn) return prev
-        return {
-          ...prev,
-          streamingTurn: addStatus(turn, statusText),
-        }
-      })
-    }, [setState]),
-    onToolProgress: useCallback((event: StreamEvent<'tool_progress'>) => {
-      const content = event.content as ToolProgressEventContent
-      setState(prev => {
-        const turn = prev.streamingTurn
-        if (!turn) return prev
-        return {
-          ...prev,
-          streamingTurn: updateToolProgress(turn, content.toolUseId, content.progress.message),
-        }
-      })
-    }, [setState]),
-    onToolUseSummary: useCallback((event: StreamEvent<'tool_use_summary'>) => {
-      const content = event.content as ToolUseSummaryEventContent
-      setState(prev => {
-        const turn = prev.streamingTurn
-        if (!turn) return prev
-        return {
-          ...prev,
-          streamingTurn: enrichToolSummary(turn, content.toolUseId, content.durationMs, content.output, content.status),
-        }
-      })
-    }, [setState]),
-    onDone: useCallback((event: StreamEvent<'done'>) => {
-      if (doneReceivedRef.current) return
-      doneReceivedRef.current = true
-      const content = event.content as DoneEventContent
-      const isError = event.success === false || !!content.error
-
-      let finalText = content.finalResponse ?? rawTextRef.current
-
-      // Strip raw error JSON that upstream LLM providers sometimes inject as text
-      // e.g. {"type":"error","error":{"type":"api_error","message":"stream closed..."}}
-      if (finalText) {
-        finalText = finalText.replace(/\{"type"\s*:\s*"error"[^}]*\{[^}]*\}\s*\}/g, '').trim()
-      }
-
-      if (isError) {
-        const errorMsg = content.error?.message ?? 'The AI provider encountered an error'
-        toast.error('Response interrupted', { description: errorMsg })
-      }
-
-      // Clear refs immediately after capturing finalText to prevent stale late-arriving tokens
-      rawTextRef.current = ''
-      respondingAgentRef.current = {}
-      toolStartTimesRef.current.clear()
-      toolMetaRef.current.clear()
-      pendingStatusLabelsRef.current = []
-
-      setState(prev => {
-        const turn = prev.streamingTurn
-        const metadata = {
-          executionId: event.execution_id,
-          tokenCount: content.summary.totalTokens,
-          processingTime: content.summary.durationMs,
-        }
-
-        const committedTurn = turn ? commitTurn(turn, finalText, metadata) : null
-
-        const assistantMessage: ChatMessageExtended = {
-          id: committedTurn?.id ?? `msg_${Date.now()}_assistant`,
+    const content = event.content as StopEventContent
+    const finalText = refs.rawText || undefined
+    const committedTurn = refs.turn ? commitTurn(refs.turn, finalText) : null
+    if (committedTurn && committedTurn.parts.length > 0) {
+      dispatchRef.current({
+        type: 'APPEND_ASSISTANT_MESSAGE',
+        convId,
+        message: {
+          id: committedTurn.id,
           role: 'assistant',
-          content: committedTurn ? extractTextFromParts(committedTurn.parts) : finalText,
-          agentSlug: prev.streamingTurn?.agentSlug,
-          agentName: prev.streamingTurn?.agentName,
-          timestamp: committedTurn?.timestamp ?? Date.now(),
-          parts: committedTurn?.parts,
-          metadata,
-        }
-
-        const updates: Partial<ChatState> = {
-          messages: [...prev.messages, assistantMessage],
-          isLoading: false,
-          executionState: null,
-          streamingTurn: null,
-          pendingToolAuth: null,
-          pendingGuidance: null,
-        }
-        if (content.conversationId && !prev.conversationId) {
-          updates.conversationId = content.conversationId
-        }
-        return { ...prev, ...updates }
+          content: extractTextFromParts(committedTurn.parts),
+          agentSlug: refs.respondingAgent.agentSlug,
+          agentName: refs.respondingAgent.agentName,
+          timestamp: committedTurn.timestamp,
+          parts: committedTurn.parts,
+        },
       })
-    }, [setState]),
-    onStop: useCallback((event: StreamEvent<'stop'>) => {
-      const content = event.content as StopEventContent
-      const finalText = rawTextRef.current || undefined
+    }
 
-      rawTextRef.current = ''
-      respondingAgentRef.current = {}
-      toolStartTimesRef.current.clear()
-      toolMetaRef.current.clear()
-      pendingStatusLabelsRef.current = []
+    const result: 'success' | 'cancelled' | 'error' =
+      content.reason === 'complete' ? 'success'
+        : content.reason === 'user_cancel' ? 'cancelled'
+          : 'error'
+    const errorMessage = content.reason === 'timeout' ? 'Agent timed out. Please try again.'
+      : content.reason === 'user_cancel' ? 'Execution cancelled.'
+        : content.reason === 'error' ? 'Execution stopped unexpectedly.'
+          : undefined
 
-      setState(prev => {
-        const turn = prev.streamingTurn
-        const committedTurn = turn ? commitTurn(turn, finalText) : null
-        const updates: Partial<ChatState> = {
-          isLoading: false,
-          executionState: null,
-          streamingTurn: null,
-          pendingToolAuth: null,
-          pendingGuidance: null,
-        }
-        // Preserve any partial response the agent sent before stopping
-        if (committedTurn && committedTurn.parts.length > 0) {
-          const msg: ChatMessageExtended = {
-            id: committedTurn.id,
-            role: 'assistant',
-            content: extractTextFromParts(committedTurn.parts),
-            agentSlug: prev.streamingTurn?.agentSlug,
-            agentName: prev.streamingTurn?.agentName,
-            timestamp: committedTurn.timestamp,
-            parts: committedTurn.parts,
-          }
-          updates.messages = [...prev.messages, msg]
-        }
-        if (content.reason !== 'complete') {
-          updates.error = content.reason === 'timeout'
-            ? 'Agent timed out. Please try again.'
-            : content.reason === 'user_cancel'
-              ? 'Execution cancelled.'
-              : 'Execution stopped unexpectedly.'
-        }
-        return { ...prev, ...updates }
+    dispatchRef.current({ type: 'EXECUTION_FINISHED', convId, result, errorMessage })
+    refsByConv.current.delete(convId)
+  }, [drainTokens, getRefs])
+
+  const onError = useCallback((error: Error) => {
+    console.error('Execution stream error:', error)
+    const convId = getConvIdRef.current()
+    toast.error("Something went wrong", { description: 'Please try sending your message again.' })
+    if (!convId) return
+    refsByConv.current.delete(convId)
+    dispatchRef.current({ type: 'EXECUTION_FINISHED', convId, result: 'error', errorMessage: error.message })
+  }, [])
+
+  const onConnectionChange = useCallback((connected: boolean) => {
+    if (connected) {
+      if (disconnectTimerRef.current) {
+        clearTimeout(disconnectTimerRef.current)
+        disconnectTimerRef.current = null
+      }
+      return
+    }
+    if (disconnectTimerRef.current) return
+    disconnectTimerRef.current = setTimeout(() => {
+      disconnectTimerRef.current = null
+      const convId = getConvIdRef.current()
+      if (!convId) return
+      refsByConv.current.delete(convId)
+      dispatchRef.current({
+        type: 'EXECUTION_FINISHED',
+        convId,
+        result: 'error',
+        errorMessage: 'Connection lost. Please resend your message.',
       })
-    }, [setState]),
-    onError: useCallback((error: Error) => {
-      console.error('Execution stream error:', error)
-      rawTextRef.current = ''
-      respondingAgentRef.current = {}
-      toolStartTimesRef.current.clear()
-      toolMetaRef.current.clear()
-      pendingStatusLabelsRef.current = []
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: error.message,
-        executionState: null,
-        pendingToolAuth: null,
-        pendingGuidance: null,
-        streamingTurn: null,
-      }))
-      toast.error("Something went wrong", { description: 'Please try sending your message again.' })
-    }, [setState]),
-    onConnectionChange: useCallback((connected: boolean) => {
-      if (connected) {
-        // Reconnected — cancel any pending disconnect reset
-        if (disconnectTimerRef.current) {
-          clearTimeout(disconnectTimerRef.current)
-          disconnectTimerRef.current = null
-        }
-        return
-      }
-      // Delay reset to allow EventSource auto-reconnect (avoids false "Connection lost"
-      // on transient network hiccups). If reconnected within 5s, the timer is cancelled above.
-      if (!disconnectTimerRef.current) {
-        disconnectTimerRef.current = setTimeout(() => {
-          disconnectTimerRef.current = null
-          rawTextRef.current = ''
-          respondingAgentRef.current = {}
-          toolStartTimesRef.current.clear()
-          pendingStatusLabelsRef.current = []
-          setState(prev => {
-            if (!prev.isLoading) return prev
-            return {
-              ...prev,
-              isLoading: false,
-              error: 'Connection lost. Please resend your message.',
-              executionState: null,
-              streamingTurn: null,
-            }
-          })
-        }, 5000)
-      }
-    }, [setState]),
+    }, 5000)
+  }, [])
+
+  // Memoize handler factories so the callbacks identity is stable.
+  const handlers = useMemo(() => ({
+    onToken: makeOnToken(ctx),
+    onProgress: makeOnProgress(ctx),
+    onToolCall: makeOnToolCall(ctx),
+    onToolResult: makeOnToolResult(ctx),
+    onMeta: makeOnMeta(ctx),
+    onReasoning: makeOnReasoning(ctx),
+    onSubagentStart: makeOnSubagentStart(ctx),
+    onSubagentStop: makeOnSubagentStop(ctx),
+    onDelegation: makeOnDelegation(ctx),
+    onNotification: makeOnNotification(ctx),
+    onToolAuthRequired: makeOnToolAuthRequired(ctx),
+    onGuidance: makeOnGuidance(ctx),
+    onPreview: makeOnPreview(ctx),
+    onCreditWarning: makeOnCreditWarning(),
+    onInsufficientCredits: makeOnInsufficientCredits(),
+    onProviderUnavailable: makeOnProviderUnavailable(),
+    onTaskStarted: makeOnTaskStarted(ctx),
+    onTaskUpdated: makeOnTaskUpdated(ctx),
+    onTaskProgress: makeOnTaskProgress(ctx),
+    onTaskNotification: makeOnTaskNotification(ctx),
+    onToolProgress: makeOnToolProgress(ctx),
+    onToolUseSummary: makeOnToolUseSummary(ctx),
+  }), [ctx])
+
+  const stream = useExecutionStream({
+    ...handlers,
+    onDone,
+    onStop,
+    onError,
+    onConnectionChange,
   })
 
-  return {
-    ...stream,
-    resetStreamContent,
-  }
+  getConvIdRef.current = stream.getConnectedConversationId
+
+  useEffect(() => {
+    const refs = refsByConv.current
+    const disconnectTimer = disconnectTimerRef
+    return () => {
+      for (const r of refs.values()) {
+        if (r.pendingTokenFrame !== null) cancelAnimationFrame(r.pendingTokenFrame)
+      }
+      if (disconnectTimer.current) clearTimeout(disconnectTimer.current)
+    }
+  }, [])
+
+  return { ...stream, resetStreamContent }
 }

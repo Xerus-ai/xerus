@@ -650,7 +650,7 @@ async function callBackendApi(
 // -----------------------------------------------------------------------------
 
 const server = new Server(
-    { name: 'xerus-platform', version: '2.0.0' },
+    { name: 'platform', version: '2.0.0' },
     { capabilities: { tools: {} } },
 );
 

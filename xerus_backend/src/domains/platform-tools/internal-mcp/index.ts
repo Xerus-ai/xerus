@@ -1,6 +1,6 @@
 // Internal MCP Routes
 // Backend API endpoints called by mcp-server.ts from sandbox
-// These routes handle 34 backend-coupled tools that require platform state
+// These routes handle 38 backend-coupled tools that require platform state
 //
 // Existing tools (18):
 //  1. pause_execution          - Session control (needs backend state machine)

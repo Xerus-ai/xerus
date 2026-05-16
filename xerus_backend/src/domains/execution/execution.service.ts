@@ -226,7 +226,8 @@ export class ExecutionService {
                     );
                 }
             } catch (err) {
-                log.warn('Failed to write connectors context (non-critical)', { error: (err as Error).message });
+                // Context files are supplementary — execution continues without them
+                log.error('Failed to write connectors context', { error: (err as Error).message });
             }
 
             // Build runner environment with the resolved API key + skill secrets + CLI BYOK keys
@@ -256,7 +257,7 @@ export class ExecutionService {
             const handle = await resolved.sandboxService.getOrCreateRunner(
                 request.userId, ctx.sandboxId, runnerEnvVars,
                 agentForTracking.slug, agentConfig.adapterType, agentIdentity || undefined,
-                agentConfig.model, ctx.sdkSessionId || undefined,
+                agentConfig.model, ctx.sdkSessionId || undefined, ctx.conversationId,
             );
             ctx.sessionHandle = handle;
             log.debug('Agent session ready', { execution_id: executionId, duration_ms: Date.now() - startedAt, session_id: handle.sessionId });

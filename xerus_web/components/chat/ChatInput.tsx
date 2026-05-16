@@ -7,7 +7,7 @@ import { Agent } from './types'
 import { AgentDropdown } from './AgentDropdown'
 import { SlashCommandPicker } from './SlashCommandPicker'
 import { useSlashCommands } from './useSlashCommands'
-import { UnifiedMentionPicker, type MentionItem } from './UnifiedMentionPicker'
+import { UnifiedMentionPicker, type MentionItem, type AppItem } from './UnifiedMentionPicker'
 import { useWorkspaceFiles } from '@/hooks/useWorkspaceFiles'
 import { useKBSearch } from '@/hooks/useKBSearch'
 import { uploadFile } from '@/lib/api/workspace'
@@ -23,11 +23,12 @@ interface AttachedFile {
 }
 
 interface ChatInputProps {
-  onSendMessage: (message: string) => void
+  onSendMessage: (message: string, metadata?: { attachedFiles?: string[] }) => void
   disabled?: boolean
   placeholder?: string
   className?: string
   agents?: Agent[]
+  apps?: AppItem[]
   selectedAgent?: Agent | null
   onAgentChange?: (agent: Agent | null) => void
   onOpenTerminal?: () => void
@@ -49,6 +50,7 @@ export function ChatInput({
   placeholder = 'Type your message...',
   className,
   agents = [],
+  apps = [],
   selectedAgent,
   onAgentChange,
   onOpenTerminal,
@@ -220,10 +222,7 @@ export function ChatInput({
     const trimmed = value.trim()
     if (!trimmed || disabled) return
     const uploadedPaths = attachedFiles.filter(f => !f.uploading && f.path).map(f => f.path)
-    const fileContext = uploadedPaths.length > 0
-      ? `\n\n[Attached files: ${uploadedPaths.join(', ')}]`
-      : ''
-    onSendMessage(trimmed + fileContext)
+    onSendMessage(trimmed, uploadedPaths.length > 0 ? { attachedFiles: uploadedPaths } : undefined)
     setValue('')
     setAttachedFiles([])
     closePicker()
@@ -388,6 +387,7 @@ export function ChatInput({
             agents={agents}
             files={workspaceFiles}
             kbEntries={kbEntries}
+            apps={apps}
             filesLoading={filesLoading}
             kbLoading={kbLoading}
             selectedIdx={selectedIdx}
@@ -579,13 +579,13 @@ export function ChatInput({
                 aria-label="Stop agent"
                 className={cn(
                   'flex items-center justify-center w-8 h-8 rounded-xl',
-                  'bg-red-500 text-white',
-                  'hover:bg-red-600 active:scale-90',
+                  'bg-text text-white',
+                  'hover:bg-primary active:scale-90',
                   'transition-all duration-150',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-1'
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1'
                 )}
               >
-                <Square className="w-3.5 h-3.5" fill="currentColor" />
+                <Square className="w-3 h-3" fill="currentColor" />
               </button>
             ) : (
               <div
@@ -616,7 +616,7 @@ export function ChatInput({
         </div>
 
         {/* Disclaimer + Token counter */}
-        <div className="flex items-center justify-between mt-1 px-1">
+        <div className="flex items-center justify-center gap-3 mt-1 px-1">
           <p className="text-[11px] text-text-muted/40 select-none">
             AI can make mistakes. Verify important information.
           </p>

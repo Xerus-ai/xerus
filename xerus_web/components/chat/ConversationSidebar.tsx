@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback, memo } from 'react'
+import { useState, useEffect, useMemo, useCallback, memo, useRef } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Plus,
@@ -14,10 +14,13 @@ import {
   X,
   Loader2,
   Clock,
+  Trash2,
+  Pencil,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ProjectGroup, SessionEntry, SessionStatus, SelectedChannel } from './types'
 import { useDomains, type Domain } from '@/hooks/useDomains'
+import { useInfiniteScroll } from '@/hooks/useInfiniteScroll'
 
 interface ConversationSidebarProps {
   projects: ProjectGroup[]
@@ -25,6 +28,7 @@ interface ConversationSidebarProps {
   onSelectConversation: (id: string) => void
   onNewConversation: () => void
   onDeleteConversation?: (id: string) => void
+  onRenameConversation?: (id: string, newTitle: string) => void
   isCollapsed?: boolean
   isLoading?: boolean
   onToggleCollapse?: () => void
@@ -32,6 +36,9 @@ interface ConversationSidebarProps {
   selectedChannel?: SelectedChannel | null
   onSelectChannel?: (channel: SelectedChannel) => void
   onClearChannel?: () => void
+  hasMore?: boolean
+  isLoadingMore?: boolean
+  onLoadMore?: () => void
 }
 
 // ---------------------------------------------------------------------------
@@ -190,20 +197,67 @@ function StatusIndicator({ status }: { status: SessionStatus }) {
 }
 
 // ---------------------------------------------------------------------------
-// Three-dot menu button (always visible)
+// Session context menu (dropdown from three-dot button)
 // ---------------------------------------------------------------------------
 
-function ThreeDotMenu({ onClick }: { onClick: (e: React.MouseEvent) => void }) {
+function SessionContextMenu({
+  onDelete,
+  onRename,
+}: {
+  onDelete: () => void
+  onRename: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
   return (
-    <span
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={(e) => { if (e.key === 'Enter') onClick(e as unknown as React.MouseEvent) }}
-      className="flex items-center justify-center w-5 h-5 rounded-md hover:bg-surface-active text-text-muted hover:text-text transition-colors cursor-pointer shrink-0"
-    >
-      <MoreHorizontal className="w-3.5 h-3.5" />
-    </span>
+    <div className="relative shrink-0" ref={ref}>
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
+        onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); setOpen(!open) } }}
+        className={cn(
+          'flex items-center justify-center w-5 h-5 rounded-md transition-colors cursor-pointer',
+          open ? 'bg-surface-active text-text' : 'text-text-muted hover:bg-surface-active hover:text-text'
+        )}
+      >
+        <MoreHorizontal className="w-3.5 h-3.5" />
+      </div>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 w-36 bg-surface border border-surface-active rounded-xl shadow-lg py-1 z-50">
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={(e) => { e.stopPropagation(); setOpen(false); onRename() }}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); setOpen(false); onRename() } }}
+            className="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-text hover:bg-surface-hover transition-colors text-left cursor-pointer"
+          >
+            <Pencil className="w-3.5 h-3.5 text-text-muted" />
+            Rename
+          </div>
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={(e) => { e.stopPropagation(); setOpen(false); onDelete() }}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); setOpen(false); onDelete() } }}
+            className="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors text-left cursor-pointer"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Delete
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -216,29 +270,55 @@ const SessionRow = memo(function SessionRow({
   isActive,
   onSelectConversation,
   onDeleteConversation,
+  onRenameConversation,
 }: {
   session: SessionEntry
   isActive: boolean
   onSelectConversation: (id: string) => void
   onDeleteConversation?: (id: string) => void
+  onRenameConversation?: (id: string, newTitle: string) => void
 }) {
   const statusConfig = STATUS_CONFIG[session.status]
+  const [isRenaming, setIsRenaming] = useState(false)
+  const [renameValue, setRenameValue] = useState(session.title)
+  const renameInputRef = useRef<HTMLInputElement>(null)
 
   const handleSelect = useCallback(() => {
-    onSelectConversation(session.id)
-  }, [onSelectConversation, session.id])
+    if (!isRenaming) onSelectConversation(session.id)
+  }, [onSelectConversation, session.id, isRenaming])
 
   const handleDelete = useCallback(() => {
     onDeleteConversation?.(session.id)
   }, [onDeleteConversation, session.id])
 
+  const handleStartRename = useCallback(() => {
+    setRenameValue(session.title)
+    setIsRenaming(true)
+    setTimeout(() => renameInputRef.current?.select(), 0)
+  }, [session.title])
+
+  const handleCommitRename = useCallback(() => {
+    const trimmed = renameValue.trim()
+    if (trimmed && trimmed !== session.title) {
+      onRenameConversation?.(session.id, trimmed)
+    }
+    setIsRenaming(false)
+  }, [renameValue, session.title, session.id, onRenameConversation])
+
+  const handleRenameKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') { e.preventDefault(); handleCommitRename() }
+    if (e.key === 'Escape') { setIsRenaming(false) }
+  }, [handleCommitRename])
+
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={handleSelect}
+      onKeyDown={(e) => { if (e.key === 'Enter') handleSelect() }}
       data-testid="session-row"
       className={cn(
-        'group relative flex items-center gap-2 w-full text-left px-3 py-2 rounded-lg transition-all duration-150',
+        'group relative flex items-center gap-2 w-full text-left px-3 py-2 rounded-lg transition-all duration-150 cursor-pointer',
         isActive
           ? 'bg-surface-hover text-text font-medium'
           : 'hover:bg-surface-hover'
@@ -251,12 +331,22 @@ const SessionRow = memo(function SessionRow({
 
       {/* Content */}
       <div className="flex-1 min-w-0">
-        <div className={cn(
-          'text-sm font-medium truncate leading-tight',
-          isActive ? 'text-text' : 'text-text',
-        )}>
-          {session.title}
-        </div>
+        {isRenaming ? (
+          <input
+            ref={renameInputRef}
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onBlur={handleCommitRename}
+            onKeyDown={handleRenameKeyDown}
+            onClick={(e) => e.stopPropagation()}
+            className="text-sm font-medium w-full bg-surface-hover border border-border-active rounded px-1 py-0 leading-tight text-text outline-none"
+            autoFocus
+          />
+        ) : (
+          <div className="text-sm font-medium truncate leading-tight text-text">
+            {session.title}
+          </div>
+        )}
         <div className={cn(
           'text-[11px] mt-0.5 truncate tabular-nums',
           session.status === 'idle' ? 'text-text-muted' : statusConfig.textColor,
@@ -268,11 +358,14 @@ const SessionRow = memo(function SessionRow({
         </div>
       </div>
 
-      {/* Three-dot menu — always visible */}
+      {/* Context menu */}
       {onDeleteConversation && (
-        <ThreeDotMenu onClick={(e) => { e.stopPropagation(); handleDelete() }} />
+        <SessionContextMenu
+          onDelete={handleDelete}
+          onRename={handleStartRename}
+        />
       )}
-    </button>
+    </div>
   )
 })
 
@@ -285,12 +378,14 @@ const ProjectGroupSection = memo(function ProjectGroupSection({
   currentConversationId,
   onSelectConversation,
   onDeleteConversation,
+  onRenameConversation,
   defaultExpanded,
 }: {
   project: ProjectGroup
   currentConversationId?: string | null
   onSelectConversation: (id: string) => void
   onDeleteConversation?: (id: string) => void
+  onRenameConversation?: (id: string, newTitle: string) => void
   defaultExpanded: boolean
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded)
@@ -314,8 +409,7 @@ const ProjectGroupSection = memo(function ProjectGroupSection({
             </div>
           </div>
         </button>
-        {/* Three-dot menu on project row — always visible */}
-        <ThreeDotMenu onClick={(e) => { e.stopPropagation() }} />
+        <span className="w-5 shrink-0" />
       </div>
 
       {/* Sessions */}
@@ -328,6 +422,7 @@ const ProjectGroupSection = memo(function ProjectGroupSection({
               isActive={currentConversationId === session.id}
               onSelectConversation={onSelectConversation}
               onDeleteConversation={onDeleteConversation}
+              onRenameConversation={onRenameConversation}
             />
           ))}
         </div>
@@ -346,6 +441,7 @@ export function ConversationSidebar({
   onSelectConversation,
   onNewConversation,
   onDeleteConversation,
+  onRenameConversation,
   isCollapsed = false,
   isLoading = false,
   onToggleCollapse,
@@ -353,10 +449,19 @@ export function ConversationSidebar({
   selectedChannel,
   onSelectChannel,
   onClearChannel,
+  hasMore = false,
+  isLoadingMore = false,
+  onLoadMore,
 }: ConversationSidebarProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [isChannelPickerOpen, setIsChannelPickerOpen] = useState(false)
   const { domains: channelDomains, isLoading: isLoadingChannels } = useDomains()
+
+  const sentinelRef = useInfiniteScroll<HTMLDivElement>({
+    hasMore: hasMore && !searchQuery,
+    isLoading: isLoadingMore,
+    onLoadMore: onLoadMore ?? (() => {}),
+  })
 
   // Filter projects/sessions by search
   const filteredProjects = useMemo(() => {
@@ -489,9 +594,17 @@ export function ConversationSidebar({
                 currentConversationId={currentConversationId}
                 onSelectConversation={onSelectConversation}
                 onDeleteConversation={onDeleteConversation}
+                onRenameConversation={onRenameConversation}
                 defaultExpanded={project.id === activeProjectId || filteredProjects.length === 1}
               />
             ))}
+            {hasMore && !searchQuery && (
+              <div ref={sentinelRef} className="py-3 text-center">
+                {isLoadingMore && (
+                  <Loader2 className="w-4 h-4 mx-auto animate-spin text-text-muted" />
+                )}
+              </div>
+            )}
           </div>
         )}
       </ScrollArea>

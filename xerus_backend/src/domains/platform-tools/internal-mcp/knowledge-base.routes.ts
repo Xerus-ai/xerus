@@ -5,12 +5,14 @@
 import { Router, Response, NextFunction } from 'express';
 import { BadRequestError } from '../../../utils/errors';
 import { InternalMcpRequest, McpToolResult } from './types';
-import { escapeSQL, executeWorkspaceJsonQuery, executeWorkspaceQuery } from '../../conversations/workspace-db.helpers';
+import { escapeSQL, escapeLikePattern, executeWorkspaceJsonQuery, executeWorkspaceQuery } from '../../conversations/workspace-db.helpers';
 import { requireRunningSandbox, getDaytonaProvider } from '../../sandbox-infra/sandbox/sandbox-route-helpers';
 import type { SandboxService } from '../../sandbox-infra/sandbox/sandbox.service';
 
 const MAX_RESULTS = 100;
 const MAX_CONTENT_SIZE = 1_048_576; // 1MB
+const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
+const KB_HEREDOC_DELIM = 'XERUS_KB_EOF_9a2c';
 
 // ---------------------------------------------------------------------------
 // Dependencies (injected at startup)
@@ -64,11 +66,11 @@ router.post('/search_kb', async (req: InternalMcpRequest, res: Response, next: N
         const sandboxId = await requireRunningSandbox(sandboxService, userId);
         const provider = getDaytonaProvider(sandboxService);
 
-        const escaped = escapeSQL(searchQuery);
+        const escaped = escapeLikePattern(searchQuery);
 
         let sql = `SELECT akb.id, akb.agent_slug, akb.kb_id, akb.access_level, akb.added_at
                    FROM agent_knowledge_bases akb
-                   WHERE akb.kb_id LIKE '%${escaped}%'`;
+                   WHERE akb.kb_id LIKE '%${escaped}%' ESCAPE '\\'`;
 
         if (collection_id) {
             sql += ` AND akb.agent_slug = '${escapeSQL(String(collection_id))}'`;
@@ -77,6 +79,19 @@ router.post('/search_kb', async (req: InternalMcpRequest, res: Response, next: N
         sql += ` ORDER BY akb.added_at DESC LIMIT ${resultLimit}`;
 
         const rows = await executeWorkspaceJsonQuery<AgentKbRow>(provider, sandboxId, sql);
+
+        // Also search actual file content on the sandbox filesystem
+        const safeQuery = escaped.replace(/'/g, "'\\''");
+        const grepCmd = `grep -ril '${safeQuery}' /home/xerus/workspace/knowledge/ 2>/dev/null | head -20`;
+        let contentMatches: string[] = [];
+        try {
+            const grepResult = await provider.executeCommand(sandboxId, grepCmd);
+            if (grepResult.result) {
+                contentMatches = grepResult.result.trim().split('\n').filter(Boolean);
+            }
+        } catch {
+            // grep returns exit code 1 when no matches found - not an error
+        }
 
         const mcpResult: McpToolResult = {
             success: true,
@@ -88,7 +103,11 @@ router.post('/search_kb', async (req: InternalMcpRequest, res: Response, next: N
                     access_level: row.access_level,
                     added_at: row.added_at,
                 })),
-                total: rows.length,
+                content_matches: contentMatches.map(filePath => ({
+                    file_path: filePath.replace('/home/xerus/workspace/', ''),
+                    source: 'filesystem',
+                })),
+                total: rows.length + contentMatches.length,
             },
         };
 
@@ -119,14 +138,38 @@ router.post('/upload_kb', async (req: InternalMcpRequest, res: Response, next: N
         const provider = getDaytonaProvider(sandboxService);
 
         const collection = collection_id || 'default';
+
+        // Validate collection_id against path traversal and injection
+        if (collection !== 'default' && !SLUG_PATTERN.test(collection)) {
+            throw new BadRequestError('collection_id must be alphanumeric with hyphens only');
+        }
+
         const safeTitle = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
         const kbId = `${collection}-${safeTitle}`;
         const kbPath = `knowledge/${collection}/${safeTitle}.md`;
 
         // Write the KB file to the sandbox filesystem
         if (content) {
-            const writeCmd = `mkdir -p /home/xerus/workspace/knowledge/${escapeSQL(collection)} && cat > /home/xerus/workspace/${escapeSQL(kbPath)} << 'EOKB'\n${content}\nEOKB`;
+            // Validate content doesn't contain heredoc delimiter to prevent command injection
+            if (content.includes(KB_HEREDOC_DELIM)) {
+                throw new BadRequestError('Content contains reserved delimiter sequence');
+            }
+            const writeCmd = `mkdir -p /home/xerus/workspace/knowledge/${escapeSQL(collection)} && cat > /home/xerus/workspace/${escapeSQL(kbPath)} << '${KB_HEREDOC_DELIM}'\n${content}\n${KB_HEREDOC_DELIM}`;
             await provider.executeCommand(sandboxId, writeCmd);
+        } else if (file_path && typeof file_path === 'string') {
+            // Validate file_path against path traversal
+            if (file_path.includes('..') || file_path.startsWith('/')) {
+                throw new BadRequestError('file_path must be a relative path without traversal');
+            }
+            // Verify the file exists and copy it to the knowledge directory
+            const mkdirCmd = `mkdir -p /home/xerus/workspace/knowledge/${escapeSQL(collection)}`;
+            await provider.executeCommand(sandboxId, mkdirCmd);
+            const copyCmd = `test -f '/home/xerus/workspace/${escapeSQL(file_path)}' && cp '/home/xerus/workspace/${escapeSQL(file_path)}' '/home/xerus/workspace/${escapeSQL(kbPath)}'`;
+            try {
+                await provider.executeCommand(sandboxId, copyCmd);
+            } catch {
+                throw new BadRequestError(`File not found: ${file_path}`);
+            }
         }
 
         const mcpResult: McpToolResult = {
@@ -175,7 +218,9 @@ router.post('/assign_kb', async (req: InternalMcpRequest, res: Response, next: N
         }
 
         const kbId = document_id || collection_id;
-        const accessLevel = permission || 'read';
+        // Map MCP tool permission values to workspace.db CHECK constraint values (read, write, admin)
+        const accessLevelMap: Record<string, string> = { 'read': 'read', 'read_write': 'write', 'write': 'write', 'admin': 'admin' };
+        const accessLevel = accessLevelMap[permission] || 'read';
 
         const sql = `INSERT INTO agent_knowledge_bases (agent_slug, kb_id, access_level)
                      VALUES ('${agentSlug}', '${escapeSQL(String(kbId))}', '${escapeSQL(accessLevel)}')

@@ -7,7 +7,7 @@ import { Router, Response, NextFunction } from 'express';
 import { query } from '../../../database/connection';
 import { BadRequestError } from '../../../utils/errors';
 import { InternalMcpRequest, McpToolResult } from './types';
-import { escapeSQL, executeWorkspaceJsonQuery, executeWorkspaceQuery } from '../../conversations/workspace-db.helpers';
+import { escapeSQL, escapeLikePattern, executeWorkspaceJsonQuery, executeWorkspaceQuery } from '../../conversations/workspace-db.helpers';
 import { requireRunningSandbox, getDaytonaProvider } from '../../sandbox-infra/sandbox/sandbox-route-helpers';
 import type { SandboxService } from '../../sandbox-infra/sandbox/sandbox.service';
 
@@ -62,14 +62,14 @@ router.post('/search_skills', async (req: InternalMcpRequest, res: Response, nex
         const sandboxId = await requireRunningSandbox(sandboxService, userId);
         const provider = getDaytonaProvider(sandboxService);
 
-        const escaped = escapeSQL(searchQuery);
+        const escaped = escapeLikePattern(searchQuery);
 
         const sql = `SELECT slug, name, version, source, source_ref, description, categories, installed_at
                      FROM skills
-                     WHERE slug LIKE '%${escaped}%'
-                        OR name LIKE '%${escaped}%'
-                        OR description LIKE '%${escaped}%'
-                        OR categories LIKE '%${escaped}%'
+                     WHERE slug LIKE '%${escaped}%' ESCAPE '\\'
+                        OR name LIKE '%${escaped}%' ESCAPE '\\'
+                        OR description LIKE '%${escaped}%' ESCAPE '\\'
+                        OR categories LIKE '%${escaped}%' ESCAPE '\\'
                      ORDER BY slug
                      LIMIT 50`;
 
@@ -138,6 +138,13 @@ router.post('/create_skill', async (req: InternalMcpRequest, res: Response, next
 
         const rows = await executeWorkspaceJsonQuery<SkillRow>(provider, sandboxId, sql);
 
+        // Write the SKILL.md file to the sandbox filesystem
+        const SKILL_HEREDOC = 'XERUS_SKILL_EOF_4b7e';
+        if (!instructions.includes(SKILL_HEREDOC)) {
+            const writeCmd = `mkdir -p /home/xerus/workspace/.claude/skills/${escapeSQL(skillSlug)} && cat > /home/xerus/workspace/.claude/skills/${escapeSQL(skillSlug)}/SKILL.md << '${SKILL_HEREDOC}'\n${instructions}\n${SKILL_HEREDOC}`;
+            await provider.executeCommand(sandboxId, writeCmd);
+        }
+
         // If agent_id specified, also create the agent_skills link
         if (agent_id) {
             const agentSlug = escapeSQL(String(agent_id));
@@ -148,18 +155,21 @@ router.post('/create_skill', async (req: InternalMcpRequest, res: Response, next
         }
 
         const row = rows[0];
+        if (!row) {
+            throw new BadRequestError('Failed to create skill — database insert returned no result');
+        }
         const mcpResult: McpToolResult = {
             success: true,
             data: {
                 skill: {
-                    slug: row?.slug || skillSlug,
-                    name: row?.name || name,
-                    description: row?.description || description,
+                    slug: row.slug,
+                    name: row.name,
+                    description: row.description || description,
                     category: cat,
                     agent_id: agent_id || null,
                     user_id: userId,
                     path: skillPath,
-                    created_at: row?.installed_at || new Date().toISOString(),
+                    created_at: row.installed_at || new Date().toISOString(),
                 },
             },
         };

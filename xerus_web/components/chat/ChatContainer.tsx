@@ -7,6 +7,7 @@ import { ChatInput } from './ChatInput'
 import { DeliverableChips } from './DeliverableChips'
 import { TaskDock } from './TaskDock'
 import { useTaskDock } from './useTaskDock'
+import { INFRA_NOISE } from './useChatExecution.helpers'
 import { BackgroundAgentPanel } from './BackgroundAgentPanel'
 import type { SandboxTab } from './SandboxPanel'
 
@@ -29,6 +30,7 @@ import { mapStreamEventsToExecution } from './mapStreamToExecutionEvents'
 import { useArtifactTabs } from '@/hooks/useArtifactTabs'
 
 const ExecutionDetail = dynamic(() => import('@/components/execution').then((m) => ({ default: m.ExecutionDetail })))
+import { Loader2, X } from 'lucide-react'
 import { toast } from '@/lib/toast'
 import { XerusLoader } from '@/components/common/XerusLoader'
 import { startBrowser, startTerminal } from '@/lib/api/workspace'
@@ -42,11 +44,15 @@ interface SidebarPropsRef {
   conversationId: string | null
   selectedChannel?: import('./types').SelectedChannel | null
   isLoading: boolean
+  hasMore: boolean
+  isLoadingMore: boolean
   handleSelectConversation: (id: string) => void
   handleNewConversation: () => void
   handleDeleteConversation: (id: string) => void
+  handleRenameConversation: (id: string, newTitle: string) => void
   handleSelectChannel: (ch: import('./types').SelectedChannel) => void
   handleClearChannel: () => void
+  handleLoadMore: () => void
 }
 
 function ChatSidebarSlotComponent({ propsRef, forceUpdateRef }: {
@@ -63,11 +69,15 @@ function ChatSidebarSlotComponent({ propsRef, forceUpdateRef }: {
       onSelectConversation={p.handleSelectConversation}
       onNewConversation={p.handleNewConversation}
       onDeleteConversation={p.handleDeleteConversation}
+      onRenameConversation={p.handleRenameConversation}
       isCollapsed={false}
       isLoading={p.isLoading}
       selectedChannel={p.selectedChannel}
       onSelectChannel={p.handleSelectChannel}
       onClearChannel={p.handleClearChannel}
+      hasMore={p.hasMore}
+      isLoadingMore={p.isLoadingMore}
+      onLoadMore={p.handleLoadMore}
     />
   )
 }
@@ -86,7 +96,7 @@ export function ChatContainer({
   className,
 }: ChatContainerProps) {
   const chat = useChatState({ initialAgentId, conversationId, initialMessage })
-  const { state, agents, user, isAuthReady, executionStream } = chat
+  const { state, activeExec, agents, user, isAuthReady, executionStream } = chat
   const { isMobile } = useLayout()
 
   // ---- Artifact tabs (multi-tab viewer) ----
@@ -104,9 +114,8 @@ export function ChatContainer({
   const taskDock = useTaskDock()
 
   // Sync delegation tasks to task dock (skip raw infra steps like sandbox/executing)
-  const INFRA_NOISE = new Set(['sandbox', 'executing', 'provisioning', 'connecting'])
   useEffect(() => {
-    const steps = state.executionState?.steps ?? []
+    const steps = activeExec.executionState?.steps ?? []
     for (const step of steps) {
       const rawName = step.name ?? ''
       const cleanName = rawName.replace(/^Spawning\s+/i, '').replace(/\s*\(failed\)\s*$/i, '')
@@ -122,7 +131,7 @@ export function ChatContainer({
         taskDock.completeTask(step.id, success, durationMs)
       }
     }
-  }, [state.executionState?.steps, taskDock])
+  }, [activeExec.executionState?.steps, taskDock])
 
   // ---- Tool auth (Pipedream OAuth) ----
   const handleToolAuthConnect = useCallback((appSlug: string) => {
@@ -161,7 +170,7 @@ export function ChatContainer({
         accepted,
         response_value: feedback,
       })
-      chat.setState((prev) => ({ ...prev, pendingGuidance: null }))
+      chat.dispatch({ type: 'SET_PENDING_GUIDANCE', pendingGuidance: null })
     } catch {
       toast.error("Your response wasn't sent", { description: 'The agent may have moved on. Try sending a new message.' })
     } finally {
@@ -259,27 +268,35 @@ export function ChatContainer({
   }, [])
 
   // ---- Sidebar slot registration ----
-  const sidebarPropsRef = useRef({
+  const sidebarPropsRef = useRef<SidebarPropsRef>({
     projects: chat.projects,
     conversationId: state.conversationId,
     selectedChannel: state.selectedChannel,
     isLoading: chat.isLoadingAgents,
+    hasMore: state.hasMoreConversations,
+    isLoadingMore: chat.isLoadingMore,
     handleSelectConversation: chat.handleSelectConversation,
     handleNewConversation: chat.handleNewConversation,
     handleDeleteConversation: chat.handleDeleteConversation,
+    handleRenameConversation: chat.handleRenameConversation,
     handleSelectChannel: chat.handleSelectChannel,
     handleClearChannel: chat.handleClearChannel,
+    handleLoadMore: chat.loadMoreConversations,
   })
   sidebarPropsRef.current = {
     projects: chat.projects,
     conversationId: state.conversationId,
     selectedChannel: state.selectedChannel,
     isLoading: chat.isLoadingAgents,
+    hasMore: state.hasMoreConversations,
+    isLoadingMore: chat.isLoadingMore,
     handleSelectConversation: chat.handleSelectConversation,
     handleNewConversation: chat.handleNewConversation,
     handleDeleteConversation: chat.handleDeleteConversation,
+    handleRenameConversation: chat.handleRenameConversation,
     handleSelectChannel: chat.handleSelectChannel,
     handleClearChannel: chat.handleClearChannel,
+    handleLoadMore: chat.loadMoreConversations,
   }
 
   const sidebarForceUpdateRef = useRef<() => void>(() => {})
@@ -289,7 +306,7 @@ export function ChatContainer({
 
   useEffect(() => {
     sidebarForceUpdateRef.current()
-  }, [chat.projects, state.conversationId, state.selectedChannel, chat.isLoadingAgents])
+  }, [chat.projects, state.conversationId, state.selectedChannel, chat.isLoadingAgents, state.hasMoreConversations, chat.isLoadingMore])
 
   useSidebarSlotRegister('chat-sidebar', ChatSidebarSlot)
 
@@ -310,9 +327,9 @@ export function ChatContainer({
             <MessageList
               messages={state.messages as ChatMessageExtended[]}
               currentAgent={state.currentAgent}
-              isLoading={state.isLoading}
-              streamingTurn={state.streamingTurn}
-              executionState={state.executionState}
+              isLoading={activeExec.isLoading}
+              streamingTurn={activeExec.streamingTurn}
+              executionState={activeExec.executionState}
               className="flex-1"
               onViewExecution={setShowExecution}
               onSuggestionClick={chat.sendMessage}
@@ -378,26 +395,29 @@ export function ChatContainer({
                 <BackgroundAgentPanel tasks={state.backgroundTasks!} />
               </div>
             )}
-            {(state.pendingMessages?.length ?? 0) > 0 && (
-              <div className="w-full max-w-3xl mx-auto px-4 pb-1">
-                <div className="flex flex-wrap gap-1.5">
-                  {state.pendingMessages!.map((msg, idx) => (
-                    <span
-                      key={idx}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs bg-primary/10 text-primary border border-primary/20"
-                    >
-                      <span className="truncate max-w-[200px]">{msg}</span>
-                      <button
-                        type="button"
-                        onClick={() => chat.handleCancelQueuedMessage(idx)}
-                        className="p-0.5 rounded hover:bg-primary/20"
-                        aria-label="Cancel queued message"
+            {activeExec.pendingMessages.length > 0 && (
+              <div className="w-full max-w-3xl mx-auto px-4 pb-2">
+                <div className="flex items-center gap-2 px-3 py-2 bg-surface rounded-xl border border-surface-active">
+                  <Loader2 className="w-3.5 h-3.5 text-text-muted animate-spin shrink-0" />
+                  <span className="text-[11px] text-text-muted shrink-0">{activeExec.pendingMessages.length} queued</span>
+                  <div className="flex flex-wrap gap-1.5 flex-1 min-w-0">
+                    {activeExec.pendingMessages.map((msg, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-surface-hover text-text-secondary"
                       >
-                        <span className="text-[10px]">&times;</span>
-                      </button>
-                    </span>
-                  ))}
-                  <span className="text-[11px] text-text-muted self-center ml-1">queued</span>
+                        <span className="truncate max-w-[180px]">{msg}</span>
+                        <button
+                          type="button"
+                          onClick={() => chat.handleCancelQueuedMessage(idx)}
+                          className="p-0.5 rounded-full hover:bg-surface-active text-text-muted hover:text-text transition-colors"
+                          aria-label="Cancel queued message"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
@@ -419,9 +439,9 @@ export function ChatContainer({
               isBrowserLoading={isBrowserLoading}
               isBrowserOpen={!!browserUrl}
               conversationId={conversationId}
-              isExecuting={state.isLoading}
+              isExecuting={activeExec.isLoading}
               onStop={chat.handleStopExecution}
-              tokenUsage={state.tokenUsage}
+              tokenUsage={activeExec.tokenUsage}
             />
           </div>
         </Panel>

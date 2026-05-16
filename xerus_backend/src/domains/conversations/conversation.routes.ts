@@ -194,7 +194,11 @@ router.get('/:id/workspace/files', auth, async (req: AuthenticatedRequest, res: 
         const sandboxId = await requireRunningSandbox(sandboxService, req.user.uid);
         const provider = getDaytonaProvider(sandboxService);
 
-        const sanitizedQuery = query.replace(/['"\\;|&$`]/g, '');
+        const sanitizedQuery = query.replace(/[\n\r\t\0'"\\;|&$`]/g, '');
+        if (!sanitizedQuery) {
+            sendResponse(res, 200, { files: [] }, startTime);
+            return;
+        }
         const cmd = `find /home/xerus/workspace -maxdepth 5 -type f -iname "*${sanitizedQuery}*" 2>/dev/null | head -30`;
         const { result: output } = await provider.executeCommand(sandboxId, cmd);
 

@@ -14,6 +14,8 @@ import {
     incrementConversationMessageCount,
     writeChatExecution,
 } from '../conversations/workspace-db.service';
+import { syncBeadsToTasks } from '../company/task-workspace-db.service';
+import { syncPostsJsonlToChannelMessages, syncDeliverablesFromFilesystem } from '../company/company-workspace-db.service';
 import type { ResolvedExecutionDeps, PipelineContext } from './execution-pipeline.types';
 
 const log = logger('SessionRecord');
@@ -80,6 +82,16 @@ export async function updateSessionRecord(
         throw new SDKExecutionError('Cannot update session: sessionId is missing (pipeline invariant violated)');
     }
 
+    // Clear any pending incremental flush to prevent stale data overwrite after final write
+    if (ctx.conversationId) {
+        const key = `${ctx.conversationId}:${ctx.sessionId}`;
+        const existingTimer = pendingFlushes.get(key);
+        if (existingTimer) {
+            clearTimeout(existingTimer);
+            pendingFlushes.delete(key);
+        }
+    }
+
     // Join accumulated response chunks into final responseText (avoids O(n^2) string concat during streaming)
     if (ctx.responseChunks.length > 0 && !ctx.responseText) {
         ctx.responseText = ctx.responseChunks.join('');
@@ -139,26 +151,47 @@ export async function updateSessionRecord(
 
     // Persist chat turn to workspace.db for conversation history reload.
     // Non-critical — don't fail the session if it errors.
+    // Write message first, then increment count so they stay in sync.
     if (ctx.conversationId && ctx.sandboxId) {
         try {
             const provider = deps.sandboxService.getDaytonaProvider();
-            await Promise.all([
-                incrementConversationMessageCount(provider, ctx.sandboxId, ctx.conversationId),
-                writeChatExecution(
-                    provider,
-                    ctx.sandboxId,
-                    ctx.conversationId,
-                    ctx.sessionId || null,
-                    ctx.request.task,
-                    ctx.responseText || null,
-                    ctx.inputTokens + ctx.outputTokens,
-                    Date.now() - ctx.startedAt,
-                    messageMetadata,
-                ),
-            ]);
+            await writeChatExecution(
+                provider,
+                ctx.sandboxId,
+                ctx.conversationId,
+                ctx.sessionId || null,
+                ctx.request.task,
+                ctx.responseText || null,
+                ctx.inputTokens + ctx.outputTokens,
+                Date.now() - ctx.startedAt,
+                messageMetadata,
+            );
+            await incrementConversationMessageCount(provider, ctx.sandboxId, ctx.conversationId);
         } catch (err) {
-            log.error('Failed to persist chat execution', { conversation_id: ctx.conversationId, error: (err as Error).message });
+            log.error('Failed to persist chat execution', {
+                conversation_id: ctx.conversationId,
+                response_length: ctx.responseText?.length ?? 0,
+                error: (err as Error).message,
+            });
         }
+    }
+
+    // Post-execution syncs: bridge agent-created data to workspace.db for frontend visibility.
+    // Non-critical — fire and forget so session completion isn't blocked.
+    if (ctx.sandboxId) {
+        const provider = deps.sandboxService.getDaytonaProvider();
+
+        syncBeadsToTasks(provider, ctx.sandboxId).catch(err =>
+            log.warn('Post-execution beads sync failed', { error: (err as Error).message }),
+        );
+
+        syncPostsJsonlToChannelMessages(provider, ctx.sandboxId).catch(err =>
+            log.warn('Post-execution posts sync failed', { error: (err as Error).message }),
+        );
+
+        syncDeliverablesFromFilesystem(provider, ctx.sandboxId).catch(err =>
+            log.warn('Post-execution deliverables sync failed', { error: (err as Error).message }),
+        );
     }
 }
 

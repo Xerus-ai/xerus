@@ -55,7 +55,7 @@ const router = Router();
 // POST /mcp/search_outputs
 router.post('/search_outputs', async (req: InternalMcpRequest, res: Response, next: NextFunction) => {
     try {
-        const { agent_id, output_type, date_from, date_to, limit } = req.body;
+        const { agent_id, task_id, output_type, date_from, date_to, limit } = req.body;
         const userId = req.sandbox!.userId;
 
         const resultLimit = Math.min(limit || 20, MAX_RESULTS);
@@ -71,6 +71,10 @@ router.post('/search_outputs', async (req: InternalMcpRequest, res: Response, ne
 
         if (agent_id) {
             sql += ` AND ao.agent_slug = '${escapeSQL(String(agent_id))}'`;
+        }
+
+        if (task_id) {
+            sql += ` AND ao.session_id = '${escapeSQL(String(task_id))}'`;
         }
 
         if (output_type) {

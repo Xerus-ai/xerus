@@ -67,15 +67,44 @@ export interface SelectedChannel {
   domainName: string
 }
 
+/**
+ * Per-conversation execution state. Keyed by conversationId in execByConversation.
+ *
+ * This isolation prevents loading/streaming state from one conversation bleeding
+ * into another when the user switches between sessions while an agent is still
+ * executing in the background.
+ */
+export interface ConversationExecutionState {
+  isLoading: boolean
+  streamingTurn: import('./streaming-turn.types').StreamingAssistantTurn | null
+  executionState: ExecutionState | null
+  tokenUsage: { used: number; total: number } | null
+  pendingMessages: string[]
+  activeExecutionId: string | null
+  lastExecutionResult: 'success' | 'cancelled' | 'error' | null
+  respondingAgent: { agentSlug?: string; agentName?: string } | null
+}
+
+export const EMPTY_EXEC_STATE: ConversationExecutionState = {
+  isLoading: false,
+  streamingTurn: null,
+  executionState: null,
+  tokenUsage: null,
+  pendingMessages: [],
+  activeExecutionId: null,
+  lastExecutionResult: null,
+  respondingAgent: null,
+}
+
 export interface ChatState {
   currentAgent: Agent | null
   messages: Message[]
-  isLoading: boolean
   conversationId: string | null
   conversations: Conversation[]
+  hasMoreConversations: boolean
   error: string | null
-  executionState?: ExecutionState | null
-  streamingTurn?: import('./streaming-turn.types').StreamingAssistantTurn | null
+  // Per-conversation execution state. Use getExecState(state, convId) to read.
+  execByConversation: Record<string, ConversationExecutionState>
   selectedChannel?: SelectedChannel | null
   pendingToolAuth?: { app_slug: string; agent_slug: string } | null
   pendingGuidance?: {
@@ -93,8 +122,6 @@ export interface ChatState {
     preview_url?: string;
     artifact_path?: string;
   } | null
-  pendingMessages?: string[]
-  tokenUsage?: { used: number; total: number } | null
   backgroundTasks?: Array<{
     id: string
     name: string

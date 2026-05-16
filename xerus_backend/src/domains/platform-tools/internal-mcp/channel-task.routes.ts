@@ -2,6 +2,7 @@
 // Handles create_channel, add_to_channel, create_task MCP tools
 // Queries workspace.db (SQLite) on sandbox via executeWorkspaceJsonQuery.
 
+import crypto from 'crypto';
 import { Router, Response, NextFunction } from 'express';
 import { BadRequestError } from '../../../utils/errors';
 import { InternalMcpRequest, McpToolResult } from './types';
@@ -80,10 +81,6 @@ router.post('/create_channel', async (req: InternalMcpRequest, res: Response, ne
 
         // Ensure the domain exists (use project_id as domain_slug, default to 'default')
         const domainSlug = project_id || 'default';
-        await executeWorkspaceQuery(
-            provider, sandboxId,
-            `INSERT OR IGNORE INTO domains (slug, name) VALUES ('${escapeSQL(domainSlug)}', '${escapeSQL(domainSlug)}')`,
-        );
 
         // Determine lead agent (first in agent_ids list, if provided)
         const leadAgent = Array.isArray(agent_ids) && agent_ids.length > 0
@@ -92,7 +89,9 @@ router.post('/create_channel', async (req: InternalMcpRequest, res: Response, ne
 
         const descValue = description ? `'${escapeSQL(description)}'` : 'NULL';
 
+        // Combine domain upsert + channel insert + select into a single round-trip
         const sql = `
+            INSERT OR IGNORE INTO domains (slug, name) VALUES ('${escapeSQL(domainSlug)}', '${escapeSQL(domainSlug)}');
             INSERT INTO channels (slug, name, domain_slug, lead_agent_slug, description)
             VALUES ('${escapeSQL(channelSlug)}', '${escapeSQL(name)}', '${escapeSQL(domainSlug)}', ${leadAgent}, ${descValue});
             SELECT slug, name, domain_slug, lead_agent_slug, description, created_at
@@ -101,8 +100,16 @@ router.post('/create_channel', async (req: InternalMcpRequest, res: Response, ne
 
         const rows = await executeWorkspaceJsonQuery<ChannelRow>(provider, sandboxId, sql);
 
-        // If agent_ids provided, add them as channel members
+        // Validate all agent_ids exist before creating members (prevents orphan channel with no members)
         if (Array.isArray(agent_ids) && agent_ids.length > 0) {
+            const checkSql = `SELECT slug FROM agents WHERE slug IN (${agent_ids.map((id: string) => `'${escapeSQL(String(id))}'`).join(',')})`;
+            const existingAgents = await executeWorkspaceJsonQuery<AgentRow>(provider, sandboxId, checkSql);
+            const existingSlugs = new Set(existingAgents.map((a) => a.slug));
+            const missing = agent_ids.filter((id: string) => !existingSlugs.has(id));
+            if (missing.length > 0) {
+                throw new BadRequestError(`Agents not found: ${missing.join(', ')}`);
+            }
+
             const memberInserts = agent_ids.map((aid: string, idx: number) => {
                 const role = idx === 0 ? 'lead' : 'member';
                 return `INSERT OR IGNORE INTO channel_members (channel_slug, agent_slug, role) VALUES ('${escapeSQL(channelSlug)}', '${escapeSQL(String(aid))}', '${role}')`;
@@ -111,17 +118,20 @@ router.post('/create_channel', async (req: InternalMcpRequest, res: Response, ne
         }
 
         const row = rows[0];
+        if (!row) {
+            throw new BadRequestError('Failed to create channel — database insert returned no result');
+        }
         const mcpResult: McpToolResult = {
             success: true,
             data: {
                 channel: {
-                    slug: row?.slug || channelSlug,
-                    name: row?.name || name,
-                    description: row?.description || description || '',
-                    domain_slug: row?.domain_slug || domainSlug,
-                    lead_agent_slug: row?.lead_agent_slug || null,
+                    slug: row.slug,
+                    name: row.name,
+                    description: row.description || '',
+                    domain_slug: row.domain_slug,
+                    lead_agent_slug: row.lead_agent_slug || null,
                     agent_ids: agent_ids || [],
-                    created_at: row?.created_at || new Date().toISOString(),
+                    created_at: row.created_at,
                 },
             },
         };
@@ -205,7 +215,7 @@ router.post('/create_task', async (req: InternalMcpRequest, res: Response, next:
         const sandboxId = await requireRunningSandbox(sandboxService, userId);
         const provider = getDaytonaProvider(sandboxService);
 
-        const taskId = `task-${Date.now()}`;
+        const taskId = `task-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
         const taskPriority = priority || 'medium';
         const descValue = description ? `'${escapeSQL(description)}'` : 'NULL';
         const assignedAgent = Array.isArray(assigned_agent_ids) && assigned_agent_ids.length > 0
@@ -236,20 +246,23 @@ router.post('/create_task', async (req: InternalMcpRequest, res: Response, next:
         const rows = await executeWorkspaceJsonQuery<TaskRow>(provider, sandboxId, sql);
 
         const row = rows[0];
+        if (!row) {
+            throw new BadRequestError('Failed to create task — database insert returned no result');
+        }
         const mcpResult: McpToolResult = {
             success: true,
             data: {
                 task: {
-                    id: row?.id || taskId,
+                    id: row.id,
                     channel_id,
-                    title: row?.title || title,
-                    description: row?.description || description || '',
+                    title: row.title,
+                    description: row.description || '',
                     assigned_agent_ids: assigned_agent_ids || [],
-                    priority: row?.priority || taskPriority,
+                    priority: row.priority,
                     subtasks: subtasks || [],
-                    status: row?.status || 'open',
+                    status: row.status,
                     created_by: userId,
-                    created_at: row?.created_at || new Date().toISOString(),
+                    created_at: row.created_at,
                 },
             },
         };

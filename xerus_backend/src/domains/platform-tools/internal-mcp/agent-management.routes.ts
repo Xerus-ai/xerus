@@ -5,7 +5,7 @@
 import { Router, Response, NextFunction } from 'express';
 import { BadRequestError } from '../../../utils/errors';
 import { InternalMcpRequest, McpToolResult } from './types';
-import { escapeSQL, executeWorkspaceJsonQuery, executeWorkspaceQuery } from '../../conversations/workspace-db.helpers';
+import { escapeSQL, escapeLikePattern, executeWorkspaceJsonQuery, executeWorkspaceQuery } from '../../conversations/workspace-db.helpers';
 import { requireRunningSandbox, getDaytonaProvider } from '../../sandbox-infra/sandbox/sandbox-route-helpers';
 import type { SandboxService } from '../../sandbox-infra/sandbox/sandbox.service';
 
@@ -51,7 +51,7 @@ const router = Router();
 // POST /mcp/search_agents
 router.post('/search_agents', async (req: InternalMcpRequest, res: Response, next: NextFunction) => {
     try {
-        const { query: searchQuery, scope } = req.body;
+        const { query: searchQuery } = req.body;
         const userId = req.sandbox!.userId;
 
         if (!searchQuery || typeof searchQuery !== 'string') {
@@ -62,24 +62,14 @@ router.post('/search_agents', async (req: InternalMcpRequest, res: Response, nex
         const sandboxId = await requireRunningSandbox(sandboxService, userId);
         const provider = getDaytonaProvider(sandboxService);
 
-        const escaped = escapeSQL(searchQuery);
+        const escaped = escapeLikePattern(searchQuery);
 
-        let sql: string;
-        if (scope === 'mine') {
-            // In workspace.db all agents belong to the workspace owner
-            sql = `SELECT slug, name, adapter_type, role, autonomy_level, status, installed_at
+        // workspace.db is per-user, so all agents are accessible regardless of scope
+        const sql = `SELECT slug, name, adapter_type, role, autonomy_level, status, installed_at
                    FROM agents
-                   WHERE slug LIKE '%${escaped}%' OR name LIKE '%${escaped}%'
+                   WHERE slug LIKE '%${escaped}%' ESCAPE '\\' OR name LIKE '%${escaped}%' ESCAPE '\\'
                    ORDER BY slug
                    LIMIT ${MAX_RESULTS}`;
-        } else {
-            // Same query — workspace.db is per-user, so all agents are accessible
-            sql = `SELECT slug, name, adapter_type, role, autonomy_level, status, installed_at
-                   FROM agents
-                   WHERE slug LIKE '%${escaped}%' OR name LIKE '%${escaped}%'
-                   ORDER BY slug
-                   LIMIT ${MAX_RESULTS}`;
-        }
 
         const rows = await executeWorkspaceJsonQuery<WorkspaceAgentRow>(provider, sandboxId, sql);
 
@@ -281,7 +271,7 @@ router.post('/clone_agent', async (req: InternalMcpRequest, res: Response, next:
 // POST /mcp/update_agent
 router.post('/update_agent', async (req: InternalMcpRequest, res: Response, next: NextFunction) => {
     try {
-        const { agent_id } = req.body;
+        const { agent_id, name, description, system_prompt, model_id, autonomy_level } = req.body;
         const userId = req.sandbox!.userId;
 
         if (!agent_id) {
@@ -305,10 +295,25 @@ router.post('/update_agent', async (req: InternalMcpRequest, res: Response, next
         }
 
         const now = new Date().toISOString();
-        await executeWorkspaceQuery(
-            provider, sandboxId,
-            `UPDATE agents SET updated_at = '${now}' WHERE slug = '${agentSlug}'`,
-        );
+
+        // Build dynamic SET clause from provided fields
+        const updates: string[] = [`updated_at = '${now}'`];
+        if (name) updates.push(`name = '${escapeSQL(String(name))}'`);
+        if (autonomy_level) updates.push(`autonomy_level = '${escapeSQL(String(autonomy_level))}'`);
+        if (description !== undefined) updates.push(`description = '${escapeSQL(String(description))}'`);
+        if (model_id) updates.push(`model_id = '${escapeSQL(String(model_id))}'`);
+
+        const sql = `UPDATE agents SET ${updates.join(', ')} WHERE slug = '${agentSlug}'`;
+        await executeWorkspaceQuery(provider, sandboxId, sql);
+
+        // system_prompt goes to the agent.md file on the sandbox filesystem
+        if (system_prompt && typeof system_prompt === 'string') {
+            const PROMPT_HEREDOC = 'XERUS_PROMPT_EOF_8f3d';
+            if (!system_prompt.includes(PROMPT_HEREDOC)) {
+                const writeCmd = `mkdir -p /home/xerus/workspace/agents/${agentSlug} && cat > /home/xerus/workspace/agents/${agentSlug}/agent.md << '${PROMPT_HEREDOC}'\n${system_prompt}\n${PROMPT_HEREDOC}`;
+                await provider.executeCommand(sandboxId, writeCmd);
+            }
+        }
 
         const row = existing[0];
         const mcpResult: McpToolResult = {
@@ -316,7 +321,7 @@ router.post('/update_agent', async (req: InternalMcpRequest, res: Response, next
             data: {
                 agent: {
                     slug: row.slug,
-                    name: row.name,
+                    name: name || row.name,
                     adapter_type: row.adapter_type,
                     updated_at: now,
                 },

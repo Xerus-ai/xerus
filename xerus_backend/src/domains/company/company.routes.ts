@@ -20,7 +20,7 @@ import { shellEscapePath } from '../../utils/shell-safety';
 import { slugify, sanitizeSlug } from '../../shared/slugify';
 import { strictRateLimit } from '../../middleware/rate-limit';
 import { scaffoldProject, scaffoldChannel } from './workspace-scaffold.service';
-import { executeWorkspaceJsonQuery as execWsQuery, executeWorkspaceQuery as execWsMutate, escapeSQL } from '../conversations/workspace-db.helpers';
+import { executeWorkspaceJsonQuery as execWsQuery } from '../conversations/workspace-db.helpers';
 import {
     listDomainsWithChannels,
     createDomain,
@@ -32,6 +32,7 @@ import {
     updateChannel,
     getProjectOverview,
 } from './company-workspace-db.service';
+import { addSystemAgentsToChannel } from './system-agent-assignment.service';
 import { logger } from '../../utils/logger';
 
 const log = logger('CompanyRoutes');
@@ -39,39 +40,6 @@ const log = logger('CompanyRoutes');
 const MAX_NAME_LENGTH = 100;
 const MAX_DESCRIPTION_LENGTH = 500;
 const MAX_MESSAGE_CONTENT_LENGTH = 50000;
-
-const SYSTEM_AGENT_SLUGS = ['xerus-master', 'xerus-cto'];
-
-async function addSystemAgentsToChannel(
-    provider: import('../sandbox-infra/sandbox/providers/daytona.provider').DaytonaProvider,
-    sandboxId: string,
-    channelSlug: string,
-): Promise<void> {
-    const basePath = SANDBOX_CONFIG.workspacePath;
-    for (const slug of SYSTEM_AGENT_SLUGS) {
-        // 1. Insert into channel_members (SQLite)
-        const sql = `INSERT OR IGNORE INTO channel_members (channel_slug, agent_slug, role) VALUES ('${escapeSQL(channelSlug)}', '${escapeSQL(slug)}', 'member')`;
-        await execWsMutate(provider, sandboxId, sql).catch(() => {});
-
-        // 2. Update agent config.json channels array
-        try {
-            const configPath = `${basePath}/agents/${slug}/config.json`;
-            const readResult = await provider.executeCommand(sandboxId, `cat '${configPath}' 2>/dev/null`);
-            if (readResult.result) {
-                const config = JSON.parse(readResult.result) as Record<string, unknown>;
-                const channels = Array.isArray(config.channels) ? config.channels as string[] : [];
-                if (!channels.includes(channelSlug)) {
-                    channels.push(channelSlug);
-                    config.channels = channels;
-                    const escaped = JSON.stringify(config, null, 2).replace(/'/g, "'\\''");
-                    await provider.executeCommand(sandboxId, `echo '${escaped}' > '${configPath}'`);
-                }
-            }
-        } catch {
-            log.warn('Failed to update agent config channels', { agent_slug: slug, channel_slug: channelSlug });
-        }
-    }
-}
 
 const router = Router();
 const auth = authenticateFirebaseToken;
@@ -476,8 +444,8 @@ router.get('/channels/:channelId/agents', auth, async (req: AuthenticatedRequest
                         skills,
                     });
                 }
-            } catch {
-                // Agent config not found on sandbox — skip
+            } catch (err) {
+                log.error('Failed to read agent config from sandbox', { error: (err as Error).message, slug: row.slug });
             }
         }
 
