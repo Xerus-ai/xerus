@@ -440,6 +440,10 @@ export interface Skill {
 export interface SkillDetail extends Skill {
   files: SkillFile[];
   installedByAgents: number[];
+  // True if installed at global scope.
+  isGloballyInstalled: boolean;
+  // Channel IDs ("domain/channel") where this skill is installed at channel scope.
+  installedChannels: string[];
 }
 
 export interface SkillFile {

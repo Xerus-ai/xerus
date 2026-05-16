@@ -18,10 +18,10 @@ import type { TriggerType } from './queue/execution-lane.types';
 import {
     SDKExecutionError,
 } from './errors';
+import { routeEventWithResilience, createResilienceState } from './event-resilience';
 import { AgentAlreadyRunningError, QueueFullError } from './queue/execution-queue.errors';
 import { sendCommand, sendMessage, streamEvents } from '../sandbox-infra/sandbox';
 import type { SessionHandle } from '../sandbox-infra/sandbox';
-import { routeEventToBackend } from './runner-event-router';
 import { createHealthGuard, type HealthGuard } from './execution-health-guard';
 import {
     getConversation,
@@ -295,6 +295,10 @@ async function processEventStream(
     // events belonging to its agent — prevents identity leakage across streams.
     const expectedSlug = requireAgent(ctx).slug;
     let eventsProcessed = 0;
+    // Resilience: routeEventWithResilience tracks consecutive non-fatal handler
+    // failures across iterations. Fatal invariants re-throw; non-fatal errors are
+    // logged + degraded into a 'notification' until MAX_CONSECUTIVE_HANDLER_ERRORS.
+    const resilience = createResilienceState();
 
     // Safety: abort if no events arrive within FIRST_EVENT_TIMEOUT_MS.
     // This catches cases where the runner process crashed silently or the SDK never starts.
@@ -345,7 +349,7 @@ async function processEventStream(
         eventsProcessed++;
         if (healthGuard) healthGuard.recordActivity();
 
-        await routeEventToBackend(eventType, raw, ctx, deps);
+        await routeEventWithResilience(eventType, raw, ctx, deps, resilience);
 
         // sse_forward events are already sent by handleSseForward (token, tool_call, tool_result, reasoning)
         // agent_output is raw SDK data translated by the runner into typed sse_forward events

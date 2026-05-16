@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, memo } from 'react'
 import { MessageBubble } from './MessageBubble'
 import { ChatWelcome } from './ChatWelcome'
 import { RichThinkingIndicator } from './RichThinkingIndicator'
@@ -44,7 +44,7 @@ function AgentAvatarIcon({ agent, size = 28 }: { agent: Agent; size?: number }) 
   )
 }
 
-export function MessageList({
+function MessageListComponent({
   messages,
   currentAgent,
   isLoading = false,
@@ -103,19 +103,23 @@ export function MessageList({
           {allMessages.map((message) => {
             const messageHasIdentity = !!(message.agentSlug || message.agentName)
             return (
-              <MessageBubble
+              <div
                 key={message.id}
-                message={message}
-                agent={
-                  message.role === 'assistant' && !messageHasIdentity && currentAgent
-                    ? currentAgent
-                    : null
-                }
-                agents={agents}
-                isStreaming={message.isStreaming}
-                onViewExecution={onViewExecution}
-                onOpenWorkspace={onOpenWorkspace}
-              />
+                style={{ contentVisibility: 'auto', containIntrinsicSize: '0 200px' }}
+              >
+                <MessageBubble
+                  message={message}
+                  agent={
+                    message.role === 'assistant' && !messageHasIdentity && currentAgent
+                      ? currentAgent
+                      : null
+                  }
+                  agents={agents}
+                  isStreaming={message.isStreaming}
+                  onViewExecution={onViewExecution}
+                  onOpenWorkspace={onOpenWorkspace}
+                />
+              </div>
             )
           })}
         </div>
@@ -150,3 +154,5 @@ export function MessageList({
     </div>
   )
 }
+
+export const MessageList = memo(MessageListComponent)

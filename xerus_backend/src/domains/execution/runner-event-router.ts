@@ -3,6 +3,7 @@
 
 import { logger } from '../../utils/logger';
 import type { PipelineContext, ResolvedExecutionDeps } from './execution-pipeline.types';
+import { PipelineInvariantError } from './errors';
 import { requireAgent } from './pipeline-guards';
 import { STREAM_EVENT_TYPES, type RunnerEventType, type StreamEventType } from './types';
 import type { HITLRequest } from './hitl/hitl.types';
@@ -313,11 +314,11 @@ async function handleAgentMessage(
     const data = assertAgentMessageData(d);
 
     if (!deps.messageBridge) {
-        throw new Error(`${EVENT_ROUTER_LOG_PREFIX} agent_message: messageBridge not initialized`);
+        throw new PipelineInvariantError(`${EVENT_ROUTER_LOG_PREFIX} agent_message: messageBridge not initialized`);
     }
 
     if (!ctx.sandboxId) {
-        throw new Error(`${EVENT_ROUTER_LOG_PREFIX} agent_message: sandboxId not set`);
+        throw new PipelineInvariantError(`${EVENT_ROUTER_LOG_PREFIX} agent_message: sandboxId not set`);
     }
     const provider = deps.sandboxService.getDaytonaProvider();
 
@@ -421,7 +422,7 @@ async function handleHitlRequest(
     d: Record<string, unknown>, ctx: PipelineContext, deps: ResolvedExecutionDeps,
 ): Promise<void> {
     if (!ctx.sessionId) {
-        throw new Error(`${EVENT_ROUTER_LOG_PREFIX} hitl_request: sessionId not set -- pipeline invariant violated`);
+        throw new PipelineInvariantError(`${EVENT_ROUTER_LOG_PREFIX} hitl_request: sessionId not set -- pipeline invariant violated`);
     }
 
     const data = assertHitlRequestData(d);

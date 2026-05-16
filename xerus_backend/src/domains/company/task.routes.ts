@@ -15,10 +15,12 @@ import { sanitizeSlug } from '../../shared/slugify';
 import { VALID_STATUSES, VALID_PRIORITIES } from './task.constants';
 import {
     listTasks, listTasksByChannel, createTask, getTask, updateTask, updateTaskStatus, resolveAgentsFromWorkspace,
-    listChannelDeliverables,
+    listChannelDeliverables, syncBeadsToTasks,
     type WorkspaceTaskRow, type WorkspaceAgentRow, type UpdateTaskFields,
 } from './task-workspace-db.service';
 import { createSystemEvent } from './company-workspace-db.service';
+import { triggerChannelExecution } from './channel-execution.service';
+import type { ExecutionService } from '../execution/execution.service';
 import { strictRateLimit } from '../../middleware/rate-limit';
 import { logger } from '../../utils/logger';
 
@@ -29,7 +31,7 @@ const auth = authenticateFirebaseToken;
 
 // Dependency Injection (set from index.ts at startup)
 
-interface TaskRoutesDeps { sandboxService: SandboxService }
+interface TaskRoutesDeps { sandboxService: SandboxService; executionService?: ExecutionService }
 let deps: TaskRoutesDeps | null = null;
 export function setTaskRoutesDeps(d: TaskRoutesDeps): void { deps = d; }
 
@@ -280,6 +282,14 @@ router.post('/channels/:channelId/tasks', auth, strictRateLimit, async (req: Aut
             { event_type: 'task_created', task_id: beadsId },
         ).catch(err => log.warn('System event failed', { error: err instanceof Error ? err.message : String(err) }));
 
+        // Auto-trigger agent execution when task is assigned
+        if (assignedAgent && getDeps().executionService) {
+            const taskPrompt = `You have a new task assigned: "${title}". ${description || ''}\nTask ID: ${beadsId}\nPlease work on this task.`;
+            triggerChannelExecution(
+                getDeps().executionService!, provider, sandboxId, userId, assignedAgent, taskPrompt, channelId,
+            ).catch(err => log.warn('Auto-execution trigger failed', { error: err instanceof Error ? err.message : String(err) }));
+        }
+
         const allSlugs = row.assigned_agent ? [row.assigned_agent] : [];
         const agentMap = await resolveAgentsFromWorkspace(provider, sandboxId, allSlugs);
         sendResponse(res, 201, { task: formatTask(row, agentMap) }, startTime);
@@ -394,6 +404,14 @@ router.patch('/tasks/:taskId', auth, strictRateLimit, async (req: AuthenticatedR
                     `assigned task "${row.title}" to ${fields.assigned_agent}`,
                     { event_type: 'task_assigned', task_id: taskId, assigned_to: fields.assigned_agent },
                 ).catch(err => log.warn('System event failed', { error: err instanceof Error ? err.message : String(err) }));
+
+                // Auto-trigger agent execution when task is (re-)assigned
+                if (getDeps().executionService) {
+                    const taskPrompt = `You have a new task assigned: "${row.title}". ${row.description || ''}\nTask ID: ${taskId}\nPlease work on this task.`;
+                    triggerChannelExecution(
+                        getDeps().executionService!, provider, sandboxId, userId, fields.assigned_agent, taskPrompt, row.project_slug,
+                    ).catch(err => log.warn('Auto-execution trigger failed', { error: err instanceof Error ? err.message : String(err) }));
+                }
             }
             if (fields.status) {
                 createSystemEvent(
@@ -498,6 +516,24 @@ router.get('/channels/:channelId/deliverables', auth, async (req: AuthenticatedR
         });
 
         sendResponse(res, 200, { deliverables }, startTime);
+    } catch (err) {
+        next(err);
+    }
+});
+
+// POST /api/v1/tasks/sync - Trigger beads → workspace.db sync
+router.post('/tasks/sync', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const startTime = res.locals.startTime || Date.now();
+    try {
+        const userId = req.user?.uid;
+        if (!userId) throw new UnauthorizedError();
+
+        const { sandboxService } = getDeps();
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
+
+        const result = await syncBeadsToTasks(provider, sandboxId);
+        sendResponse(res, 200, result, startTime);
     } catch (err) {
         next(err);
     }

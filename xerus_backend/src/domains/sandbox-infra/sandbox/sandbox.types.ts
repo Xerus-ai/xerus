@@ -28,6 +28,7 @@ export interface SandboxRegistryEntry {
 export interface AgentSessionEntry {
     handle: SessionHandle;
     envVars: Record<string, string>;
+    conversationId?: string;
 }
 
 // In-memory sandbox session

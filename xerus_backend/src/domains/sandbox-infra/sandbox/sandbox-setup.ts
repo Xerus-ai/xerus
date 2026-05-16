@@ -257,6 +257,23 @@ export async function runFullWorkspaceSetup(
         log.info('Installed sqlite3', { sandbox_id: sandboxId });
     }
 
+    // 4a2. Install Python packages required by workspace hooks (pyyaml for shift.yaml, mcp for IPC)
+    const pipCheck = await provider.executeCommand(
+        sandboxId,
+        `python3 -c "import yaml, mcp" 2>/dev/null && echo FOUND || echo MISSING`,
+    );
+    if ((pipCheck.result || '').trim().endsWith('MISSING')) {
+        const pipResult = await provider.executeCommand(
+            sandboxId,
+            `pip3 install --break-system-packages --quiet pyyaml mcp 2>&1 || echo 'WARN: pip install failed'`,
+        );
+        if ((pipResult.result || '').includes('WARN')) {
+            log.warn('Python package install failed (non-blocking)', { sandbox_id: sandboxId, output: (pipResult.result || '').slice(-200) });
+        } else {
+            log.info('Installed Python packages (pyyaml, mcp)', { sandbox_id: sandboxId });
+        }
+    }
+
     // 4b. Initialize workspace databases (company.db + workspace.db)
     // Run init-db.sh explicitly since CLI prompts mode may not trigger SessionStart hooks
     const initDbScript = `${basePath}/.claude/hooks/scripts/init-db.sh`;

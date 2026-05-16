@@ -81,30 +81,53 @@ export class SandboxContextBuilder {
      * Copy memory files from .memory/agents/{slug}/ to context/memory/.
      * The agent's prompt tells it to read context/index.md — having memory
      * files listed there makes them discoverable without hardcoded paths.
+     *
+     * Also copies company-level and user-level memory for broader context.
      */
     private syncMemoryFiles(agentSlug: string): string[] {
-        const memorySource = path.join(this.workspacePath, '.memory', 'agents', agentSlug);
         const memoryDest = path.join(this.workspacePath, 'context', 'memory');
         const written: string[] = [];
 
-        if (!fs.existsSync(memorySource)) return written;
-
         this.ensureDir(memoryDest);
 
-        const memoryFiles = ['working.md', 'episodic.md', 'semantic.md', 'procedural.md'];
-        for (const file of memoryFiles) {
-            const src = path.join(memorySource, file);
-            if (!fs.existsSync(src)) continue;
+        // Agent-scoped memory — copied to context/memory/ (flat, preserving existing path contract)
+        const agentMemory = path.join(this.workspacePath, '.memory', 'agents', agentSlug);
+        if (fs.existsSync(agentMemory)) {
+            const agentFiles = ['working.md', 'expertise.md', 'episodic.md', 'semantic.md', 'procedural.md'];
+            for (const file of agentFiles) {
+                written.push(...this.copyIfExists(path.join(agentMemory, file), path.join(memoryDest, file)));
+            }
+        }
 
-            const content = fs.readFileSync(src, 'utf-8');
-            if (content.trim().length === 0) continue;
+        // Company-level memory — copied to context/memory/company/
+        const companyMemory = path.join(this.workspacePath, '.memory', 'company');
+        if (fs.existsSync(companyMemory)) {
+            const companyDest = path.join(memoryDest, 'company');
+            this.ensureDir(companyDest);
+            for (const file of ['vision.md', 'decisions.md', 'standup.md']) {
+                written.push(...this.copyIfExists(path.join(companyMemory, file), path.join(companyDest, file)));
+            }
+        }
 
-            const dest = path.join(memoryDest, file);
-            fs.writeFileSync(dest, content, 'utf-8');
-            written.push(path.relative(this.workspacePath, dest));
+        // User-level memory — copied to context/memory/user/
+        const userMemory = path.join(this.workspacePath, '.memory', 'user');
+        if (fs.existsSync(userMemory)) {
+            const userDest = path.join(memoryDest, 'user');
+            this.ensureDir(userDest);
+            for (const file of ['preferences.md', 'context.md']) {
+                written.push(...this.copyIfExists(path.join(userMemory, file), path.join(userDest, file)));
+            }
         }
 
         return written;
+    }
+
+    private copyIfExists(src: string, dest: string): string[] {
+        if (!fs.existsSync(src)) return [];
+        const content = fs.readFileSync(src, 'utf-8');
+        if (content.trim().length === 0) return [];
+        fs.writeFileSync(dest, content, 'utf-8');
+        return [path.relative(this.workspacePath, dest)];
     }
 
     // -------------------------------------------------------------------------

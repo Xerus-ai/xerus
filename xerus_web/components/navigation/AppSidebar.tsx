@@ -21,6 +21,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { InboxSidebarBody } from './InboxSidebarBody'
 import { getWorkspaceOverview, type WorkspaceOverview } from '@/lib/api/workspace'
+import { getAssistants } from '@/lib/api/agents'
 
 const TABS = [
   { name: 'Home', href: '/workspace', icon: Home },
@@ -204,6 +205,11 @@ function HomeSidebarBody({ activeSection, isOnWorkspace, onSectionClick, onPathC
     revalidateOnFocus: false,
     dedupingInterval: 30000,
   })
+  const { data: agentsData } = useSWR('sidebar/agents', () => getAssistants({ limit: 100 }), {
+    revalidateOnFocus: false,
+    dedupingInterval: 30000,
+  })
+  const agentCount = agentsData?.agents.length ?? 0
 
   return (
     <nav className="px-3 py-3 space-y-5">
@@ -254,7 +260,7 @@ function HomeSidebarBody({ activeSection, isOnWorkspace, onSectionClick, onPathC
         <p className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-2 px-3">Marketplace</p>
         <div className="space-y-0.5">
           {[
-            { id: 'agents' as WorkspaceSection, label: 'Agents', icon: Bot, count: overview?.stats.agentCount },
+            { id: 'agents' as WorkspaceSection, label: 'Agents', icon: Bot, count: agentCount },
             { id: 'skills' as WorkspaceSection, label: 'Skills', icon: Puzzle },
             { id: 'connectors' as WorkspaceSection, label: 'Connectors', icon: Unplug },
           ].map(item => {

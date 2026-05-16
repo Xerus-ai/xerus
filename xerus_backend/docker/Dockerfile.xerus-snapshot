@@ -102,7 +102,8 @@ RUN curl -LsSf https://astral.sh/uv/0.6.14/install.sh | sh
 # Create shell config files
 RUN touch ~/.bashrc ~/.zshrc
 
-# Claude IPC MCP server is installed from workspace clone (.xerus/ipc/)
+# MCP SDK for IPC server + pyyaml for shift.yaml/task-context parsing
+RUN pip install --user --break-system-packages mcp pyyaml
 
 # Bun runtime (scheduler daemon uses bun:sqlite and Bun.spawn)
 RUN curl -fsSL https://bun.sh/install | bash -s "bun-v1.2.5"

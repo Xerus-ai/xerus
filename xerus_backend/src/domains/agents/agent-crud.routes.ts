@@ -11,6 +11,9 @@ import { AgentUnauthorizedError, AgentNotFoundError, AgentNotClonableError } fro
 import { agentRegistryRepository } from './agent-registry.repository';
 import { formatPromptWithAI } from './prompt-formatter';
 import { resolveAgentParam } from './resolve-agent-param';
+import { getAgentSandboxService } from './routes';
+import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
+import { requireRunningSandbox, getDaytonaProvider } from '../sandbox-infra/sandbox/sandbox-route-helpers';
 
 const router = Router();
 const auth = authenticateFirebaseToken;
@@ -167,6 +170,87 @@ router.get('/:id', auth, async (req: AuthenticatedRequest, res: Response, next: 
         next(err);
     }
 });
+
+// GET /api/v1/agents/:id/memory - Read agent memory files from sandbox
+router.get('/:id/memory', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const startTime = res.locals.startTime || Date.now();
+    try {
+        if (!req.user) throw new AgentUnauthorizedError();
+        const userId = req.user.uid;
+
+        const param = req.params.id;
+        const slug = await resolveSlug(param, userId);
+        if (!slug) throw new AgentNotFoundError(param);
+
+        const sandboxService = getAgentSandboxService();
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
+
+        const wp = SANDBOX_CONFIG.workspacePath;
+        const memoryDir = `${wp}/.memory/agents/${slug}`;
+        const agentDir = `${wp}/agents/${slug}`;
+
+        const readFile = async (path: string): Promise<string | null> => {
+            try {
+                return await provider.readFile(sandboxId, path);
+            } catch {
+                return null;
+            }
+        };
+
+        const [working, expertise, status] = await Promise.all([
+            readFile(`${memoryDir}/working.md`),
+            readFile(`${memoryDir}/expertise.md`),
+            readFile(`${agentDir}/STATUS.md`),
+        ]);
+
+        sendResponse(res, 200, { memory: { working, expertise, status } }, startTime);
+    } catch (err) {
+        next(err);
+    }
+});
+
+// GET /api/v1/agents/:id/sessions - Execution history for an agent
+router.get('/:id/sessions', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const startTime = res.locals.startTime || Date.now();
+    try {
+        if (!req.user) throw new AgentUnauthorizedError();
+        const userId = req.user.uid;
+
+        const param = req.params.id;
+        const slug = await resolveSlug(param, userId);
+        if (!slug) throw new AgentNotFoundError(param);
+
+        const limit = Math.min(parseInt(req.query.limit as string, 10) || 20, 50);
+
+        const { query: dbQuery } = await import('../../database/connection');
+        const result = await dbQuery(
+            `SELECT id, agent_slug, status, trigger_type, input_tokens, output_tokens, credits_used,
+                    started_at, completed_at, created_at
+             FROM execution_sessions
+             WHERE agent_slug = $1 AND workspace_id IN (
+                SELECT id FROM workspaces WHERE user_id = $2
+             )
+             ORDER BY created_at DESC
+             LIMIT $3`,
+            [slug, userId, limit],
+        );
+
+        sendResponse(res, 200, { sessions: result.rows }, startTime);
+    } catch (err) {
+        next(err);
+    }
+});
+
+async function resolveSlug(param: string, userId: string): Promise<string | null> {
+    const numericId = parseInt(param, 10);
+    if (!Number.isNaN(numericId) && String(numericId) === param) {
+        const entry = await agentRegistryRepository.findById(numericId);
+        return entry?.slug ?? null;
+    }
+    const entry = await agentRegistryRepository.findBySlug(param, userId);
+    return entry?.slug ?? null;
+}
 
 // POST /api/v1/agents - Create new agent (registry + filesystem scaffold)
 router.post('/', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {

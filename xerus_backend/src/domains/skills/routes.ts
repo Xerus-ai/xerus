@@ -9,6 +9,7 @@ import { authenticateFirebaseToken } from '../../middleware/auth';
 import { skillService } from './service';
 import { skillSecretsService } from './secrets.service';
 import { SkillUnauthorizedError, SkillValidationError } from './errors';
+import { SLUG_PATTERN } from '../../shared/slugify';
 import type { PaginatedSkills } from './types';
 import type { SandboxService } from '../sandbox-infra/sandbox/sandbox.service';
 import { SkillWorkspaceService } from './workspace.service';
@@ -56,11 +57,47 @@ function sendPaginatedSkills(res: Response, result: PaginatedSkills, startTime: 
     }, startTime);
 }
 
+function normalizeChannelId(channelId: string): string {
+    if (channelId.includes('--')) {
+        const idx = channelId.indexOf('--');
+        const domain = channelId.slice(0, idx);
+        const channel = channelId.slice(idx + 2);
+        if (!domain || !channel) {
+            throw new SkillValidationError([{ field: 'channel_id', message: 'channel_id must be in "domain--channel" or "domain/channel" format' }]);
+        }
+        if (!SLUG_PATTERN.test(domain) || !SLUG_PATTERN.test(channel)) {
+            throw new SkillValidationError([{ field: 'channel_id', message: `Invalid slug segment in channel_id` }]);
+        }
+        return `${domain}/${channel}`;
+    }
+    const parts = channelId.split('/');
+    if (parts.length !== 2 || !parts[0] || !parts[1]) {
+        throw new SkillValidationError([{ field: 'channel_id', message: 'channel_id must be in "domain--channel" or "domain/channel" format' }]);
+    }
+    for (const part of parts) {
+        if (!SLUG_PATTERN.test(part)) {
+            throw new SkillValidationError([{ field: 'channel_id', message: `Invalid slug segment in channel_id` }]);
+        }
+    }
+    return channelId;
+}
+
 // GET /api/v1/skills - Unified: all skills with is_installed flag + categories
+// Optional ?channel_id=domain/channel filters to skills installed in that channel
+// (plus all global skills, since global skills are visible everywhere).
 router.get('/', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const startTime = res.locals.startTime || Date.now();
     try {
         if (!req.user) throw new SkillUnauthorizedError();
+
+        const rawChannelId = typeof req.query.channel_id === 'string' ? req.query.channel_id : undefined;
+        if (rawChannelId) {
+            const channelId = normalizeChannelId(rawChannelId);
+            const result = await skillService.listByChannel(req.user.uid, channelId, parseListQueryParams(req.query));
+            sendPaginatedSkills(res, result, startTime);
+            return;
+        }
+
         const result = await skillService.list(req.user.uid, parseListQueryParams(req.query));
         sendPaginatedSkills(res, result, startTime);
     } catch (err) {

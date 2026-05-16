@@ -16,7 +16,7 @@ import {
 } from './errors';
 import { SkillRepository, skillRepository } from './repository';
 import { SkillValidator, skillValidator } from './validators';
-import { SkillWorkspaceService, channelIdToWorkspacePath } from './workspace.service';
+import { SkillWorkspaceService, channelIdToWorkspacePath, workspacePathToChannelId } from './workspace.service';
 import { generatePuzzleConfig } from './skill-avatar';
 import { skillSecretsService } from './secrets.service';
 import { canUserViewSkill } from './skill-access';
@@ -49,12 +49,21 @@ export class SkillService {
             throw new SkillNotFoundError(slug);
         }
 
-        // Check install status first — installed skills are always viewable by the user
-        const isInstalled = await this.repository.isInstalled(userId, slug);
+        // Cached: every channel install of every skill for this user.
+        const installed = await this.repository.listInstalledCached(userId);
+        const installedForSlug = installed.filter(s => s.slug === slug);
+        const isInstalled = installedForSlug.length > 0;
 
         if (!isInstalled && !canUserViewSkill(skill, userId)) {
             throw new SkillAccessDeniedError(slug);
         }
+
+        const installed_channels = installedForSlug
+            .filter(s => s.installed_scope === 'channel' && s.channel_path)
+            .map(s => workspacePathToChannelId(s.channel_path!))
+            .filter((c): c is string => !!c);
+
+        const is_globally_installed = installedForSlug.some(s => s.installed_scope === 'global');
 
         const files = await this.getSkillFiles(skill, userId);
 
@@ -62,6 +71,8 @@ export class SkillService {
             ...skill,
             files,
             is_installed: isInstalled,
+            is_globally_installed,
+            installed_channels,
         };
     }
 
@@ -74,7 +85,9 @@ export class SkillService {
             validated.avatar_config = generatePuzzleConfig();
         }
 
-        return this.repository.create(userId, validated);
+        const created = await this.repository.create(userId, validated);
+        this.repository.invalidateInstalledCache(userId);
+        return created;
     }
 
     async update(slug: string, data: unknown, userId: string): Promise<Skill> {
@@ -89,6 +102,7 @@ export class SkillService {
         if (!updated) {
             throw new SkillNotFoundError(slug);
         }
+        this.repository.invalidateInstalledCache(userId);
         return updated;
     }
 
@@ -100,6 +114,7 @@ export class SkillService {
         this.checkOwnership(existing, userId);
 
         await this.repository.delete(userId, slug);
+        this.repository.invalidateInstalledCache(userId);
         await skillSecretsService.cleanupOnUninstall(slug, userId);
     }
 
@@ -110,6 +125,12 @@ export class SkillService {
     async list(userId: string, options: unknown): Promise<PaginatedSkills> {
         const validated = this.validator.validateListOptions(options || {});
         return this.repository.list(userId, validated);
+    }
+
+    async listByChannel(userId: string, channelId: string, options: unknown): Promise<PaginatedSkills> {
+        const validated = this.validator.validateListOptions(options || {});
+        const channelPath = channelIdToWorkspacePath(channelId);
+        return this.repository.listByChannel(userId, channelPath, validated);
     }
 
     // ===== INSTALL / UNINSTALL =====
@@ -141,6 +162,7 @@ export class SkillService {
             validated.scope,
             channelPath,
         );
+        this.repository.invalidateInstalledCache(userId);
     }
 
     async uninstall(
@@ -172,12 +194,13 @@ export class SkillService {
             scope,
             channelPath,
         );
+        this.repository.invalidateInstalledCache(userId);
 
         await skillSecretsService.cleanupOnUninstall(skillSlug, userId);
     }
 
     async getInstalledSkills(userId: string): Promise<Skill[]> {
-        return this.repository.listInstalled(userId);
+        return this.repository.listInstalledCached(userId);
     }
 
     // ===== FILE OPERATIONS =====
