@@ -8,8 +8,7 @@ import { DeliverableChips } from './DeliverableChips'
 import { TaskDock } from './TaskDock'
 import { useTaskDock } from './useTaskDock'
 import { INFRA_NOISE } from './useChatExecution.helpers'
-import { BackgroundAgentPanel } from './BackgroundAgentPanel'
-import type { SandboxTab } from './SandboxPanel'
+import { useSandboxPanel } from './useSandboxPanel'
 
 // Heavy panels loaded only when user opens them (bundle-dynamic-imports + bundle-conditional rules)
 const ArtifactViewerPanel = dynamic(() =>
@@ -20,7 +19,7 @@ const SandboxPanel = dynamic(() =>
 )
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from 'react-resizable-panels'
 import { GuidanceInterventionCard } from './GuidanceInterventionCard'
-import { ConversationSidebar } from './ConversationSidebar'
+import { ChatSidebarSlotComponent, type SidebarPropsRef } from './ChatSidebarSlot'
 import { useSidebarSlotRegister } from '@/components/layout/SidebarSlotContext'
 import { useLayout } from '@/components/layout/LayoutContext'
 import { cn } from '@/lib/utils'
@@ -33,54 +32,9 @@ const ExecutionDetail = dynamic(() => import('@/components/execution').then((m) 
 import { Loader2, X } from 'lucide-react'
 import { toast } from '@/lib/toast'
 import { XerusLoader } from '@/components/common/XerusLoader'
-import { startBrowser, startTerminal } from '@/lib/api/workspace'
 import { getSharedPipedreamClient } from '@/lib/pipedream-client'
 import { respondToGuidance } from '@/lib/api/execute'
 import { useChatState } from './useChatState'
-
-// Top-level component rendered inside AppSidebar via the slot system.
-interface SidebarPropsRef {
-  projects: import('./types').ProjectGroup[]
-  conversationId: string | null
-  selectedChannel?: import('./types').SelectedChannel | null
-  isLoading: boolean
-  hasMore: boolean
-  isLoadingMore: boolean
-  handleSelectConversation: (id: string) => void
-  handleNewConversation: () => void
-  handleDeleteConversation: (id: string) => void
-  handleRenameConversation: (id: string, newTitle: string) => void
-  handleSelectChannel: (ch: import('./types').SelectedChannel) => void
-  handleClearChannel: () => void
-  handleLoadMore: () => void
-}
-
-function ChatSidebarSlotComponent({ propsRef, forceUpdateRef }: {
-  propsRef: React.RefObject<SidebarPropsRef>
-  forceUpdateRef: React.MutableRefObject<() => void>
-}) {
-  const [, setTick] = useState(0)
-  forceUpdateRef.current = () => setTick((t) => t + 1)
-  const p = propsRef.current!
-  return (
-    <ConversationSidebar
-      projects={p.projects}
-      currentConversationId={p.conversationId}
-      onSelectConversation={p.handleSelectConversation}
-      onNewConversation={p.handleNewConversation}
-      onDeleteConversation={p.handleDeleteConversation}
-      onRenameConversation={p.handleRenameConversation}
-      isCollapsed={false}
-      isLoading={p.isLoading}
-      selectedChannel={p.selectedChannel}
-      onSelectChannel={p.handleSelectChannel}
-      onClearChannel={p.handleClearChannel}
-      hasMore={p.hasMore}
-      isLoadingMore={p.isLoadingMore}
-      onLoadMore={p.handleLoadMore}
-    />
-  )
-}
 
 interface ChatContainerProps {
   initialAgentId?: string
@@ -102,13 +56,8 @@ export function ChatContainer({
   // ---- Artifact tabs (multi-tab viewer) ----
   const artifacts = useArtifactTabs()
 
-  // ---- Sandbox panel (terminal + browser) ----
+  const sandbox = useSandboxPanel()
   const [showExecution, setShowExecution] = useState<string | null>(null)
-  const [browserUrl, setBrowserUrl] = useState<string | null>(null)
-  const [isBrowserLoading, setIsBrowserLoading] = useState(false)
-  const [terminalUrl, setTerminalUrl] = useState<string | null>(null)
-  const [isTerminalLoading, setIsTerminalLoading] = useState(false)
-  const [sandboxTab, setSandboxTab] = useState<SandboxTab>('terminal')
 
   // ---- Task dock (subagent progress) ----
   const taskDock = useTaskDock()
@@ -233,39 +182,6 @@ export function ChatContainer({
     })
   }, [])
 
-  // ---- Sandbox ----
-  const handleOpenBrowser = useCallback(async () => {
-    if (browserUrl || isBrowserLoading) return
-    setSandboxTab('browser')
-    setIsBrowserLoading(true)
-    try {
-      const result = await startBrowser()
-      setBrowserUrl(result.novnc_url)
-    } catch {
-      toast.error("Couldn't open the browser preview", { description: 'Your workspace may still be starting up.' })
-    } finally {
-      setIsBrowserLoading(false)
-    }
-  }, [browserUrl, isBrowserLoading])
-
-  const handleOpenTerminal = useCallback(async () => {
-    if (terminalUrl || isTerminalLoading) return
-    setSandboxTab('terminal')
-    setIsTerminalLoading(true)
-    try {
-      const result = await startTerminal()
-      setTerminalUrl(result.terminal_url)
-    } catch {
-      toast.error("Couldn't open the terminal", { description: 'Your workspace may still be starting up.' })
-    } finally {
-      setIsTerminalLoading(false)
-    }
-  }, [terminalUrl, isTerminalLoading])
-
-  const handleCloseSandboxPanel = useCallback(() => {
-    setBrowserUrl(null)
-    setTerminalUrl(null)
-  }, [])
 
   // ---- Sidebar slot registration ----
   const sidebarPropsRef = useRef<SidebarPropsRef>({
@@ -314,15 +230,18 @@ export function ChatContainer({
     return <XerusLoader variant="inline" className="h-full bg-surface" />
   }
 
-  const isSandboxOpen = !!(terminalUrl || browserUrl)
-  const hasArtifacts = artifacts.tabs.length > 0
-  const showArtifactPanel = hasArtifacts && !isSandboxOpen
+  type RightPanelMode = 'sandbox' | 'artifact' | null
+  const rightPanel: RightPanelMode = (sandbox.terminalUrl || sandbox.browserUrl)
+    ? 'sandbox'
+    : artifacts.tabs.length > 0
+      ? 'artifact'
+      : null
 
   return (
     <div className={cn('flex w-full relative h-screen overflow-hidden', className)}>
       <PanelGroup orientation="horizontal" className="flex-1 min-w-0">
         {/* Chat column */}
-        <Panel defaultSize={isSandboxOpen ? 50 : showArtifactPanel ? 55 : 100} minSize={30}>
+        <Panel defaultSize={rightPanel === 'sandbox' ? 50 : rightPanel === 'artifact' ? 55 : 100} minSize={30}>
           <div className="flex flex-col h-full relative overflow-hidden">
             <MessageList
               messages={state.messages as ChatMessageExtended[]}
@@ -390,11 +309,6 @@ export function ChatContainer({
                 />
               </div>
             )}
-            {(state.backgroundTasks?.length ?? 0) > 0 && (
-              <div className="w-full max-w-3xl mx-auto">
-                <BackgroundAgentPanel tasks={state.backgroundTasks!} />
-              </div>
-            )}
             {activeExec.pendingMessages.length > 0 && (
               <div className="w-full max-w-3xl mx-auto px-4 pb-2">
                 <div className="flex items-center gap-2 px-3 py-2 bg-surface rounded-xl border border-surface-active">
@@ -432,12 +346,12 @@ export function ChatContainer({
               agents={agents}
               selectedAgent={state.currentAgent}
               onAgentChange={chat.handleAgentChange}
-              onOpenTerminal={handleOpenTerminal}
-              isTerminalLoading={isTerminalLoading}
-              isTerminalOpen={!!terminalUrl}
-              onOpenBrowser={handleOpenBrowser}
-              isBrowserLoading={isBrowserLoading}
-              isBrowserOpen={!!browserUrl}
+              onOpenTerminal={sandbox.openTerminal}
+              isTerminalLoading={sandbox.isTerminalLoading}
+              isTerminalOpen={!!sandbox.terminalUrl}
+              onOpenBrowser={sandbox.openBrowser}
+              isBrowserLoading={sandbox.isBrowserLoading}
+              isBrowserOpen={!!sandbox.browserUrl}
               conversationId={conversationId}
               isExecuting={activeExec.isLoading}
               onStop={chat.handleStopExecution}
@@ -447,21 +361,21 @@ export function ChatContainer({
         </Panel>
 
         {/* Sandbox panel — terminal/browser, side-by-side on md+ */}
-        {isSandboxOpen && !isMobile && (
+        {rightPanel === 'sandbox' && !isMobile && (
           <>
             <PanelResizeHandle className="w-2 flex items-center justify-center cursor-col-resize group shrink-0">
               <div className="w-px h-8 rounded-full bg-[#E5E5E5] group-hover:bg-primary/50 group-hover:h-16 transition-all" />
             </PanelResizeHandle>
             <Panel defaultSize={50} minSize={25}>
               <SandboxPanel
-                terminalUrl={terminalUrl}
+                terminalUrl={sandbox.terminalUrl}
                 browserUrl={state.pendingGuidance?.ui_hint === 'browser' && state.pendingGuidance.browser_url
                   ? state.pendingGuidance.browser_url
-                  : browserUrl}
+                  : sandbox.browserUrl}
                 previewUrl={null}
-                activeTab={sandboxTab}
-                onTabChange={setSandboxTab}
-                onClose={handleCloseSandboxPanel}
+                activeTab={sandbox.sandboxTab}
+                onTabChange={sandbox.setSandboxTab}
+                onClose={sandbox.closePanel}
                 className="h-full"
               />
             </Panel>
@@ -469,7 +383,7 @@ export function ChatContainer({
         )}
 
         {/* Artifact viewer — multi-tab; hidden when sandbox is open */}
-        {showArtifactPanel && !isMobile && (
+        {rightPanel === 'artifact' && !isMobile && (
           <>
             <PanelResizeHandle className="w-2 flex items-center justify-center cursor-col-resize group shrink-0">
               <div className="w-px h-8 rounded-full bg-[#E5E5E5] group-hover:bg-primary/50 group-hover:h-16 transition-all" />
@@ -489,23 +403,23 @@ export function ChatContainer({
       </PanelGroup>
 
       {/* Mobile full-screen overlays */}
-      {isMobile && isSandboxOpen && (
+      {isMobile && rightPanel === 'sandbox' && (
         <div className="fixed inset-0 z-50 bg-surface flex flex-col" role="dialog" aria-label="Sandbox">
           <SandboxPanel
-            terminalUrl={terminalUrl}
+            terminalUrl={sandbox.terminalUrl}
             browserUrl={state.pendingGuidance?.ui_hint === 'browser' && state.pendingGuidance.browser_url
               ? state.pendingGuidance.browser_url
-              : browserUrl}
+              : sandbox.browserUrl}
             previewUrl={null}
-            activeTab={sandboxTab}
-            onTabChange={setSandboxTab}
-            onClose={handleCloseSandboxPanel}
+            activeTab={sandbox.sandboxTab}
+            onTabChange={sandbox.setSandboxTab}
+            onClose={sandbox.closePanel}
             className="h-full"
           />
         </div>
       )}
 
-      {isMobile && !isSandboxOpen && hasArtifacts && (
+      {isMobile && rightPanel === 'artifact' && (
         <div className="fixed inset-0 z-50 bg-surface flex flex-col" role="dialog" aria-label="Artifact viewer">
           <ArtifactViewerPanel
             tabs={artifacts.tabs}

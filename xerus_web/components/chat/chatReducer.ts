@@ -352,7 +352,6 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
       }
 
     case 'EXECUTION_FINISHED': {
-      // Cancellation clears the queue: user explicitly stopped, so don't auto-send queued.
       const patch: Partial<ConversationExecutionState> = {
         isLoading: false,
         streamingTurn: null,
@@ -368,6 +367,7 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         execByConversation: patchExec(state, action.convId, patch),
         pendingToolAuth: null,
         pendingGuidance: null,
+        backgroundTasks: [],
       }
     }
 

@@ -52,7 +52,7 @@ function HtmlRenderer({ content, url }: { content?: string; url?: string }) {
   return (
     <iframe
       title="HTML Preview"
-      sandbox="allow-scripts allow-same-origin allow-forms"
+      sandbox="allow-scripts allow-forms allow-popups"
       srcDoc={content || undefined}
       src={!content && url ? url : undefined}
       className="w-full h-full border-0 bg-white"
@@ -66,7 +66,7 @@ function PdfRenderer({ url }: { url: string }) {
     <iframe
       title="PDF Preview"
       src={url}
-      sandbox="allow-scripts allow-same-origin"
+      sandbox="allow-scripts allow-popups"
       className="w-full h-full border-0"
     />
   )
