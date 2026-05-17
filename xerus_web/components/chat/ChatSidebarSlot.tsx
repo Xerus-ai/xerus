@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { ConversationSidebar } from './ConversationSidebar'
+import { useSidebarSlotRegister } from '@/components/layout/SidebarSlotContext'
 import type { ProjectGroup, SelectedChannel } from './types'
 
 export interface SidebarPropsRef {
@@ -20,7 +21,7 @@ export interface SidebarPropsRef {
   handleLoadMore: () => void
 }
 
-export function ChatSidebarSlotComponent({ propsRef, forceUpdateRef }: {
+function ChatSidebarSlotComponent({ propsRef, forceUpdateRef }: {
   propsRef: React.RefObject<SidebarPropsRef>
   forceUpdateRef: React.MutableRefObject<() => void>
 }) {
@@ -45,4 +46,21 @@ export function ChatSidebarSlotComponent({ propsRef, forceUpdateRef }: {
       onLoadMore={p.handleLoadMore}
     />
   )
+}
+
+export function useChatSidebar(props: SidebarPropsRef, deps: unknown[]) {
+  const propsRef = useRef<SidebarPropsRef>(props)
+  propsRef.current = props
+
+  const forceUpdateRef = useRef<() => void>(() => {})
+  const SlotComponent = useRef(() => (
+    <ChatSidebarSlotComponent propsRef={propsRef} forceUpdateRef={forceUpdateRef} />
+  )).current
+
+  useEffect(() => {
+    forceUpdateRef.current()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps)
+
+  useSidebarSlotRegister('chat-sidebar', SlotComponent)
 }

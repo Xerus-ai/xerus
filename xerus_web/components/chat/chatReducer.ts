@@ -210,6 +210,7 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         ...state,
         messages: [...state.messages, action.userMessage],
         error: null,
+        backgroundTasks: [],
         execByConversation: patchExec(state, action.convId, {
           isLoading: true,
           executionState: null,

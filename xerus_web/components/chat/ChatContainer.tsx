@@ -18,8 +18,7 @@ const SandboxPanel = dynamic(() =>
 )
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from 'react-resizable-panels'
 import { GuidanceInterventionCard } from './GuidanceInterventionCard'
-import { ChatSidebarSlotComponent, type SidebarPropsRef } from './ChatSidebarSlot'
-import { useSidebarSlotRegister } from '@/components/layout/SidebarSlotContext'
+import { useChatSidebar } from './ChatSidebarSlot'
 import { useLayout } from '@/components/layout/LayoutContext'
 import { cn } from '@/lib/utils'
 import type { WorkspacePayload } from './MessageBubble'
@@ -186,49 +185,25 @@ export function ChatContainer({
     })
   }, [])
 
-
   // ---- Sidebar slot registration ----
-  const sidebarPropsRef = useRef<SidebarPropsRef>({
-    projects: chat.projects,
-    conversationId: state.conversationId,
-    selectedChannel: state.selectedChannel,
-    isLoading: chat.isLoadingAgents,
-    hasMore: state.hasMoreConversations,
-    isLoadingMore: chat.isLoadingMore,
-    handleSelectConversation: chat.handleSelectConversation,
-    handleNewConversation: chat.handleNewConversation,
-    handleDeleteConversation: chat.handleDeleteConversation,
-    handleRenameConversation: chat.handleRenameConversation,
-    handleSelectChannel: chat.handleSelectChannel,
-    handleClearChannel: chat.handleClearChannel,
-    handleLoadMore: chat.loadMoreConversations,
-  })
-  sidebarPropsRef.current = {
-    projects: chat.projects,
-    conversationId: state.conversationId,
-    selectedChannel: state.selectedChannel,
-    isLoading: chat.isLoadingAgents,
-    hasMore: state.hasMoreConversations,
-    isLoadingMore: chat.isLoadingMore,
-    handleSelectConversation: chat.handleSelectConversation,
-    handleNewConversation: chat.handleNewConversation,
-    handleDeleteConversation: chat.handleDeleteConversation,
-    handleRenameConversation: chat.handleRenameConversation,
-    handleSelectChannel: chat.handleSelectChannel,
-    handleClearChannel: chat.handleClearChannel,
-    handleLoadMore: chat.loadMoreConversations,
-  }
-
-  const sidebarForceUpdateRef = useRef<() => void>(() => {})
-  const ChatSidebarSlot = useRef(() => (
-    <ChatSidebarSlotComponent propsRef={sidebarPropsRef} forceUpdateRef={sidebarForceUpdateRef} />
-  )).current
-
-  useEffect(() => {
-    sidebarForceUpdateRef.current()
-  }, [chat.projects, state.conversationId, state.selectedChannel, chat.isLoadingAgents, state.hasMoreConversations, chat.isLoadingMore])
-
-  useSidebarSlotRegister('chat-sidebar', ChatSidebarSlot)
+  useChatSidebar(
+    {
+      projects: chat.projects,
+      conversationId: state.conversationId,
+      selectedChannel: state.selectedChannel,
+      isLoading: chat.isLoadingAgents,
+      hasMore: state.hasMoreConversations,
+      isLoadingMore: chat.isLoadingMore,
+      handleSelectConversation: chat.handleSelectConversation,
+      handleNewConversation: chat.handleNewConversation,
+      handleDeleteConversation: chat.handleDeleteConversation,
+      handleRenameConversation: chat.handleRenameConversation,
+      handleSelectChannel: chat.handleSelectChannel,
+      handleClearChannel: chat.handleClearChannel,
+      handleLoadMore: chat.loadMoreConversations,
+    },
+    [chat.projects, state.conversationId, state.selectedChannel, chat.isLoadingAgents, state.hasMoreConversations, chat.isLoadingMore],
+  )
 
   if (!isAuthReady) {
     return <XerusLoader variant="inline" className="h-full bg-surface" />
