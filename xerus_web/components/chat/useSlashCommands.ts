@@ -1,11 +1,11 @@
-import { useMemo, useCallback } from 'react'
+import { useMemo, useCallback, useState, useEffect } from 'react'
 import {
-  Sparkles, MessageSquare, PenTool,
-  Trash2, Plus, ArrowRightLeft,
+  Sparkles, Trash2, Plus, ArrowRightLeft,
   FileText, BookOpen,
 } from 'lucide-react'
 import type { SlashCommand } from './SlashCommandPicker'
 import type { Agent } from './types'
+import { getSkills } from '@/lib/api/skills'
 
 interface UseSlashCommandsOptions {
   currentAgent?: Agent | null
@@ -15,31 +15,43 @@ interface UseSlashCommandsOptions {
   onSwitchAgent?: (agent: Agent) => void
 }
 
+interface InstalledSkill {
+  slug: string
+  name: string
+  description: string
+}
+
 export function useSlashCommands({
-  currentAgent,
   onSendMessage,
   onClearConversation,
   onNewConversation,
 }: UseSlashCommandsOptions) {
+  const [installedSkills, setInstalledSkills] = useState<InstalledSkill[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    getSkills({ limit: 50 })
+      .then(({ skills }) => {
+        if (cancelled) return
+        const installed = skills
+          .filter((s) => s.isInstalled)
+          .map((s) => ({ slug: s.slug, name: s.name, description: s.description }))
+        setInstalledSkills(installed)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
   const commands = useMemo<SlashCommand[]>(() => {
     const cmds: SlashCommand[] = []
 
-    const agentSkills = (currentAgent as Record<string, unknown> | null | undefined)?.skills as string[] | undefined
-    if (agentSkills && agentSkills.length > 0) {
-      for (const skill of agentSkills.slice(0, 8)) {
-        cmds.push({
-          name: skill,
-          description: `Run ${skill} skill`,
-          category: 'skill',
-          icon: Sparkles,
-        })
-      }
-    } else {
-      cmds.push(
-        { name: 'review', description: 'Review code changes', category: 'skill', icon: Sparkles },
-        { name: 'plan', description: 'Create a plan', category: 'skill', icon: PenTool },
-        { name: 'brainstorm', description: 'Explore ideas', category: 'skill', icon: MessageSquare },
-      )
+    for (const skill of installedSkills) {
+      cmds.push({
+        name: skill.slug,
+        description: skill.description || `Run ${skill.name}`,
+        category: 'skill',
+        icon: Sparkles,
+      })
     }
 
     cmds.push(
@@ -54,7 +66,7 @@ export function useSlashCommands({
     )
 
     return cmds
-  }, [currentAgent])
+  }, [installedSkills])
 
   const executeCommand = useCallback(
     (cmd: SlashCommand, args: string) => {

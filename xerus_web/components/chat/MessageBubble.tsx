@@ -357,7 +357,7 @@ export const MessageBubble = memo(function MessageBubble({
       'transition-colors duration-100'
     )}>
       {/* Header: Avatar, Name, badge, time */}
-      <div className="flex items-center gap-2 mb-2">
+      <div className="flex items-center gap-2 mb-1">
         {!isUser && (
           <div className="w-7 h-7 rounded-lg overflow-hidden shrink-0 flex items-center justify-center">
             {isMascotConfig(resolvedAgent.avatarUrl) ? (
@@ -373,23 +373,25 @@ export const MessageBubble = memo(function MessageBubble({
           </div>
         )}
         <span className={cn(
-          'text-sm font-medium',
+          'text-sm font-medium shrink-0',
           isUser ? 'text-text' : 'text-secondary'
         )}>
           {isUser ? 'You' : resolvedAgent.name}
         </span>
         {!isUser && !isStreaming && (
-          <span className="text-[10px] font-medium text-text-muted bg-surface-hover rounded-full px-1.5 py-0.5">
+          <span className="text-[10px] font-medium text-text-muted bg-surface-hover rounded-full px-1.5 py-0.5 shrink-0">
             AI
           </span>
         )}
-        <span className="text-[11px] text-text-muted tabular-nums">
+        <span className="text-[11px] text-text-muted tabular-nums shrink-0">
           {formatTime(message.timestamp)}
         </span>
-        {isStreaming && (
-          <RichThinkingIndicator parts={message.parts} />
-        )}
       </div>
+      {isStreaming && (
+        <div className="mb-2 pl-9">
+          <RichThinkingIndicator parts={message.parts} />
+        </div>
+      )}
 
       {/* Parts-based rendering (streaming + history with parts[]) */}
       {message.parts ? (
@@ -420,10 +422,6 @@ export const MessageBubble = memo(function MessageBubble({
                   return null
               }
             })}
-          </div>
-        ) : isStreaming ? (
-          <div className="flex items-center gap-2 text-sm text-text-muted">
-            <span className="h-1.5 w-1.5 rounded-full bg-secondary animate-pulse" />
           </div>
         ) : null
       ) : (

@@ -25,6 +25,15 @@ export function createStreamingTurn(
   }
 }
 
+const THINKING_TAG_RE = /<(?:antml:)?thinking>[\s\S]*?<\/(?:antml:)?thinking>/g
+const PARTIAL_THINKING_RE = /<(?:antml:)?thinking>[\s\S]*$/
+
+function stripThinkingTags(text: string): string {
+  let cleaned = text.replace(THINKING_TAG_RE, '')
+  cleaned = cleaned.replace(PARTIAL_THINKING_RE, '')
+  return cleaned
+}
+
 export function appendToken(
   turn: StreamingAssistantTurn,
   text: string,
@@ -33,11 +42,14 @@ export function appendToken(
   const last = parts[parts.length - 1]
 
   if (last && last.type === 'text') {
-    // Append to existing text part
-    parts[parts.length - 1] = { ...last, text: last.text + text }
+    const raw = last.text + text
+    const cleaned = stripThinkingTags(raw)
+    parts[parts.length - 1] = { ...last, text: cleaned }
   } else {
-    // New text part (after a tool/reasoning/status part)
-    parts.push({ id: nextPartId(), type: 'text', text })
+    const cleaned = stripThinkingTags(text)
+    if (cleaned) {
+      parts.push({ id: nextPartId(), type: 'text', text: cleaned })
+    }
   }
 
   return { ...turn, parts }

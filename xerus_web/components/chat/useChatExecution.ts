@@ -64,10 +64,12 @@ export function useChatExecution({ dispatch }: UseChatExecutionOptions) {
     })
   }, [getRefs])
 
-  const resetStreamContent = useCallback((convId: string) => {
+  const resetStreamContent = useCallback((convId: string, agentHint?: { agentSlug?: string; agentName?: string }) => {
     const refs = getRefs(convId)
     if (refs.pendingTokenFrame !== null) cancelAnimationFrame(refs.pendingTokenFrame)
-    refsByConv.current.set(convId, emptyRefs())
+    const fresh = emptyRefs()
+    if (agentHint) fresh.respondingAgent = agentHint
+    refsByConv.current.set(convId, fresh)
     if (disconnectTimerRef.current) {
       clearTimeout(disconnectTimerRef.current)
       disconnectTimerRef.current = null

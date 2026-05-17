@@ -198,8 +198,12 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
           dispatch({ type: 'SET_CONVERSATION_ID', convId })
         }
 
-        // Reset stream tracking refs for the new send
-        executionStream.resetStreamContent(convId)
+        // Reset stream tracking refs for the new send, seeding the responding agent
+        // so the first streaming turn renders the correct avatar immediately.
+        executionStream.resetStreamContent(convId, {
+          agentSlug: agentSlug,
+          agentName: state.currentAgent?.name,
+        })
         dispatch({ type: 'SEND_MESSAGE_START', convId, userMessage })
 
         await executionStream.connectStream(convId)
