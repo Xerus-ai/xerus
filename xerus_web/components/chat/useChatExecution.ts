@@ -133,6 +133,7 @@ export function useChatExecution({ dispatch }: UseChatExecutionOptions) {
       agentName: refs.respondingAgent.agentName,
       timestamp: committedTurn?.timestamp ?? Date.now(),
       parts: committedTurn?.parts,
+      writtenFiles: committedTurn?.writtenFiles,
       metadata,
     }
 
@@ -170,6 +171,7 @@ export function useChatExecution({ dispatch }: UseChatExecutionOptions) {
           agentName: refs.respondingAgent.agentName,
           timestamp: committedTurn.timestamp,
           parts: committedTurn.parts,
+          writtenFiles: committedTurn.writtenFiles,
         },
       })
     }

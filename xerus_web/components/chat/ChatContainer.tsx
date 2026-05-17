@@ -1,13 +1,11 @@
 'use client'
 
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import { MessageList } from './MessageList'
 import { ChatInput } from './ChatInput'
 import { DeliverableChips } from './DeliverableChips'
 import { TaskDock } from './TaskDock'
-import { useTaskDock } from './useTaskDock'
-import { INFRA_NOISE } from './useChatExecution.helpers'
 import { useSandboxPanel } from './useSandboxPanel'
 import { SubagentWorkPanel } from './SubagentWorkPanel'
 
@@ -60,28 +58,33 @@ export function ChatContainer({
   const sandbox = useSandboxPanel()
   const [showExecution, setShowExecution] = useState<string | null>(null)
 
-  // ---- Task dock (subagent progress) ----
-  const taskDock = useTaskDock()
+  // ---- Task dock — derived from backgroundTasks (single source of truth) ----
+  const taskDockTasks = useMemo(() =>
+    (state.backgroundTasks ?? []).map(t => ({
+      id: t.id,
+      name: t.name,
+      description: t.description ?? '',
+      status: t.status,
+      startTime: t.startedAt,
+      durationMs: undefined as number | undefined,
+    })),
+    [state.backgroundTasks],
+  )
+  const taskDockActiveCount = taskDockTasks.filter(t => t.status === 'running').length
+  const [taskDockCollapsed, setTaskDockCollapsed] = useState(false)
+  const taskDockVisible = taskDockTasks.length > 0
+  const taskDockHideTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const [taskDockHidden, setTaskDockHidden] = useState(false)
 
-  // Sync delegation tasks to task dock (skip raw infra steps like sandbox/executing)
   useEffect(() => {
-    const steps = activeExec.executionState?.steps ?? []
-    for (const step of steps) {
-      const rawName = step.name ?? ''
-      const cleanName = rawName.replace(/^Spawning\s+/i, '').replace(/\s*\(failed\)\s*$/i, '')
-      if (INFRA_NOISE.has(cleanName.toLowerCase())) continue
-      if (!cleanName) continue
-      const meta = step.metadata as Record<string, string> | undefined
-      const subtitle = meta?.toAgent ? `@${meta.toAgent}` : ''
-      if (step.status === 'active') {
-        taskDock.addTask(step.id, cleanName, subtitle)
-      } else if (step.status === 'completed') {
-        const durationMs = step.endTime && step.startTime ? step.endTime - step.startTime : undefined
-        const success = !rawName.includes('failed')
-        taskDock.completeTask(step.id, success, durationMs)
-      }
+    if (taskDockActiveCount > 0) {
+      setTaskDockHidden(false)
+      if (taskDockHideTimerRef.current) clearTimeout(taskDockHideTimerRef.current)
+    } else if (taskDockTasks.length > 0) {
+      taskDockHideTimerRef.current = setTimeout(() => setTaskDockHidden(true), 3000)
     }
-  }, [activeExec.executionState?.steps, taskDock])
+    return () => { if (taskDockHideTimerRef.current) clearTimeout(taskDockHideTimerRef.current) }
+  }, [taskDockActiveCount, taskDockTasks.length])
 
   // ---- Tool auth (Pipedream OAuth) ----
   const handleToolAuthConnect = useCallback((appSlug: string) => {
@@ -147,7 +150,7 @@ export function ChatContainer({
     const file = state.pendingArtifactFile
     if (!file || file.ts === lastArtifactFileTsRef.current) return
     lastArtifactFileTsRef.current = file.ts
-    void artifacts.openFile({ name: file.name, path: file.path, extension: file.extension })
+    void artifacts.openFile({ name: file.name, path: file.path, extension: file.extension, editDiff: file.editDiff })
   }, [state.pendingArtifactFile, artifacts])
 
   const lastSsePreviewTsRef = useRef<number | null>(null)
@@ -298,15 +301,15 @@ export function ChatContainer({
               onSelect={handleOpenDeliverable}
             />
 
-            {taskDock.isVisible && (
+            {taskDockVisible && !taskDockHidden && (
               <div className="w-full max-w-3xl mx-auto px-4">
                 <TaskDock
-                  tasks={taskDock.tasks}
-                  activeCount={taskDock.activeCount}
-                  isCollapsed={taskDock.isCollapsed}
-                  onCollapse={taskDock.collapse}
-                  onExpand={taskDock.expand}
-                  onDismiss={taskDock.clearTasks}
+                  tasks={taskDockTasks}
+                  activeCount={taskDockActiveCount}
+                  isCollapsed={taskDockCollapsed}
+                  onCollapse={() => setTaskDockCollapsed(true)}
+                  onExpand={() => setTaskDockCollapsed(false)}
+                  onDismiss={() => setTaskDockHidden(true)}
                 />
               </div>
             )}

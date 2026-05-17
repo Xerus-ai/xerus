@@ -273,6 +273,23 @@ export const MessageBubble = memo(function MessageBubble({
         </>
       )}
 
+      {/* Written file chips — clickable to open in artifact viewer */}
+      {!isStreaming && message.writtenFiles && message.writtenFiles.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {message.writtenFiles.map((file) => (
+            <button
+              key={file.path}
+              type="button"
+              onClick={() => onOpenWorkspace?.({ type: 'artifact', artifact: { id: file.path, filename: file.name, path: file.path, lineCount: 0, description: file.extension } })}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs bg-surface-alt border border-surface-active text-text-secondary hover:text-text hover:bg-surface-hover transition-colors"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              {file.name}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Action bar — hover reveal */}
       {!isUser && !isStreaming && (
         <div className="flex items-center gap-1 mt-2.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">

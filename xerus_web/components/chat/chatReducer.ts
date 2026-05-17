@@ -94,7 +94,7 @@ export type ChatAction =
 
   // Background tasks
   | { type: 'ADD_BACKGROUND_TASK'; task: NonNullable<ChatState['backgroundTasks']>[number] }
-  | { type: 'UPDATE_BACKGROUND_TASK'; taskId: string; status: 'running' | 'completed' | 'failed' }
+  | { type: 'UPDATE_BACKGROUND_TASK'; taskId?: string; taskName?: string; status: 'running' | 'completed' | 'failed' }
 
 // ---------------------------------------------------------------------------
 // Initial state
@@ -395,9 +395,11 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
     case 'UPDATE_BACKGROUND_TASK':
       return {
         ...state,
-        backgroundTasks: (state.backgroundTasks ?? []).map(t =>
-          t.id === action.taskId ? { ...t, status: action.status } : t,
-        ),
+        backgroundTasks: (state.backgroundTasks ?? []).map(t => {
+          if (action.taskId && t.id === action.taskId) return { ...t, status: action.status }
+          if (action.taskName && t.status === 'running' && t.name.includes(action.taskName)) return { ...t, status: action.status }
+          return t
+        }),
       }
 
     default: {

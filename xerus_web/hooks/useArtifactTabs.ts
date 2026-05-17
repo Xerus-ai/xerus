@@ -47,6 +47,7 @@ export interface OpenFileInput {
   name: string
   path: string
   extension?: string
+  editDiff?: { oldString: string; newString: string }
 }
 
 // ---------------------------------------------------------------------------
@@ -98,7 +99,7 @@ export function useArtifactTabs() {
       const id = `file:${input.path}`
 
       const existing = tabs.find((t) => t.id === id)
-      const prevContent = existing?.content.content
+      const prevContent = input.editDiff?.oldString ?? existing?.content.content
 
       upsertAndActivate({
         id,

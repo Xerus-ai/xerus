@@ -135,6 +135,7 @@ export interface ChatState {
     path: string
     extension: string
     ts: number
+    editDiff?: { oldString: string; newString: string }
   } | null
   // Latest live-preview event from the agent's dev server. ChatContainer
   // watches this and opens an artifact tab when it changes.

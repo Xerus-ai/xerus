@@ -8,7 +8,7 @@ export interface PerConvRefs {
   rawText: string
   respondingAgent: { agentSlug?: string; agentName?: string }
   toolStartTimes: Map<string, number>
-  toolMeta: Map<string, { toolName: string; filePath?: string }>
+  toolMeta: Map<string, { toolName: string; filePath?: string; oldString?: string; newString?: string }>
   pendingStatusLabels: string[]
   doneReceived: boolean
   tokenCount: number
@@ -55,6 +55,7 @@ export const VIEWABLE_EXTS = new Set([
   '.md', '.mdx', '.html', '.htm', '.svg', '.json', '.txt', '.css', '.scss', '.csv',
   '.ts', '.tsx', '.js', '.jsx', '.py', '.rb', '.go', '.rs', '.java',
   '.yaml', '.yml', '.sql', '.sh', '.xml',
+  '.toml', '.cfg', '.ini', '.env', '.dockerfile',
 ])
 export const WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'write_file', 'edit_file'])
 
@@ -68,4 +69,13 @@ export function modelContextSize(model?: string): number {
 export function fileExtension(filePath: string): string {
   if (!filePath.includes('.')) return ''
   return '.' + filePath.split('.').pop()!.toLowerCase()
+}
+
+const SANDBOX_PREFIXES = ['/home/daytona/workspace/', '/workspaces/', '/home/user/']
+
+export function normalizeSandboxPath(filePath: string): string {
+  for (const prefix of SANDBOX_PREFIXES) {
+    if (filePath.startsWith(prefix)) return filePath.slice(prefix.length)
+  }
+  return filePath.startsWith('/') ? filePath.slice(1) : filePath
 }
