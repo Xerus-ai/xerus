@@ -44,6 +44,8 @@ export const STREAM_EVENT_TYPES = [
   'task_progress',
   'task_updated',
   'task_notification',
+  // Inter-agent communication
+  'agent_message',
 ] as const;
 
 export type StreamEventType = (typeof STREAM_EVENT_TYPES)[number];
@@ -173,6 +175,13 @@ export interface NotificationEventContent {
   agent_slug: string;
 }
 
+export interface AgentMessageEventContent {
+  fromAgent: string;
+  toAgent: string;
+  message: string;
+  summary?: string;
+}
+
 // Live app preview surfaced to the chat artifact viewer.
 // Emitted by agents when they start a dev server (e.g., npm run dev on port 3000).
 // Backend resolves the Daytona preview URL when only port is given.
@@ -285,6 +294,7 @@ export interface StreamEventContentMap {
   task_progress: TaskProgressEventContent;
   task_updated: TaskUpdatedEventContent;
   task_notification: TaskNotificationEventContent;
+  agent_message: AgentMessageEventContent;
 }
 
 export interface StreamEvent<T extends StreamEventType = StreamEventType> {
@@ -333,6 +343,7 @@ export interface UseExecutionStreamOptions {
   onTaskProgress?: StreamEventCallback<'task_progress'>;
   onTaskUpdated?: StreamEventCallback<'task_updated'>;
   onTaskNotification?: StreamEventCallback<'task_notification'>;
+  onAgentMessage?: StreamEventCallback<'agent_message'>;
   onError?: (error: Error) => void;
   onConnectionChange?: (connected: boolean) => void;
 }

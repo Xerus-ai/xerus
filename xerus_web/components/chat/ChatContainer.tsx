@@ -9,6 +9,7 @@ import { TaskDock } from './TaskDock'
 import { useTaskDock } from './useTaskDock'
 import { INFRA_NOISE } from './useChatExecution.helpers'
 import { useSandboxPanel } from './useSandboxPanel'
+import { SubagentWorkPanel } from './SubagentWorkPanel'
 
 // Heavy panels loaded only when user opens them (bundle-dynamic-imports + bundle-conditional rules)
 const ArtifactViewerPanel = dynamic(() =>
@@ -306,6 +307,14 @@ export function ChatContainer({
                   onCollapse={taskDock.collapse}
                   onExpand={taskDock.expand}
                   onDismiss={taskDock.clearTasks}
+                />
+              </div>
+            )}
+            {activeExec.executionState?.steps && activeExec.executionState.steps.length > 0 && (
+              <div className="w-full max-w-3xl mx-auto px-4 pb-1">
+                <SubagentWorkPanel
+                  steps={activeExec.executionState.steps}
+                  agents={agents}
                 />
               </div>
             )}

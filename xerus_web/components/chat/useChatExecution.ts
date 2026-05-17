@@ -21,7 +21,7 @@ import {
   type HandlerCtx,
   makeOnToken, makeOnProgress, makeOnToolCall, makeOnToolResult, makeOnMeta,
   makeOnReasoning, makeOnSubagentStart, makeOnSubagentStop, makeOnDelegation,
-  makeOnNotification,
+  makeOnNotification, makeOnAgentMessage,
 } from './useChatExecution.handlers'
 import {
   makeOnToolAuthRequired, makeOnGuidance, makeOnPreview,
@@ -231,6 +231,7 @@ export function useChatExecution({ dispatch }: UseChatExecutionOptions) {
     onSubagentStop: makeOnSubagentStop(ctx),
     onDelegation: makeOnDelegation(ctx),
     onNotification: makeOnNotification(ctx),
+    onAgentMessage: makeOnAgentMessage(ctx),
     onToolAuthRequired: makeOnToolAuthRequired(ctx),
     onGuidance: makeOnGuidance(ctx),
     onPreview: makeOnPreview(ctx),

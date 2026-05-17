@@ -16,6 +16,7 @@ import type {
   SubagentStopEventContent,
   DelegationEventContent,
   NotificationEventContent,
+  AgentMessageEventContent,
 } from '@/hooks/useExecutionStream'
 import { resolveToolIcon } from './tool-icon.utils'
 import {
@@ -246,6 +247,19 @@ export function makeOnDelegation(ctx: HandlerCtx) {
       currentNode: `Delegating to ${content.toAgent}`,
       agents: [content.toAgent],
     })
+  }
+}
+
+export function makeOnAgentMessage(ctx: HandlerCtx) {
+  return (event: StreamEvent<'agent_message'>) => {
+    const convId = ctx.getConvId()
+    const content = event.content as AgentMessageEventContent
+    if (!convId || !content) return
+    const refs = ctx.getRefs(convId)
+    if (refs.turn) {
+      refs.turn = addStatus(refs.turn, `${content.fromAgent}: ${content.summary || content.message}`)
+      pushTurn(ctx, convId, refs)
+    }
   }
 }
 
