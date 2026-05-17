@@ -1,13 +1,15 @@
 'use client'
 
+import { useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { cn } from '@/lib/utils'
-import { AlertCircle, Loader2 } from 'lucide-react'
+import { AlertCircle, Loader2, GitCompareArrows } from 'lucide-react'
 import { ArtifactTabStrip } from './ArtifactTabStrip'
 import {
   ArtifactContentRenderer,
   isFullBleedContent,
 } from './ArtifactContentRenderer'
+import { DiffRenderer } from './DiffRenderer'
 import type { ArtifactTab } from '@/hooks/useArtifactTabs'
 
 // Re-export shared types so existing imports keep working
@@ -35,7 +37,10 @@ export function ArtifactViewerPanel({
   className,
 }: ArtifactViewerPanelProps) {
   const reduceMotion = useReducedMotion()
+  const [showDiff, setShowDiff] = useState(false)
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? null
+
+  const hasDiff = !!(activeTab?.previousContent && activeTab.content.content)
 
   const handleCopy = () => {
     if (!activeTab) return
@@ -67,10 +72,28 @@ export function ArtifactViewerPanel({
         onClosePanel={onClosePanel}
       />
 
+      {hasDiff && (
+        <div className="flex items-center px-3 py-1.5 border-b border-surface-active/40 bg-surface-alt/30">
+          <button
+            type="button"
+            onClick={() => setShowDiff(!showDiff)}
+            className={cn(
+              'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors',
+              showDiff
+                ? 'bg-secondary/15 text-secondary'
+                : 'text-text-muted hover:text-text hover:bg-surface-hover',
+            )}
+          >
+            <GitCompareArrows className="w-3.5 h-3.5" />
+            Diff
+          </button>
+        </div>
+      )}
+
       <div
         className={cn(
           'flex-1',
-          isFullBleed ? 'overflow-hidden' : 'overflow-y-auto scrollbar-thin',
+          isFullBleed && !showDiff ? 'overflow-hidden' : 'overflow-y-auto scrollbar-thin',
         )}
       >
         {!activeTab ? (
@@ -79,6 +102,12 @@ export function ArtifactViewerPanel({
           <ErrorState message={activeTab.error} title={activeTab.content.title} />
         ) : activeTab.loading && !activeTab.content.content && !activeTab.content.url ? (
           <LoadingState title={activeTab.content.title} />
+        ) : showDiff && hasDiff ? (
+          <DiffRenderer
+            oldContent={activeTab.previousContent!}
+            newContent={activeTab.content.content!}
+            language={activeTab.content.language}
+          />
         ) : (
           <ArtifactContentRenderer content={activeTab.content} />
         )}

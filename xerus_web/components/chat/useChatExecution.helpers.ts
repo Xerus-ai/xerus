@@ -51,7 +51,11 @@ export const MODEL_CONTEXT: Record<string, number> = {
 }
 
 export const INFRA_NOISE = new Set(['sandbox', 'executing', 'provisioning', 'connecting'])
-export const VIEWABLE_EXTS = new Set(['.md', '.html', '.htm', '.svg', '.json', '.txt', '.css', '.csv'])
+export const VIEWABLE_EXTS = new Set([
+  '.md', '.mdx', '.html', '.htm', '.svg', '.json', '.txt', '.css', '.scss', '.csv',
+  '.ts', '.tsx', '.js', '.jsx', '.py', '.rb', '.go', '.rs', '.java',
+  '.yaml', '.yml', '.sql', '.sh', '.xml',
+])
 export const WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'write_file', 'edit_file'])
 
 export function modelContextSize(model?: string): number {

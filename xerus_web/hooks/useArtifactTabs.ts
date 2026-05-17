@@ -38,6 +38,7 @@ export interface ArtifactTab {
   id: string
   kind: ArtifactTabKind
   content: ViewerContent
+  previousContent?: string
   loading?: boolean
   error?: string
 }
@@ -96,17 +97,14 @@ export function useArtifactTabs() {
       const type = extToViewerType(ext)
       const id = `file:${input.path}`
 
-      // Already loaded — just activate
       const existing = tabs.find((t) => t.id === id)
-      if (existing && !existing.loading && !existing.error && (existing.content.content || existing.content.url)) {
-        setActiveTabId(id)
-        return
-      }
+      const prevContent = existing?.content.content
 
       upsertAndActivate({
         id,
         kind: 'file',
         content: { type, title: input.name, subtitle: ext.toUpperCase(), language: ext },
+        previousContent: prevContent ?? undefined,
         loading: true,
       })
 
@@ -119,7 +117,11 @@ export function useArtifactTabs() {
           updateTab(id, { loading: false, content: { type, title: input.name, url } })
         } else {
           const result = await getFile(input.path)
-          updateTab(id, { loading: false, content: { type, title: input.name, content: result.content } })
+          updateTab(id, {
+            loading: false,
+            previousContent: prevContent ?? undefined,
+            content: { type, title: input.name, content: result.content },
+          })
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to load file'
