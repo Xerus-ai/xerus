@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { cn } from '@/lib/utils'
-import { AlertCircle, Loader2, GitCompareArrows } from 'lucide-react'
+import { AlertCircle, Loader2, GitCompareArrows, Check, X as XIcon, MessageSquare } from 'lucide-react'
 import { ArtifactTabStrip } from './ArtifactTabStrip'
 import {
   ArtifactContentRenderer,
@@ -23,6 +23,8 @@ interface ArtifactViewerPanelProps {
   onClosePanel: () => void
   onAddTab?: () => void
   onPublish?: () => void
+  onOpenInWorkspace?: (path: string) => void
+  onSendMessage?: (message: string) => void
   className?: string
 }
 
@@ -34,6 +36,8 @@ export function ArtifactViewerPanel({
   onClosePanel,
   onAddTab,
   onPublish,
+  onOpenInWorkspace,
+  onSendMessage,
   className,
 }: ArtifactViewerPanelProps) {
   const reduceMotion = useReducedMotion()
@@ -69,6 +73,7 @@ export function ArtifactViewerPanel({
         onAddTab={onAddTab}
         onPublish={onPublish}
         onCopy={activeTab ? handleCopy : undefined}
+        onOpenInWorkspace={onOpenInWorkspace}
         onClosePanel={onClosePanel}
       />
 
@@ -112,7 +117,91 @@ export function ArtifactViewerPanel({
           <ArtifactContentRenderer content={activeTab.content} />
         )}
       </div>
+
+      {activeTab?.content.type === 'plan' && onSendMessage && (
+        <PlanActionBar
+          title={activeTab.content.title}
+          onSendMessage={onSendMessage}
+        />
+      )}
     </motion.div>
+  )
+}
+
+function PlanActionBar({ title, onSendMessage }: { title: string; onSendMessage: (msg: string) => void }) {
+  const [showFeedback, setShowFeedback] = useState(false)
+  const [feedback, setFeedback] = useState('')
+
+  const handleAccept = useCallback(() => {
+    onSendMessage(`Plan approved: ${title}`)
+  }, [onSendMessage, title])
+
+  const handleReject = useCallback(() => {
+    const msg = feedback
+      ? `Plan rejected: ${title}. Feedback: ${feedback}`
+      : `Plan rejected: ${title}`
+    onSendMessage(msg)
+    setFeedback('')
+    setShowFeedback(false)
+  }, [onSendMessage, title, feedback])
+
+  return (
+    <div className="border-t border-surface-active/40 bg-surface-alt/50 px-4 py-3">
+      {showFeedback ? (
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={feedback}
+            onChange={(e) => setFeedback(e.target.value)}
+            placeholder="Describe changes needed..."
+            className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-surface-active bg-surface text-text placeholder:text-text-muted focus:outline-none focus:border-primary/30"
+            onKeyDown={(e) => { if (e.key === 'Enter') handleReject() }}
+            autoFocus
+          />
+          <button
+            type="button"
+            onClick={handleReject}
+            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 transition-colors"
+          >
+            Send
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowFeedback(false)}
+            className="p-1.5 rounded-lg text-text-muted hover:text-text hover:bg-surface-hover transition-colors"
+          >
+            <XIcon className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleAccept}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 transition-colors"
+          >
+            <Check className="w-3.5 h-3.5" />
+            Accept
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowFeedback(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 transition-colors"
+          >
+            <XIcon className="w-3.5 h-3.5" />
+            Reject
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowFeedback(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-surface-active text-text-muted hover:text-text hover:bg-surface-hover transition-colors"
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+            Request changes
+          </button>
+        </div>
+      )}
+    </div>
   )
 }
 

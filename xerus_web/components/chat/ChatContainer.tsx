@@ -408,6 +408,8 @@ export function ChatContainer({
                 onCloseTab={artifacts.closeTab}
                 onClosePanel={artifacts.closeAll}
                 onPublish={handlePublish}
+                onOpenInWorkspace={(path) => window.open(`/workspace?file=${encodeURIComponent(path)}`, '_blank')}
+                onSendMessage={chat.sendMessage}
               />
             </Panel>
           </>
@@ -440,6 +442,8 @@ export function ChatContainer({
             onCloseTab={artifacts.closeTab}
             onClosePanel={artifacts.closeAll}
             onPublish={handlePublish}
+            onOpenInWorkspace={(path) => window.open(`/workspace?file=${encodeURIComponent(path)}`, '_blank')}
+            onSendMessage={chat.sendMessage}
           />
         </div>
       )}
