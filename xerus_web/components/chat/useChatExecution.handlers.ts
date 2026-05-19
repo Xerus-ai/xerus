@@ -16,6 +16,7 @@ import type {
   SubagentStopEventContent,
   DelegationEventContent,
   NotificationEventContent,
+  AgentMessageEventContent,
 } from '@/hooks/useExecutionStream'
 import { resolveToolIcon } from './tool-icon.utils'
 import {
@@ -34,6 +35,7 @@ import {
   WRITE_TOOLS,
   modelContextSize,
   fileExtension,
+  normalizeSandboxPath,
 } from './useChatExecution.helpers'
 
 export interface HandlerCtx {
@@ -98,6 +100,8 @@ export function makeOnToolCall(ctx: HandlerCtx) {
     refs.toolMeta.set(content.callId, {
       toolName: content.toolName,
       filePath: content.arguments?.file_path as string | undefined,
+      oldString: content.arguments?.old_string as string | undefined,
+      newString: content.arguments?.new_string as string | undefined,
     })
     if (!refs.turn) return
     refs.turn = startToolCall(refs.turn, content.callId, content.toolName, resolveToolIcon(content.toolName), content.arguments)
@@ -122,14 +126,26 @@ export function makeOnToolResult(ctx: HandlerCtx) {
       pushTurn(ctx, convId, refs)
     }
 
-    const filePath = meta?.filePath ?? ''
+    const rawPath = meta?.filePath ?? ''
+    const filePath = normalizeSandboxPath(rawPath)
     const ext = fileExtension(filePath)
     const isWriteTool = !!meta && WRITE_TOOLS.has(meta.toolName)
-    if (isWriteTool && content.success && VIEWABLE_EXTS.has(ext)) {
+    const isPlanFile = filePath.includes('/plans/') || filePath.endsWith('-plan.md')
+    if (isWriteTool && content.success && (VIEWABLE_EXTS.has(ext) || isPlanFile)) {
+      const fileName = filePath.split('/').pop() ?? filePath
+      const editDiff = meta?.oldString && meta?.newString
+        ? { oldString: meta.oldString, newString: meta.newString }
+        : undefined
       ctx.dispatch({
         type: 'SET_PENDING_ARTIFACT_FILE',
-        file: { name: filePath.split('/').pop() ?? filePath, path: filePath, extension: ext, ts: now },
+        file: { name: fileName, path: filePath, extension: ext, ts: now, editDiff },
       })
+      if (refs.turn) {
+        const existing = refs.turn.writtenFiles ?? []
+        if (!existing.some(f => f.path === filePath)) {
+          refs.turn = { ...refs.turn, writtenFiles: [...existing, { name: fileName, path: filePath, extension: ext }] }
+        }
+      }
     }
   }
 }
@@ -192,14 +208,25 @@ export function makeOnSubagentStart(ctx: HandlerCtx) {
       refs.turn = addStatus(refs.turn, `${content.subagentType}: ${content.taskDescription || 'working...'}`)
       pushTurn(ctx, convId, refs)
     }
+    const taskId = `subagent-${Date.now()}`
     ctx.dispatch({
       type: 'PUSH_EXECUTION_STEP',
       convId,
       step: {
-        id: `subagent-${Date.now()}`,
+        id: taskId,
         name: content.taskDescription || content.subagentType,
         status: 'active',
         startTime: Date.now(),
+      },
+    })
+    ctx.dispatch({
+      type: 'ADD_BACKGROUND_TASK',
+      task: {
+        id: taskId,
+        name: content.taskDescription || content.subagentType,
+        description: content.subagentType,
+        status: 'running',
+        startedAt: Date.now(),
       },
     })
   }
@@ -224,6 +251,11 @@ export function makeOnSubagentStop(ctx: HandlerCtx) {
       matchName: content.subagentType,
       failed: !content.success,
     })
+    ctx.dispatch({
+      type: 'UPDATE_BACKGROUND_TASK',
+      taskName: content.subagentType,
+      status: content.success ? 'completed' : 'failed',
+    })
   }
 }
 
@@ -246,6 +278,19 @@ export function makeOnDelegation(ctx: HandlerCtx) {
       currentNode: `Delegating to ${content.toAgent}`,
       agents: [content.toAgent],
     })
+  }
+}
+
+export function makeOnAgentMessage(ctx: HandlerCtx) {
+  return (event: StreamEvent<'agent_message'>) => {
+    const convId = ctx.getConvId()
+    const content = event.content as AgentMessageEventContent
+    if (!convId || !content) return
+    const refs = ctx.getRefs(convId)
+    if (refs.turn) {
+      refs.turn = addStatus(refs.turn, `${content.fromAgent}: ${content.summary || content.message}`)
+      pushTurn(ctx, convId, refs)
+    }
   }
 }
 

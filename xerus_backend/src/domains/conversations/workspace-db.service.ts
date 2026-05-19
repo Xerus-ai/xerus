@@ -186,11 +186,14 @@ export async function createConversation(
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
     const titleValue = title ? `'${escapeSQL(title)}'` : 'NULL';
+    const escaped = escapeSQL(agentSlug);
 
     const sql = `
         BEGIN;
+        INSERT OR IGNORE INTO agents (slug, name, adapter_type, role, autonomy_level, status)
+        VALUES ('${escaped}', '${escaped}', 'claudecode', 'specialist', 'supervised', 'idle');
         INSERT INTO conversations (id, agent_slug, title, message_count, status, created_at, updated_at)
-        VALUES ('${id}', '${escapeSQL(agentSlug)}', ${titleValue}, 0, 'active', '${now}', '${now}');
+        VALUES ('${id}', '${escaped}', ${titleValue}, 0, 'active', '${now}', '${now}');
         SELECT id, agent_slug, title, summary, message_count, sdk_session_id, status, created_at, updated_at
         FROM conversations WHERE id = '${id}';
         COMMIT;

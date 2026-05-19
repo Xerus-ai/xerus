@@ -342,6 +342,13 @@ async function handleAgentMessage(
         throw err;
     }
 
+    ctx.stream.send('agent_message' as StreamEventType, {
+        from_agent: data.agent_slug || '',
+        to_channel: data.channel || '',
+        content: (data.content || '').slice(0, 200),
+        message_type: data.message_type || 'chat',
+    });
+
     const agentSlug = data.agent_slug || '';
     const mentions = mentionParser.parseMentions(data.content);
     for (const mention of mentions) {

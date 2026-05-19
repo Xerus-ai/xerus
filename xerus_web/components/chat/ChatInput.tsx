@@ -330,7 +330,7 @@ export function ChatInput({
       setAttachedFiles(prev => [...prev, placeholder])
 
       try {
-        const result = await uploadFile(file, `uploads/${file.name}`)
+        const result = await uploadFile(file, `drive/uploads/${file.name}`)
         setAttachedFiles(prev =>
           prev.map(f => f.id === id ? { ...f, path: result.path, uploading: false } : f)
         )

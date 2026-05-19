@@ -71,12 +71,18 @@ const PROSE_CLASSES = cn(
   'prose-em:text-text/80',
 )
 
+const THINKING_TAG_RE = /<(?:antml:)?thinking>[\s\S]*?<\/(?:antml:)?thinking>/g
+const PARTIAL_THINKING_RE = /<(?:antml:)?thinking>[\s\S]*$/
+
 interface MarkdownContentProps {
   content: string
   className?: string
 }
 
 export function MarkdownContent({ content, className }: MarkdownContentProps) {
+  const cleaned = content.replace(THINKING_TAG_RE, '').replace(PARTIAL_THINKING_RE, '')
+  if (!cleaned.trim()) return null
+
   return (
     <div className={cn(PROSE_CLASSES, className)}>
       <ReactMarkdown
@@ -157,7 +163,7 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
           },
         }}
       >
-        {content}
+        {cleaned}
       </ReactMarkdown>
     </div>
   )

@@ -25,6 +25,7 @@ export function mapDetailToMessages(convId: string, detail: ConversationDetail):
       role: msg.role,
       content: msg.content,
       timestamp: new Date(msg.created_at).getTime(),
+      agentSlug: msg.role === 'assistant' && detail.agent_slug ? detail.agent_slug : undefined,
       metadata: {
         executionId: msg.execution_id,
         tokenCount: msg.input_tokens || msg.output_tokens

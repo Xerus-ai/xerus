@@ -25,6 +25,12 @@ export type TurnPart =
     }
   | { id: string; type: 'status'; label: string }
 
+export interface WrittenFile {
+  name: string
+  path: string
+  extension: string
+}
+
 export interface StreamingAssistantTurn {
   id: string
   role: 'assistant'
@@ -33,6 +39,7 @@ export interface StreamingAssistantTurn {
   status: 'streaming' | 'completed' | 'error'
   timestamp: number
   parts: TurnPart[]
+  writtenFiles?: WrittenFile[]
   metadata?: {
     executionId?: string
     tokenCount?: number

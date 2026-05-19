@@ -310,18 +310,22 @@ router.post('/:id/respond', auth, async (req: AuthenticatedRequest, res: Respons
 
         const sessionControl = getSessionControlService();
 
+        // Validate guidance_id BEFORE resuming to avoid accidentally resolving the wrong pause
+        if (validated.guidance_id) {
+            const state = await sessionControl.getSessionState(req.user.uid, { sessionId: req.params.id });
+            const activePauseId = state.pendingApproval?.pauseId;
+            if (activePauseId && activePauseId !== validated.guidance_id) {
+                throw new BadRequestError(
+                    `guidance_id mismatch: expected ${activePauseId}, got ${validated.guidance_id}`,
+                );
+            }
+        }
+
         const resumeResult = await sessionControl.resumeExecution(req.user.uid, {
             sessionId: req.params.id,
             approved: validated.accepted,
             feedback: validated.response_value,
         });
-
-        // Validate that the client-supplied guidance_id matches the actual pause
-        if (validated.guidance_id && validated.guidance_id !== resumeResult.pauseId) {
-            throw new BadRequestError(
-                `guidance_id mismatch: expected ${resumeResult.pauseId}, got ${validated.guidance_id}`,
-            );
-        }
 
         // Forward HITL response to the runner process via stdin
         const executionService = getExecutionService();

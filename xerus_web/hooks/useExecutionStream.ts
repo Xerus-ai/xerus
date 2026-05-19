@@ -21,6 +21,7 @@ export type {
   CreditWarningEventContent, InsufficientCreditsEventContent, ProviderUnavailableEventContent,
   ToolProgressEventContent, ToolUseSummaryEventContent,
   TaskStartedEventContent, TaskProgressEventContent, TaskUpdatedEventContent, TaskNotificationEventContent,
+  AgentMessageEventContent,
   StreamEventContentMap, StreamEvent, StreamEventCallback,
   UseExecutionStreamOptions, UseExecutionStreamReturn, ConnectionState,
 } from './useExecutionStream.types';
@@ -65,6 +66,7 @@ export interface UseExecutionStreamCallbacks {
   onTaskProgress?: (event: StreamEvent<'task_progress'>) => void;
   onTaskUpdated?: (event: StreamEvent<'task_updated'>) => void;
   onTaskNotification?: (event: StreamEvent<'task_notification'>) => void;
+  onAgentMessage?: (event: StreamEvent<'agent_message'>) => void;
   onError?: (error: Error) => void;
   onConnectionChange?: (connected: boolean) => void;
 }
@@ -186,6 +188,9 @@ export function useExecutionStream(
         break;
       case 'task_notification':
         cbs.onTaskNotification?.(event as StreamEvent<'task_notification'>);
+        break;
+      case 'agent_message':
+        cbs.onAgentMessage?.(event as StreamEvent<'agent_message'>);
         break;
     }
   }, []);

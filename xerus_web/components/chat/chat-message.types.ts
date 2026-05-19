@@ -1,5 +1,5 @@
 import type { Message } from './types'
-import type { TurnPart } from './streaming-turn.types'
+import type { TurnPart, WrittenFile } from './streaming-turn.types'
 
 // ---------------------------------------------------------------------------
 // Tool call types for rich visualization
@@ -38,6 +38,7 @@ export interface ChatMessageExtended extends Message {
   planTitle?: string
   artifacts?: WorkspaceArtifact[]
   parts?: TurnPart[]
+  writtenFiles?: WrittenFile[]
 }
 
 // Re-export session types from the canonical location

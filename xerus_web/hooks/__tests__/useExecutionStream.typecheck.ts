@@ -39,9 +39,9 @@ import { STREAM_EVENT_TYPES } from '../useExecutionStream';
 // These will cause TypeScript errors if types are wrong.
 // ---------------------------------------------------------------------------
 
-// Verify all 28 event types are present
+// Verify all 29 event types are present
 const _eventTypes: readonly string[] = STREAM_EVENT_TYPES;
-const _expectedLength: 28 = STREAM_EVENT_TYPES.length;
+const _expectedLength: 29 = STREAM_EVENT_TYPES.length;
 
 // Verify StreamEventType is a union of all event type strings
 const _metaType: StreamEventType = 'meta';
@@ -228,7 +228,7 @@ function assert(condition: boolean, message: string): void {
 // ---------------------------------------------------------------------------
 
 export function testStreamEventTypesArray(): void {
-  assert(STREAM_EVENT_TYPES.length === 28, 'Should have exactly 28 event types');
+  assert(STREAM_EVENT_TYPES.length === 29, 'Should have exactly 29 event types');
   assert(STREAM_EVENT_TYPES.includes('meta'), 'Should include meta');
   assert(STREAM_EVENT_TYPES.includes('progress'), 'Should include progress');
   assert(STREAM_EVENT_TYPES.includes('token'), 'Should include token');

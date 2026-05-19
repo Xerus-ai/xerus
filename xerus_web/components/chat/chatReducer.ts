@@ -94,7 +94,7 @@ export type ChatAction =
 
   // Background tasks
   | { type: 'ADD_BACKGROUND_TASK'; task: NonNullable<ChatState['backgroundTasks']>[number] }
-  | { type: 'UPDATE_BACKGROUND_TASK'; taskId: string; status: 'running' | 'completed' | 'failed' }
+  | { type: 'UPDATE_BACKGROUND_TASK'; taskId?: string; taskName?: string; status: 'running' | 'completed' | 'failed' }
 
 // ---------------------------------------------------------------------------
 // Initial state
@@ -210,6 +210,7 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         ...state,
         messages: [...state.messages, action.userMessage],
         error: null,
+        backgroundTasks: [],
         execByConversation: patchExec(state, action.convId, {
           isLoading: true,
           executionState: null,
@@ -352,7 +353,6 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
       }
 
     case 'EXECUTION_FINISHED': {
-      // Cancellation clears the queue: user explicitly stopped, so don't auto-send queued.
       const patch: Partial<ConversationExecutionState> = {
         isLoading: false,
         streamingTurn: null,
@@ -368,6 +368,7 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         execByConversation: patchExec(state, action.convId, patch),
         pendingToolAuth: null,
         pendingGuidance: null,
+        backgroundTasks: [],
       }
     }
 
@@ -395,9 +396,11 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
     case 'UPDATE_BACKGROUND_TASK':
       return {
         ...state,
-        backgroundTasks: (state.backgroundTasks ?? []).map(t =>
-          t.id === action.taskId ? { ...t, status: action.status } : t,
-        ),
+        backgroundTasks: (state.backgroundTasks ?? []).map(t => {
+          if (action.taskId && t.id === action.taskId) return { ...t, status: action.status }
+          if (action.taskName && t.status === 'running' && t.name.includes(action.taskName)) return { ...t, status: action.status }
+          return t
+        }),
       }
 
     default: {

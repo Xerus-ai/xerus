@@ -5,7 +5,9 @@
 
 import { logger } from '../../../utils/logger';
 import { SANDBOX_CONFIG } from './sandbox.config';
+import { shellEscapePath } from '../../../utils/shell-safety';
 import type { SandboxFileSystem } from '../workspace/workspace.manager';
+import type { DaytonaProvider } from './providers/daytona.provider';
 import { personalizeWorkspace } from '../workspace/workspace-personalizer.service';
 import { batchFetchAgentRows, buildScaffoldFilesFromRow } from '../scaffold/scaffold-payload.service';
 import type { SandboxDatabase } from './sandbox.service';
@@ -104,6 +106,8 @@ export async function syncAgentsToWorkspace(
     sandboxFs: SandboxFileSystem,
     userId: string,
     db: SandboxDatabase,
+    provider?: DaytonaProvider,
+    sandboxId?: string,
 ): Promise<void> {
     const result = await db.query<{ id: number; slug: string; name: string; role: string | null }>(
         `SELECT id, slug, slug AS name, 'specialist' AS role
@@ -199,4 +203,34 @@ export async function syncAgentsToWorkspace(
     if (scaffoldedCount > 0) {
         log.info('Synced agents to workspace', { scaffolded_count: scaffoldedCount });
     }
+
+    if (provider && sandboxId && result.rows.length > 0) {
+        await upsertAgentsToWorkspaceDb(provider, sandboxId, result.rows);
+    }
+}
+
+async function upsertAgentsToWorkspaceDb(
+    provider: DaytonaProvider,
+    sandboxId: string,
+    agents: Array<{ slug: string; name: string }>,
+): Promise<void> {
+    const dbPath = shellEscapePath(`${SANDBOX_CONFIG.workspacePath}/data/workspace.db`);
+    const values = agents.map(a => {
+        const slug = a.slug.replace(/\0/g, '').replace(/'/g, "''");
+        const name = a.name.replace(/\0/g, '').replace(/'/g, "''");
+        return `('${slug}', '${name}', 'claudecode', 'specialist', 'supervised', 'idle')`;
+    }).join(',\n');
+
+    const sql = `PRAGMA foreign_keys=ON;\nINSERT OR IGNORE INTO agents (slug, name, adapter_type, role, autonomy_level, status) VALUES\n${values};`;
+    const cmd = `sqlite3 ${dbPath} <<'XERUS_SYNC_EOF'\n${sql}\nXERUS_SYNC_EOF`;
+    const execResult = await provider.executeCommand(sandboxId, cmd);
+
+    if (execResult.exitCode !== 0) {
+        log.warn('Failed to upsert agents to workspace DB', {
+            sandbox_id: sandboxId,
+            output: (execResult.result || '').slice(-200),
+        });
+        return;
+    }
+    log.info('Upserted agents to workspace DB', { sandbox_id: sandboxId, count: agents.length });
 }

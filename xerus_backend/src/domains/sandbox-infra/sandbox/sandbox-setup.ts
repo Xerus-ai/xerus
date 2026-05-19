@@ -58,7 +58,8 @@ export async function runAgentSync(
     deps: SetupDeps,
 ): Promise<void> {
     const sandboxFs = await deps.getSandboxFs(sandboxId);
-    await syncAgentsToWorkspace(sandboxFs, userId, deps.db);
+    const provider = deps.getDaytonaProvider();
+    await syncAgentsToWorkspace(sandboxFs, userId, deps.db, provider, sandboxId);
 }
 
 /**
@@ -106,6 +107,9 @@ export async function runWorkspaceHealthCheck(
     // S3-restored databases may predate newer schema tables (e.g. file_connections).
     // init-db.sh migrations are idempotent (CREATE TABLE IF NOT EXISTS) so safe to re-run.
     await runDatabaseMigrations(sandboxId, deps);
+
+    // Sync agents to workspace DB (ensures FK for conversations.agent_slug is satisfied)
+    await runAgentSync(sandboxId, userId, deps);
 
     // Sync Pipedream MCP servers (connections may have changed while sandbox was paused)
     await runMcpConfigSync(sandboxId, userId, deps);

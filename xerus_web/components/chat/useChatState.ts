@@ -171,7 +171,9 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
       const activeConvId = state.conversationId
       const execState = getExecState(state, activeConvId)
 
-      // If current conversation is busy, queue the message for it.
+      // Queue for after — the auto-drain effect sends it once the current run finishes.
+      // The backend doesn't support mid-execution user injection yet (each POST starts
+      // a new execution). True mid-run guidance requires SDK-level changes.
       if (activeConvId && execState.isLoading) {
         dispatch({ type: 'QUEUE_MESSAGE', convId: activeConvId, content })
         return
@@ -198,8 +200,12 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
           dispatch({ type: 'SET_CONVERSATION_ID', convId })
         }
 
-        // Reset stream tracking refs for the new send
-        executionStream.resetStreamContent(convId)
+        // Reset stream tracking refs for the new send, seeding the responding agent
+        // so the first streaming turn renders the correct avatar immediately.
+        executionStream.resetStreamContent(convId, {
+          agentSlug: agentSlug,
+          agentName: state.currentAgent?.name,
+        })
         dispatch({ type: 'SEND_MESSAGE_START', convId, userMessage })
 
         await executionStream.connectStream(convId)
@@ -271,14 +277,11 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
       prev.isLoading &&
       !exec.isLoading
 
-    if (
-      justFinished &&
-      exec.lastExecutionResult === 'success' &&
-      exec.pendingMessages.length > 0
-    ) {
+    if (justFinished && exec.pendingMessages.length > 0) {
       const next = exec.pendingMessages[0]
       dispatch({ type: 'POP_QUEUED_MESSAGE', convId })
-      const timer = setTimeout(() => sendMessageRef(next), 300)
+      const delay = exec.lastExecutionResult === 'error' ? 1000 : 300
+      const timer = setTimeout(() => sendMessageRef(next), delay)
       return () => clearTimeout(timer)
     }
   }, [state, sendMessageRef])

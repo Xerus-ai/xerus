@@ -21,7 +21,7 @@ import {
   type HandlerCtx,
   makeOnToken, makeOnProgress, makeOnToolCall, makeOnToolResult, makeOnMeta,
   makeOnReasoning, makeOnSubagentStart, makeOnSubagentStop, makeOnDelegation,
-  makeOnNotification,
+  makeOnNotification, makeOnAgentMessage,
 } from './useChatExecution.handlers'
 import {
   makeOnToolAuthRequired, makeOnGuidance, makeOnPreview,
@@ -64,10 +64,12 @@ export function useChatExecution({ dispatch }: UseChatExecutionOptions) {
     })
   }, [getRefs])
 
-  const resetStreamContent = useCallback((convId: string) => {
+  const resetStreamContent = useCallback((convId: string, agentHint?: { agentSlug?: string; agentName?: string }) => {
     const refs = getRefs(convId)
     if (refs.pendingTokenFrame !== null) cancelAnimationFrame(refs.pendingTokenFrame)
-    refsByConv.current.set(convId, emptyRefs())
+    const fresh = emptyRefs()
+    if (agentHint) fresh.respondingAgent = agentHint
+    refsByConv.current.set(convId, fresh)
     if (disconnectTimerRef.current) {
       clearTimeout(disconnectTimerRef.current)
       disconnectTimerRef.current = null
@@ -131,6 +133,7 @@ export function useChatExecution({ dispatch }: UseChatExecutionOptions) {
       agentName: refs.respondingAgent.agentName,
       timestamp: committedTurn?.timestamp ?? Date.now(),
       parts: committedTurn?.parts,
+      writtenFiles: committedTurn?.writtenFiles,
       metadata,
     }
 
@@ -168,6 +171,7 @@ export function useChatExecution({ dispatch }: UseChatExecutionOptions) {
           agentName: refs.respondingAgent.agentName,
           timestamp: committedTurn.timestamp,
           parts: committedTurn.parts,
+          writtenFiles: committedTurn.writtenFiles,
         },
       })
     }
@@ -194,14 +198,23 @@ export function useChatExecution({ dispatch }: UseChatExecutionOptions) {
     dispatchRef.current({ type: 'EXECUTION_FINISHED', convId, result: 'error', errorMessage: error.message })
   }, [])
 
+  const wasDisconnectedRef = useRef(false)
   const onConnectionChange = useCallback((connected: boolean) => {
     if (connected) {
       if (disconnectTimerRef.current) {
         clearTimeout(disconnectTimerRef.current)
         disconnectTimerRef.current = null
       }
+      if (wasDisconnectedRef.current) {
+        wasDisconnectedRef.current = false
+        const convId = getConvIdRef.current()
+        if (convId) {
+          dispatchRef.current({ type: 'SET_EXECUTION_STATE', convId, executionState: null })
+        }
+      }
       return
     }
+    wasDisconnectedRef.current = true
     if (disconnectTimerRef.current) return
     disconnectTimerRef.current = setTimeout(() => {
       disconnectTimerRef.current = null
@@ -229,6 +242,7 @@ export function useChatExecution({ dispatch }: UseChatExecutionOptions) {
     onSubagentStop: makeOnSubagentStop(ctx),
     onDelegation: makeOnDelegation(ctx),
     onNotification: makeOnNotification(ctx),
+    onAgentMessage: makeOnAgentMessage(ctx),
     onToolAuthRequired: makeOnToolAuthRequired(ctx),
     onGuidance: makeOnGuidance(ctx),
     onPreview: makeOnPreview(ctx),

@@ -84,6 +84,7 @@ export const STREAM_EVENT_TYPES = [
     'task_progress',
     'task_updated',
     'task_notification',
+    'agent_message',
 ] as const;
 
 export type StreamEventType = (typeof STREAM_EVENT_TYPES)[number];

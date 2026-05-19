@@ -34,7 +34,6 @@ export function TaskDock({
 
   return (
     <div className="border-b border-border/50 px-3 py-2">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <button
           type="button"
@@ -81,7 +80,6 @@ export function TaskDock({
         </div>
       </div>
 
-      {/* Task list */}
       {!isCollapsed && (
         <div className="mt-1.5 space-y-0.5 max-h-[100px] overflow-y-auto">
           {tasks.map((task) => (
@@ -94,12 +92,12 @@ export function TaskDock({
                 <XIcon className="w-3 h-3 text-red-400 shrink-0" />
               )}
               <span className={cn(
-                'text-xs truncate flex-1',
+                'text-xs truncate flex-1 min-w-0',
                 task.status === 'running' ? 'font-medium text-text' : 'text-text-muted',
               )}>
                 {task.name}
               </span>
-              <span className="text-[10px] text-text-muted shrink-0 tabular-nums">
+              <span className="text-[10px] text-text-muted shrink-0 tabular-nums hidden sm:inline">
                 {task.status === 'running'
                   ? task.description
                   : task.durationMs != null

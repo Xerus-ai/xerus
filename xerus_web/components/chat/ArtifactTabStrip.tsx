@@ -13,6 +13,7 @@ import {
   Plus,
   Copy,
   Check,
+  ExternalLink,
 } from 'lucide-react'
 import { useState } from 'react'
 import type { ArtifactTab } from '@/hooks/useArtifactTabs'
@@ -25,6 +26,7 @@ interface ArtifactTabStripProps {
   onAddTab?: () => void
   onPublish?: () => void
   onCopy?: () => void
+  onOpenInWorkspace?: (path: string) => void
   onClosePanel: () => void
 }
 
@@ -53,8 +55,12 @@ export function ArtifactTabStrip({
   onAddTab,
   onPublish,
   onCopy,
+  onOpenInWorkspace,
   onClosePanel,
 }: ArtifactTabStripProps) {
+  const activeTab = tabs.find(t => t.id === activeTabId)
+  const isFileTab = activeTab?.kind === 'file'
+  const filePath = isFileTab ? activeTab.id.replace('file:', '') : null
   const [copied, setCopied] = useState(false)
 
   const handleCopy = () => {
@@ -136,6 +142,18 @@ export function ArtifactTabStrip({
             aria-label="Copy content"
           >
             {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+          </button>
+        )}
+
+        {isFileTab && filePath && onOpenInWorkspace && (
+          <button
+            type="button"
+            onClick={() => onOpenInWorkspace(filePath)}
+            className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-text-muted hover:text-text hover:bg-surface-hover transition-colors"
+            aria-label="Open in workspace"
+          >
+            <ExternalLink className="w-3 h-3" />
+            Open
           </button>
         )}
 

@@ -1,13 +1,15 @@
 'use client'
 
+import { useState, useCallback } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { cn } from '@/lib/utils'
-import { AlertCircle, Loader2 } from 'lucide-react'
+import { AlertCircle, Loader2, GitCompareArrows, Check, X as XIcon, MessageSquare } from 'lucide-react'
 import { ArtifactTabStrip } from './ArtifactTabStrip'
 import {
   ArtifactContentRenderer,
   isFullBleedContent,
 } from './ArtifactContentRenderer'
+import { DiffRenderer } from './DiffRenderer'
 import type { ArtifactTab } from '@/hooks/useArtifactTabs'
 
 // Re-export shared types so existing imports keep working
@@ -21,6 +23,8 @@ interface ArtifactViewerPanelProps {
   onClosePanel: () => void
   onAddTab?: () => void
   onPublish?: () => void
+  onOpenInWorkspace?: (path: string) => void
+  onSendMessage?: (message: string) => void
   className?: string
 }
 
@@ -32,10 +36,15 @@ export function ArtifactViewerPanel({
   onClosePanel,
   onAddTab,
   onPublish,
+  onOpenInWorkspace,
+  onSendMessage,
   className,
 }: ArtifactViewerPanelProps) {
   const reduceMotion = useReducedMotion()
+  const [showDiff, setShowDiff] = useState(false)
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? null
+
+  const hasDiff = !!(activeTab?.previousContent && activeTab.content.content)
 
   const handleCopy = () => {
     if (!activeTab) return
@@ -64,13 +73,32 @@ export function ArtifactViewerPanel({
         onAddTab={onAddTab}
         onPublish={onPublish}
         onCopy={activeTab ? handleCopy : undefined}
+        onOpenInWorkspace={onOpenInWorkspace}
         onClosePanel={onClosePanel}
       />
+
+      {hasDiff && (
+        <div className="flex items-center px-3 py-1.5 border-b border-surface-active/40 bg-surface-alt/30">
+          <button
+            type="button"
+            onClick={() => setShowDiff(!showDiff)}
+            className={cn(
+              'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors',
+              showDiff
+                ? 'bg-secondary/15 text-secondary'
+                : 'text-text-muted hover:text-text hover:bg-surface-hover',
+            )}
+          >
+            <GitCompareArrows className="w-3.5 h-3.5" />
+            Diff
+          </button>
+        </div>
+      )}
 
       <div
         className={cn(
           'flex-1',
-          isFullBleed ? 'overflow-hidden' : 'overflow-y-auto scrollbar-thin',
+          isFullBleed && !showDiff ? 'overflow-hidden' : 'overflow-y-auto scrollbar-thin',
         )}
       >
         {!activeTab ? (
@@ -79,11 +107,101 @@ export function ArtifactViewerPanel({
           <ErrorState message={activeTab.error} title={activeTab.content.title} />
         ) : activeTab.loading && !activeTab.content.content && !activeTab.content.url ? (
           <LoadingState title={activeTab.content.title} />
+        ) : showDiff && hasDiff ? (
+          <DiffRenderer
+            oldContent={activeTab.previousContent!}
+            newContent={activeTab.content.content!}
+            language={activeTab.content.language}
+          />
         ) : (
           <ArtifactContentRenderer content={activeTab.content} />
         )}
       </div>
+
+      {activeTab?.content.type === 'plan' && onSendMessage && (
+        <PlanActionBar
+          title={activeTab.content.title}
+          onSendMessage={onSendMessage}
+        />
+      )}
     </motion.div>
+  )
+}
+
+function PlanActionBar({ title, onSendMessage }: { title: string; onSendMessage: (msg: string) => void }) {
+  const [showFeedback, setShowFeedback] = useState(false)
+  const [feedback, setFeedback] = useState('')
+
+  const handleAccept = useCallback(() => {
+    onSendMessage(`Plan approved: ${title}`)
+  }, [onSendMessage, title])
+
+  const handleReject = useCallback(() => {
+    const msg = feedback
+      ? `Plan rejected: ${title}. Feedback: ${feedback}`
+      : `Plan rejected: ${title}`
+    onSendMessage(msg)
+    setFeedback('')
+    setShowFeedback(false)
+  }, [onSendMessage, title, feedback])
+
+  return (
+    <div className="border-t border-surface-active/40 bg-surface-alt/50 px-4 py-3">
+      {showFeedback ? (
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={feedback}
+            onChange={(e) => setFeedback(e.target.value)}
+            placeholder="Describe changes needed..."
+            className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-surface-active bg-surface text-text placeholder:text-text-muted focus:outline-none focus:border-primary/30"
+            onKeyDown={(e) => { if (e.key === 'Enter') handleReject() }}
+            autoFocus
+          />
+          <button
+            type="button"
+            onClick={handleReject}
+            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 transition-colors"
+          >
+            Send
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowFeedback(false)}
+            className="p-1.5 rounded-lg text-text-muted hover:text-text hover:bg-surface-hover transition-colors"
+          >
+            <XIcon className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleAccept}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 transition-colors"
+          >
+            <Check className="w-3.5 h-3.5" />
+            Accept
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowFeedback(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 transition-colors"
+          >
+            <XIcon className="w-3.5 h-3.5" />
+            Reject
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowFeedback(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-surface-active text-text-muted hover:text-text hover:bg-surface-hover transition-colors"
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+            Request changes
+          </button>
+        </div>
+      )}
+    </div>
   )
 }
 
