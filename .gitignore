@@ -70,6 +70,7 @@ xerus_backend/scripts/inspect-*
 xerus_backend/scripts/query-*
 xerus_backend/scripts/spike-*
 xerus_backend/scripts/sandbox-test-*
+xerus_backend/scripts/check-*
 
 # ─── Backend Build & Logs ────────────────────────────────────────────────────
 xerus_backend/coverage/
