@@ -62,16 +62,16 @@ function copySummary(groups: SubagentGroup[]): string {
 interface SubagentStepRowProps {
   step: ExecutionStep
   agents?: Agent[]
-  children?: ExecutionStep[]
+  childSteps?: ExecutionStep[]
   isChildExpanded: boolean
   onToggleChildren: () => void
 }
 
-function SubagentStepRow({ step, agents, children, isChildExpanded, onToggleChildren }: SubagentStepRowProps) {
+function SubagentStepRow({ step, agents, childSteps, isChildExpanded, onToggleChildren }: SubagentStepRowProps) {
   const agentSlug = (step.metadata as Record<string, string> | undefined)?.toAgent
   const matched = agentSlug && agents?.find(a => a.slug === agentSlug || a.name === agentSlug)
   const duration = step.endTime && step.startTime ? step.endTime - step.startTime : null
-  const hasChildren = children && children.length > 0
+  const hasChildren = childSteps && childSteps.length > 0
 
   return (
     <div>
@@ -118,7 +118,7 @@ function SubagentStepRow({ step, agents, children, isChildExpanded, onToggleChil
 
       {hasChildren && isChildExpanded && (
         <div className="ml-5 pl-2 border-l border-border/30 space-y-0.5">
-          {children.map(child => {
+          {childSteps.map(child => {
             const childDuration = child.endTime && child.startTime ? child.endTime - child.startTime : null
             return (
               <div key={child.id} className="flex items-center gap-2 py-0.5">
@@ -285,7 +285,7 @@ export function SubagentWorkPanel({ steps, agents, className, onClose, variant =
               key={parent.id}
               step={parent}
               agents={agents}
-              children={children}
+              childSteps={children}
               isChildExpanded={expandedChildren.has(parent.id)}
               onToggleChildren={() => toggleChildExpanded(parent.id)}
             />
