@@ -12,6 +12,7 @@ import type { StreamingAssistantTurn } from './streaming-turn.types'
 import type { WorkspacePayload } from './MessageBubble'
 import { isMascotConfig } from '@/lib/mascot-config'
 import { MascotAvatar } from '@/components/agents/MascotAvatar'
+import { InlineProgressChecklist } from './InlineProgressChecklist'
 
 interface MessageListProps {
   messages: ChatMessageExtended[]
@@ -23,6 +24,7 @@ interface MessageListProps {
   onViewExecution?: (messageId: string) => void
   onSuggestionClick?: (text: string) => void
   onOpenWorkspace?: (payload: WorkspacePayload) => void
+  onStopAll?: () => void
   userName?: string
   agents?: Agent[]
 }
@@ -54,6 +56,7 @@ function MessageListComponent({
   onViewExecution,
   onSuggestionClick,
   onOpenWorkspace,
+  onStopAll,
   userName,
   agents,
 }: MessageListProps) {
@@ -124,25 +127,29 @@ function MessageListComponent({
           })}
         </div>
 
+        {/* Inline progress checklist — shows subagent tasks as a todo list below the streaming turn */}
+        {executionState?.steps && executionState.steps.length > 0 && streamingTurn && (
+          <InlineProgressChecklist
+            steps={executionState.steps}
+            onStopAll={onStopAll}
+          />
+        )}
+
         {/* Thinking indicator — show while waiting for first token.
             Always show the user's selected agent (currentAgent). Delegated
             subagents are visible in the TaskDock instead. */}
         {isLoading && !streamingTurn && (() => {
           const thinkingAgent = currentAgent || XERUS_AGENT
           return (
-            <div className="px-6 py-5">
-              <div className="flex items-start gap-3">
-                {/* Agent avatar */}
-                <div className="h-9 w-9 shrink-0 mt-0.5 rounded-full overflow-hidden flex items-center justify-center">
-                  <AgentAvatarIcon agent={thinkingAgent} size={36} />
+            <div className="px-6 py-4">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 shrink-0 rounded-lg overflow-hidden flex items-center justify-center">
+                  <AgentAvatarIcon agent={thinkingAgent} size={28} />
                 </div>
-
-                <div className="flex-1 min-w-0">
-                  <span className="text-base font-semibold text-secondary block">
-                    {thinkingAgent.name}
-                  </span>
-                  <RichThinkingIndicator executionState={executionState} />
-                </div>
+                <span className="text-sm font-medium text-secondary">
+                  {thinkingAgent.name}
+                </span>
+                <RichThinkingIndicator executionState={executionState} />
               </div>
             </div>
           )

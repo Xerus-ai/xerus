@@ -48,7 +48,7 @@ describe('SubagentWorkPanel', () => {
     ]
     render(<SubagentWorkPanel steps={steps} />)
     expect(screen.getByText('2 agents working')).toBeInTheDocument()
-    expect(screen.getByText('1 completed')).toBeInTheDocument()
+    expect(screen.getByText('1/3 done')).toBeInTheDocument()
   })
 
   it('renders singular agent text for single active agent', () => {
@@ -118,13 +118,15 @@ describe('SubagentWorkPanel', () => {
     // Initially expanded (component default)
     expect(screen.getByText('Visible Agent')).toBeInTheDocument()
 
-    // Click to collapse
-    const button = screen.getByRole('button')
-    fireEvent.click(button)
-    expect(screen.queryByText('Visible Agent')).not.toBeInTheDocument()
+    // Click the header toggle button (contains the active count text)
+    const headerButton = screen.getByText('1 agent working').closest('button')!
+    fireEvent.click(headerButton)
+    // Collapsed: container has opacity-0 and max-h-0 (CSS animation)
+    const stepEl = screen.getByText('Visible Agent')
+    expect(stepEl.closest('[class*="opacity-0"]')).toBeTruthy()
 
     // Click to expand again
-    fireEvent.click(button)
-    expect(screen.getByText('Visible Agent')).toBeInTheDocument()
+    fireEvent.click(headerButton)
+    expect(screen.getByText('Visible Agent').closest('[class*="opacity-0"]')).toBeFalsy()
   })
 })

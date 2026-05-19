@@ -31,6 +31,7 @@ export function resolveToolIcon(name: string): ToolCallIcon {
   if (n === 'skill') return 'skill'
   if (n === 'todowrite') return 'task'
   if (n === 'askuserquestion') return 'question'
+  if (n === 'sendmessage') return 'agent'
   // File & search tools
   if (n.includes('read') || n.includes('glob') || n.includes('grep')) return 'read'
   if (n.includes('write') || n.includes('edit') || n.includes('notebook')) return 'write'

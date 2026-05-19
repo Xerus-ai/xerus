@@ -71,7 +71,7 @@ export function DiffRenderer({ oldContent, newContent }: DiffRendererProps) {
         <span className="text-emerald-600">+{addedCount}</span>
         <span className="text-rose-500">-{removedCount}</span>
       </div>
-      <div className="flex-1 overflow-auto font-mono text-[12px] leading-[1.6]">
+      <div className="flex-1 overflow-auto font-mono text-[12px] leading-[1.6] min-w-0">
         {lines.map((line, i) => (
           <div
             key={i}

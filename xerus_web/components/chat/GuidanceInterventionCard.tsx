@@ -12,6 +12,8 @@ import {
   Eye,
   Terminal,
   FileText,
+  MessageSquare,
+  Send,
 } from 'lucide-react'
 import type { UIHint } from '@/hooks/useExecutionStream.types'
 
@@ -26,6 +28,7 @@ interface GuidanceInterventionCardProps {
   browser_url?: string
   preview_url?: string
   onRespond: (accepted: boolean, feedback?: string) => void
+  onSendMessage?: (message: string) => void
 }
 
 function getHintConfig(uiHint?: UIHint, scenario?: string) {
@@ -55,15 +58,17 @@ export function GuidanceInterventionCard({
   browser_url,
   preview_url,
   onRespond,
+  onSendMessage,
 }: GuidanceInterventionCardProps) {
   const [secondsLeft, setSecondsLeft] = useState(timeout_seconds)
   const [feedbackText, setFeedbackText] = useState('')
+  const [selectedOption, setSelectedOption] = useState<string | null>(null)
   const { Icon, label } = getHintConfig(ui_hint, scenario)
+  const isForm = ui_hint === 'form'
 
-  // Countdown timer — auto-deny when expired (backend owns true timeout, this is UX feedback)
   useEffect(() => {
     if (secondsLeft <= 0) {
-      onRespond(false, 'Timed out')
+      onRespond(false, feedbackText || 'Timed out')
       return
     }
     const timer = setInterval(() => {
@@ -76,22 +81,42 @@ export function GuidanceInterventionCard({
       })
     }, 1000)
     return () => clearInterval(timer)
-  }, [secondsLeft, onRespond])
+  }, [secondsLeft, onRespond, feedbackText])
 
   const handleApprove = useCallback(() => {
-    onRespond(true, feedbackText || undefined)
-  }, [onRespond, feedbackText])
+    onRespond(true, selectedOption ?? (feedbackText || undefined))
+  }, [onRespond, selectedOption, feedbackText])
 
   const handleDeny = useCallback(() => {
     onRespond(false, feedbackText || undefined)
   }, [onRespond, feedbackText])
 
+  const handleOptionSelect = useCallback((opt: string) => {
+    if (isForm) {
+      setSelectedOption(opt)
+    } else {
+      onRespond(true, opt)
+    }
+  }, [isForm, onRespond])
+
+  const handleSubmitCustom = useCallback(() => {
+    if (!feedbackText.trim()) return
+    onRespond(true, feedbackText.trim())
+  }, [onRespond, feedbackText])
+
+  const handleChatAbout = useCallback(() => {
+    if (onSendMessage) {
+      onSendMessage(question)
+    }
+  }, [onSendMessage, question])
+
+  const timerWarning = secondsLeft <= 30
+  const timerUrgent = secondsLeft <= 10
+
   return (
     <div className="mx-4 mb-2 rounded-2xl border border-secondary/20 bg-secondary/5 px-4 py-3">
-      <div className="flex items-start gap-3">
-        {/* Left: Icon + Content */}
-        <div className="flex-1 min-w-0">
-          {/* Label row */}
+      <div className="flex flex-col sm:flex-row items-start gap-3">
+        <div className="flex-1 min-w-0 w-full">
           <div className="flex items-center gap-2 mb-1.5">
             <div className="w-7 h-7 rounded-xl flex items-center justify-center bg-secondary/15 shrink-0">
               <Icon className="w-3.5 h-3.5 text-secondary" />
@@ -100,19 +125,18 @@ export function GuidanceInterventionCard({
               {label}
             </span>
             {secondsLeft > 0 && (
-              <span className="ml-auto flex items-center gap-1 text-[11px] text-text-muted">
+              <span className={cn(
+                'ml-auto flex items-center gap-1 text-[11px]',
+                timerUrgent ? 'text-rose-400 font-semibold' : timerWarning ? 'text-amber-400' : 'text-text-muted',
+              )}>
                 <Clock className="w-3 h-3" />
                 {secondsLeft}s
               </span>
             )}
           </div>
 
-          {/* Question */}
-          <p className="text-sm font-medium text-text">
-            {question}
-          </p>
+          <p className="text-sm font-medium text-text">{question}</p>
 
-          {/* Context row: tool + agent + URLs */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5">
             {tool_name && (
               <span className="text-xs text-text-muted">
@@ -148,17 +172,18 @@ export function GuidanceInterventionCard({
             )}
           </div>
 
-          {/* Options (if provided) */}
           {options && options.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-2">
               {options.map((opt) => (
                 <button
                   key={opt}
                   type="button"
-                  onClick={() => onRespond(true, opt)}
+                  onClick={() => handleOptionSelect(opt)}
                   className={cn(
                     'px-2.5 py-1 text-xs rounded-lg border transition-colors',
-                    'border-surface-active text-text-secondary hover:text-text hover:bg-surface-hover',
+                    selectedOption === opt
+                      ? 'border-secondary bg-secondary/10 text-secondary font-medium'
+                      : 'border-surface-active text-text-secondary hover:text-text hover:bg-surface-hover',
                   )}
                 >
                   {opt}
@@ -167,32 +192,55 @@ export function GuidanceInterventionCard({
             </div>
           )}
 
-          {/* Feedback input — always available for rejection notes */}
+          {/* Custom input for form hint, or feedback note for other hints */}
           {ui_hint !== 'browser' && (
-            <input
-              type="text"
-              value={feedbackText}
-              onChange={(e) => setFeedbackText(e.target.value)}
-              placeholder="Add a note (optional)..."
-              className={cn(
-                'mt-2 w-full px-2.5 py-1.5 text-xs rounded-lg border',
-                'border-surface-active bg-surface-alt text-text placeholder:text-text-muted',
-                'focus:outline-none focus:border-primary/30',
+            <div className={cn('mt-2 flex gap-1.5', isForm && 'items-center')}>
+              <input
+                type="text"
+                value={feedbackText}
+                onChange={(e) => { setFeedbackText(e.target.value); if (isForm) setSelectedOption(null) }}
+                placeholder={isForm ? 'Or type your own answer...' : 'Add a note (optional)...'}
+                onKeyDown={(e) => { if (e.key === 'Enter' && isForm && feedbackText.trim()) handleSubmitCustom() }}
+                className={cn(
+                  'flex-1 px-2.5 py-1.5 text-xs rounded-lg border',
+                  'border-surface-active bg-surface-alt text-text placeholder:text-text-muted',
+                  'focus:outline-none focus:border-primary/30',
+                )}
+              />
+              {isForm && feedbackText.trim() && (
+                <button
+                  type="button"
+                  onClick={handleSubmitCustom}
+                  className="p-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white transition-colors shrink-0"
+                  aria-label="Submit answer"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                </button>
               )}
-            />
+            </div>
           )}
         </div>
 
-        {/* Right: Action buttons */}
-        <div className="flex flex-col gap-1.5 shrink-0 pt-6">
-          <button
-            type="button"
-            onClick={handleApprove}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-primary hover:bg-primary/90 text-white transition-colors"
-          >
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            Approve
-          </button>
+        <div className="flex flex-row sm:flex-col gap-1.5 shrink-0 sm:pt-6 w-full sm:w-auto">
+          {isForm && selectedOption ? (
+            <button
+              type="button"
+              onClick={handleApprove}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-primary hover:bg-primary/90 text-white transition-colors"
+            >
+              <Send className="w-3.5 h-3.5" />
+              Submit
+            </button>
+          ) : !isForm ? (
+            <button
+              type="button"
+              onClick={handleApprove}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-primary hover:bg-primary/90 text-white transition-colors"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Approve
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={handleDeny}
@@ -201,6 +249,16 @@ export function GuidanceInterventionCard({
             <XCircle className="w-3.5 h-3.5" />
             Deny
           </button>
+          {isForm && onSendMessage && (
+            <button
+              type="button"
+              onClick={handleChatAbout}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-surface-active text-text-muted hover:text-secondary hover:bg-secondary/5 transition-colors"
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              Discuss
+            </button>
+          )}
         </div>
       </div>
     </div>

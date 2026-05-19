@@ -2,7 +2,7 @@
 
 import { memo } from 'react'
 import { cn } from '@/lib/utils'
-import { Copy, Eye, RotateCcw } from 'lucide-react'
+import { Copy, RotateCcw } from 'lucide-react'
 import type { ChatMessageExtended, ToolCall, WorkspaceArtifact } from './chat-message.types'
 import type { TurnPart } from './streaming-turn.types'
 import type { Agent } from './types'
@@ -126,11 +126,7 @@ export const MessageBubble = memo(function MessageBubble({
     }
     return XERUS_AGENT
   })()
-  const hasExecution =
-    !isUser &&
-    !isStreaming &&
-    (message.metadata?.executionId !== undefined ||
-      message.metadata?.processingTime !== undefined)
+  void onViewExecution
 
   const formatTime = (timestamp: number) =>
     new Date(timestamp).toLocaleTimeString('en-US', {
@@ -178,12 +174,10 @@ export const MessageBubble = memo(function MessageBubble({
         <span className="text-[11px] text-text-muted tabular-nums shrink-0">
           {formatTime(message.timestamp)}
         </span>
-      </div>
-      {isStreaming && (
-        <div className="mb-2 pl-9">
+        {isStreaming && !message.parts?.some(p => p.type === 'reasoning') && (
           <RichThinkingIndicator parts={message.parts} />
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Parts-based rendering (streaming + history with parts[]) */}
       {message.parts ? (
@@ -308,16 +302,6 @@ export const MessageBubble = memo(function MessageBubble({
             <RotateCcw className="w-3 h-3" />
             Regenerate
           </button>
-          {hasExecution && onViewExecution && (
-            <button
-              type="button"
-              onClick={() => onViewExecution(message.id)}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] text-secondary hover:bg-secondary/8 transition-colors font-medium"
-            >
-              <Eye className="w-3 h-3" />
-              View work
-            </button>
-          )}
         </div>
       )}
     </div>

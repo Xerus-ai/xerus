@@ -198,14 +198,23 @@ export function useChatExecution({ dispatch }: UseChatExecutionOptions) {
     dispatchRef.current({ type: 'EXECUTION_FINISHED', convId, result: 'error', errorMessage: error.message })
   }, [])
 
+  const wasDisconnectedRef = useRef(false)
   const onConnectionChange = useCallback((connected: boolean) => {
     if (connected) {
       if (disconnectTimerRef.current) {
         clearTimeout(disconnectTimerRef.current)
         disconnectTimerRef.current = null
       }
+      if (wasDisconnectedRef.current) {
+        wasDisconnectedRef.current = false
+        const convId = getConvIdRef.current()
+        if (convId) {
+          dispatchRef.current({ type: 'SET_EXECUTION_STATE', convId, executionState: null })
+        }
+      }
       return
     }
+    wasDisconnectedRef.current = true
     if (disconnectTimerRef.current) return
     disconnectTimerRef.current = setTimeout(() => {
       disconnectTimerRef.current = null

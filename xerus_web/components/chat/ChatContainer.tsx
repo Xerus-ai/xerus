@@ -8,8 +8,6 @@ import { DeliverableChips } from './DeliverableChips'
 import { TaskDock } from './TaskDock'
 import { useSandboxPanel } from './useSandboxPanel'
 import { SubagentWorkPanel } from './SubagentWorkPanel'
-
-// Heavy panels loaded only when user opens them (bundle-dynamic-imports + bundle-conditional rules)
 const ArtifactViewerPanel = dynamic(() =>
   import('./ArtifactViewerPanel').then((m) => ({ default: m.ArtifactViewerPanel })),
 )
@@ -27,12 +25,21 @@ import { mapStreamEventsToExecution } from './mapStreamToExecutionEvents'
 import { useArtifactTabs } from '@/hooks/useArtifactTabs'
 
 const ExecutionDetail = dynamic(() => import('@/components/execution').then((m) => ({ default: m.ExecutionDetail })))
-import { Loader2, X } from 'lucide-react'
+import { PendingMessagesQueue } from './PendingMessagesQueue'
 import { toast } from '@/lib/toast'
 import { XerusLoader } from '@/components/common/XerusLoader'
-import { getSharedPipedreamClient } from '@/lib/pipedream-client'
-import { respondToGuidance } from '@/lib/api/execute'
 import { useChatState } from './useChatState'
+import { useChatHandlers } from './useChatHandlers'
+import { useArtifactAutoOpen } from './useArtifactAutoOpen'
+
+const RESIZE_HANDLE_CLASS = 'w-2 flex items-center justify-center cursor-col-resize group shrink-0'
+function ResizeDivider() {
+  return (
+    <PanelResizeHandle className={RESIZE_HANDLE_CLASS}>
+      <div className="w-px h-8 rounded-full bg-[#E5E5E5] group-hover:bg-primary/50 group-hover:h-16 transition-all" />
+    </PanelResizeHandle>
+  )
+}
 
 interface ChatContainerProps {
   initialAgentId?: string
@@ -50,14 +57,12 @@ export function ChatContainer({
   const chat = useChatState({ initialAgentId, conversationId, initialMessage })
   const { state, activeExec, agents, user, isAuthReady, executionStream } = chat
   const { isMobile } = useLayout()
-
-  // ---- Artifact tabs (multi-tab viewer) ----
   const artifacts = useArtifactTabs()
-
   const sandbox = useSandboxPanel()
   const [showExecution, setShowExecution] = useState<string | null>(null)
+  const [timelinePinned, setTimelinePinned] = useState(false)
+  const timelineAutoCloseRef = useRef<ReturnType<typeof setTimeout>>()
 
-  // ---- Task dock — derived from backgroundTasks (single source of truth) ----
   const taskDockTasks = useMemo(() =>
     (state.backgroundTasks ?? []).map(t => ({
       id: t.id,
@@ -74,93 +79,52 @@ export function ChatContainer({
   const taskDockVisible = taskDockTasks.length > 0
   const taskDockHideTimerRef = useRef<ReturnType<typeof setTimeout>>()
   const [taskDockHidden, setTaskDockHidden] = useState(false)
+  const [taskDockFading, setTaskDockFading] = useState(false)
 
   useEffect(() => {
     if (taskDockActiveCount > 0) {
       setTaskDockHidden(false)
+      setTaskDockFading(false)
       if (taskDockHideTimerRef.current) clearTimeout(taskDockHideTimerRef.current)
     } else if (taskDockTasks.length > 0) {
-      taskDockHideTimerRef.current = setTimeout(() => setTaskDockHidden(true), 3000)
+      taskDockHideTimerRef.current = setTimeout(() => {
+        setTaskDockFading(true)
+        setTimeout(() => setTaskDockHidden(true), 300)
+      }, 3000)
     }
     return () => { if (taskDockHideTimerRef.current) clearTimeout(taskDockHideTimerRef.current) }
   }, [taskDockActiveCount, taskDockTasks.length])
 
-  // ---- Tool auth (Pipedream OAuth) ----
-  const handleToolAuthConnect = useCallback((appSlug: string) => {
-    try {
-      const pipedreamClient = getSharedPipedreamClient()
-      pipedreamClient.connectAccount({
-        app: appSlug,
-        onSuccess: () => {
-          chat.handleDismissToolAuth()
-          toast.success('App connected', { description: 'Your agent can now use this app.' })
-          document.querySelectorAll('iframe[id^="pipedream-connect-iframe-"]').forEach((el) => el.remove())
-        },
-        onError: () => {
-          toast.error("Connection failed", { description: 'Please close and try again.' })
-          document.querySelectorAll('iframe[id^="pipedream-connect-iframe-"]').forEach((el) => el.remove())
-        },
-        onClose: () => {
-          document.querySelectorAll('iframe[id^="pipedream-connect-iframe-"]').forEach((el) => el.remove())
-        },
-      })
-    } catch {
-      toast.error("Couldn't connect the app", { description: 'Please try again or check your permissions.' })
+  const subagentSteps = useMemo(() =>
+    (activeExec.executionState?.steps ?? []).filter(
+      s => s.id.startsWith('subagent-') || s.id.startsWith('delegation-'),
+    ),
+    [activeExec.executionState?.steps],
+  )
+  const hasActiveSubagents = subagentSteps.some(s => s.status === 'active')
+
+  useEffect(() => {
+    if (subagentSteps.length > 0 && hasActiveSubagents) {
+      if (timelineAutoCloseRef.current) clearTimeout(timelineAutoCloseRef.current)
     }
-  }, [chat])
-
-  // ---- HITL guidance ----
-  const guidanceSubmittingRef = useRef(false)
-  const handleGuidanceRespond = useCallback(async (accepted: boolean, feedback?: string) => {
-    if (guidanceSubmittingRef.current) return
-    const guidance = state.pendingGuidance
-    if (!guidance) return
-    guidanceSubmittingRef.current = true
-    try {
-      await respondToGuidance(guidance.execution_id, {
-        guidance_id: guidance.pause_id,
-        accepted,
-        response_value: feedback,
-      })
-      chat.dispatch({ type: 'SET_PENDING_GUIDANCE', pendingGuidance: null })
-    } catch {
-      toast.error("Your response wasn't sent", { description: 'The agent may have moved on. Try sending a new message.' })
-    } finally {
-      guidanceSubmittingRef.current = false
+    if (subagentSteps.length > 0 && !hasActiveSubagents && !timelinePinned) {
+      timelineAutoCloseRef.current = setTimeout(() => setTimelinePinned(false), 3000)
     }
-  }, [state.pendingGuidance, chat])
+    return () => { if (timelineAutoCloseRef.current) clearTimeout(timelineAutoCloseRef.current) }
+  }, [subagentSteps.length, hasActiveSubagents, timelinePinned])
+  const { handleToolAuthConnect, handleGuidanceRespond } = useChatHandlers({
+    state,
+    dispatch: chat.dispatch,
+    handleDismissToolAuth: chat.handleDismissToolAuth,
+  })
 
-  // ---- Promote agent-emitted preview URLs into a Preview artifact tab.
-  // Two channels feed this:
-  //   - HITL guidance with preview_url (transient, only while paused).
-  //   - Standalone 'preview' SSE events from the runner (persistent dev server signal).
-  // Either path opens or refreshes the relevant tab without disturbing other artifacts.
-  const lastHitlPreviewRef = useRef<string | null>(null)
-  useEffect(() => {
-    const url = state.pendingGuidance?.preview_url
-    if (!url || url === lastHitlPreviewRef.current) return
-    lastHitlPreviewRef.current = url
-    artifacts.openPreview(url)
-  }, [state.pendingGuidance?.preview_url, artifacts])
+  useArtifactAutoOpen({
+    pendingArtifactFile: state.pendingArtifactFile,
+    pendingPreview: state.pendingPreview,
+    pendingGuidancePreviewUrl: state.pendingGuidance?.preview_url,
+    artifacts,
+  })
 
-  // ---- Auto-open artifact panel when agent writes a viewable file.
-  const lastArtifactFileTsRef = useRef<number | null>(null)
-  useEffect(() => {
-    const file = state.pendingArtifactFile
-    if (!file || file.ts === lastArtifactFileTsRef.current) return
-    lastArtifactFileTsRef.current = file.ts
-    void artifacts.openFile({ name: file.name, path: file.path, extension: file.extension, editDiff: file.editDiff })
-  }, [state.pendingArtifactFile, artifacts])
-
-  const lastSsePreviewTsRef = useRef<number | null>(null)
-  useEffect(() => {
-    const preview = state.pendingPreview
-    if (!preview || preview.ts === lastSsePreviewTsRef.current) return
-    lastSsePreviewTsRef.current = preview.ts
-    artifacts.openPreview(preview.url, preview.label, preview.port)
-  }, [state.pendingPreview, artifacts])
-
-  // ---- Artifact open handlers ----
   const handleOpenWorkspacePayload = useCallback(
     (payload: WorkspacePayload) => {
       if (payload.type === 'plan') {
@@ -185,7 +149,6 @@ export function ChatContainer({
     })
   }, [])
 
-  // ---- Sidebar slot registration ----
   useChatSidebar(
     {
       projects: chat.projects,
@@ -209,12 +172,15 @@ export function ChatContainer({
     return <XerusLoader variant="inline" className="h-full bg-surface" />
   }
 
-  type RightPanelMode = 'sandbox' | 'artifact' | null
+  type RightPanelMode = 'sandbox' | 'artifact' | 'timeline' | null
+  const showTimeline = subagentSteps.length > 0 && (hasActiveSubagents || timelinePinned)
   const rightPanel: RightPanelMode = (sandbox.terminalUrl || sandbox.browserUrl)
     ? 'sandbox'
     : artifacts.tabs.length > 0
       ? 'artifact'
-      : null
+      : showTimeline
+        ? 'timeline'
+        : null
 
   return (
     <div className={cn('flex w-full relative h-screen overflow-hidden', className)}>
@@ -232,6 +198,7 @@ export function ChatContainer({
               onViewExecution={setShowExecution}
               onSuggestionClick={chat.sendMessage}
               onOpenWorkspace={handleOpenWorkspacePayload}
+              onStopAll={chat.handleStopExecution}
               userName={user?.display_name}
               agents={agents}
             />
@@ -268,6 +235,7 @@ export function ChatContainer({
                 browser_url={state.pendingGuidance.browser_url}
                 preview_url={state.pendingGuidance.preview_url}
                 onRespond={handleGuidanceRespond}
+                onSendMessage={chat.sendMessage}
               />
             )}
 
@@ -277,7 +245,7 @@ export function ChatContainer({
             />
 
             {taskDockVisible && !taskDockHidden && (
-              <div className="w-full max-w-3xl mx-auto px-4">
+              <div className={cn('w-full max-w-3xl mx-auto px-4 transition-opacity duration-300', taskDockFading && 'opacity-0')}>
                 <TaskDock
                   tasks={taskDockTasks}
                   activeCount={taskDockActiveCount}
@@ -288,40 +256,10 @@ export function ChatContainer({
                 />
               </div>
             )}
-            {activeExec.executionState?.steps && activeExec.executionState.steps.length > 0 && (
-              <div className="w-full max-w-3xl mx-auto px-4 pb-1">
-                <SubagentWorkPanel
-                  steps={activeExec.executionState.steps}
-                  agents={agents}
-                />
-              </div>
-            )}
-            {activeExec.pendingMessages.length > 0 && (
-              <div className="w-full max-w-3xl mx-auto px-4 pb-2">
-                <div className="flex items-center gap-2 px-3 py-2 bg-surface rounded-xl border border-surface-active">
-                  <Loader2 className="w-3.5 h-3.5 text-text-muted animate-spin shrink-0" />
-                  <span className="text-[11px] text-text-muted shrink-0">{activeExec.pendingMessages.length} queued</span>
-                  <div className="flex flex-wrap gap-1.5 flex-1 min-w-0">
-                    {activeExec.pendingMessages.map((msg, idx) => (
-                      <span
-                        key={idx}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-surface-hover text-text-secondary"
-                      >
-                        <span className="truncate max-w-[180px]">{msg}</span>
-                        <button
-                          type="button"
-                          onClick={() => chat.handleCancelQueuedMessage(idx)}
-                          className="p-0.5 rounded-full hover:bg-surface-active text-text-muted hover:text-text transition-colors"
-                          aria-label="Cancel queued message"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
+            <PendingMessagesQueue
+              messages={activeExec.pendingMessages}
+              onCancel={chat.handleCancelQueuedMessage}
+            />
             <ChatInput
               onSendMessage={chat.sendMessage}
               disabled={false}
@@ -347,12 +285,9 @@ export function ChatContainer({
           </div>
         </Panel>
 
-        {/* Sandbox panel — terminal/browser, side-by-side on md+ */}
         {rightPanel === 'sandbox' && !isMobile && (
           <>
-            <PanelResizeHandle className="w-2 flex items-center justify-center cursor-col-resize group shrink-0">
-              <div className="w-px h-8 rounded-full bg-[#E5E5E5] group-hover:bg-primary/50 group-hover:h-16 transition-all" />
-            </PanelResizeHandle>
+            <ResizeDivider />
             <Panel defaultSize={50} minSize={25}>
               <SandboxPanel
                 terminalUrl={sandbox.terminalUrl}
@@ -368,13 +303,9 @@ export function ChatContainer({
             </Panel>
           </>
         )}
-
-        {/* Artifact viewer — multi-tab; hidden when sandbox is open */}
         {rightPanel === 'artifact' && !isMobile && (
           <>
-            <PanelResizeHandle className="w-2 flex items-center justify-center cursor-col-resize group shrink-0">
-              <div className="w-px h-8 rounded-full bg-[#E5E5E5] group-hover:bg-primary/50 group-hover:h-16 transition-all" />
-            </PanelResizeHandle>
+            <ResizeDivider />
             <Panel defaultSize={45} minSize={20}>
               <ArtifactViewerPanel
                 tabs={artifacts.tabs}
@@ -389,9 +320,21 @@ export function ChatContainer({
             </Panel>
           </>
         )}
+        {rightPanel === 'timeline' && !isMobile && (
+          <>
+            <ResizeDivider />
+            <Panel defaultSize={35} minSize={20}>
+              <SubagentWorkPanel
+                steps={activeExec.executionState?.steps ?? []}
+                agents={agents}
+                variant="panel"
+                onClose={() => setTimelinePinned(false)}
+                className="h-full"
+              />
+            </Panel>
+          </>
+        )}
       </PanelGroup>
-
-      {/* Mobile full-screen overlays */}
       {isMobile && rightPanel === 'sandbox' && (
         <div className="fixed inset-0 z-50 bg-surface flex flex-col" role="dialog" aria-label="Sandbox">
           <SandboxPanel
@@ -407,7 +350,6 @@ export function ChatContainer({
           />
         </div>
       )}
-
       {isMobile && rightPanel === 'artifact' && (
         <div className="fixed inset-0 z-50 bg-surface flex flex-col" role="dialog" aria-label="Artifact viewer">
           <ArtifactViewerPanel
@@ -422,8 +364,17 @@ export function ChatContainer({
           />
         </div>
       )}
-
-      {/* Execution detail slide-over */}
+      {isMobile && rightPanel === 'timeline' && (
+        <div className="fixed inset-0 z-50 bg-surface flex flex-col" role="dialog" aria-label="Agent work">
+          <SubagentWorkPanel
+            steps={activeExec.executionState?.steps ?? []}
+            agents={agents}
+            variant="panel"
+            onClose={() => setTimelinePinned(false)}
+            className="h-full"
+          />
+        </div>
+      )}
       {showExecution && (
         <ExecutionDetail
           sessionId={showExecution}
