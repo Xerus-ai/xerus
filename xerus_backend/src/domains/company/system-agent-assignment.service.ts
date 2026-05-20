@@ -2,7 +2,6 @@ import type { DaytonaProvider } from '../sandbox-infra/sandbox/providers/daytona
 import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
 import {
     executeWorkspaceQuery as execWsMutate,
-    executeWorkspaceJsonQuery,
     escapeSQL,
 } from '../conversations/workspace-db.helpers';
 import { logger } from '../../utils/logger';
@@ -13,15 +12,6 @@ export const SYSTEM_AGENT_SLUGS = ['xerus-master', 'xerus-cto'];
 
 const AGENT_CONFIG_PATHS = ['agents', '.claude/agents'];
 
-async function agentExistsInWorkspaceDb(
-    provider: DaytonaProvider,
-    sandboxId: string,
-    slug: string,
-): Promise<boolean> {
-    const sql = `SELECT slug FROM agents WHERE slug = '${escapeSQL(slug)}' LIMIT 1`;
-    const rows = await executeWorkspaceJsonQuery<{ slug: string }>(provider, sandboxId, sql);
-    return rows.length > 0;
-}
 
 async function readAgentConfig(
     provider: DaytonaProvider,
@@ -49,22 +39,15 @@ export async function addSystemAgentsToChannel(
     channelSlug: string,
 ): Promise<void> {
     for (const slug of SYSTEM_AGENT_SLUGS) {
-        const exists = await agentExistsInWorkspaceDb(provider, sandboxId, slug).catch((err: unknown) => {
-            log.warn('Failed to verify system agent exists in workspace DB', {
+        // Ensure agent row exists in workspace.db (prevents FK violations on channel_members)
+        const ensureSql = `INSERT OR IGNORE INTO agents (slug, name, adapter_type, role, autonomy_level, status) VALUES ('${escapeSQL(slug)}', '${escapeSQL(slug)}', 'claudecode', 'specialist', 'supervised', 'idle')`;
+        await execWsMutate(provider, sandboxId, ensureSql).catch((err: unknown) => {
+            log.warn('Failed to ensure system agent exists in workspace DB', {
                 agent_slug: slug,
                 channel_slug: channelSlug,
                 error: err instanceof Error ? err.message : String(err),
             });
-            return false;
         });
-
-        if (!exists) {
-            log.warn('System agent not found in workspace DB; skipping channel assignment', {
-                agent_slug: slug,
-                channel_slug: channelSlug,
-            });
-            continue;
-        }
 
         const sql = `INSERT OR IGNORE INTO channel_members (channel_slug, agent_slug, role) VALUES ('${escapeSQL(channelSlug)}', '${escapeSQL(slug)}', 'member')`;
         await execWsMutate(provider, sandboxId, sql).catch((err: unknown) => {

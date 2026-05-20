@@ -45,8 +45,12 @@ export interface ChannelMessageRow {
     posted_at: string;
 }
 
+export interface ChannelWithCount extends ChannelRow {
+    agent_count: number;
+}
+
 export interface DomainWithChannels extends DomainRow {
-    channels: ChannelRow[];
+    channels: ChannelWithCount[];
 }
 
 // -----------------------------------------------------------------------------
@@ -65,13 +69,14 @@ export async function listDomainsWithChannels(
     const domains = await executeWorkspaceJsonQuery<DomainRow>(provider, sandboxId, domainsSql);
 
     const channelsSql = `
-        SELECT slug, name, domain_slug, lead_agent_slug, description, goals, config, created_at, updated_at
-        FROM channels
-        ORDER BY name
+        SELECT c.slug, c.name, c.domain_slug, c.lead_agent_slug, c.description, c.goals, c.config, c.created_at, c.updated_at,
+               (SELECT COUNT(*) FROM channel_members cm WHERE cm.channel_slug = c.slug) AS agent_count
+        FROM channels c
+        ORDER BY c.name
     `;
-    const channels = await executeWorkspaceJsonQuery<ChannelRow>(provider, sandboxId, channelsSql);
+    const channels = await executeWorkspaceJsonQuery<ChannelWithCount>(provider, sandboxId, channelsSql);
 
-    const channelsByDomain = new Map<string, ChannelRow[]>();
+    const channelsByDomain = new Map<string, ChannelWithCount[]>();
     for (const ch of channels) {
         const list = channelsByDomain.get(ch.domain_slug) ?? [];
         list.push(ch);
@@ -202,10 +207,13 @@ export async function createChannelMessage(
     // so the API can reconstruct the full response shape for the frontend.
     const enrichedMetadata = { ...metadata, sender_type: senderType };
     const metadataJson = JSON.stringify(enrichedMetadata);
+    const escaped = escapeSQL(senderSlug);
     const sql = `
         BEGIN;
+        INSERT OR IGNORE INTO agents (slug, name, adapter_type, role, autonomy_level, status)
+        VALUES ('${escaped}', '${escaped}', 'claudecode', 'user', 'manual', 'idle');
         INSERT INTO channel_messages (channel_slug, agent_slug, content, message_type, metadata, posted_at)
-        VALUES ('${escapeSQL(channelSlug)}', '${escapeSQL(senderSlug)}', '${escapeSQL(content)}', '${escapeSQL(messageType)}', '${escapeSQL(metadataJson)}', '${now}');
+        VALUES ('${escapeSQL(channelSlug)}', '${escaped}', '${escapeSQL(content)}', '${escapeSQL(messageType)}', '${escapeSQL(metadataJson)}', '${now}');
         SELECT id, channel_slug, agent_slug, content, message_type, metadata, posted_at
         FROM channel_messages WHERE id = last_insert_rowid();
         COMMIT;
@@ -270,10 +278,12 @@ export async function createSystemEvent(
     const enrichedMetadata = { sender_type: 'system', ...metadata };
     const metadataJson = JSON.stringify(enrichedMetadata);
     const sql = `
+        INSERT OR IGNORE INTO agents (slug, name, adapter_type, role, autonomy_level, status)
+        VALUES ('system', 'System', 'claudecode', 'system', 'manual', 'idle');
         INSERT INTO channel_messages (channel_slug, agent_slug, content, message_type, metadata, posted_at)
         VALUES ('${escapeSQL(channelSlug)}', 'system', '${escapeSQL(content)}', 'system', '${escapeSQL(metadataJson)}', '${now}')
     `;
-    await executeWorkspaceJsonQuery(provider, sandboxId, sql);
+    await executeWorkspaceQuery(provider, sandboxId, sql);
 }
 
 // -----------------------------------------------------------------------------

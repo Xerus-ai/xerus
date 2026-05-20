@@ -102,7 +102,7 @@ router.get('/domains', auth, async (req: AuthenticatedRequest, res: Response, ne
                     slug: c.slug.startsWith(prefix) ? c.slug.slice(prefix.length) : c.slug,
                     name: c.name,
                     description: c.description,
-                    agent_count: 0,
+                    agent_count: c.agent_count ?? 0,
                 })),
             };
         });
@@ -396,10 +396,10 @@ router.get('/channels/:channelId/agents', auth, async (req: AuthenticatedRequest
 
         const channelSlug = sanitizeSlug(req.params.channelId);
 
-        // Get all agent slugs for this user from Neon agent_registry
+        // Get all agent slugs for this user from Neon agent_registry (including system agents)
         const registryResult = await query<{ id: string; slug: string }>(
             `SELECT id::text, slug FROM agent_registry
-             WHERE user_id = $1 AND agent_type IN ('private', 'public')
+             WHERE (user_id = $1 OR agent_type = 'system') AND agent_type != 'internal'
              ORDER BY created_at DESC LIMIT 100`,
             [userId],
         );

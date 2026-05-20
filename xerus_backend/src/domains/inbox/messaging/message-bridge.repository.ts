@@ -46,10 +46,13 @@ export async function insertChannelMessage(
     const enrichedMetadata = { ...input.metadata, sender_type: input.sender_type };
     const metadataJson = JSON.stringify(enrichedMetadata);
 
+    const senderEsc = escapeSQL(input.sender_slug);
     const sql = `
         BEGIN;
+        INSERT OR IGNORE INTO agents (slug, name, adapter_type, role, autonomy_level, status)
+        VALUES ('${senderEsc}', '${senderEsc}', 'claudecode', 'specialist', 'supervised', 'idle');
         INSERT INTO channel_messages (channel_slug, agent_slug, content, message_type, metadata, posted_at)
-        VALUES ('${escapeSQL(input.channel_slug)}', '${escapeSQL(input.sender_slug)}', '${escapeSQL(input.content)}', '${escapeSQL(input.message_type)}', '${escapeSQL(metadataJson)}', '${now}');
+        VALUES ('${escapeSQL(input.channel_slug)}', '${senderEsc}', '${escapeSQL(input.content)}', '${escapeSQL(input.message_type)}', '${escapeSQL(metadataJson)}', '${now}');
         SELECT id, channel_slug, agent_slug, content, message_type, metadata, posted_at
         FROM channel_messages WHERE id = last_insert_rowid();
         COMMIT;

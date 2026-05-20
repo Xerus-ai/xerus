@@ -128,8 +128,13 @@ export async function createTask(
     const labelsValue = labels && labels.length > 0 ? `'${escapeSQL(JSON.stringify(labels))}'` : 'NULL';
     const dueDateValue = dueDate ? `'${escapeSQL(dueDate)}'` : 'NULL';
 
+    const ensureAgent = assignedAgent
+        ? `INSERT OR IGNORE INTO agents (slug, name, adapter_type, role, autonomy_level, status)
+           VALUES ('${escapeSQL(assignedAgent)}', '${escapeSQL(assignedAgent)}', 'claudecode', 'specialist', 'supervised', 'idle');`
+        : '';
     const sql = `
         BEGIN;
+        ${ensureAgent}
         INSERT INTO tasks (id, project_slug, title, description, status, priority, assigned_agent, labels, due_date, created_at, updated_at)
         VALUES (
             '${escapeSQL(id)}',

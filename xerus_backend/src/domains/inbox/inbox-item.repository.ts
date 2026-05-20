@@ -148,9 +148,12 @@ export class DatabaseInboxItemRepository implements InboxItemRepository {
         const senderSlug = input.agent_slug;
         const metadataStr = JSON.stringify(input.metadata);
 
+        const agentEsc = escapeSQL(agentSlug);
         const sql = `
+            INSERT OR IGNORE INTO agents (slug, name, adapter_type, role, autonomy_level, status)
+            VALUES ('${agentEsc}', '${agentEsc}', 'claudecode', 'specialist', 'supervised', 'idle');
             INSERT INTO inbox_items (agent_slug, sender_slug, message_type, subject, content, metadata, priority, status, received_at)
-            VALUES ('${escapeSQL(agentSlug)}', '${escapeSQL(senderSlug)}', '${escapeSQL(messageType)}', '${escapeSQL(input.title)}', '${escapeSQL(input.content)}', '${escapeSQL(metadataStr)}', '${escapeSQL(workspacePriority)}', '${escapeSQL(workspaceStatus)}', '${now}');
+            VALUES ('${agentEsc}', '${escapeSQL(senderSlug)}', '${escapeSQL(messageType)}', '${escapeSQL(input.title)}', '${escapeSQL(input.content)}', '${escapeSQL(metadataStr)}', '${escapeSQL(workspacePriority)}', '${escapeSQL(workspaceStatus)}', '${now}');
             SELECT id, agent_slug, sender_slug, message_type, subject, content,
                    metadata, priority, status, received_at, read_at, actioned_at
             FROM inbox_items WHERE id = last_insert_rowid();
