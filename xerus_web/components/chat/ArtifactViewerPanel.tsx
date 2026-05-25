@@ -10,6 +10,7 @@ import {
   isFullBleedContent,
 } from './ArtifactContentRenderer'
 import { DiffRenderer } from './DiffRenderer'
+import { ArtifactSidebar } from './ArtifactSidebar'
 import type { ArtifactTab } from '@/hooks/useArtifactTabs'
 
 // Re-export shared types so existing imports keep working
@@ -25,6 +26,8 @@ interface ArtifactViewerPanelProps {
   onPublish?: () => void
   onOpenInWorkspace?: (path: string) => void
   onSendMessage?: (message: string) => void
+  variant?: 'split' | 'full'
+  onToggleFullView?: () => void
   className?: string
 }
 
@@ -38,6 +41,8 @@ export function ArtifactViewerPanel({
   onPublish,
   onOpenInWorkspace,
   onSendMessage,
+  variant = 'split',
+  onToggleFullView,
   className,
 }: ArtifactViewerPanelProps) {
   const reduceMotion = useReducedMotion()
@@ -53,18 +58,10 @@ export function ArtifactViewerPanel({
   }
 
   const isFullBleed = activeTab ? isFullBleedContent(activeTab.content.type) : false
+  const isFull = variant === 'full'
 
-  return (
-    <motion.div
-      initial={reduceMotion ? { opacity: 0 } : { opacity: 0, x: 16 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
-      className={cn(
-        'flex flex-col h-full w-full overflow-hidden',
-        'bg-card border-l border-surface-active/40',
-        className,
-      )}
-    >
+  const mainContent = (
+    <div className={cn('flex flex-col flex-1 min-w-0 min-h-0')}>
       <ArtifactTabStrip
         tabs={tabs}
         activeTabId={activeTabId}
@@ -75,6 +72,8 @@ export function ArtifactViewerPanel({
         onCopy={activeTab ? handleCopy : undefined}
         onOpenInWorkspace={onOpenInWorkspace}
         onClosePanel={onClosePanel}
+        variant={variant}
+        onToggleFullView={onToggleFullView}
       />
 
       {hasDiff && (
@@ -122,6 +121,30 @@ export function ArtifactViewerPanel({
         <PlanActionBar
           title={activeTab.content.title}
           onSendMessage={onSendMessage}
+        />
+      )}
+    </div>
+  )
+
+  return (
+    <motion.div
+      initial={reduceMotion ? { opacity: 0 } : { opacity: 0, x: 16 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
+      className={cn(
+        'flex h-full w-full overflow-hidden',
+        isFull ? 'flex-row' : 'flex-col',
+        'bg-card border-l border-surface-active/40',
+        className,
+      )}
+    >
+      {mainContent}
+
+      {isFull && (
+        <ArtifactSidebar
+          versions={[]}
+          comments={[]}
+          className="w-[320px] shrink-0"
         />
       )}
     </motion.div>
