@@ -61,6 +61,7 @@ export function ChatContainer({
   const sandbox = useSandboxPanel()
   const [showExecution, setShowExecution] = useState<string | null>(null)
   const [timelinePinned, setTimelinePinned] = useState(false)
+  const [artifactFullView, setArtifactFullView] = useState(false)
   const timelineAutoCloseRef = useRef<ReturnType<typeof setTimeout>>()
 
   const taskDockTasks = useMemo(() =>
@@ -303,7 +304,7 @@ export function ChatContainer({
             </Panel>
           </>
         )}
-        {rightPanel === 'artifact' && !isMobile && (
+        {rightPanel === 'artifact' && !isMobile && !artifactFullView && (
           <>
             <ResizeDivider />
             <Panel defaultSize={45} minSize={20}>
@@ -316,6 +317,8 @@ export function ChatContainer({
                 onPublish={handlePublish}
                 onOpenInWorkspace={(path) => window.open(`/workspace?file=${encodeURIComponent(path)}`, '_blank')}
                 onSendMessage={chat.sendMessage}
+                variant="split"
+                onToggleFullView={() => setArtifactFullView(true)}
               />
             </Panel>
           </>
@@ -361,6 +364,22 @@ export function ChatContainer({
             onPublish={handlePublish}
             onOpenInWorkspace={(path) => window.open(`/workspace?file=${encodeURIComponent(path)}`, '_blank')}
             onSendMessage={chat.sendMessage}
+            variant="full"
+          />
+        </div>
+      )}
+      {!isMobile && artifactFullView && rightPanel === 'artifact' && (
+        <div className="fixed inset-0 z-50 bg-card flex flex-col" role="dialog" aria-label="Artifact full view">
+          <ArtifactViewerPanel
+            tabs={artifacts.tabs}
+            activeTabId={artifacts.activeTabId}
+            onSelectTab={artifacts.setActiveTabId}
+            onCloseTab={artifacts.closeTab}
+            onClosePanel={() => setArtifactFullView(false)}
+            onPublish={handlePublish}
+            onOpenInWorkspace={(path) => window.open(`/workspace?file=${encodeURIComponent(path)}`, '_blank')}
+            onSendMessage={chat.sendMessage}
+            variant="full"
           />
         </div>
       )}
