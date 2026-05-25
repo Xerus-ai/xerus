@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/utils/AuthContext'
 import { useOnboardingStream } from '@/hooks/useOnboardingStream'
-import { createCheckout, syncSubscription } from '@/lib/api/billing'
+import { createCheckout, syncSubscription, getSubscription } from '@/lib/api/billing'
 import { saveApiKey, triggerCliLogin } from '@/lib/api/user'
 import { PLANS, type PlanType } from '@/lib/plans'
 import { BlobBackground } from './BlobBackground'
@@ -49,12 +49,31 @@ export function OnboardingChat() {
   const stream = useOnboardingStream({ userId, onWorkspaceCreated: markWorkspaceReady })
   const templateMessages = useMemo(() => buildTemplateMessages(firstName), [firstName])
 
-  // Logo phase: hold for 2.5s then transition to template
+  // On mount: check if subscription is already active (e.g. user paid, then reloaded)
+  // If so, skip directly to 'activate' phase — don't re-show plan selection.
+  const resumeCheckedRef = useRef(false)
+  useEffect(() => {
+    if (resumeCheckedRef.current || !userId) return
+    resumeCheckedRef.current = true
+    getSubscription()
+      .then((sub) => {
+        if (sub.subscription_status === 'active') {
+          setPhase('activate')
+        }
+      })
+      .catch(() => {
+        // Not subscribed or network error — proceed with normal flow
+      })
+  }, [userId, setPhase])
+
+  // Logo phase: hold for 2.5s then transition to template (only if still on logo)
   useEffect(() => {
     if (phase !== 'logo') return
-    const timer = setTimeout(() => setPhase('template'), 2500)
+    const timer = setTimeout(() => {
+      setPhaseRaw((current) => current === 'logo' ? 'template' : current)
+    }, 2500)
     return () => clearTimeout(timer)
-  }, [phase, setPhase])
+  }, [phase])
 
   // Sequential template messages
   useEffect(() => {

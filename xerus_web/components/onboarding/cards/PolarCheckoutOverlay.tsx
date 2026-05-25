@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { ExternalLink, Loader2 } from 'lucide-react'
+import { syncSubscription } from '@/lib/api/billing'
 
 interface PolarCheckoutOverlayProps {
   checkoutUrl: string
@@ -12,7 +13,8 @@ interface PolarCheckoutOverlayProps {
 
 /**
  * Opens Polar checkout in a new tab and shows a waiting overlay.
- * Detects completion via the syncSubscription poll in OnboardingChat.
+ * Polls syncSubscription every 3s to detect when payment completes,
+ * AND detects tab close as a fallback trigger.
  */
 export function PolarCheckoutOverlay({
   checkoutUrl,
@@ -22,6 +24,7 @@ export function PolarCheckoutOverlay({
   const shouldReduceMotion = useReducedMotion()
   const tabRef = useRef<Window | null>(null)
   const openedRef = useRef(false)
+  const resolvedRef = useRef(false)
 
   useEffect(() => {
     if (openedRef.current) return
@@ -29,13 +32,34 @@ export function PolarCheckoutOverlay({
     tabRef.current = window.open(checkoutUrl, '_blank')
   }, [checkoutUrl])
 
-  // Poll to detect if user closed the tab without completing
+  // Poll syncSubscription to detect payment completion while tab is open
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      if (resolvedRef.current) return
+      try {
+        const result = await syncSubscription()
+        if (result.synced && result.subscription_status === 'active') {
+          resolvedRef.current = true
+          clearInterval(interval)
+          onSuccess()
+        }
+      } catch {
+        // Network error during poll — ignore and retry next tick
+      }
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [onSuccess])
+
+  // Fallback: detect tab close (user may close before webhook arrives)
   useEffect(() => {
     const interval = setInterval(() => {
+      if (resolvedRef.current) { clearInterval(interval); return }
       if (tabRef.current && tabRef.current.closed) {
         clearInterval(interval)
-        // Tab closed — trigger success check (the sync poll in OnboardingChat handles the rest)
-        onSuccess()
+        if (!resolvedRef.current) {
+          resolvedRef.current = true
+          onSuccess()
+        }
       }
     }, 1500)
     return () => clearInterval(interval)
