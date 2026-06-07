@@ -105,17 +105,17 @@ export class TriggerNotFoundError extends TriggerError {
 // -----------------------------------------------------------------------------
 
 export class TriggerAlreadyExistsError extends TriggerError {
-    public readonly agentId: number;
+    public readonly agentSlug: string;
     public readonly app: string;
     public readonly eventType: string;
 
-    constructor(agentId: number, app: string, eventType: string) {
+    constructor(agentSlug: string, app: string, eventType: string) {
         super(
-            `Trigger ${app}.${eventType} already registered for agent ${agentId}`,
+            `Trigger ${app}.${eventType} already registered for agent ${agentSlug}`,
             409,
             'TRIGGER_ALREADY_EXISTS'
         );
-        this.agentId = agentId;
+        this.agentSlug = agentSlug;
         this.app = app;
         this.eventType = eventType;
     }

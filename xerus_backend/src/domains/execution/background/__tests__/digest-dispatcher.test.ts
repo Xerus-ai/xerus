@@ -95,7 +95,7 @@ function createDigestConfig(overrides: Partial<DailyDigestConfig> = {}): DailyDi
         report_cron: '0 18 * * *',
         timezone: 'UTC',
         skip_on_no_activity: true,
-        xerus_agent_id: 1,
+        xerus_agent_slug: 'xerus-master',
         default_channel_id: null,
         ...overrides,
     };

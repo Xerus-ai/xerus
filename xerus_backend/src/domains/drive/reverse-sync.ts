@@ -2,10 +2,9 @@
 // When users create/edit/delete files via the Drive, sync changes back to DB
 // so other pages (/ai-agents, /inbox) reflect the change.
 //
-// With filesystem as source of truth, agent data no longer needs reverse-sync.
-// Only agent_registry (slug/id mapping) and non-agent entities still sync.
+// With workspace.db as source of truth, agent data no longer needs reverse-sync.
+// Only non-agent entities still sync.
 
-import { query } from '../../database/connection';
 import { logger } from '../../utils/logger';
 
 const log = logger('ReverseSync');
@@ -74,36 +73,19 @@ export async function reverseSyncToDB(
 
 // -----------------------------------------------------------------------------
 // Handler: agents/{slug}/config.json
-// Filesystem is source of truth. Only manage agent_registry on create/delete.
+// workspace.db is source of truth. No NeonDB agent_registry writes needed.
+// Agent registration/deletion in workspace.db is handled by scaffold-sync-hook.
 // -----------------------------------------------------------------------------
 
 async function syncAgentConfig(
     event: SyncEvent,
     match: RegExpMatchArray,
     _content: string | null,
-    userId: string,
+    _userId: string,
 ): Promise<void> {
     const slug = match[1];
-
-    if (event === 'create') {
-        // Ensure agent is registered in agent_registry
-        await query(
-            `INSERT INTO agent_registry (slug, user_id, agent_type)
-             VALUES ($1, $2, 'private')
-             ON CONFLICT (slug, user_id) DO NOTHING`,
-            [slug, userId],
-        );
-        log.debug('Agent config create', { slug, action: 'registered in agent_registry' });
-    } else if (event === 'update') {
-        // Config.json IS the source of truth — no DB sync needed
-        log.debug('Agent config update', { slug, action: 'filesystem is source of truth' });
-    } else if (event === 'delete') {
-        await query(
-            `DELETE FROM agent_registry WHERE slug = $1 AND user_id = $2`,
-            [slug, userId],
-        );
-        log.debug('Agent config delete', { slug });
-    }
+    // workspace.db is source of truth for agent data. No NeonDB writes needed.
+    log.debug('Agent config sync', { event, slug, action: 'workspace.db is source of truth, no Neon write' });
 }
 
 // -----------------------------------------------------------------------------

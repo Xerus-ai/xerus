@@ -102,7 +102,7 @@ export interface DailyDigestConfig {
     report_cron: string;
     timezone: string;
     skip_on_no_activity: boolean;
-    xerus_agent_id: number;
+    xerus_agent_slug: string;
     default_channel_id: string | null;
 }
 

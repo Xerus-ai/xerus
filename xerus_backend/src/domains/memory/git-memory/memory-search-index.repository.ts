@@ -24,7 +24,7 @@ interface SearchIndexDbRow {
     scope: string;
     project_id: number | null;
     channel_id: string | null;
-    agent_id: number | null;
+    agent_slug: string | null;
     commit_sha: string | null;
     score: string;
     vector_score: string;
@@ -66,7 +66,7 @@ export class NeonSearchIndexRepository implements SearchIndexRepository {
             row.scope,
             row.project_id ?? null,
             row.channel_id ?? null,
-            row.agent_id ?? null,
+            row.agent_slug ?? null,
             `[${row.embedding.join(',')}]`,
             row.commit_sha ?? null,
         ]);
@@ -75,7 +75,7 @@ export class NeonSearchIndexRepository implements SearchIndexRepository {
             `INSERT INTO memory_search_index (
                 workspace_id, file_path, chunk_start_line, chunk_end_line,
                 content, content_hash, memory_type, scope,
-                project_id, channel_id, agent_id, embedding, commit_sha
+                project_id, channel_id, agent_slug, embedding, commit_sha
             )
             VALUES ${valueClauses}
             ON CONFLICT (workspace_id, file_path, chunk_start_line)
@@ -87,7 +87,7 @@ export class NeonSearchIndexRepository implements SearchIndexRepository {
                     scope = EXCLUDED.scope,
                     project_id = EXCLUDED.project_id,
                     channel_id = EXCLUDED.channel_id,
-                    agent_id = EXCLUDED.agent_id,
+                    agent_slug = EXCLUDED.agent_slug,
                     embedding = EXCLUDED.embedding,
                     commit_sha = EXCLUDED.commit_sha,
                     updated_at = NOW()
@@ -175,9 +175,9 @@ export class NeonSearchIndexRepository implements SearchIndexRepository {
             paramIndex++;
         }
 
-        if (options.agentId !== undefined) {
-            conditions.push(`agent_id = $${paramIndex}`);
-            params.push(options.agentId);
+        if (options.agentSlug !== undefined) {
+            conditions.push(`agent_slug = $${paramIndex}`);
+            params.push(options.agentSlug);
             paramIndex++;
         }
 

@@ -112,7 +112,7 @@ function createIndexFileOptions(overrides: Partial<IndexFileOptions> = {}): Inde
         content: 'Line 1: SEO keywords analysis.\nLine 2: Competitor research notes.\nLine 3: Rankings tracker.',
         memoryType: 'expertise',
         scope: 'agent',
-        agentId: 42,
+        agentSlug: 'seo-agent',
         commitSha: 'abc123def',
         ...overrides,
     };
@@ -277,7 +277,7 @@ describe('MemorySearchIndexService', () => {
             expect(firstRow.file_path).toBe('agents/seo-agent/expertise.md');
             expect(firstRow.memory_type).toBe('expertise');
             expect(firstRow.scope).toBe('agent');
-            expect(firstRow.agent_id).toBe(42);
+            expect(firstRow.agent_slug).toBe('seo-agent');
             expect(firstRow.commit_sha).toBe('abc123def');
             expect(firstRow.content_hash).toMatch(/^[a-f0-9]{64}$/);
             expect(firstRow.embedding).toHaveLength(1536);
@@ -300,7 +300,7 @@ describe('MemorySearchIndexService', () => {
                 scope: 'project',
                 projectId: 7,
                 channelId: undefined,
-                agentId: undefined,
+                agentSlug: undefined,
             });
 
             await service.indexFile(options);
@@ -309,7 +309,7 @@ describe('MemorySearchIndexService', () => {
             expect(row.scope).toBe('project');
             expect(row.project_id).toBe(7);
             expect(row.channel_id).toBeUndefined();
-            expect(row.agent_id).toBeUndefined();
+            expect(row.agent_slug).toBeUndefined();
         });
 
         it('should skip indexing when content is empty', async () => {
@@ -359,7 +359,7 @@ describe('MemorySearchIndexService', () => {
                 scope: 'channel',
                 projectId: 5,
                 channelId: '12',
-                agentId: undefined,
+                agentSlug: undefined,
             });
 
             await service.indexFile(options);
@@ -367,7 +367,7 @@ describe('MemorySearchIndexService', () => {
             const row = repo.upserted[0];
             expect(row.scope).toBe('channel');
             expect(row.project_id).toBe(5);
-            expect(row.channel_id).toBe(12);
+            expect(row.channel_id).toBe('12');
         });
     });
 

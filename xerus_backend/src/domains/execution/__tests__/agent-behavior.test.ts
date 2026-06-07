@@ -627,9 +627,9 @@ Create engaging content that drives organic growth.
             expect(Array.isArray(config.platform_tools)).toBe(true);
             expect(config.platform_tools.length).toBeGreaterThan(0);
 
-            // Every listed tool should have the platform. prefix
+            // Every listed tool should have the platform. or mcp__platform__ prefix
             for (const tool of config.platform_tools) {
-                expect(tool).toMatch(/^platform\./);
+                expect(tool).toMatch(/^(platform\.|mcp__platform__)/);
             }
         });
 

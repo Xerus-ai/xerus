@@ -1,6 +1,6 @@
 // Agent Domain Routes
 // REST API endpoints for agent CRUD operations.
-// Source of truth: filesystem (config.json) + agent_registry (ID/slug mapping).
+// Source of truth: filesystem (config.json) + workspace.db agents table.
 // Split into sub-routers: agent-crud, agent-tools, agent-import.
 // Knowledge base assignment is unified under /workspace/connections (file_connections table).
 

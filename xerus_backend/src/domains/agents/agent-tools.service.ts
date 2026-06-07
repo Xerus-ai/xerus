@@ -1,7 +1,6 @@
 // Agent Tools Service
 // Tool assignment and removal operations extracted from service.ts
 
-import { AgentRegistryRepository, agentRegistryRepository } from './agent-registry.repository';
 import { AgentFilesystemRepository } from './agent-filesystem.repository';
 import { Agent, EnrichedTool } from './types';
 import { AgentNotFoundError, AgentAccessDeniedError, InvalidToolsError } from './errors';
@@ -9,10 +8,11 @@ import { toolsRepository } from '../tools/repository';
 import { configToAgent, canUserView, canUserModify } from './agent-helpers';
 import { syncPipedreamMcpConfigViaRepo } from '../sandbox-infra/workspace/mcp-config.service';
 import { query as dbQuery } from '../../database/connection';
+import type { DaytonaProvider } from '../sandbox-infra/sandbox/providers/daytona.provider';
+import { findAgentByRowid, listAgents } from './agent-workspace-db.service';
 
 export class AgentToolsService {
     constructor(
-        private registry: AgentRegistryRepository = agentRegistryRepository,
         private fsRepo: AgentFilesystemRepository | null = null,
     ) {}
 
@@ -27,15 +27,21 @@ export class AgentToolsService {
         return this.fsRepo;
     }
 
-    async addTool(agentId: number, appSlug: string, userId: string): Promise<string[]> {
-        const entry = await this.registry.findById(agentId);
-        if (!entry) throw new AgentNotFoundError(agentId);
+    async addTool(
+        agentId: number,
+        appSlug: string,
+        userId: string,
+        provider: DaytonaProvider,
+        sandboxId: string,
+    ): Promise<string[]> {
+        const row = await findAgentByRowid(provider, sandboxId, agentId);
+        if (!row) throw new AgentNotFoundError(agentId);
 
         const fs = this.getFs();
-        const config = await fs.getAgentConfig(userId, entry.slug);
+        const config = await fs.getAgentConfig(userId, row.slug);
         if (!config) throw new AgentNotFoundError(agentId);
 
-        const agent = configToAgent(config, entry.id, entry.user_id, entry.agent_type);
+        const agent = configToAgent(config, row.rowid, userId, 'private');
         if (!canUserModify(agent, userId)) throw new AgentAccessDeniedError(agentId);
 
         const toolExists = await toolsRepository.appExists(appSlug);
@@ -45,7 +51,7 @@ export class AgentToolsService {
         if (!tools.includes(appSlug)) {
             tools.push(appSlug);
         }
-        await fs.updateTools(userId, entry.slug, tools);
+        await fs.updateTools(userId, row.slug, tools);
 
         // Sync .mcp.json so the new tool's Pipedream MCP server is available to CLI agents
         await this.syncMcpConfig(userId);
@@ -53,19 +59,25 @@ export class AgentToolsService {
         return tools;
     }
 
-    async removeTool(agentId: number, appSlug: string, userId: string): Promise<string[]> {
-        const entry = await this.registry.findById(agentId);
-        if (!entry) throw new AgentNotFoundError(agentId);
+    async removeTool(
+        agentId: number,
+        appSlug: string,
+        userId: string,
+        provider: DaytonaProvider,
+        sandboxId: string,
+    ): Promise<string[]> {
+        const row = await findAgentByRowid(provider, sandboxId, agentId);
+        if (!row) throw new AgentNotFoundError(agentId);
 
         const fs = this.getFs();
-        const config = await fs.getAgentConfig(userId, entry.slug);
+        const config = await fs.getAgentConfig(userId, row.slug);
         if (!config) throw new AgentNotFoundError(agentId);
 
-        const agent = configToAgent(config, entry.id, entry.user_id, entry.agent_type);
+        const agent = configToAgent(config, row.rowid, userId, 'private');
         if (!canUserModify(agent, userId)) throw new AgentAccessDeniedError(agentId);
 
         const tools = (config.tools || []).filter(t => t !== appSlug);
-        await fs.updateTools(userId, entry.slug, tools);
+        await fs.updateTools(userId, row.slug, tools);
 
         // Sync .mcp.json to reflect removed tool
         await this.syncMcpConfig(userId);
@@ -73,34 +85,44 @@ export class AgentToolsService {
         return tools;
     }
 
-    async getTools(agentId: number, userId: string): Promise<EnrichedTool[]> {
-        const entry = await this.registry.findById(agentId);
-        if (!entry) throw new AgentNotFoundError(agentId);
+    async getTools(
+        agentId: number,
+        userId: string,
+        provider: DaytonaProvider,
+        sandboxId: string,
+    ): Promise<EnrichedTool[]> {
+        const row = await findAgentByRowid(provider, sandboxId, agentId);
+        if (!row) throw new AgentNotFoundError(agentId);
 
         const fs = this.getFs();
-        const config = await fs.getAgentConfig(userId, entry.slug);
+        const config = await fs.getAgentConfig(userId, row.slug);
         if (!config) throw new AgentNotFoundError(agentId);
 
-        const agent = configToAgent(config, entry.id, entry.user_id, entry.agent_type);
+        const agent = configToAgent(config, row.rowid, userId, 'private');
         if (!canUserView(agent, userId)) throw new AgentAccessDeniedError(agentId);
 
         return toolsRepository.enrichBySlugs(config.tools || []);
     }
 
-    async findByTool(appSlug: string, userId: string): Promise<Agent[]> {
+    async findByTool(
+        appSlug: string,
+        userId: string,
+        provider: DaytonaProvider,
+        sandboxId: string,
+    ): Promise<Agent[]> {
         const fs = this.getFs();
         const index = await fs.getAgentIndex(userId);
-        const entries = await this.registry.listByUser(userId);
-        const entryBySlug = new Map(entries.map(e => [e.slug, e]));
+        const wsRows = await listAgents(provider, sandboxId);
+        const rowBySlug = new Map(wsRows.map(r => [r.slug, r]));
 
-        const slugs = index.map(ie => ie.slug).filter(s => entryBySlug.has(s));
+        const slugs = index.map(ie => ie.slug).filter(s => rowBySlug.has(s));
         const configs = await fs.getAgentConfigs(userId, slugs);
 
         const result: Agent[] = [];
         for (const [slug, config] of configs) {
-            const entry = entryBySlug.get(slug)!;
+            const row = rowBySlug.get(slug)!;
             if ((config.tools || []).includes(appSlug)) {
-                result.push(configToAgent(config, entry.id, entry.user_id, entry.agent_type));
+                result.push(configToAgent(config, row.rowid, userId, 'private'));
             }
         }
         return result;
@@ -131,20 +153,25 @@ export class AgentToolsService {
         }
     }
 
-    async findByTools(appSlugs: string[], userId: string): Promise<Agent[]> {
+    async findByTools(
+        appSlugs: string[],
+        userId: string,
+        provider: DaytonaProvider,
+        sandboxId: string,
+    ): Promise<Agent[]> {
         const fs = this.getFs();
         const index = await fs.getAgentIndex(userId);
-        const entries = await this.registry.listByUser(userId);
-        const entryBySlug = new Map(entries.map(e => [e.slug, e]));
+        const wsRows = await listAgents(provider, sandboxId);
+        const rowBySlug = new Map(wsRows.map(r => [r.slug, r]));
 
-        const slugs = index.map(ie => ie.slug).filter(s => entryBySlug.has(s));
+        const slugs = index.map(ie => ie.slug).filter(s => rowBySlug.has(s));
         const configs = await fs.getAgentConfigs(userId, slugs);
 
         const result: Agent[] = [];
         for (const [slug, config] of configs) {
-            const entry = entryBySlug.get(slug)!;
+            const row = rowBySlug.get(slug)!;
             if ((config.tools || []).some(t => appSlugs.includes(t))) {
-                result.push(configToAgent(config, entry.id, entry.user_id, entry.agent_type));
+                result.push(configToAgent(config, row.rowid, userId, 'private'));
             }
         }
         return result;

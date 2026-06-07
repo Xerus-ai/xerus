@@ -1,8 +1,10 @@
 // Resolve Agent Param
 // Accepts route param as either numeric ID or slug string.
 // Returns resolved { id, slug, userId, agentType }.
+// Source of truth: workspace.db agents table (SQLite on sandbox).
 
-import { AgentRegistryRepository, agentRegistryRepository, AgentRegistryEntry } from './agent-registry.repository';
+import type { DaytonaProvider } from '../sandbox-infra/sandbox/providers/daytona.provider';
+import { findAgentBySlug, findAgentByRowid, AgentWorkspaceRow } from './agent-workspace-db.service';
 import { AgentNotFoundError } from './errors';
 
 export interface ResolvedAgent {
@@ -15,27 +17,28 @@ export interface ResolvedAgent {
 export async function resolveAgentParam(
     param: string,
     userId: string,
-    registry: AgentRegistryRepository = agentRegistryRepository,
+    provider: DaytonaProvider,
+    sandboxId: string,
 ): Promise<ResolvedAgent> {
     const numericId = parseInt(param, 10);
-    let entry: AgentRegistryEntry | null = null;
+    let row: AgentWorkspaceRow | null = null;
 
     if (!isNaN(numericId) && String(numericId) === param) {
-        // Numeric ID path
-        entry = await registry.findById(numericId);
+        // Numeric ID path (workspace.db rowid)
+        row = await findAgentByRowid(provider, sandboxId, numericId);
     } else {
         // Slug path
-        entry = await registry.findBySlug(param, userId);
+        row = await findAgentBySlug(provider, sandboxId, param);
     }
 
-    if (!entry) {
+    if (!row) {
         throw new AgentNotFoundError(param);
     }
 
     return {
-        id: entry.id,
-        slug: entry.slug,
-        userId: entry.user_id,
-        agentType: entry.agent_type,
+        id: row.rowid,
+        slug: row.slug,
+        userId: userId,
+        agentType: 'private',
     };
 }

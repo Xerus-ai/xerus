@@ -303,12 +303,12 @@ describe('AnnounceQueueService', () => {
             expect(inMemoryInbox.messages[0].timestamp).toBeInstanceOf(Date);
         });
 
-        it('should set agent_slug to xerus for system notifications', async () => {
+        it('should set agent_slug to xerus-master for system notifications', async () => {
             service.enqueue(createTestItem());
 
             await service.drain();
 
-            expect(inMemoryInbox.messages[0].agent_slug).toBe('xerus');
+            expect(inMemoryInbox.messages[0].agent_slug).toBe('xerus-master');
         });
     });
 

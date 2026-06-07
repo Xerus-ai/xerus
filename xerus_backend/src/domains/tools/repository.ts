@@ -33,7 +33,7 @@ function mapConnectedAccountRow(row: ConnectedAccountRow): ConnectedAccount {
 function mapToolExecutionRow(row: ToolExecutionRow): ToolExecution {
     return {
         id: row.id,
-        agent_id: row.agent_id,
+        agent_slug: row.agent_slug,
         app_slug: row.app_slug,
         action_key: row.action_key,
         input: typeof row.input === 'string' ? JSON.parse(row.input) : (row.input as Record<string, unknown>),
@@ -98,12 +98,12 @@ export class ToolsRepository {
     async logExecution(input: LogExecutionInput): Promise<ToolExecution> {
         const result = await query<ToolExecutionRow>(
             `INSERT INTO tool_executions (
-        agent_id, app_slug, action_key,
+        agent_slug, app_slug, action_key,
         input, output, success, error, duration_ms, created_at
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
       RETURNING *`,
             [
-                input.agent_id,
+                input.agent_slug,
                 input.app_slug,
                 input.action_key,
                 JSON.stringify(input.input),
@@ -131,10 +131,8 @@ export class ToolsRepository {
         const runsResult = await query<{ total_runs: string }>(
             `SELECT COUNT(*) as total_runs
        FROM tool_executions te
-       LEFT JOIN agent_registry a ON te.agent_id = a.id
-       WHERE (a.user_id = $1 OR te.agent_id IS NULL OR te.agent_id = 0)
-         AND te.app_slug = $2`,
-            [user_id, app_slug]
+       WHERE te.app_slug = $1`,
+            [app_slug]
         );
 
         const totalRuns = parseInt(runsResult.rows[0]?.total_runs || '0', 10);

@@ -247,7 +247,7 @@ export class ToolsService {
             await toolsRepository.updateLastUsed(validated.pipedream_account_id);
 
             await toolsRepository.logExecution({
-                agent_id: null,
+                agent_slug: null,
                 app_slug,
                 action_key: validated.action_key,
                 input: validated.params,
@@ -266,7 +266,7 @@ export class ToolsService {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
             await toolsRepository.logExecution({
-                agent_id: null,
+                agent_slug: null,
                 app_slug,
                 action_key: validated.action_key,
                 input: validated.params,

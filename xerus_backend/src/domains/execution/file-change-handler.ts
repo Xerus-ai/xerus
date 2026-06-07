@@ -34,7 +34,7 @@ export async function syncFileChangeToNeon(
 
     const syncAction = entry.tool_name === 'Write' ? 'create' : 'update';
     await reverseSyncToDB(syncAction, pathResult.normalized, null, ctx.request.userId);
-    log.debug('Neon agent_registry synced from tool_result', { path: pathResult.normalized, action: syncAction, user_id: ctx.request.userId });
+    log.debug('Agent config change detected from tool_result', { path: pathResult.normalized, action: syncAction, user_id: ctx.request.userId });
 }
 
 export function emitFileChangedFromToolCall(d: Record<string, unknown>, ctx: PipelineContext): void {

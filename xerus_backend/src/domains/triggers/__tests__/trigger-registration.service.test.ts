@@ -7,12 +7,12 @@ import type { AgentTriggerRow } from '../trigger.types';
 
 // Test constants
 const TEST_USER_ID = 'test_trigger_reg_user';
-const TEST_AGENT_ID = 99901;
-const TEST_AGENT_ID_2 = 99902;
+const TEST_AGENT_SLUG = 'test-agent-trigger-reg';
+const TEST_AGENT_SLUG_2 = 'test-agent-trigger-reg-2';
 
 // Helper to insert a trigger row with required provider_id
 async function insertTestTrigger(
-    agentId: number,
+    agentSlug: string,
     userId: string,
     appSlug: string,
     eventType: string,
@@ -21,9 +21,9 @@ async function insertTestTrigger(
 ): Promise<void> {
     const pid = providerId ?? await getTestProviderId();
     await pool.query(
-        `INSERT INTO agent_triggers (agent_id, user_id, app_slug, event_type, provider_id, filter_config, enabled)
+        `INSERT INTO agent_triggers (agent_slug, user_id, app_slug, event_type, provider_id, filter_config, enabled)
          VALUES ($1, $2, $3, $4, $5, $6, true)`,
-        [agentId, userId, appSlug, eventType, pid, filterConfig]
+        [agentSlug, userId, appSlug, eventType, pid, filterConfig]
     );
 }
 
@@ -64,24 +64,11 @@ describe('TriggerRegistrationService', () => {
                 is_active = EXCLUDED.is_active
         `);
 
-        // Ensure user exists (must come before agents due to FK constraint)
+        // Ensure user exists
         await pool.query(`
             INSERT INTO users (user_id, email) VALUES ($1, 'trigger-reg-test@test.com')
             ON CONFLICT (user_id) DO NOTHING
         `, [TEST_USER_ID]);
-
-        // Ensure agent_registry has test entries
-        await pool.query(`
-            INSERT INTO agent_registry (id, slug, user_id, agent_type)
-            VALUES ($1, $2, $3, 'private')
-            ON CONFLICT (id) DO NOTHING
-        `, [TEST_AGENT_ID, 'test-agent-trigger-reg', TEST_USER_ID]);
-
-        await pool.query(`
-            INSERT INTO agent_registry (id, slug, user_id, agent_type)
-            VALUES ($1, $2, $3, 'private')
-            ON CONFLICT (id) DO NOTHING
-        `, [TEST_AGENT_ID_2, 'test-agent-trigger-reg-2', TEST_USER_ID]);
 
         // Setup connected_accounts for test user (used by trigger-resolver.service.ts)
         await pool.query(`
@@ -100,14 +87,14 @@ describe('TriggerRegistrationService', () => {
 
         // Clean agent_triggers for test agents before each test
         await pool.query(
-            `DELETE FROM agent_triggers WHERE agent_id IN ($1, $2)`,
-            [TEST_AGENT_ID, TEST_AGENT_ID_2]
+            `DELETE FROM agent_triggers WHERE agent_slug IN ($1, $2)`,
+            [TEST_AGENT_SLUG, TEST_AGENT_SLUG_2]
         );
     });
 
     afterAll(async () => {
         // Clean up test data
-        await pool.query(`DELETE FROM agent_triggers WHERE agent_id IN ($1, $2)`, [TEST_AGENT_ID, TEST_AGENT_ID_2]);
+        await pool.query(`DELETE FROM agent_triggers WHERE agent_slug IN ($1, $2)`, [TEST_AGENT_SLUG, TEST_AGENT_SLUG_2]);
         await pool.query(`DELETE FROM connected_accounts WHERE user_id = $1`, [TEST_USER_ID]);
     });
 
@@ -121,7 +108,7 @@ describe('TriggerRegistrationService', () => {
                 { app: 'gmail', event_type: 'new_email', filter: null },
             ];
 
-            const result = await service.reconcileTriggers(TEST_AGENT_ID, TEST_USER_ID, desiredEvents);
+            const result = await service.reconcileTriggers(TEST_AGENT_SLUG, TEST_USER_ID, desiredEvents);
 
             expect(result.registered).toHaveLength(1);
             expect(result.registered[0].app).toBe('gmail');
@@ -131,8 +118,8 @@ describe('TriggerRegistrationService', () => {
 
             // Verify DB row was created
             const dbResult = await pool.query<AgentTriggerRow>(
-                `SELECT * FROM agent_triggers WHERE agent_id = $1 AND app_slug = 'gmail'`,
-                [TEST_AGENT_ID]
+                `SELECT * FROM agent_triggers WHERE agent_slug = $1 AND app_slug = 'gmail'`,
+                [TEST_AGENT_SLUG]
             );
             expect(dbResult.rows).toHaveLength(1);
             expect(dbResult.rows[0].event_type).toBe('new_email');
@@ -146,7 +133,7 @@ describe('TriggerRegistrationService', () => {
                 { app: 'github', event_type: 'pr_opened', filter: null },
             ];
 
-            const result = await service.reconcileTriggers(TEST_AGENT_ID, TEST_USER_ID, desiredEvents);
+            const result = await service.reconcileTriggers(TEST_AGENT_SLUG, TEST_USER_ID, desiredEvents);
 
             expect(result.registered).toHaveLength(2);
             expect(result.deregistered).toHaveLength(0);
@@ -154,10 +141,10 @@ describe('TriggerRegistrationService', () => {
 
         it('should deregister triggers removed from HEARTBEAT.md', async () => {
             // First register a trigger
-            await insertTestTrigger(TEST_AGENT_ID, TEST_USER_ID, 'gmail', 'new_email');
+            await insertTestTrigger(TEST_AGENT_SLUG, TEST_USER_ID, 'gmail', 'new_email');
 
             // Now reconcile with empty events (trigger was removed from HEARTBEAT.md)
-            const result = await service.reconcileTriggers(TEST_AGENT_ID, TEST_USER_ID, []);
+            const result = await service.reconcileTriggers(TEST_AGENT_SLUG, TEST_USER_ID, []);
 
             expect(result.deregistered).toHaveLength(1);
             expect(result.deregistered[0].app).toBe('gmail');
@@ -165,22 +152,22 @@ describe('TriggerRegistrationService', () => {
 
             // Verify DB row was deleted
             const dbResult = await pool.query(
-                `SELECT * FROM agent_triggers WHERE agent_id = $1 AND app_slug = 'gmail'`,
-                [TEST_AGENT_ID]
+                `SELECT * FROM agent_triggers WHERE agent_slug = $1 AND app_slug = 'gmail'`,
+                [TEST_AGENT_SLUG]
             );
             expect(dbResult.rows).toHaveLength(0);
         });
 
         it('should keep unchanged triggers intact', async () => {
             // Insert existing trigger
-            await insertTestTrigger(TEST_AGENT_ID, TEST_USER_ID, 'gmail', 'new_email');
+            await insertTestTrigger(TEST_AGENT_SLUG, TEST_USER_ID, 'gmail', 'new_email');
 
             // Reconcile with the same event
             const desiredEvents: ParsedEventEntry[] = [
                 { app: 'gmail', event_type: 'new_email', filter: null },
             ];
 
-            const result = await service.reconcileTriggers(TEST_AGENT_ID, TEST_USER_ID, desiredEvents);
+            const result = await service.reconcileTriggers(TEST_AGENT_SLUG, TEST_USER_ID, desiredEvents);
 
             expect(result.unchanged).toHaveLength(1);
             expect(result.unchanged[0].app).toBe('gmail');
@@ -190,14 +177,14 @@ describe('TriggerRegistrationService', () => {
 
         it('should handle filter changes by deregistering and re-registering', async () => {
             // Insert existing trigger with a filter
-            await insertTestTrigger(TEST_AGENT_ID, TEST_USER_ID, 'gmail', 'new_email', '{"raw": "from:old-filter"}');
+            await insertTestTrigger(TEST_AGENT_SLUG, TEST_USER_ID, 'gmail', 'new_email', '{"raw": "from:old-filter"}');
 
             // Reconcile with changed filter
             const desiredEvents: ParsedEventEntry[] = [
                 { app: 'gmail', event_type: 'new_email', filter: 'from:new-filter' },
             ];
 
-            const result = await service.reconcileTriggers(TEST_AGENT_ID, TEST_USER_ID, desiredEvents);
+            const result = await service.reconcileTriggers(TEST_AGENT_SLUG, TEST_USER_ID, desiredEvents);
 
             expect(result.deregistered).toHaveLength(1);
             expect(result.registered).toHaveLength(1);
@@ -205,8 +192,8 @@ describe('TriggerRegistrationService', () => {
 
             // Verify DB row has new filter
             const dbResult = await pool.query<AgentTriggerRow>(
-                `SELECT * FROM agent_triggers WHERE agent_id = $1 AND app_slug = 'gmail'`,
-                [TEST_AGENT_ID]
+                `SELECT * FROM agent_triggers WHERE agent_slug = $1 AND app_slug = 'gmail'`,
+                [TEST_AGENT_SLUG]
             );
             expect(dbResult.rows).toHaveLength(1);
             expect(dbResult.rows[0].filter_config).toEqual({ raw: 'from:new-filter' });
@@ -214,8 +201,8 @@ describe('TriggerRegistrationService', () => {
 
         it('should handle mixed scenario: add some, remove some, keep some', async () => {
             // Existing: gmail.new_email, github.pr_opened
-            await insertTestTrigger(TEST_AGENT_ID, TEST_USER_ID, 'gmail', 'new_email');
-            await insertTestTrigger(TEST_AGENT_ID, TEST_USER_ID, 'github', 'pr_opened');
+            await insertTestTrigger(TEST_AGENT_SLUG, TEST_USER_ID, 'gmail', 'new_email');
+            await insertTestTrigger(TEST_AGENT_SLUG, TEST_USER_ID, 'github', 'pr_opened');
 
             // Desired: gmail.new_email (keep), stripe.payment_failed (add), github removed
             const desiredEvents: ParsedEventEntry[] = [
@@ -223,7 +210,7 @@ describe('TriggerRegistrationService', () => {
                 { app: 'stripe', event_type: 'payment_failed', filter: null },
             ];
 
-            const result = await service.reconcileTriggers(TEST_AGENT_ID, TEST_USER_ID, desiredEvents);
+            const result = await service.reconcileTriggers(TEST_AGENT_SLUG, TEST_USER_ID, desiredEvents);
 
             expect(result.unchanged).toHaveLength(1);
             expect(result.unchanged[0].app).toBe('gmail');
@@ -239,7 +226,7 @@ describe('TriggerRegistrationService', () => {
                 { app: 'notion', event_type: 'page_updated', filter: null },
             ];
 
-            const result = await service.reconcileTriggers(TEST_AGENT_ID, TEST_USER_ID, desiredEvents);
+            const result = await service.reconcileTriggers(TEST_AGENT_SLUG, TEST_USER_ID, desiredEvents);
 
             expect(result.warnings).toHaveLength(1);
             expect(result.warnings[0]).toContain('notion');
@@ -251,11 +238,11 @@ describe('TriggerRegistrationService', () => {
                 { app: 'gmail', event_type: 'new_email', filter: 'from:vip-list' },
             ];
 
-            await service.reconcileTriggers(TEST_AGENT_ID, TEST_USER_ID, desiredEvents);
+            await service.reconcileTriggers(TEST_AGENT_SLUG, TEST_USER_ID, desiredEvents);
 
             const dbResult = await pool.query<AgentTriggerRow>(
-                `SELECT filter_config FROM agent_triggers WHERE agent_id = $1 AND app_slug = 'gmail'`,
-                [TEST_AGENT_ID]
+                `SELECT filter_config FROM agent_triggers WHERE agent_slug = $1 AND app_slug = 'gmail'`,
+                [TEST_AGENT_SLUG]
             );
             expect(dbResult.rows[0].filter_config).toEqual({ raw: 'from:vip-list' });
         });
@@ -265,25 +252,25 @@ describe('TriggerRegistrationService', () => {
                 { app: 'gmail', event_type: 'new_email', filter: null },
             ];
 
-            await service.reconcileTriggers(TEST_AGENT_ID, TEST_USER_ID, desiredEvents);
+            await service.reconcileTriggers(TEST_AGENT_SLUG, TEST_USER_ID, desiredEvents);
 
             const dbResult = await pool.query<AgentTriggerRow>(
-                `SELECT filter_config FROM agent_triggers WHERE agent_id = $1 AND app_slug = 'gmail'`,
-                [TEST_AGENT_ID]
+                `SELECT filter_config FROM agent_triggers WHERE agent_slug = $1 AND app_slug = 'gmail'`,
+                [TEST_AGENT_SLUG]
             );
             expect(dbResult.rows[0].filter_config).toEqual({});
         });
 
         it('should handle adding filter where none existed before', async () => {
             // Existing trigger with no filter
-            await insertTestTrigger(TEST_AGENT_ID, TEST_USER_ID, 'gmail', 'new_email');
+            await insertTestTrigger(TEST_AGENT_SLUG, TEST_USER_ID, 'gmail', 'new_email');
 
             // Now add a filter
             const desiredEvents: ParsedEventEntry[] = [
                 { app: 'gmail', event_type: 'new_email', filter: 'from:boss' },
             ];
 
-            const result = await service.reconcileTriggers(TEST_AGENT_ID, TEST_USER_ID, desiredEvents);
+            const result = await service.reconcileTriggers(TEST_AGENT_SLUG, TEST_USER_ID, desiredEvents);
 
             expect(result.deregistered).toHaveLength(1);
             expect(result.registered).toHaveLength(1);
@@ -291,38 +278,38 @@ describe('TriggerRegistrationService', () => {
 
         it('should handle removing filter where one existed before', async () => {
             // Existing trigger with filter
-            await insertTestTrigger(TEST_AGENT_ID, TEST_USER_ID, 'gmail', 'new_email', '{"raw": "from:boss"}');
+            await insertTestTrigger(TEST_AGENT_SLUG, TEST_USER_ID, 'gmail', 'new_email', '{"raw": "from:boss"}');
 
             // Now remove the filter
             const desiredEvents: ParsedEventEntry[] = [
                 { app: 'gmail', event_type: 'new_email', filter: null },
             ];
 
-            const result = await service.reconcileTriggers(TEST_AGENT_ID, TEST_USER_ID, desiredEvents);
+            const result = await service.reconcileTriggers(TEST_AGENT_SLUG, TEST_USER_ID, desiredEvents);
 
             expect(result.deregistered).toHaveLength(1);
             expect(result.registered).toHaveLength(1);
 
             const dbResult = await pool.query<AgentTriggerRow>(
-                `SELECT filter_config FROM agent_triggers WHERE agent_id = $1 AND app_slug = 'gmail'`,
-                [TEST_AGENT_ID]
+                `SELECT filter_config FROM agent_triggers WHERE agent_slug = $1 AND app_slug = 'gmail'`,
+                [TEST_AGENT_SLUG]
             );
             expect(dbResult.rows[0].filter_config).toEqual({});
         });
 
         it('should not affect triggers belonging to other agents', async () => {
             // Insert trigger for agent 2
-            await insertTestTrigger(TEST_AGENT_ID_2, TEST_USER_ID, 'gmail', 'new_email');
+            await insertTestTrigger(TEST_AGENT_SLUG_2, TEST_USER_ID, 'gmail', 'new_email');
 
             // Reconcile for agent 1 (no events)
-            const result = await service.reconcileTriggers(TEST_AGENT_ID, TEST_USER_ID, []);
+            const result = await service.reconcileTriggers(TEST_AGENT_SLUG, TEST_USER_ID, []);
 
             expect(result.deregistered).toHaveLength(0);
 
             // Verify agent 2's trigger is untouched
             const dbResult = await pool.query(
-                `SELECT * FROM agent_triggers WHERE agent_id = $1`,
-                [TEST_AGENT_ID_2]
+                `SELECT * FROM agent_triggers WHERE agent_slug = $1`,
+                [TEST_AGENT_SLUG_2]
             );
             expect(dbResult.rows).toHaveLength(1);
         });
@@ -339,7 +326,7 @@ describe('TriggerRegistrationService', () => {
                 { app: 'github', event_type: 'pr_opened', filter: null },
             ];
 
-            const result = await service.syncFromEvents(TEST_AGENT_ID, TEST_USER_ID, events);
+            const result = await service.syncFromEvents(TEST_AGENT_SLUG, TEST_USER_ID, events);
 
             expect(result.registered).toHaveLength(2);
             expect(result.registered[0].app).toBe('gmail');
@@ -348,10 +335,10 @@ describe('TriggerRegistrationService', () => {
 
         it('should deregister when events list is empty', async () => {
             // First register a trigger manually
-            await insertTestTrigger(TEST_AGENT_ID, TEST_USER_ID, 'gmail', 'new_email');
+            await insertTestTrigger(TEST_AGENT_SLUG, TEST_USER_ID, 'gmail', 'new_email');
 
             // Sync with empty events - should deregister
-            const result = await service.syncFromEvents(TEST_AGENT_ID, TEST_USER_ID, []);
+            const result = await service.syncFromEvents(TEST_AGENT_SLUG, TEST_USER_ID, []);
 
             expect(result.deregistered).toHaveLength(1);
             expect(result.deregistered[0].app).toBe('gmail');
@@ -362,13 +349,13 @@ describe('TriggerRegistrationService', () => {
                 { app: 'gmail', event_type: 'new_email', filter: 'from:vip-list' },
             ];
 
-            const result = await service.syncFromEvents(TEST_AGENT_ID, TEST_USER_ID, events);
+            const result = await service.syncFromEvents(TEST_AGENT_SLUG, TEST_USER_ID, events);
 
             expect(result.registered).toHaveLength(1);
 
             const dbResult = await pool.query<AgentTriggerRow>(
-                `SELECT filter_config FROM agent_triggers WHERE agent_id = $1`,
-                [TEST_AGENT_ID]
+                `SELECT filter_config FROM agent_triggers WHERE agent_slug = $1`,
+                [TEST_AGENT_SLUG]
             );
             expect(dbResult.rows[0].filter_config).toEqual({ raw: 'from:vip-list' });
         });
@@ -380,17 +367,17 @@ describe('TriggerRegistrationService', () => {
 
     describe('getRegisteredTriggers()', () => {
         it('should return all triggers for an agent', async () => {
-            await insertTestTrigger(TEST_AGENT_ID, TEST_USER_ID, 'gmail', 'new_email');
-            await insertTestTrigger(TEST_AGENT_ID, TEST_USER_ID, 'github', 'pr_opened');
+            await insertTestTrigger(TEST_AGENT_SLUG, TEST_USER_ID, 'gmail', 'new_email');
+            await insertTestTrigger(TEST_AGENT_SLUG, TEST_USER_ID, 'github', 'pr_opened');
 
-            const triggers = await service.getRegisteredTriggers(TEST_AGENT_ID);
+            const triggers = await service.getRegisteredTriggers(TEST_AGENT_SLUG);
 
             expect(triggers).toHaveLength(2);
             expect(triggers.map(t => t.app_slug).sort()).toEqual(['github', 'gmail']);
         });
 
         it('should return empty array when no triggers registered', async () => {
-            const triggers = await service.getRegisteredTriggers(TEST_AGENT_ID);
+            const triggers = await service.getRegisteredTriggers(TEST_AGENT_SLUG);
 
             expect(triggers).toEqual([]);
         });

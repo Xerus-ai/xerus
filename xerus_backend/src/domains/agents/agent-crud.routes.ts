@@ -8,12 +8,13 @@ import { BadRequestError } from '../../utils/errors';
 import { authenticateFirebaseToken } from '../../middleware/auth';
 import { agentService, agentMarketplaceService } from './service';
 import { AgentUnauthorizedError, AgentNotFoundError, AgentNotClonableError } from './errors';
-import { agentRegistryRepository } from './agent-registry.repository';
 import { formatPromptWithAI } from './prompt-formatter';
 import { resolveAgentParam } from './resolve-agent-param';
 import { getAgentSandboxService } from './routes';
 import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
 import { requireRunningSandbox, getDaytonaProvider } from '../sandbox-infra/sandbox/sandbox-route-helpers';
+import type { DaytonaProvider } from '../sandbox-infra/sandbox/providers/daytona.provider';
+import { findAgentBySlug, findAgentByRowid } from './agent-workspace-db.service';
 
 const router = Router();
 const auth = authenticateFirebaseToken;
@@ -47,6 +48,10 @@ router.get('/', auth, async (req: AuthenticatedRequest, res: Response, next: Nex
             throw new AgentUnauthorizedError();
         }
 
+        const sandboxService = getAgentSandboxService();
+        const sbId = await requireRunningSandbox(sandboxService, req.user.uid);
+        const provider = getDaytonaProvider(sandboxService);
+
         const { page, limit, sort_by, sort_order, agent_type, is_verified, ai_model, search, tags } = req.query;
 
         const options: Record<string, unknown> = {
@@ -63,7 +68,7 @@ router.get('/', auth, async (req: AuthenticatedRequest, res: Response, next: Nex
             },
         };
 
-        const result = await agentService.listWithEnrichedTools(req.user.uid, options);
+        const result = await agentService.listWithEnrichedTools(req.user.uid, options, provider, sbId);
 
         sendResponse(
             res,
@@ -134,7 +139,11 @@ router.get('/mine', auth, async (req: AuthenticatedRequest, res: Response, next:
             throw new AgentUnauthorizedError();
         }
 
-        const agents = await agentMarketplaceService.getUserAgents(req.user.uid);
+        const sandboxService = getAgentSandboxService();
+        const sbId = await requireRunningSandbox(sandboxService, req.user.uid);
+        const provider = getDaytonaProvider(sandboxService);
+
+        const agents = await agentMarketplaceService.getUserAgents(req.user.uid, provider, sbId);
 
         sendResponse(res, 200, { agents }, startTime);
     } catch (err) {
@@ -151,16 +160,20 @@ router.get('/:id', auth, async (req: AuthenticatedRequest, res: Response, next: 
         }
         const userId = req.user.uid;
 
+        const sandboxService = getAgentSandboxService();
+        const sbId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
+
         const param = req.params.id;
         const numericId = parseInt(param, 10);
         const isNumericParam = !Number.isNaN(numericId) && String(numericId) === param;
 
         const agent = isNumericParam
-            ? await agentService.getById(numericId, userId)
+            ? await agentService.getById(numericId, userId, provider, sbId)
             : await (async () => {
-                const entry = await agentRegistryRepository.findBySlug(param, userId);
-                if (entry) {
-                    return agentService.getById(entry.id, userId);
+                const row = await findAgentBySlug(provider, sbId, param);
+                if (row) {
+                    return agentService.getById(row.rowid, userId, provider, sbId);
                 }
                 return agentMarketplaceService.getMarketplaceDetailBySlug(param, userId);
             })();
@@ -178,13 +191,13 @@ router.get('/:id/memory', auth, async (req: AuthenticatedRequest, res: Response,
         if (!req.user) throw new AgentUnauthorizedError();
         const userId = req.user.uid;
 
-        const param = req.params.id;
-        const slug = await resolveSlug(param, userId);
-        if (!slug) throw new AgentNotFoundError(param);
-
         const sandboxService = getAgentSandboxService();
         const sandboxId = await requireRunningSandbox(sandboxService, userId);
         const provider = getDaytonaProvider(sandboxService);
+
+        const param = req.params.id;
+        const slug = await resolveSlug(param, userId, provider, sandboxId);
+        if (!slug) throw new AgentNotFoundError(param);
 
         const wp = SANDBOX_CONFIG.workspacePath;
         const memoryDir = `${wp}/.memory/agents/${slug}`;
@@ -217,8 +230,12 @@ router.get('/:id/sessions', auth, async (req: AuthenticatedRequest, res: Respons
         if (!req.user) throw new AgentUnauthorizedError();
         const userId = req.user.uid;
 
+        const sandboxService = getAgentSandboxService();
+        const sbId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
+
         const param = req.params.id;
-        const slug = await resolveSlug(param, userId);
+        const slug = await resolveSlug(param, userId, provider, sbId);
         if (!slug) throw new AgentNotFoundError(param);
 
         const limit = Math.min(parseInt(req.query.limit as string, 10) || 20, 50);
@@ -242,17 +259,22 @@ router.get('/:id/sessions', auth, async (req: AuthenticatedRequest, res: Respons
     }
 });
 
-async function resolveSlug(param: string, userId: string): Promise<string | null> {
+async function resolveSlug(
+    param: string,
+    _userId: string,
+    provider: DaytonaProvider,
+    sandboxId: string,
+): Promise<string | null> {
     const numericId = parseInt(param, 10);
     if (!Number.isNaN(numericId) && String(numericId) === param) {
-        const entry = await agentRegistryRepository.findById(numericId);
-        return entry?.slug ?? null;
+        const row = await findAgentByRowid(provider, sandboxId, numericId);
+        return row?.slug ?? null;
     }
-    const entry = await agentRegistryRepository.findBySlug(param, userId);
-    return entry?.slug ?? null;
+    const row = await findAgentBySlug(provider, sandboxId, param);
+    return row?.slug ?? null;
 }
 
-// POST /api/v1/agents - Create new agent (registry + filesystem scaffold)
+// POST /api/v1/agents - Create new agent (workspace.db + filesystem scaffold)
 router.post('/', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const startTime = res.locals.startTime || Date.now();
     try {
@@ -260,7 +282,11 @@ router.post('/', auth, async (req: AuthenticatedRequest, res: Response, next: Ne
             throw new AgentUnauthorizedError();
         }
 
-        const agent = await agentService.create(req.body, req.user.uid);
+        const sandboxService = getAgentSandboxService();
+        const sbId = await requireRunningSandbox(sandboxService, req.user.uid);
+        const provider = getDaytonaProvider(sandboxService);
+
+        const agent = await agentService.create(req.body, req.user.uid, provider, sbId);
 
         sendResponse(res, 201, { agent }, startTime);
     } catch (err) {
@@ -276,8 +302,12 @@ router.patch('/:id', auth, async (req: AuthenticatedRequest, res: Response, next
             throw new AgentUnauthorizedError();
         }
 
-        const resolved = await resolveAgentParam(req.params.id, req.user.uid);
-        const agent = await agentService.update(resolved.id, req.body, req.user.uid);
+        const sandboxService = getAgentSandboxService();
+        const sbId = await requireRunningSandbox(sandboxService, req.user.uid);
+        const provider = getDaytonaProvider(sandboxService);
+
+        const resolved = await resolveAgentParam(req.params.id, req.user.uid, provider, sbId);
+        const agent = await agentService.update(resolved.id, req.body, req.user.uid, provider, sbId);
 
         sendResponse(res, 200, { agent }, startTime);
     } catch (err) {
@@ -285,7 +315,7 @@ router.patch('/:id', auth, async (req: AuthenticatedRequest, res: Response, next
     }
 });
 
-// DELETE /api/v1/agents/:id - Delete agent (registry + filesystem cleanup)
+// DELETE /api/v1/agents/:id - Delete agent (workspace.db + filesystem cleanup)
 router.delete('/:id', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const startTime = res.locals.startTime || Date.now();
     try {
@@ -293,8 +323,12 @@ router.delete('/:id', auth, async (req: AuthenticatedRequest, res: Response, nex
             throw new AgentUnauthorizedError();
         }
 
-        const resolved = await resolveAgentParam(req.params.id, req.user.uid);
-        await agentService.delete(resolved.id, req.user.uid);
+        const sandboxService = getAgentSandboxService();
+        const sbId = await requireRunningSandbox(sandboxService, req.user.uid);
+        const provider = getDaytonaProvider(sandboxService);
+
+        const resolved = await resolveAgentParam(req.params.id, req.user.uid, provider, sbId);
+        await agentService.delete(resolved.id, req.user.uid, provider, sbId);
 
         sendResponse(res, 200, { deleted: true, id: resolved.id }, startTime);
     } catch (err) {
@@ -302,9 +336,9 @@ router.delete('/:id', auth, async (req: AuthenticatedRequest, res: Response, nex
     }
 });
 
-// POST /api/v1/agents/:id/clone - Clone agent (registry + filesystem copy)
-// Accepts both registered agent IDs/slugs and marketplace agent slugs.
-// For marketplace agents (no registry entry), falls through to filesystem-based clone.
+// POST /api/v1/agents/:id/clone - Clone agent (workspace.db + filesystem copy)
+// Accepts both workspace agent IDs/slugs and marketplace agent slugs.
+// For marketplace agents (no workspace.db entry), falls through to filesystem-based clone.
 router.post('/:id/clone', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const startTime = res.locals.startTime || Date.now();
     try {
@@ -312,15 +346,19 @@ router.post('/:id/clone', auth, async (req: AuthenticatedRequest, res: Response,
             throw new AgentUnauthorizedError();
         }
 
+        const sandboxService = getAgentSandboxService();
+        const sbId = await requireRunningSandbox(sandboxService, req.user.uid);
+        const provider = getDaytonaProvider(sandboxService);
+
         const { name } = req.body;
         const param = req.params.id;
         let resolvedSlug: string | null = null;
 
-        // Try registered agent first (private or user-published)
+        // Try workspace agent first (private or user-published)
         try {
-            const resolved = await resolveAgentParam(param, req.user.uid);
+            const resolved = await resolveAgentParam(param, req.user.uid, provider, sbId);
             resolvedSlug = resolved.slug;
-            const { cloned } = await agentMarketplaceService.clone(resolved.id, req.user.uid, { name });
+            const { cloned } = await agentMarketplaceService.clone(resolved.id, req.user.uid, provider, sbId, { name });
             sendResponse(res, 201, { agent: cloned, source_id: resolved.id }, startTime);
             return;
         } catch (err) {
@@ -329,11 +367,11 @@ router.post('/:id/clone', auth, async (req: AuthenticatedRequest, res: Response,
             if (!(err instanceof AgentNotFoundError) && !(err instanceof AgentNotClonableError)) throw err;
         }
 
-        // Not clonable via registry path: try marketplace agent clone by slug.
-        // Use resolved slug (from registry lookup by negative ID) when available.
+        // Not clonable via workspace path: try marketplace agent clone by slug.
+        // Use resolved slug (from workspace lookup by negative ID) when available.
         const slugForClone = resolvedSlug || param;
         const { cloned, sourceSlug } = await agentMarketplaceService.cloneMarketplaceAgent(
-            slugForClone, req.user.uid, { name },
+            slugForClone, req.user.uid, provider, sbId, { name },
         );
         sendResponse(res, 201, { agent: cloned, source_slug: sourceSlug }, startTime);
     } catch (err) {
@@ -349,8 +387,12 @@ router.post('/:id/publish', auth, async (req: AuthenticatedRequest, res: Respons
             throw new AgentUnauthorizedError();
         }
 
-        const resolved = await resolveAgentParam(req.params.id, req.user.uid);
-        const agent = await agentMarketplaceService.publish(resolved.id, req.user.uid);
+        const sandboxService = getAgentSandboxService();
+        const sbId = await requireRunningSandbox(sandboxService, req.user.uid);
+        const provider = getDaytonaProvider(sandboxService);
+
+        const resolved = await resolveAgentParam(req.params.id, req.user.uid, provider, sbId);
+        const agent = await agentMarketplaceService.publish(resolved.id, req.user.uid, provider, sbId);
 
         sendResponse(res, 200, { agent, published: true }, startTime);
     } catch (err) {
@@ -366,8 +408,12 @@ router.post('/:id/unpublish', auth, async (req: AuthenticatedRequest, res: Respo
             throw new AgentUnauthorizedError();
         }
 
-        const resolved = await resolveAgentParam(req.params.id, req.user.uid);
-        const agent = await agentMarketplaceService.unpublish(resolved.id, req.user.uid);
+        const sandboxService = getAgentSandboxService();
+        const sbId = await requireRunningSandbox(sandboxService, req.user.uid);
+        const provider = getDaytonaProvider(sandboxService);
+
+        const resolved = await resolveAgentParam(req.params.id, req.user.uid, provider, sbId);
+        const agent = await agentMarketplaceService.unpublish(resolved.id, req.user.uid, provider, sbId);
 
         sendResponse(res, 200, { agent, unpublished: true }, startTime);
     } catch (err) {
@@ -383,8 +429,12 @@ router.post('/:id/set-default', auth, async (req: AuthenticatedRequest, res: Res
             throw new AgentUnauthorizedError();
         }
 
-        const resolved = await resolveAgentParam(req.params.id, req.user.uid);
-        const agent = await agentMarketplaceService.setDefault(resolved.id, req.user.uid);
+        const sandboxService = getAgentSandboxService();
+        const sbId = await requireRunningSandbox(sandboxService, req.user.uid);
+        const provider = getDaytonaProvider(sandboxService);
+
+        const resolved = await resolveAgentParam(req.params.id, req.user.uid, provider, sbId);
+        const agent = await agentMarketplaceService.setDefault(resolved.id, req.user.uid, provider, sbId);
 
         sendResponse(res, 200, { agent, is_default: true }, startTime);
     } catch (err) {

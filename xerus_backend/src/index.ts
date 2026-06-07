@@ -23,6 +23,7 @@ import { setAgentFilesDeps } from './domains/execution/agent-files.routes';
 import { setConversationRoutesDeps } from './domains/conversations/conversation.routes';
 import { setScheduleRoutesDeps } from './domains/platform-tools/internal-mcp/schedule.routes';
 import { setAgentManagementRoutesDeps } from './domains/platform-tools/internal-mcp/agent-management.routes';
+import { setSessionControlRoutesDeps } from './domains/platform-tools/internal-mcp/session-control.routes';
 import { setKnowledgeBaseRoutesDeps } from './domains/platform-tools/internal-mcp/knowledge-base.routes';
 import { setChannelTaskRoutesDeps } from './domains/platform-tools/internal-mcp/channel-task.routes';
 import { setSkillManagementRoutesDeps } from './domains/platform-tools/internal-mcp/skill-management.routes';
@@ -274,6 +275,7 @@ async function startServer(): Promise<void> {
         setInboxRoutesDeps({ sandboxService });
         setScheduleRoutesDeps({ sandboxService });
         setAgentManagementRoutesDeps({ sandboxService });
+        setSessionControlRoutesDeps({ sandboxService });
         setKnowledgeBaseRoutesDeps({ sandboxService });
         setChannelTaskRoutesDeps({ sandboxService });
         setSkillManagementRoutesDeps({ sandboxService });

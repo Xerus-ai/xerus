@@ -51,11 +51,11 @@ export class TriggerRegistrationService {
      * Previously parsed from HEARTBEAT.md; now accepts events directly.
      */
     async syncFromEvents(
-        agentId: number,
+        agentSlug: string,
         userId: string,
         events: ParsedEventEntry[]
     ): Promise<ReconcileResult> {
-        return this.reconcileTriggers(agentId, userId, events);
+        return this.reconcileTriggers(agentSlug, userId, events);
     }
 
     /**
@@ -71,7 +71,7 @@ export class TriggerRegistrationService {
      * All DB mutations run inside a single transaction so partial failures roll back.
      */
     async reconcileTriggers(
-        agentId: number,
+        agentSlug: string,
         userId: string,
         desiredEvents: ParsedEventEntry[]
     ): Promise<ReconcileResult> {
@@ -83,7 +83,7 @@ export class TriggerRegistrationService {
                 warnings: [],
             };
 
-            const existingTriggers = await this.getRegisteredTriggers(agentId, client);
+            const existingTriggers = await this.getRegisteredTriggers(agentSlug, client);
             const existingMap = buildTriggerMap(existingTriggers);
             const desiredKeys = new Set<string>();
 
@@ -97,14 +97,14 @@ export class TriggerRegistrationService {
 
                 if (!existing) {
                     // New trigger - resolve and register
-                    const registered = await this.registerNewTrigger(client, agentId, userId, event, result);
+                    const registered = await this.registerNewTrigger(client, agentSlug, userId, event, result);
                     if (!registered) {
                         continue;
                     }
                 } else if (filterChanged(existing.filter_config, desiredFilterConfig)) {
                     // Filter changed - deregister old, register new
                     await this.deregisterTrigger(client, existing, result);
-                    await this.registerNewTrigger(client, agentId, userId, event, result);
+                    await this.registerNewTrigger(client, agentSlug, userId, event, result);
                 } else {
                     // Unchanged
                     result.unchanged.push({
@@ -129,15 +129,15 @@ export class TriggerRegistrationService {
     /**
      * Get all registered triggers for an agent from the database.
      */
-    async getRegisteredTriggers(agentId: number, client?: PoolClient): Promise<AgentTriggerRow[]> {
+    async getRegisteredTriggers(agentSlug: string, client?: PoolClient): Promise<AgentTriggerRow[]> {
         const queryable = client ?? pool;
         const dbResult = await queryable.query<AgentTriggerRow>(
-            `SELECT id, agent_id, user_id, provider_id, app_slug, event_type,
+            `SELECT id, agent_slug, user_id, provider_id, app_slug, event_type,
                     external_id, webhook_url, filter_config, account_id,
                     enabled, last_fired_at, fire_count, created_at, updated_at
              FROM agent_triggers
-             WHERE agent_id = $1`,
-            [agentId]
+             WHERE agent_slug = $1`,
+            [agentSlug]
         );
         return dbResult.rows;
     }
@@ -148,7 +148,7 @@ export class TriggerRegistrationService {
 
     private async registerNewTrigger(
         client: PoolClient,
-        agentId: number,
+        agentSlug: string,
         userId: string,
         event: ParsedEventEntry,
         result: ReconcileResult
@@ -172,10 +172,10 @@ export class TriggerRegistrationService {
         // Insert into agent_triggers
         await client.query(
             `INSERT INTO agent_triggers
-                (agent_id, user_id, app_slug, event_type, provider_id, filter_config, account_id, enabled)
+                (agent_slug, user_id, app_slug, event_type, provider_id, filter_config, account_id, enabled)
              VALUES ($1, $2, $3, $4, $5, $6, $7, true)`,
             [
-                agentId,
+                agentSlug,
                 userId,
                 event.app,
                 event.event_type,

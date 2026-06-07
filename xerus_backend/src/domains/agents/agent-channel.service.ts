@@ -4,7 +4,6 @@
 // Channel metadata resolved from workspace-DB (SQLite on sandbox).
 // Pattern mirrors agent-tools.service.ts.
 
-import { AgentRegistryRepository, agentRegistryRepository } from './agent-registry.repository';
 import { AgentFilesystemRepository } from './agent-filesystem.repository';
 import {
     AgentNotFoundError,
@@ -15,6 +14,7 @@ import {
 import { configToAgent, canUserView, canUserModify } from './agent-helpers';
 import type { DaytonaProvider } from '../sandbox-infra/sandbox/providers/daytona.provider';
 import { escapeSQL, executeWorkspaceJsonQuery, executeWorkspaceQuery } from '../conversations/workspace-db.helpers';
+import { findAgentByRowid } from './agent-workspace-db.service';
 
 // -----------------------------------------------------------------------------
 // Types
@@ -41,7 +41,6 @@ interface ChannelRow {
 
 export class AgentChannelService {
     constructor(
-        private registry: AgentRegistryRepository = agentRegistryRepository,
         private fsRepo: AgentFilesystemRepository | null = null,
     ) {}
 
@@ -116,14 +115,14 @@ export class AgentChannelService {
         agentId: number,
         userId: string,
     ): Promise<ChannelEntry[]> {
-        const entry = await this.registry.findById(agentId);
-        if (!entry) throw new AgentNotFoundError(agentId);
+        const row = await findAgentByRowid(provider, sandboxId, agentId);
+        if (!row) throw new AgentNotFoundError(agentId);
 
         const fs = this.getFs();
-        const config = await fs.getAgentConfig(userId, entry.slug);
+        const config = await fs.getAgentConfig(userId, row.slug);
         if (!config) throw new AgentNotFoundError(agentId);
 
-        const agent = configToAgent(config, entry.id, entry.user_id, entry.agent_type);
+        const agent = configToAgent(config, row.rowid, userId, 'private');
         if (!canUserView(agent, userId)) throw new AgentAccessDeniedError(agentId);
 
         const channelSlugs = config.channels || [];
@@ -139,14 +138,14 @@ export class AgentChannelService {
         channelSlug: string,
         userId: string,
     ): Promise<{ channels: ChannelEntry[]; primary_channel: string }> {
-        const entry = await this.registry.findById(agentId);
-        if (!entry) throw new AgentNotFoundError(agentId);
+        const row = await findAgentByRowid(provider, sandboxId, agentId);
+        if (!row) throw new AgentNotFoundError(agentId);
 
         const fs = this.getFs();
-        const config = await fs.getAgentConfig(userId, entry.slug);
+        const config = await fs.getAgentConfig(userId, row.slug);
         if (!config) throw new AgentNotFoundError(agentId);
 
-        const agent = configToAgent(config, entry.id, entry.user_id, entry.agent_type);
+        const agent = configToAgent(config, row.rowid, userId, 'private');
         if (!canUserModify(agent, userId)) throw new AgentAccessDeniedError(agentId);
 
         const channelMeta = await this.resolveChannelMeta(provider, sandboxId, channelSlug);
@@ -166,18 +165,18 @@ export class AgentChannelService {
         config.channels = channels;
         config.primary_channel = primaryChannel;
         config.updated_at = new Date().toISOString();
-        await fs.putAgentConfig(userId, entry.slug, config);
+        await fs.putAgentConfig(userId, row.slug, config);
 
         const channelMap = await this.batchResolveChannels(provider, sandboxId, channels);
         const slugs = channels.filter(s => channelMap.has(s));
         const primarySlug = channelMap.get(primaryChannel)?.slug || '';
-        await fs.updateIndexChannels(userId, entry.slug, channelMeta.domain_slug, primarySlug, slugs);
+        await fs.updateIndexChannels(userId, row.slug, channelMeta.domain_slug, primarySlug, slugs);
 
         // Sync to channel_members table so GET /company/channels/:slug/agents works
         const role = primaryChannel === channelSlug ? 'lead' : 'member';
         const memberSql = `
             INSERT OR IGNORE INTO channel_members (channel_slug, agent_slug, role)
-            VALUES ('${escapeSQL(channelSlug)}', '${escapeSQL(entry.slug)}', '${role}');
+            VALUES ('${escapeSQL(channelSlug)}', '${escapeSQL(row.slug)}', '${role}');
         `;
         await executeWorkspaceQuery(provider, sandboxId, memberSql).catch(() => {});
 
@@ -185,7 +184,7 @@ export class AgentChannelService {
         // This ensures findChannelLead() can route messages to an agent.
         const setLeadSql = `
             UPDATE channels
-            SET lead_agent_slug = '${escapeSQL(entry.slug)}', updated_at = '${new Date().toISOString()}'
+            SET lead_agent_slug = '${escapeSQL(row.slug)}', updated_at = '${new Date().toISOString()}'
             WHERE slug = '${escapeSQL(channelSlug)}' AND lead_agent_slug IS NULL;
         `;
         await executeWorkspaceQuery(provider, sandboxId, setLeadSql).catch(() => {});
@@ -203,14 +202,14 @@ export class AgentChannelService {
         channelSlug: string,
         userId: string,
     ): Promise<{ channels: ChannelEntry[]; primary_channel: string }> {
-        const entry = await this.registry.findById(agentId);
-        if (!entry) throw new AgentNotFoundError(agentId);
+        const row = await findAgentByRowid(provider, sandboxId, agentId);
+        if (!row) throw new AgentNotFoundError(agentId);
 
         const fs = this.getFs();
-        const config = await fs.getAgentConfig(userId, entry.slug);
+        const config = await fs.getAgentConfig(userId, row.slug);
         if (!config) throw new AgentNotFoundError(agentId);
 
-        const agent = configToAgent(config, entry.id, entry.user_id, entry.agent_type);
+        const agent = configToAgent(config, row.rowid, userId, 'private');
         if (!canUserModify(agent, userId)) throw new AgentAccessDeniedError(agentId);
 
         const currentChannels = config.channels || [];
@@ -224,7 +223,7 @@ export class AgentChannelService {
         config.channels = channels;
         config.primary_channel = primaryChannel;
         config.updated_at = new Date().toISOString();
-        await fs.putAgentConfig(userId, entry.slug, config);
+        await fs.putAgentConfig(userId, row.slug, config);
 
         const channelMap = await this.batchResolveChannels(provider, sandboxId, channels);
         const slugs = channels.filter(s => channelMap.has(s));
@@ -232,12 +231,12 @@ export class AgentChannelService {
         const domainSlug = channels.length > 0
             ? (channelMap.get(channels[0])?.domain_slug || '')
             : undefined;
-        await fs.updateIndexChannels(userId, entry.slug, domainSlug, primarySlug, slugs);
+        await fs.updateIndexChannels(userId, row.slug, domainSlug, primarySlug, slugs);
 
         // Sync removal from channel_members table
         const deleteSql = `
             DELETE FROM channel_members
-            WHERE channel_slug = '${escapeSQL(channelSlug)}' AND agent_slug = '${escapeSQL(entry.slug)}';
+            WHERE channel_slug = '${escapeSQL(channelSlug)}' AND agent_slug = '${escapeSQL(row.slug)}';
         `;
         await executeWorkspaceQuery(provider, sandboxId, deleteSql).catch(() => {});
 
@@ -254,14 +253,14 @@ export class AgentChannelService {
         channelSlug: string,
         userId: string,
     ): Promise<{ channels: ChannelEntry[]; primary_channel: string }> {
-        const entry = await this.registry.findById(agentId);
-        if (!entry) throw new AgentNotFoundError(agentId);
+        const row = await findAgentByRowid(provider, sandboxId, agentId);
+        if (!row) throw new AgentNotFoundError(agentId);
 
         const fs = this.getFs();
-        const config = await fs.getAgentConfig(userId, entry.slug);
+        const config = await fs.getAgentConfig(userId, row.slug);
         if (!config) throw new AgentNotFoundError(agentId);
 
-        const agent = configToAgent(config, entry.id, entry.user_id, entry.agent_type);
+        const agent = configToAgent(config, row.rowid, userId, 'private');
         if (!canUserModify(agent, userId)) throw new AgentAccessDeniedError(agentId);
 
         const currentChannels = config.channels || [];
@@ -269,12 +268,12 @@ export class AgentChannelService {
 
         config.primary_channel = channelSlug;
         config.updated_at = new Date().toISOString();
-        await fs.putAgentConfig(userId, entry.slug, config);
+        await fs.putAgentConfig(userId, row.slug, config);
 
         const channelMap = await this.batchResolveChannels(provider, sandboxId, currentChannels);
         const primarySlug = channelMap.get(channelSlug)?.slug || '';
         const slugs = currentChannels.filter(s => channelMap.has(s));
-        await fs.updateIndexChannels(userId, entry.slug, undefined, primarySlug, slugs);
+        await fs.updateIndexChannels(userId, row.slug, undefined, primarySlug, slugs);
 
         return {
             channels: this.toEntries(channelMap, currentChannels, channelSlug),

@@ -6,7 +6,6 @@ import {
     getTriggerService,
     resetTriggerService,
     TriggerNotFoundError,
-    AgentNotFoundError,
     TriggerAlreadyExistsError,
     UnauthorizedTriggerAccessError,
 } from '../trigger.tools';
@@ -25,19 +24,11 @@ describe('TriggerNotFoundError', () => {
     });
 });
 
-describe('AgentNotFoundError', () => {
-    it('should set name and message', () => {
-        const error = new AgentNotFoundError('agent-99');
-        expect(error.message).toBe('Agent agent-99 not found');
-        expect(error).toBeInstanceOf(Error);
-    });
-});
-
 describe('TriggerAlreadyExistsError', () => {
     it('should set name and message with all identifiers', () => {
-        const error = new TriggerAlreadyExistsError(1, 'stripe', 'invoice.created');
-        expect(error.message).toBe('Trigger stripe.invoice.created already registered for agent 1');
-        expect(error.agentId).toBe(1);
+        const error = new TriggerAlreadyExistsError('stripe-agent', 'stripe', 'invoice.created');
+        expect(error.message).toBe('Trigger stripe.invoice.created already registered for agent stripe-agent');
+        expect(error.agentSlug).toBe('stripe-agent');
         expect(error).toBeInstanceOf(Error);
     });
 });

@@ -111,10 +111,20 @@ export async function sendConversationMessage(
     task: string;
     coordinationMode?: string;
     context?: Record<string, unknown>;
+    agent_slug?: string;
   },
 ): Promise<{ execution_id: string | null; conversation_id: string }> {
   const baseUrl = await getApiBaseUrl();
   const headers = await getApiHeaders();
+
+  const body: Record<string, unknown> = {
+    task: params.task,
+    coordination_mode: params.coordinationMode,
+    context: params.context,
+  };
+  if (params.agent_slug) {
+    body.agent_slug = params.agent_slug;
+  }
 
   const response = await fetch(`${baseUrl}/execute/conversations/${conversationId}/messages`, {
     method: 'POST',
@@ -122,11 +132,7 @@ export async function sendConversationMessage(
       ...headers,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      task: params.task,
-      coordination_mode: params.coordinationMode,
-      context: params.context,
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {

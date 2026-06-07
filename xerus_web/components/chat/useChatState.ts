@@ -53,6 +53,9 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
   // Execution stream (v3: long-lived SSE + POST messages)
   const executionStream = useChatExecution({ dispatch })
 
+  // Track whether the user manually selected an agent (prevents auto-sync overwriting it)
+  const manualAgentSelectionRef = useRef(false)
+
   const [isLoadingMore, setIsLoadingMore] = useReducer((_: boolean, next: boolean) => next, false)
 
   // ---- Load conversation details ----
@@ -127,8 +130,10 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
   }, [isAuthReady])
 
   // ---- Sync current agent when conversation changes ----
+  // Skip if user manually selected an agent (prevents overwriting their choice)
   useEffect(() => {
     if (!state.conversationId || agents.length === 0) return
+    if (manualAgentSelectionRef.current) return
 
     const activeConversation = state.conversations.find((c) => c.id === state.conversationId)
     if (!activeConversation?.agentSlug) return
@@ -221,7 +226,10 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
         }
         const contextArg = Object.keys(messageContext).length > 0 ? messageContext : undefined
 
-        const sendResult = await executionStream.sendMessage(convId, content, contextArg)
+        // Pass agent_slug override when sending to an existing conversation
+        // so the backend uses the user's current agent selection, not the conversation default
+        const agentSlugOverride = activeConvId ? (state.currentAgent?.slug ?? undefined) : undefined
+        const sendResult = await executionStream.sendMessage(convId, content, contextArg, agentSlugOverride)
         dispatch({ type: 'SET_ACTIVE_EXECUTION_ID', convId, executionId: sendResult.execution_id })
 
         // Refresh conversation list (non-critical) — merge to preserve existing entries
@@ -288,6 +296,7 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
 
   // ---- Action handlers ----
   const handleNewConversation = useCallback(() => {
+    manualAgentSelectionRef.current = false
     executionStream.close()
     dispatch({ type: 'NEW_CONVERSATION' })
   }, [executionStream])
@@ -315,6 +324,7 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
 
   const handleSelectConversation = useCallback(
     (id: string) => {
+      manualAgentSelectionRef.current = false
       const conversation = state.conversations.find((item) => item.id === id)
       const matchingAgent = conversation?.agentSlug
         ? agents.find((a) => a.slug === conversation.agentSlug) ?? null
@@ -334,6 +344,7 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
   }, [])
 
   const handleAgentChange = useCallback((agent: Agent | null) => {
+    manualAgentSelectionRef.current = true
     dispatch({ type: 'SET_AGENT', agent })
   }, [])
 

@@ -90,6 +90,18 @@ class InMemoryPauseRepository implements HITLPauseRepository {
         return { resolved_at };
     }
 
+    async resolveExpiredPauseStates(_timeoutSeconds: number): Promise<string[]> {
+        const expired: string[] = [];
+        for (const [id, state] of this.states) {
+            if (state.resolved_at === null) {
+                state.resolved_at = new Date().toISOString();
+                state.resolution = 'timed_out' as PauseResolution;
+                expired.push(id);
+            }
+        }
+        return expired;
+    }
+
     getAll(): HITLPauseState[] {
         return [...this.states.values()];
     }

@@ -161,13 +161,12 @@ export class ExecutionService {
 
         try {
             // -----------------------------------------------------------------
-            // Preflight: fire independent work at T=0 (agent, API key, sandbox, CLI keys)
-            // Skill secrets depend on sandbox being ready (workspace DB is on sandbox)
+            // Preflight: fire independent work at T=0 (API key, sandbox, CLI keys)
+            // loadAgent depends on sandbox (queries workspace.db on sandbox)
             // -----------------------------------------------------------------
-            log.info('Preflight started', { execution_id: executionId, phase: 'agent+apikey+sandbox+clikeys' });
+            log.info('Preflight started', { execution_id: executionId, phase: 'apikey+sandbox+clikeys' });
             stream.send('progress', { phase: 'sandbox', message: 'Preparing sandbox', percent: 10 });
 
-            const preAgent = loadAgent(resolved, request.agentSlug, request.userId);
             preApiKey = resolveApiKey(request.userId, 'openrouter')
                 .then(r => { log.debug('preApiKey resolved', { execution_id: executionId, duration_ms: Date.now() - startedAt }); return r; });
             preSandbox = ensureSandbox(resolved, ctx)
@@ -177,21 +176,8 @@ export class ExecutionService {
                 .then(r => { log.debug('preCliKeys resolved', { execution_id: executionId, duration_ms: Date.now() - startedAt, has_anthropic: !!r.anthropicKey, has_openai: !!r.openaiKey }); return r; });
 
             // -----------------------------------------------------------------
-            // Await agent first — needed for lane acquisition
-            // -----------------------------------------------------------------
-            const agentResult = await preAgent;
-            ctx.agent = agentResult.agent;
-            ctx.subscriptionStatus = agentResult.subscriptionStatus;
-            ctx.subscriptionPeriodEnd = agentResult.subscriptionPeriodEnd;
-            log.debug('preAgent resolved', { execution_id: executionId, duration_ms: Date.now() - startedAt });
-
-            // Acquire execution lane (stale lanes cleaned periodically, not per-execution)
-            const lane = await acquireExecutionLane(resolved, ctx, triggerType || 'user_message');
-            ctx.laneId = lane.lane_id;
-            log.debug('Lane acquired', { execution_id: executionId, duration_ms: Date.now() - startedAt, queued: lane.queued });
-
-            // -----------------------------------------------------------------
-            // Await sandbox + independent preflight, then resolve secrets from workspace DB
+            // Await sandbox + independent preflight first
+            // loadAgent queries workspace.db on sandbox, so sandbox must be ready
             // -----------------------------------------------------------------
             const [resolvedKey, sandboxId, userCliKeys] = await Promise.all([
                 preApiKey,
@@ -205,6 +191,20 @@ export class ExecutionService {
             if (!ctx.sandboxId) {
                 throw new Error('Sandbox not available after creation');
             }
+
+            // -----------------------------------------------------------------
+            // Now validate agent via workspace.db (requires sandbox to be ready)
+            // -----------------------------------------------------------------
+            const agentResult = await loadAgent(resolved, request.agentSlug, request.userId, ctx.sandboxId);
+            ctx.agent = agentResult.agent;
+            ctx.subscriptionStatus = agentResult.subscriptionStatus;
+            ctx.subscriptionPeriodEnd = agentResult.subscriptionPeriodEnd;
+            log.debug('preAgent resolved', { execution_id: executionId, duration_ms: Date.now() - startedAt });
+
+            // Acquire execution lane (stale lanes cleaned periodically, not per-execution)
+            const lane = await acquireExecutionLane(resolved, ctx, triggerType || 'user_message');
+            ctx.laneId = lane.lane_id;
+            log.debug('Lane acquired', { execution_id: executionId, duration_ms: Date.now() - startedAt, queued: lane.queued });
 
             const daytonaProvider = resolved.sandboxService.getDaytonaProvider();
 

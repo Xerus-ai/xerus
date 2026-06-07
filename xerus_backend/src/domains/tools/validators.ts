@@ -27,7 +27,7 @@ const saveConnectionSchema = Joi.object({
 });
 
 const logExecutionSchema = Joi.object({
-    agent_id: Joi.number().integer().positive().allow(null).required(),
+    agent_slug: Joi.string().allow(null).required(),
     app_slug: Joi.string().required(),
     action_key: Joi.string().required(),
     input: Joi.object().required(),

@@ -30,7 +30,7 @@ export interface SearchIndexRow {
     scope: MemoryScope;
     project_id?: number;
     channel_id?: string;
-    agent_id?: number;
+    agent_slug?: string;
     embedding: number[];
     commit_sha?: string;
 }
@@ -44,7 +44,7 @@ export interface SearchOptions {
     memoryTypes?: MemoryType[];
     projectId?: number;
     channelId?: string;
-    agentId?: number;
+    agentSlug?: string;
 }
 
 export interface SearchResult {
@@ -95,7 +95,7 @@ export interface IndexFileOptions {
     scope: MemoryScope;
     projectId?: number;
     channelId?: string;
-    agentId?: number;
+    agentSlug?: string;
     commitSha?: string;
 }
 
@@ -105,7 +105,7 @@ export interface FileReadResult {
     scope: MemoryScope;
     projectId?: number;
     channelId?: string;
-    agentId?: number;
+    agentSlug?: string;
 }
 
 export type FileReader = (filePath: string) => Promise<FileReadResult | null>;
@@ -236,7 +236,7 @@ export class MemorySearchIndexService {
             scope: options.scope,
             project_id: options.projectId,
             channel_id: options.channelId,
-            agent_id: options.agentId,
+            agent_slug: options.agentSlug,
             embedding: embeddings[i],
             commit_sha: options.commitSha,
         }));
@@ -331,7 +331,7 @@ export class MemorySearchIndexService {
                 scope: file.data.scope,
                 project_id: file.data.projectId,
                 channel_id: file.data.channelId,
-                agent_id: file.data.agentId,
+                agent_slug: file.data.agentSlug,
                 embedding: embeddings[i],
                 commit_sha: commitSha,
             };
@@ -356,7 +356,7 @@ export class MemorySearchIndexService {
             memoryTypes: options.memoryTypes,
             projectId: options.projectId,
             channelId: options.channelId,
-            agentId: options.agentId,
+            agentSlug: options.agentSlug,
         });
     }
 }

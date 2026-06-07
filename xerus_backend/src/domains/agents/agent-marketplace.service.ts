@@ -1,7 +1,6 @@
 // Agent Marketplace Service
 // Clone, publish, templates, and marketplace operations extracted from service.ts
 
-import { AgentRegistryRepository, agentRegistryRepository } from './agent-registry.repository';
 import { AgentFilesystemRepository, AgentConfigFile } from './agent-filesystem.repository';
 import { AgentValidator, agentValidator } from './validators';
 import {
@@ -15,10 +14,7 @@ import {
 import { toolsRepository } from '../tools/repository';
 import {
     AgentNotFoundError,
-    AgentAccessDeniedError,
     AgentNotClonableError,
-    AgentAlreadyPublicError,
-    AgentAlreadyPrivateError,
     AgentLimitExceededError,
     AgentDefaultError,
 } from './errors';
@@ -27,6 +23,14 @@ import { slugify } from '../../shared/slugify';
 import { configToAgent, canUserClone } from './agent-helpers';
 import { buildAllSoulFiles } from '../sandbox-infra/workspace/soul-file-templates';
 import { generateOperatingMd } from '../sandbox-infra/workspace/operating-md.template';
+import type { DaytonaProvider } from '../sandbox-infra/sandbox/providers/daytona.provider';
+import {
+    findAgentByRowid,
+    findAgentBySlug,
+    listAgents,
+    countAgents,
+    agentExists,
+} from './agent-workspace-db.service';
 
 const AGENT_LIMITS = {
     private: 100,
@@ -66,7 +70,6 @@ function buildSupplementaryFiles(cloneSlug: string, config: AgentConfigFile): Ar
 
 export class AgentMarketplaceService {
     constructor(
-        private registry: AgentRegistryRepository = agentRegistryRepository,
         private validator: AgentValidator = agentValidator,
         private fsRepo: AgentFilesystemRepository | null = null,
     ) {}
@@ -82,25 +85,28 @@ export class AgentMarketplaceService {
         return this.fsRepo;
     }
 
-    async clone(sourceId: number, userId: string, options?: { name?: string }): Promise<{ cloned: Agent; sourceSlug: string | null }> {
-        const sourceEntry = await this.registry.findById(sourceId);
-        if (!sourceEntry) throw new AgentNotFoundError(sourceId);
+    async clone(
+        sourceId: number,
+        userId: string,
+        provider: DaytonaProvider,
+        sandboxId: string,
+        options?: { name?: string },
+    ): Promise<{ cloned: Agent; sourceSlug: string | null }> {
+        const sourceRow = await findAgentByRowid(provider, sandboxId, sourceId);
+        if (!sourceRow) throw new AgentNotFoundError(sourceId);
 
         const fs = this.getFs();
-        const sourceConfig = await fs.getAgentConfig(
-            sourceEntry.user_id || userId,
-            sourceEntry.slug,
-        );
+        const sourceConfig = await fs.getAgentConfig(userId, sourceRow.slug);
         if (!sourceConfig) throw new AgentNotFoundError(sourceId);
 
-        const sourceAgent = configToAgent(sourceConfig, sourceEntry.id, sourceEntry.user_id, sourceEntry.agent_type);
+        const sourceAgent = configToAgent(sourceConfig, sourceRow.rowid, userId, 'private');
         if (!canUserClone(sourceAgent, userId)) {
             throw new AgentNotClonableError(sourceId);
         }
 
-        const { cloneName, cloneSlug, cloneEntry } = await this.prepareClone(sourceConfig.name, userId, options?.name);
+        const { cloneName, cloneSlug } = await this.prepareClone(sourceConfig.name, userId, provider, sandboxId, options?.name);
 
-        await fs.cloneAgentDir(userId, sourceEntry.slug, cloneSlug);
+        await fs.cloneAgentDir(userId, sourceRow.slug, cloneSlug);
 
         const now = new Date().toISOString();
         const cloneConfig: AgentConfigFile = {
@@ -128,20 +134,22 @@ export class AgentMarketplaceService {
 
         await fs.addToIndex(userId, { slug: cloneSlug, name: cloneName, agent_type: 'private' });
 
-        if (sourceEntry.agent_type === 'public' && sourceEntry.user_id) {
-            await fs.putAgentConfig(sourceEntry.user_id, sourceEntry.slug, {
-                ...sourceConfig,
-                clone_count: (sourceConfig.clone_count || 0) + 1,
-                updated_at: new Date().toISOString(),
-            });
-        }
+        // Read back the workspace.db row to get the rowid assigned by the hook
+        const cloneRow = await findAgentBySlug(provider, sandboxId, cloneSlug);
+        const cloneRowid = cloneRow?.rowid ?? 0;
 
-        const cloned = configToAgent(cloneConfig, cloneEntry.id, userId, cloneEntry.agent_type);
-        return { cloned, sourceSlug: sourceEntry.slug };
+        const cloned = configToAgent(cloneConfig, cloneRowid, userId, 'private');
+        return { cloned, sourceSlug: sourceRow.slug };
     }
 
     // Clone a marketplace agent by slug (marketplace agents have no DB registry entry)
-    async cloneMarketplaceAgent(sourceSlug: string, userId: string, options?: { name?: string }): Promise<{ cloned: Agent; sourceSlug: string }> {
+    async cloneMarketplaceAgent(
+        sourceSlug: string,
+        userId: string,
+        provider: DaytonaProvider,
+        sandboxId: string,
+        options?: { name?: string },
+    ): Promise<{ cloned: Agent; sourceSlug: string }> {
         const fs = this.getFs();
 
         // findMarketplaceAgent returns both category and config in one scan (avoids double-read)
@@ -151,7 +159,7 @@ export class AgentMarketplaceService {
         }
         const { category, config: marketplaceConfig } = found;
 
-        const { cloneName, cloneSlug, cloneEntry } = await this.prepareClone(marketplaceConfig.name, userId, options?.name);
+        const { cloneName, cloneSlug } = await this.prepareClone(marketplaceConfig.name, userId, provider, sandboxId, options?.name);
 
         await fs.cloneFromMarketplace(userId, category, sourceSlug, cloneSlug);
 
@@ -181,64 +189,65 @@ export class AgentMarketplaceService {
 
         await fs.addToIndex(userId, { slug: cloneSlug, name: cloneName, agent_type: 'private' });
 
-        const cloned = configToAgent(cloneConfig, cloneEntry.id, userId, cloneEntry.agent_type);
+        // Read back the workspace.db row to get the rowid assigned by the hook
+        const cloneRow = await findAgentBySlug(provider, sandboxId, cloneSlug);
+        const cloneRowid = cloneRow?.rowid ?? 0;
+
+        const cloned = configToAgent(cloneConfig, cloneRowid, userId, 'private');
         return { cloned, sourceSlug };
     }
 
-    async publish(id: number, userId: string): Promise<Agent> {
-        const entry = await this.registry.findById(id);
-        if (!entry) throw new AgentNotFoundError(id);
+    async publish(
+        id: number,
+        userId: string,
+        provider: DaytonaProvider,
+        sandboxId: string,
+    ): Promise<Agent> {
+        const row = await findAgentByRowid(provider, sandboxId, id);
+        if (!row) throw new AgentNotFoundError(id);
 
         const fs = this.getFs();
-        const config = await fs.getAgentConfig(userId, entry.slug);
+        const config = await fs.getAgentConfig(userId, row.slug);
         if (!config) throw new AgentNotFoundError(id);
 
-        if (entry.user_id !== userId) throw new AgentAccessDeniedError(id);
-        if (entry.agent_type !== 'private') throw new AgentAlreadyPublicError(id);
-
-        const publicCount = await this.registry.countByUser(userId, 'public');
-        if (publicCount >= AGENT_LIMITS.public) {
-            throw new AgentLimitExceededError(AGENT_LIMITS.public, 'public');
-        }
-
-        const agent = configToAgent(config, entry.id, entry.user_id, entry.agent_type);
+        const agent = configToAgent(config, row.rowid, userId, 'private');
         this.validator.validatePublishRequirements(agent);
 
-        await this.registry.updateType(id, 'public');
         const updatedConfig = { ...config, updated_at: new Date().toISOString() };
-        await fs.putAgentConfig(userId, entry.slug, updatedConfig);
-        await fs.addToIndex(userId, { slug: entry.slug, name: config.name, agent_type: 'public' });
+        await fs.putAgentConfig(userId, row.slug, updatedConfig);
+        await fs.addToIndex(userId, { slug: row.slug, name: config.name, agent_type: 'public' });
 
-        return configToAgent(updatedConfig, entry.id, entry.user_id, 'public');
+        return configToAgent(updatedConfig, row.rowid, userId, 'public');
     }
 
-    async unpublish(id: number, userId: string): Promise<Agent> {
-        const entry = await this.registry.findById(id);
-        if (!entry) throw new AgentNotFoundError(id);
+    async unpublish(
+        id: number,
+        userId: string,
+        provider: DaytonaProvider,
+        sandboxId: string,
+    ): Promise<Agent> {
+        const row = await findAgentByRowid(provider, sandboxId, id);
+        if (!row) throw new AgentNotFoundError(id);
 
         const fs = this.getFs();
-        const config = await fs.getAgentConfig(userId, entry.slug);
+        const config = await fs.getAgentConfig(userId, row.slug);
         if (!config) throw new AgentNotFoundError(id);
 
-        if (entry.user_id !== userId) throw new AgentAccessDeniedError(id);
-        if (entry.agent_type !== 'public') throw new AgentAlreadyPrivateError(id);
-
-        await this.registry.updateType(id, 'private');
         const updatedConfig = { ...config, updated_at: new Date().toISOString() };
-        await fs.putAgentConfig(userId, entry.slug, updatedConfig);
-        await fs.addToIndex(userId, { slug: entry.slug, name: config.name, agent_type: 'private' });
+        await fs.putAgentConfig(userId, row.slug, updatedConfig);
+        await fs.addToIndex(userId, { slug: row.slug, name: config.name, agent_type: 'private' });
 
-        return configToAgent(updatedConfig, entry.id, entry.user_id, 'private');
+        return configToAgent(updatedConfig, row.rowid, userId, 'private');
     }
 
-    async setDefault(id: number, userId: string): Promise<Agent> {
-        const entry = await this.registry.findById(id);
-        if (!entry) throw new AgentNotFoundError(id);
-
-        if (entry.agent_type !== 'private') {
-            throw new AgentDefaultError('Only private agents can be set as default');
-        }
-        if (entry.user_id !== userId) throw new AgentAccessDeniedError(id);
+    async setDefault(
+        id: number,
+        userId: string,
+        provider: DaytonaProvider,
+        sandboxId: string,
+    ): Promise<Agent> {
+        const row = await findAgentByRowid(provider, sandboxId, id);
+        if (!row) throw new AgentNotFoundError(id);
 
         const fs = this.getFs();
 
@@ -255,44 +264,52 @@ export class AgentMarketplaceService {
         }
 
         // Set new default (use already-loaded config if available)
-        const config = configs.get(entry.slug) ?? await fs.getAgentConfig(userId, entry.slug);
+        const config = configs.get(row.slug) ?? await fs.getAgentConfig(userId, row.slug);
         if (!config) throw new AgentNotFoundError(id);
         const updatedConfig = { ...config, is_default: true, updated_at: now };
-        await fs.putAgentConfig(userId, entry.slug, updatedConfig);
+        await fs.putAgentConfig(userId, row.slug, updatedConfig);
 
-        return configToAgent(updatedConfig, entry.id, entry.user_id, entry.agent_type);
+        return configToAgent(updatedConfig, row.rowid, userId, 'private');
     }
 
-    async unsetDefault(id: number, userId: string): Promise<Agent> {
-        const entry = await this.registry.findById(id);
-        if (!entry) throw new AgentNotFoundError(id);
-        if (entry.user_id !== userId) throw new AgentAccessDeniedError(id);
+    async unsetDefault(
+        id: number,
+        userId: string,
+        provider: DaytonaProvider,
+        sandboxId: string,
+    ): Promise<Agent> {
+        const row = await findAgentByRowid(provider, sandboxId, id);
+        if (!row) throw new AgentNotFoundError(id);
 
         const fs = this.getFs();
-        const config = await fs.getAgentConfig(userId, entry.slug);
+        const config = await fs.getAgentConfig(userId, row.slug);
         if (!config) throw new AgentNotFoundError(id);
 
         if (!config.is_default) throw new AgentDefaultError('Agent is not currently default');
 
         const updatedConfig = { ...config, is_default: false, updated_at: new Date().toISOString() };
-        await fs.putAgentConfig(userId, entry.slug, updatedConfig);
+        await fs.putAgentConfig(userId, row.slug, updatedConfig);
 
-        return configToAgent(updatedConfig, entry.id, entry.user_id, entry.agent_type);
+        return configToAgent(updatedConfig, row.rowid, userId, 'private');
     }
 
-    async getUserAgents(userId: string): Promise<AgentWithEnrichedTools[]> {
-        const entries = await this.registry.listByUser(userId);
+    async getUserAgents(
+        userId: string,
+        provider: DaytonaProvider,
+        sandboxId: string,
+    ): Promise<AgentWithEnrichedTools[]> {
+        const wsRows = await listAgents(provider, sandboxId);
         const fs = this.getFs();
-        const configs = await fs.getAgentConfigs(userId, entries.map(e => e.slug));
+        const configs = await fs.getAgentConfigs(userId, wsRows.map(r => r.slug));
 
         const agents: Array<{ agent: Agent; toolSlugs: string[] }> = [];
         const allToolSlugs = new Set<string>();
-        for (const entry of entries) {
-            const config = configs.get(entry.slug);
+        for (const row of wsRows) {
+            const config = configs.get(row.slug);
             if (!config) continue;
             const toolSlugs = config.tools || [];
             toolSlugs.forEach(t => allToolSlugs.add(t));
-            agents.push({ agent: configToAgent(config, entry.id, entry.user_id, entry.agent_type), toolSlugs });
+            agents.push({ agent: configToAgent(config, row.rowid, userId, 'private'), toolSlugs });
         }
 
         return enrichAgentsWithTools(agents, allToolSlugs);
@@ -365,9 +382,11 @@ export class AgentMarketplaceService {
     private async prepareClone(
         sourceName: string,
         userId: string,
+        provider: DaytonaProvider,
+        sandboxId: string,
         customName?: string,
-    ): Promise<{ cloneName: string; cloneSlug: string; cloneEntry: { id: number; agent_type: string } }> {
-        const currentCount = await this.registry.countByUser(userId, 'private');
+    ): Promise<{ cloneName: string; cloneSlug: string }> {
+        const currentCount = await countAgents(provider, sandboxId);
         if (currentCount >= AGENT_LIMITS.private) {
             throw new AgentLimitExceededError(AGENT_LIMITS.private, 'private');
         }
@@ -377,13 +396,12 @@ export class AgentMarketplaceService {
         if (!baseSlug) throw new Error(`Cannot generate slug from clone name: "${cloneName}"`);
         let cloneSlug = baseSlug;
         let counter = 0;
-        while (await this.registry.findBySlug(cloneSlug, userId)) {
+        while (await agentExists(provider, sandboxId, cloneSlug)) {
             counter++;
             cloneSlug = `${baseSlug}-${counter}`;
         }
 
-        const cloneEntry = await this.registry.register(cloneSlug, userId, 'private');
-        return { cloneName, cloneSlug, cloneEntry };
+        return { cloneName, cloneSlug };
     }
 
     private async generateCloneName(baseName: string, userId: string): Promise<string> {

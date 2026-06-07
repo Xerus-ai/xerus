@@ -131,7 +131,7 @@ export async function handleTriggerSync(
     if (action === 'deregister') {
         // Deregister supports two paths:
         // 1. By trigger_id (from platform.deregister_trigger MCP handler)
-        // 2. By agent_id + app_slug + event_type (field-based match)
+        // 2. By agent_slug + app_slug + event_type (field-based match)
         if (d.trigger_id !== undefined) {
             await deps.db.query(
                 `DELETE FROM agent_triggers WHERE id = $1 AND user_id = $2`,
@@ -148,28 +148,18 @@ export async function handleTriggerSync(
         return;
     }
 
-    const agentResult = await deps.db.query<{ id: number }>(
-        `SELECT id FROM agent_registry WHERE slug = $1 AND (user_id = $2 OR agent_type = 'system') LIMIT 1`,
-        [d.agent_slug, ctx.request.userId],
-    );
-    if (agentResult.rows.length === 0) {
-        log.warn('Trigger sync agent not found', { agent_slug: d.agent_slug });
-        return;
-    }
-    const agentId = agentResult.rows[0].id;
-
     if (action === 'register') {
         await deps.db.query(
-            `INSERT INTO agent_triggers (agent_id, user_id, app_slug, event_type)
+            `INSERT INTO agent_triggers (agent_slug, user_id, app_slug, event_type)
              VALUES ($1, $2, $3, $4)
-             ON CONFLICT (agent_id, app_slug, event_type) DO NOTHING`,
-            [agentId, ctx.request.userId, d.app_slug, d.event_type],
+             ON CONFLICT (agent_slug, user_id, app_slug, event_type) DO NOTHING`,
+            [d.agent_slug, ctx.request.userId, d.app_slug, d.event_type],
         );
         log.info('Trigger sync registered', { app_slug: d.app_slug, event_type: d.event_type, agent_slug: d.agent_slug });
     } else if (action === 'deregister') {
         await deps.db.query(
-            `DELETE FROM agent_triggers WHERE agent_id = $1 AND app_slug = $2 AND event_type = $3`,
-            [agentId, d.app_slug, d.event_type],
+            `DELETE FROM agent_triggers WHERE agent_slug = $1 AND app_slug = $2 AND event_type = $3`,
+            [d.agent_slug, d.app_slug, d.event_type],
         );
         log.info('Trigger sync deregistered', { app_slug: d.app_slug, event_type: d.event_type, agent_slug: d.agent_slug });
     }

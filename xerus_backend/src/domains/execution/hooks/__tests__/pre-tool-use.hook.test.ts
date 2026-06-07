@@ -178,12 +178,12 @@ describe('PreToolUseHandler', () => {
             context = createTestContext({
                 agent_type: 'orchestrator',
                 is_master_orchestrator: true,
-                allowed_tools: ['platform.search_agents', 'Task'],
+                allowed_tools: ['search_agents', 'Task'],
             });
             const deps: PreToolUseHandlerDeps = { hookExecutionLogger: logger };
             handler = new PreToolUseHandler(deps, context);
 
-            const input = createTestInput({ tool_name: 'platform.search_agents' });
+            const input = createTestInput({ tool_name: 'search_agents' });
 
             const result = await handler.handle(input);
 
@@ -219,13 +219,13 @@ describe('PreToolUseHandler', () => {
             context = createTestContext({
                 agent_type: 'orchestrator',
                 is_master_orchestrator: true,
-                allowed_tools: ['platform.create_agent'],
+                allowed_tools: ['create_agent'],
             });
             const deps: PreToolUseHandlerDeps = { hookExecutionLogger: logger };
             handler = new PreToolUseHandler(deps, context);
 
             const input = createTestInput({
-                tool_name: 'platform.create_agent',
+                tool_name: 'create_agent',
                 tool_input: { name: 'New Agent', description: 'A new agent' },
             });
 
@@ -240,13 +240,13 @@ describe('PreToolUseHandler', () => {
             context = createTestContext({
                 agent_type: 'orchestrator',
                 is_master_orchestrator: true,
-                allowed_tools: ['platform.search_agents'],
+                allowed_tools: ['search_agents'],
             });
             const deps: PreToolUseHandlerDeps = { hookExecutionLogger: logger };
             handler = new PreToolUseHandler(deps, context);
 
             const input = createTestInput({
-                tool_name: 'platform.search_agents',
+                tool_name: 'search_agents',
                 tool_input: { query: 'test' },
             });
 
@@ -261,13 +261,13 @@ describe('PreToolUseHandler', () => {
             context = createTestContext({
                 agent_type: 'orchestrator',
                 is_master_orchestrator: true,
-                allowed_tools: ['platform.connect_tool'],
+                allowed_tools: ['connect_tool'],
             });
             const deps: PreToolUseHandlerDeps = { hookExecutionLogger: logger };
             handler = new PreToolUseHandler(deps, context);
 
             const input = createTestInput({
-                tool_name: 'platform.connect_tool',
+                tool_name: 'connect_tool',
                 tool_input: { agent_id: 'agent-1', app_slug: 'gmail' },
             });
 
@@ -325,13 +325,13 @@ describe('PreToolUseHandler', () => {
             context = createTestContext({
                 agent_type: 'orchestrator',
                 is_master_orchestrator: true,
-                allowed_tools: ['platform.create_agent'],
+                allowed_tools: ['create_agent'],
             });
             const deps: PreToolUseHandlerDeps = { hookExecutionLogger: logger };
             handler = new PreToolUseHandler(deps, context);
 
             const input = createTestInput({
-                tool_name: 'platform.create_agent',
+                tool_name: 'create_agent',
                 tool_input: { name: 'Test' },
             });
 

@@ -396,29 +396,15 @@ router.get('/channels/:channelId/agents', auth, async (req: AuthenticatedRequest
 
         const channelSlug = sanitizeSlug(req.params.channelId);
 
-        // Get all agent slugs for this user from Neon agent_registry (including system agents)
-        const registryResult = await query<{ id: string; slug: string }>(
-            `SELECT id::text, slug FROM agent_registry
-             WHERE (user_id = $1 OR agent_type = 'system') AND agent_type != 'internal'
-             ORDER BY created_at DESC LIMIT 100`,
-            [userId],
+        // Get all agents from workspace.db (single source of truth)
+        const agentRows = await execWsQuery<{ rowid: number; slug: string; status: string }>(
+            provider, sandboxId,
+            `SELECT rowid, slug, status FROM agents ORDER BY installed_at DESC LIMIT 100`,
         );
-
-        // Get real-time agent statuses from workspace.db (updated by runner events)
-        const agentStatuses = new Map<string, string>();
-        try {
-            const statusRows = await execWsQuery<{ slug: string; status: string }>(
-                provider, sandboxId,
-                `SELECT slug, status FROM agents`,
-            );
-            for (const sr of statusRows) agentStatuses.set(sr.slug, sr.status);
-        } catch {
-            // workspace.db may not have agents table populated yet
-        }
 
         // For each agent, read config.json from sandbox and check channel membership
         const matchingAgents: Array<Record<string, unknown>> = [];
-        for (const row of registryResult.rows) {
+        for (const row of agentRows) {
             try {
                 const configRaw = await provider.readFile(
                     sandboxId,
@@ -429,16 +415,14 @@ router.get('/channels/:channelId/agents', auth, async (req: AuthenticatedRequest
                 if (agentChannels.includes(channelSlug)) {
                     const tools: string[] = (config.tools as string[]) || [];
                     const skills: string[] = (config.skills as string[]) || [];
-                    // Use workspace.db status (real-time from runner events) over config.json
-                    const liveStatus = agentStatuses.get(row.slug) || (config.status as string) || 'idle';
                     matchingAgents.push({
-                        id: row.id,
+                        id: String(row.rowid),
                         name: config.name || row.slug,
                         slug: row.slug,
                         avatar_url: config.mascot || config.avatar_url || null,
                         ai_model: config.ai_model || config.model || null,
                         adapter_type: config.adapter_type || null,
-                        status: liveStatus,
+                        status: row.status || (config.status as string) || 'idle',
                         description: config.description || null,
                         tools,
                         skills,
@@ -641,12 +625,12 @@ router.post('/channels/:channelId/messages', auth, strictRateLimit, async (req: 
                 if (memberRows.length > 0) {
                     targetAgent = memberRows[0].agent_slug;
                 } else {
-                    // Fallback: scan agent configs from filesystem (same source as GET /channels/:id/agents)
-                    const agentRegistry = await query<{ slug: string }>(
-                        `SELECT slug FROM agent_registry WHERE user_id = $1 AND agent_type IN ('private', 'public') ORDER BY created_at DESC LIMIT 50`,
-                        [userId],
-                    );
-                    for (const row of agentRegistry.rows) {
+                    // Fallback: scan agent configs from filesystem
+                    const wsAgents = await execWsQuery<{ slug: string }>(
+                        provider, sandboxId,
+                        `SELECT slug FROM agents ORDER BY installed_at DESC LIMIT 50`,
+                    ).catch(() => [] as Array<{ slug: string }>);
+                    for (const row of wsAgents) {
                         try {
                             const cfgRaw = await provider.readFile(
                                 sandboxId,
@@ -699,12 +683,26 @@ router.post('/channels/:channelId/messages', auth, strictRateLimit, async (req: 
                     channelId,
                 );
             }
-        })().catch(err =>
-            log.warn('Channel agent dispatch failed', {
+        })().catch(async (err) => {
+            const errorMsg = err instanceof Error ? err.message : String(err);
+            log.error('Channel agent dispatch failed', {
                 channel: channelId,
-                error: err instanceof Error ? err.message : String(err),
-            }),
-        );
+                error: errorMsg,
+            });
+            // Write a system message to channel_messages so the user sees the error in the activity tab
+            try {
+                const { createSystemEvent } = await import('./company-workspace-db.service');
+                await createSystemEvent(provider, sandboxId, channelId,
+                    `Agent dispatch failed: ${errorMsg}`,
+                    { error_type: 'dispatch_failure' },
+                );
+            } catch (sysErr) {
+                log.error('Failed to write dispatch error as system event', {
+                    channel: channelId,
+                    error: sysErr instanceof Error ? sysErr.message : String(sysErr),
+                });
+            }
+        });
 
         sendResponse(res, 201, {
             message: {

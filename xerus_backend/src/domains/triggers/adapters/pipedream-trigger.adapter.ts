@@ -65,7 +65,7 @@ export class PipedreamTriggerAdapter extends BaseTriggerAdapter {
     async register(config: TriggerRegistration): Promise<TriggerRegistrationResult> {
         const webhookUrl = this.buildWebhookUrl(
             getBaseUrl(),
-            config.agent_id
+            config.agent_slug
         );
 
         const triggerKey = buildTriggerKey(config.app, config.event_type);

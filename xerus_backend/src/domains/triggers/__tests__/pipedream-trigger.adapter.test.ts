@@ -252,7 +252,7 @@ describe('PipedreamTriggerAdapter', () => {
 
     describe('register', () => {
         const baseConfig: TriggerRegistration = {
-            agent_id: 42,
+            agent_slug: 'gmail-watcher',
             user_id: 'user_abc',
             app: 'gmail',
             event_type: 'new-email',
@@ -267,7 +267,7 @@ describe('PipedreamTriggerAdapter', () => {
             const result = await adapter.register(baseConfig);
 
             expect(result.external_id).toContain('user_abc:dc_gmail-new-email_');
-            expect(result.webhook_url).toBe('https://api.xerus.test/api/v1/webhooks/triggers/pipedream/42');
+            expect(result.webhook_url).toBe('https://api.xerus.test/api/v1/webhooks/triggers/pipedream/gmail-watcher');
         });
 
         it('should pass correct configuredProps including auth', async () => {
@@ -356,7 +356,7 @@ describe('PipedreamTriggerAdapter', () => {
 
             // First register a trigger
             const config: TriggerRegistration = {
-                agent_id: 1,
+                agent_slug: 'test-agent',
                 user_id: 'user_123',
                 app: 'gmail',
                 event_type: 'new-email',
@@ -392,7 +392,7 @@ describe('PipedreamTriggerAdapter', () => {
         const metadata: EventNormalizationMetadata = {
             app: 'gmail',
             event_type: 'new_email',
-            agent_id: 42,
+            agent_slug: 'gmail-watcher',
         };
 
         it('should normalize a standard webhook payload', () => {

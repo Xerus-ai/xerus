@@ -23,7 +23,6 @@ import {
 
 const TEST_PREFIX = 'xcredit_ded_' + Date.now();
 const TEST_USER_ID = TEST_PREFIX + '_user';
-let TEST_AGENT_ID: number;
 
 async function seedTestData(): Promise<void> {
     const email = `${TEST_USER_ID}_${Math.random().toString(36).substring(7)}@test.com`;
@@ -36,13 +35,6 @@ async function seedTestData(): Promise<void> {
             credits_used = EXCLUDED.credits_used`,
         [TEST_USER_ID, email, 'Test User', 10000, 0]
     );
-
-    const agentResult = await query<{ id: number }>(
-        `INSERT INTO agent_registry (slug, user_id, agent_type)
-         VALUES ($1, $2, $3) RETURNING id`,
-        [TEST_PREFIX + '_agent', TEST_USER_ID, 'private']
-    );
-    TEST_AGENT_ID = agentResult.rows[0].id;
 }
 
 async function resetUserCredits(credits: number): Promise<void> {
@@ -62,7 +54,6 @@ async function getUserCredits(): Promise<number> {
 
 async function cleanupTestData(): Promise<void> {
     await query(`DELETE FROM credit_transactions WHERE user_id = $1`, [TEST_USER_ID]);
-    await query(`DELETE FROM agent_registry WHERE slug LIKE '${TEST_PREFIX}%'`);
     await query(`DELETE FROM users WHERE user_id = $1`, [TEST_USER_ID]);
 }
 
@@ -239,7 +230,7 @@ describe('CreditDeductionService', () => {
             await resetUserCredits(500);
             sessionStore.setSession('session-xyz', {
                 user_id: TEST_USER_ID,
-                agent_id: TEST_AGENT_ID,
+                agent_id: 1,
                 workspace_id: 'ws-test',
             });
 
@@ -266,7 +257,7 @@ describe('CreditDeductionService', () => {
             await resetUserCredits(500);
             sessionStore.setSession('session-abc', {
                 user_id: TEST_USER_ID,
-                agent_id: TEST_AGENT_ID,
+                agent_id: 1,
                 workspace_id: 'ws-test',
             });
 
@@ -307,7 +298,7 @@ describe('CreditDeductionService', () => {
             await resetUserCredits(500);
             sessionStore.setSession('session-zero', {
                 user_id: TEST_USER_ID,
-                agent_id: TEST_AGENT_ID,
+                agent_id: 1,
                 workspace_id: 'ws-test',
             });
 
@@ -330,7 +321,7 @@ describe('CreditDeductionService', () => {
             await resetUserCredits(500);
             sessionStore.setSession('session-refund', {
                 user_id: TEST_USER_ID,
-                agent_id: TEST_AGENT_ID,
+                agent_id: 1,
                 workspace_id: 'ws-test',
             });
 
@@ -361,7 +352,7 @@ describe('CreditDeductionService', () => {
             await resetUserCredits(500);
             sessionStore.setSession('session-shortfall', {
                 user_id: TEST_USER_ID,
-                agent_id: TEST_AGENT_ID,
+                agent_id: 1,
                 workspace_id: 'ws-test',
             });
 
@@ -392,7 +383,7 @@ describe('CreditDeductionService', () => {
             await resetUserCredits(500);
             sessionStore.setSession('session-exact', {
                 user_id: TEST_USER_ID,
-                agent_id: TEST_AGENT_ID,
+                agent_id: 1,
                 workspace_id: 'ws-test',
             });
 
@@ -422,7 +413,7 @@ describe('CreditDeductionService', () => {
             await resetUserCredits(500);
             sessionStore.setSession('session-cleanup', {
                 user_id: TEST_USER_ID,
-                agent_id: TEST_AGENT_ID,
+                agent_id: 1,
                 workspace_id: 'ws-test',
             });
 
@@ -449,7 +440,7 @@ describe('CreditDeductionService', () => {
             await resetUserCredits(10000);
             sessionStore.setSession('session-1', {
                 user_id: TEST_USER_ID,
-                agent_id: TEST_AGENT_ID,
+                agent_id: 1,
                 workspace_id: 'ws-test',
             });
 
@@ -536,7 +527,7 @@ describe('CreditDeductionService', () => {
                 const sid = `session-multi-${i}`;
                 sessionStore.setSession(sid, {
                     user_id: TEST_USER_ID,
-                    agent_id: TEST_AGENT_ID,
+                    agent_id: 1,
                     workspace_id: 'ws-test',
                 });
 

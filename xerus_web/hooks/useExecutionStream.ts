@@ -79,7 +79,7 @@ export function useExecutionStream(
   callbacks: UseExecutionStreamCallbacks,
 ): UseExecutionStreamReturn & {
   connectStream: (conversationId: string) => Promise<void>;
-  sendMessage: (conversationId: string, task: string, context?: Record<string, unknown>) => Promise<{ execution_id: string | null }>;
+  sendMessage: (conversationId: string, task: string, context?: Record<string, unknown>, agentSlug?: string) => Promise<{ execution_id: string | null }>;
   getConnectedConversationId: () => string | null;
 } {
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
@@ -415,11 +415,12 @@ export function useExecutionStream(
     conversationId: string,
     task: string,
     context?: Record<string, unknown>,
+    agentSlug?: string,
   ): Promise<{ execution_id: string | null }> => {
     // Clear events from previous execution in this conversation
     setEvents([]);
     setLastEvent(null);
-    const result = await sendConversationMessage(conversationId, { task, context });
+    const result = await sendConversationMessage(conversationId, { task, context, agent_slug: agentSlug });
     return { execution_id: result.execution_id };
   }, []);
 
