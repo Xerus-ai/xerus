@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/utils/AuthContext'
 import { useOnboardingStream } from '@/hooks/useOnboardingStream'
 import { createCheckout, syncSubscription, getSubscription } from '@/lib/api/billing'
+import { createSchedule } from '@/lib/api/schedules'
 import { saveApiKey, triggerCliLogin } from '@/lib/api/user'
 import { PLANS, type PlanType } from '@/lib/plans'
 import { BlobBackground } from './BlobBackground'
@@ -262,6 +263,37 @@ export function OnboardingChat() {
           await createWorkspace(workspaceData.workspace, workspaceData.project)
         } catch (err) {
           console.error('[Onboarding] Workspace creation failed:', err)
+        }
+      }
+      return
+    }
+
+    if (action === 'set-schedule') {
+      const schedule = data.schedule as string
+      const agentName = data.agentName as string | undefined
+      const agentSlug = agentName ? agentName.toLowerCase().replace(/\s+/g, '-') : 'xerus-master'
+
+      const scheduleLabels: Record<string, string> = {
+        daily: 'Every day',
+        weekly: 'Weekly',
+        'on-demand': 'Only when I ask',
+      }
+      collapseCard(messageId, scheduleLabels[schedule] || schedule)
+
+      if (schedule !== 'on-demand') {
+        const rrule = schedule === 'daily'
+          ? 'FREQ=DAILY;BYHOUR=9;BYMINUTE=0;BYSECOND=0'
+          : 'FREQ=WEEKLY;BYDAY=MO;BYHOUR=9;BYMINUTE=0;BYSECOND=0'
+
+        try {
+          await createSchedule({
+            agent_slug: agentSlug,
+            name: `${schedule}-checkin`,
+            prompt: 'Run your morning check-in routine. Review pending tasks, check for blockers, and prepare a status update.',
+            rrule,
+          })
+        } catch (err) {
+          console.error('[Onboarding] Schedule creation failed:', err)
         }
       }
       return

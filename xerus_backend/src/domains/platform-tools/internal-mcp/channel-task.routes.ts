@@ -9,6 +9,9 @@ import { InternalMcpRequest, McpToolResult } from './types';
 import { escapeSQL, executeWorkspaceJsonQuery, executeWorkspaceQuery } from '../../conversations/workspace-db.helpers';
 import { requireRunningSandbox, getDaytonaProvider } from '../../sandbox-infra/sandbox/sandbox-route-helpers';
 import type { SandboxService } from '../../sandbox-infra/sandbox/sandbox.service';
+import { workspaceSSEBroadcaster } from '../../drive';
+import { scaffoldChannel } from '../../company/workspace-scaffold.service';
+import { addSystemAgentsToChannel } from '../../company/system-agent-assignment.service';
 
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 
@@ -121,6 +124,14 @@ router.post('/create_channel', async (req: InternalMcpRequest, res: Response, ne
         if (!row) {
             throw new BadRequestError('Failed to create channel — database insert returned no result');
         }
+
+        // Scaffold channel filesystem (CLAUDE.md, context.md, shift.yaml, AGENTS.md)
+        await scaffoldChannel(provider, sandboxId, domainSlug, channelSlug, {
+            CHANNEL_NAME: name,
+            CHANNEL_MISSION: description || `Channel: ${name}`,
+        });
+        await addSystemAgentsToChannel(provider, sandboxId, channelSlug);
+
         const mcpResult: McpToolResult = {
             success: true,
             data: {
@@ -135,6 +146,11 @@ router.post('/create_channel', async (req: InternalMcpRequest, res: Response, ne
                 },
             },
         };
+
+        workspaceSSEBroadcaster.broadcastFileChanged(userId, {
+            type: 'file_changed', path: `channels/${channelSlug}`, action: 'created',
+            timestamp: new Date().toISOString(),
+        });
 
         res.json(mcpResult);
     } catch (error) {
@@ -215,6 +231,25 @@ router.post('/create_task', async (req: InternalMcpRequest, res: Response, next:
         const sandboxId = await requireRunningSandbox(sandboxService, userId);
         const provider = getDaytonaProvider(sandboxService);
 
+        // Normalize channel_id to domain--channel format for project_slug
+        let normalizedChannelId = channel_id;
+        if (!channel_id.includes('--')) {
+            // Bare slug — look up the channel in workspace.db to find the full domain--channel slug
+            const channelLookupSql = `SELECT slug, domain_slug FROM channels WHERE slug LIKE '%--${escapeSQL(channel_id)}' OR slug = '${escapeSQL(channel_id)}' LIMIT 1`;
+            const channelRows = await executeWorkspaceJsonQuery<{ slug: string; domain_slug: string }>(provider, sandboxId, channelLookupSql);
+            if (channelRows.length > 0) {
+                normalizedChannelId = channelRows[0].slug;
+            } else {
+                // Channel not found by suffix match — try looking up domain_slug for this channel
+                const domainLookupSql = `SELECT domain_slug FROM channels WHERE slug = '${escapeSQL(channel_id)}' LIMIT 1`;
+                const domainRows = await executeWorkspaceJsonQuery<{ domain_slug: string }>(provider, sandboxId, domainLookupSql);
+                if (domainRows.length > 0) {
+                    normalizedChannelId = `${domainRows[0].domain_slug}--${channel_id}`;
+                }
+                // If still not found, use as-is — the insert will fail with a clear error downstream
+            }
+        }
+
         const taskId = `task-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
         const taskPriority = priority || 'medium';
         const descValue = description ? `'${escapeSQL(description)}'` : 'NULL';
@@ -230,7 +265,7 @@ router.post('/create_task', async (req: InternalMcpRequest, res: Response, next:
             INSERT INTO tasks (id, project_slug, title, description, status, priority, assigned_agent, labels)
             VALUES (
                 '${escapeSQL(taskId)}',
-                '${escapeSQL(channel_id)}',
+                '${escapeSQL(normalizedChannelId)}',
                 '${escapeSQL(title)}',
                 ${descValue},
                 'open',
@@ -266,6 +301,11 @@ router.post('/create_task', async (req: InternalMcpRequest, res: Response, next:
                 },
             },
         };
+
+        workspaceSSEBroadcaster.broadcastFileChanged(userId, {
+            type: 'file_changed', path: `tasks/${taskId}`, action: 'created',
+            timestamp: new Date().toISOString(),
+        });
 
         res.json(mcpResult);
     } catch (error) {

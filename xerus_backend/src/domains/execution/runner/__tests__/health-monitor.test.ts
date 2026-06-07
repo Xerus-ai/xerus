@@ -126,10 +126,10 @@ describe('RunnerHealthMonitor', () => {
         });
     });
 
-    describe('recordHealthResponse', () => {
+    describe('recordActivity (marks healthy)', () => {
         it('should mark sandbox as healthy', () => {
             monitor.registerSandbox('sandbox-1', 'user-1');
-            monitor.recordHealthResponse('sandbox-1');
+            monitor.recordActivity('sandbox-1');
 
             const status = monitor.getStatus('sandbox-1');
             expect(status?.healthy).toBe(true);

@@ -10,6 +10,8 @@ import { InternalMcpRequest, McpToolResult } from './types';
 import { escapeSQL, escapeLikePattern, executeWorkspaceJsonQuery, executeWorkspaceQuery } from '../../conversations/workspace-db.helpers';
 import { requireRunningSandbox, getDaytonaProvider } from '../../sandbox-infra/sandbox/sandbox-route-helpers';
 import type { SandboxService } from '../../sandbox-infra/sandbox/sandbox.service';
+import { SANDBOX_CONFIG } from '../../sandbox-infra/sandbox/sandbox.config';
+import { workspaceSSEBroadcaster } from '../../drive';
 
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 
@@ -140,9 +142,14 @@ router.post('/create_skill', async (req: InternalMcpRequest, res: Response, next
 
         // Write the SKILL.md file to the sandbox filesystem
         const SKILL_HEREDOC = 'XERUS_SKILL_EOF_4b7e';
-        if (!instructions.includes(SKILL_HEREDOC)) {
-            const writeCmd = `mkdir -p /home/xerus/workspace/.claude/skills/${escapeSQL(skillSlug)} && cat > /home/xerus/workspace/.claude/skills/${escapeSQL(skillSlug)}/SKILL.md << '${SKILL_HEREDOC}'\n${instructions}\n${SKILL_HEREDOC}`;
-            await provider.executeCommand(sandboxId, writeCmd);
+        if (instructions.includes(SKILL_HEREDOC)) {
+            throw new BadRequestError('instructions content contains reserved heredoc delimiter');
+        }
+        const skillDir = `${SANDBOX_CONFIG.workspacePath}/.claude/skills/${skillSlug}`;
+        const writeCmd = `mkdir -p ${skillDir} && cat > ${skillDir}/SKILL.md << '${SKILL_HEREDOC}'\n${instructions}\n${SKILL_HEREDOC}`;
+        const { exitCode: skillWriteExitCode } = await provider.executeCommand(sandboxId, writeCmd);
+        if (skillWriteExitCode !== 0) {
+            throw new Error(`Failed to write SKILL.md for ${skillSlug} (exit ${skillWriteExitCode})`);
         }
 
         // If agent_id specified, also create the agent_skills link
@@ -174,6 +181,11 @@ router.post('/create_skill', async (req: InternalMcpRequest, res: Response, next
             },
         };
 
+        workspaceSSEBroadcaster.broadcastFileChanged(userId, {
+            type: 'file_changed', path: `.claude/skills/${skillSlug}/SKILL.md`, action: 'created',
+            timestamp: new Date().toISOString(),
+        });
+
         res.json(mcpResult);
     } catch (error) {
         next(error);
@@ -197,6 +209,28 @@ router.post('/install_skill', async (req: InternalMcpRequest, res: Response, nex
         const sandboxId = await requireRunningSandbox(sandboxService, userId);
         const provider = getDaytonaProvider(sandboxService);
 
+        // Copy skill files from marketplace to .claude/skills/ on sandbox
+        const basePath = SANDBOX_CONFIG.workspacePath;
+        const marketplaceSrc = `${basePath}/marketplace/skills/${skill_slug}`;
+        const destDir = `${basePath}/.claude/skills/${skill_slug}`;
+        const { result: checkResult } = await provider.executeCommand(sandboxId, `test -d "${marketplaceSrc}" && echo EXISTS || echo MISSING`);
+        if (checkResult.trim() !== 'EXISTS') {
+            throw new BadRequestError(`Skill "${skill_slug}" not found in marketplace`);
+        }
+        const copyCmd = `mkdir -p "${destDir}" && cp -r "${marketplaceSrc}/." "${destDir}/"`;
+        const { exitCode: copyExitCode } = await provider.executeCommand(sandboxId, copyCmd);
+        if (copyExitCode !== 0) {
+            throw new Error(`Failed to copy skill files for ${skill_slug} (exit ${copyExitCode})`);
+        }
+
+        // Also ensure the skill is registered in workspace.db
+        const skillEscaped = escapeSQL(skill_slug);
+        const skillPath = `.claude/skills/${skill_slug}/SKILL.md`;
+        await executeWorkspaceQuery(
+            provider, sandboxId,
+            `INSERT OR IGNORE INTO skills (slug, name, version, source, source_ref) VALUES ('${skillEscaped}', '${skillEscaped}', '1.0.0', 'marketplace', '${escapeSQL(skillPath)}')`,
+        );
+
         if (agent_id) {
             // Verify agent exists in workspace.db
             const agentSlug = escapeSQL(String(agent_id));
@@ -211,7 +245,7 @@ router.post('/install_skill', async (req: InternalMcpRequest, res: Response, nex
             // Install skill for this agent
             await executeWorkspaceQuery(
                 provider, sandboxId,
-                `INSERT OR IGNORE INTO agent_skills (agent_slug, skill_slug, enabled) VALUES ('${agentSlug}', '${escapeSQL(skill_slug)}', 1)`,
+                `INSERT OR IGNORE INTO agent_skills (agent_slug, skill_slug, enabled) VALUES ('${agentSlug}', '${skillEscaped}', 1)`,
             );
         }
 
@@ -222,8 +256,15 @@ router.post('/install_skill', async (req: InternalMcpRequest, res: Response, nex
                 skill_slug,
                 agent_id: agent_id || null,
                 user_id: userId,
+                files_copied_from: `marketplace/skills/${skill_slug}`,
+                installed_to: `.claude/skills/${skill_slug}`,
             },
         };
+
+        workspaceSSEBroadcaster.broadcastFileChanged(userId, {
+            type: 'file_changed', path: `.claude/skills/${skill_slug}`, action: 'created',
+            timestamp: new Date().toISOString(),
+        });
 
         res.json(mcpResult);
     } catch (error) {

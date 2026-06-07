@@ -255,7 +255,12 @@ router.post('/conversations/:id/messages', auth, executionRateLimit, async (req:
             throw new NotFoundError('Conversation');
         }
 
-        const agentSlug = conversation.agent_slug;
+        // Allow per-message agent override: if agent_slug is in the request body, use it
+        // instead of the conversation's default agent. This enables the frontend agent
+        // dropdown to route individual messages to a different agent.
+        const agentSlug = (typeof req.body.agent_slug === 'string' && req.body.agent_slug.trim())
+            ? req.body.agent_slug.trim()
+            : conversation.agent_slug;
         if (!agentSlug) {
             throw new BadRequestError('Conversation has no associated agent');
         }
@@ -497,7 +502,7 @@ interface SessionListRow {
 
 let executionServiceInstance: ExecutionService | null = null;
 
-function getExecutionService(): ExecutionService {
+export function getExecutionService(): ExecutionService {
     if (!executionServiceInstance) {
         throw new Error('ExecutionService not initialized. Call setExecutionService() at startup.');
     }

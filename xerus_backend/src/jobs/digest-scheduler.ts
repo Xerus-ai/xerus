@@ -7,13 +7,13 @@
 // cron schedules (standup_cron, report_cron) per user, independent of
 // agent heartbeat intervals.
 
-import { randomUUID } from 'crypto';
 import cron from 'node-cron';
 import type { ScheduledTask } from 'node-cron';
 import { DailyDigestService } from '../domains/execution/background/daily-digest.service';
 import { DigestDispatcher } from '../domains/execution/background/digest-dispatcher';
 import type { DailyDigestConfig, DigestVariant, DigestActivityData, ActivityDataCollector } from '../domains/execution/background/daily-digest.types';
 import type { ExecutionDatabase } from '../domains/execution/execution-pipeline.types';
+import { NullStreamingResponse } from '../domains/execution/streaming/stream.handler';
 import { logger } from '../utils/logger';
 
 const log = logger('DigestScheduler');
@@ -24,7 +24,7 @@ const log = logger('DigestScheduler');
 
 export interface DigestDispatchFn {
     (request: {
-        agent_id: number;
+        agent_slug: string;
         user_id: string;
         prompt: string;
         variant: DigestVariant;
@@ -156,7 +156,8 @@ export class DigestScheduler {
 
         if (result.skipped) {
             await this.digestService.recordDigestExecution({
-                agent_id: config.xerus_agent_id,
+                agent_slug: config.xerus_agent_slug,
+                user_id: config.user_id,
                 heartbeat_config_id: null,
                 variant,
                 outcome: 'skipped',
@@ -167,14 +168,15 @@ export class DigestScheduler {
         }
 
         const dispatchResult = await this.dispatchFn({
-            agent_id: config.xerus_agent_id,
+            agent_slug: config.xerus_agent_slug,
             user_id: config.user_id,
             prompt: result.prompt!,
             variant,
         });
 
         await this.digestService.recordDigestExecution({
-            agent_id: config.xerus_agent_id,
+            agent_slug: config.xerus_agent_slug,
+            user_id: config.user_id,
             heartbeat_config_id: null,
             variant,
             outcome: dispatchResult.outcome as 'success' | 'failure',
@@ -193,14 +195,14 @@ function createActivityCollector(db: ExecutionDatabase): ActivityDataCollector {
         async collectForUser(userId: string, since: Date): Promise<DigestActivityData> {
             // Completed tasks: execution sessions completed since `since`
             const completedResult = await db.query<{
-                agent_id: number; agent_name: string; title: string;
+                agent_slug: string; agent_name: string; title: string;
                 channel_id: string | null; completed_at: Date | null;
             }>(
-                `SELECT COALESCE(ar.id, 0) AS agent_id, COALESCE(es.agent_slug, 'unknown') AS agent_name,
+                `SELECT COALESCE(es.agent_slug, 'unknown') AS agent_slug,
+                        COALESCE(es.agent_slug, 'unknown') AS agent_name,
                         COALESCE(es.user_prompt, 'Untitled task') AS title,
                         es.conversation_id AS channel_id, es.completed_at
                  FROM execution_sessions es
-                 LEFT JOIN agent_registry ar ON ar.slug = es.agent_slug
                  WHERE es.workspace_id IN (SELECT id FROM workspaces WHERE user_id = $1)
                    AND es.status = 'completed' AND es.completed_at >= $2
                  ORDER BY es.completed_at DESC LIMIT 50`,
@@ -209,13 +211,13 @@ function createActivityCollector(db: ExecutionDatabase): ActivityDataCollector {
 
             // In-progress tasks
             const inProgressResult = await db.query<{
-                agent_id: number; agent_name: string; title: string; channel_id: string | null;
+                agent_slug: string; agent_name: string; title: string; channel_id: string | null;
             }>(
-                `SELECT COALESCE(ar.id, 0) AS agent_id, COALESCE(es.agent_slug, 'unknown') AS agent_name,
+                `SELECT COALESCE(es.agent_slug, 'unknown') AS agent_slug,
+                        COALESCE(es.agent_slug, 'unknown') AS agent_name,
                         COALESCE(es.user_prompt, 'Untitled task') AS title,
                         es.conversation_id AS channel_id
                  FROM execution_sessions es
-                 LEFT JOIN agent_registry ar ON ar.slug = es.agent_slug
                  WHERE es.workspace_id IN (SELECT id FROM workspaces WHERE user_id = $1)
                    AND es.status = 'running'
                  ORDER BY es.started_at DESC LIMIT 20`,
@@ -241,11 +243,11 @@ function createActivityCollector(db: ExecutionDatabase): ActivityDataCollector {
 
             return {
                 completed_tasks: completedResult.rows.map(r => ({
-                    agent_id: r.agent_id, agent_name: r.agent_name,
+                    agent_id: 0, agent_name: r.agent_name,
                     title: r.title, channel_id: r.channel_id, completed_at: r.completed_at,
                 })),
                 in_progress_tasks: inProgressResult.rows.map(r => ({
-                    agent_id: r.agent_id, agent_name: r.agent_name,
+                    agent_id: 0, agent_name: r.agent_name,
                     title: r.title, channel_id: r.channel_id, completed_at: null,
                 })),
                 blocked_items: [],
@@ -280,32 +282,29 @@ export function startDigestSchedulerJob(db?: ExecutionDatabase): void {
         log.info('Dispatching digest', {
             variant: request.variant,
             user_id: request.user_id,
-            agent_id: request.agent_id,
+            agent_slug: request.agent_slug,
         });
 
-        // Resolve agent slug from integer agent_id (execution_sessions uses agent_slug, not agent_id)
-        const agentResult = await db.query<{ slug: string }>(
-            'SELECT slug FROM agent_registry WHERE id = $1',
-            [request.agent_id],
-        );
-        if (agentResult.rows.length === 0) {
-            throw new Error(`Agent ${request.agent_id} not found in registry (digest dispatch)`);
-        }
-        const agentSlug = agentResult.rows[0].slug;
+        // Import lazily to avoid circular dependency at module load time
+        const { getExecutionService } = await import('../domains/execution/execution.routes');
 
-        // Digest dispatch creates an execution_sessions record
-        const sessionId = randomUUID();
-        const result = await db.query(
-            `INSERT INTO execution_sessions
-             (id, workspace_id, agent_slug, status, trigger_type, user_prompt, started_at, created_at)
-             SELECT $1, w.id, $2, 'completed', 'heartbeat', $3, NOW(), NOW()
-             FROM workspaces w WHERE w.user_id = $4 LIMIT 1
-             RETURNING id`,
-            [sessionId, agentSlug, request.prompt.slice(0, 500), request.user_id],
-        );
-        if (result.rows.length === 0) {
-            throw new Error(`Digest dispatch failed: no workspace found for user ${request.user_id}`);
-        }
+        const executionService = getExecutionService();
+        const stream = new NullStreamingResponse();
+
+        await executionService.startExecution({
+            request: {
+                agentSlug: request.agent_slug,
+                task: request.prompt,
+                userId: request.user_id,
+                context: {
+                    trigger: 'digest',
+                    variant: request.variant,
+                },
+            },
+            stream,
+            triggerType: 'heartbeat',
+        });
+
         return { tokens_used: 0, outcome: 'success' };
     };
 
@@ -331,10 +330,10 @@ async function loadDigestConfigs(db: ExecutionDatabase): Promise<DailyDigestConf
             user_id: string; enabled: boolean;
             standup_cron: string; report_cron: string;
             timezone: string; skip_on_no_activity: boolean;
-            xerus_agent_id: number; default_channel_id: string | null;
+            xerus_agent_slug: string; default_channel_id: string | null;
         }>(
             `SELECT user_id, enabled, standup_cron, report_cron, timezone,
-                    skip_on_no_activity, xerus_agent_id, default_channel_id
+                    skip_on_no_activity, xerus_agent_slug, default_channel_id
              FROM digest_configs WHERE enabled = true`,
         );
         return result.rows;

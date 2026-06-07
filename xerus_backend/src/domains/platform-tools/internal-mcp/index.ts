@@ -89,18 +89,33 @@ router.use(channelTaskRoutes);
 router.use(skillManagementRoutes);
 router.use(searchOutputsRoutes);
 
-// Error Handler
-router.use((error: Error, _req: Request, res: Response, _next: NextFunction) => {
+// Error Handler — returns structured errors that LLMs can interpret and act on
+router.use((error: Error, req: Request, res: Response, _next: NextFunction) => {
     log.error('Internal MCP request failed', error);
+
+    const statusCode = (error as { statusCode?: number }).statusCode || 500;
+    const toolName = req.path.replace(/^\//, '').replace(/\//g, '_') || 'unknown';
 
     const mcpResult: McpToolResult = {
         success: false,
-        error: error.message,
+        error: formatMcpError(toolName, statusCode, error),
     };
 
-    const statusCode = (error as { statusCode?: number }).statusCode || 500;
     res.status(statusCode).json(mcpResult);
 });
+
+function formatMcpError(toolName: string, statusCode: number, error: Error): string {
+    const category = statusCode >= 500 ? 'INTERNAL_ERROR' : 'VALIDATION_ERROR';
+    const hint = statusCode === 400
+        ? 'Check the parameter values and try again with corrected input.'
+        : statusCode === 404
+            ? 'The requested resource does not exist. Verify the identifier.'
+            : statusCode === 409
+                ? 'A conflicting resource already exists. Use a different name/slug.'
+                : 'An unexpected error occurred. Retry or try a different approach.';
+
+    return `[${category}] Tool "${toolName}" failed (HTTP ${statusCode}): ${error.message}. ${hint}`;
+}
 
 export { router as internalMcpRouter };
 

@@ -81,7 +81,7 @@ Categories:
 4. PROCEDURAL - Patterns learned. Workflows, techniques, approaches mastered.
 
 Scope classification (who should see this memory):
-- workspace: everyone in the organization (company facts, user preferences)
+- company: everyone in the organization (company facts, user preferences)
 - project: project team members (project decisions, architecture choices)
 - channel: channel team members (channel-specific knowledge)
 - agent: private to this agent (personal working memory, agent-specific patterns)
@@ -95,9 +95,9 @@ Rules:
 Respond ONLY with valid JSON matching this schema:
 {
   "working": "string - current state summary",
-  "episodic": [{"event": "string", "outcome": "string", "scope": "workspace|project|channel|agent"}],
-  "semantic": [{"fact": "string", "confidence": 0.0-1.0, "scope": "workspace|project|channel|agent"}],
-  "procedural": [{"pattern": "string", "steps": ["string"], "scope": "workspace|project|channel|agent"}],
+  "episodic": [{"event": "string", "outcome": "string", "scope": "company|project|channel|agent"}],
+  "semantic": [{"fact": "string", "confidence": 0.0-1.0, "scope": "company|project|channel|agent"}],
+  "procedural": [{"pattern": "string", "steps": ["string"], "scope": "company|project|channel|agent"}],
   "digest_line": "string - one-line summary"
 }`;
 

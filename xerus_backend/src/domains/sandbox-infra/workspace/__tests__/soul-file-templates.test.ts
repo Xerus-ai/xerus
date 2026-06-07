@@ -106,10 +106,10 @@ describe('soul-file-templates', () => {
     });
 
     describe('bootstrap template', () => {
-        it('should start with Bootstrap heading', () => {
+        it('should start with Getting Started heading', () => {
             const files = buildAllSoulFiles(context);
 
-            expect(files.bootstrap.startsWith('# Bootstrap')).toBe(true);
+            expect(files.bootstrap.startsWith('# Getting Started with')).toBe(true);
         });
 
         it('should have null completed_at', () => {
@@ -123,7 +123,7 @@ describe('soul-file-templates', () => {
 
             expect(files.bootstrap).toContain('Read workspace CLAUDE.md');
             expect(files.bootstrap).toContain('SOUL.md');
-            expect(files.bootstrap).toContain('Introduce yourself');
+            expect(files.bootstrap).toContain('Introduce myself');
             expect(files.bootstrap).toContain('Mark bootstrap complete');
         });
     });

@@ -122,27 +122,36 @@ export function createGitMemoryServiceAdapter(
             return { commitSha: result?.sha || '' };
         },
         triggerIndexing(workspaceId: string, commitSha: string): void {
-            // Fire-and-forget: read files from the specific commit and emit
+            // Fire-and-forget with retry: read files from the specific commit and emit
             // individual trigger_indexing events with content included.
             // Uses getFilesInCommit (git show) to get exactly the files in the commit,
             // not getChangedFiles (git diff) which compares against working tree.
             void (async () => {
-                try {
-                    const changedFiles = await gitRepo.getFilesInCommit(commitSha);
-                    for (const filePath of changedFiles) {
-                        try {
-                            const content = await gitRepo.readFile(filePath);
-                            emitTriggerIndexing(emitter, agentSlug, {
-                                filePath, workspaceId, content,
-                                memoryType: inferMemoryType(filePath),
-                                scope: inferMemoryScope(filePath),
-                            });
-                        } catch (fileErr) {
-                            log.error('triggerIndexing: failed to read file', { file_path: filePath, error: (fileErr as Error).message });
+                const MAX_RETRIES = 2;
+                for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+                    try {
+                        const changedFiles = await gitRepo.getFilesInCommit(commitSha);
+                        for (const filePath of changedFiles) {
+                            try {
+                                const content = await gitRepo.readFile(filePath);
+                                emitTriggerIndexing(emitter, agentSlug, {
+                                    filePath, workspaceId, content,
+                                    memoryType: inferMemoryType(filePath),
+                                    scope: inferMemoryScope(filePath),
+                                });
+                            } catch (fileErr) {
+                                log.error('triggerIndexing: failed to read file', { file_path: filePath, error: (fileErr as Error).message });
+                            }
+                        }
+                        return;
+                    } catch (err) {
+                        if (attempt < MAX_RETRIES) {
+                            log.warn('triggerIndexing: retrying after failure', { attempt: attempt + 1, error: (err as Error).message });
+                            await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+                        } else {
+                            log.error('triggerIndexing: failed after retries', { commit: commitSha, error: (err as Error).message });
                         }
                     }
-                } catch (err) {
-                    log.error('triggerIndexing: failed to list changed files', { error: (err as Error).message });
                 }
             })();
         },
@@ -292,10 +301,14 @@ export function createSandboxDRMCompressor(
 
 const MEMORY_TYPE_MAP: Record<string, string> = {
     'working': 'working',
-    'episodic': 'expertise',
-    'semantic': 'learnings',
-    'procedural': 'patterns',
+    'expertise': 'expertise',
+    'episodic': 'episodic',
+    'semantic': 'semantic',
+    'procedural': 'procedural',
+    'learnings': 'semantic',
+    'patterns': 'procedural',
     'digest': 'context',
+    'context': 'context',
 };
 
 function inferMemoryType(filePath: string): string {
@@ -305,7 +318,11 @@ function inferMemoryType(filePath: string): string {
 
 function inferMemoryScope(filePath: string): string {
     if (filePath.startsWith('agents/')) return 'agent';
-    if (filePath.startsWith('shared/')) return 'user';
-    if (filePath.startsWith('company/')) return 'entity';
+    if (filePath.startsWith('shared/')) return 'company';
+    if (filePath.startsWith('company/')) return 'company';
+    if (filePath.startsWith('user/')) return 'user';
+    if (filePath.startsWith('entities/')) return 'entity';
+    if (filePath.startsWith('topics/')) return 'topic';
+    if (filePath.startsWith('projects/')) return 'project';
     return 'agent';
 }

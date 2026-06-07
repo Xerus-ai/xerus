@@ -8,6 +8,9 @@ import { InternalMcpRequest, McpToolResult } from './types';
 import { escapeSQL, escapeLikePattern, executeWorkspaceJsonQuery, executeWorkspaceQuery } from '../../conversations/workspace-db.helpers';
 import { requireRunningSandbox, getDaytonaProvider } from '../../sandbox-infra/sandbox/sandbox-route-helpers';
 import type { SandboxService } from '../../sandbox-infra/sandbox/sandbox.service';
+import { buildScaffoldFilesFromRow } from '../../sandbox-infra/scaffold/scaffold-payload.service';
+import { SANDBOX_CONFIG } from '../../sandbox-infra/sandbox/sandbox.config';
+import { workspaceSSEBroadcaster } from '../../drive';
 
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 const MAX_RESULTS = 100;
@@ -29,6 +32,27 @@ function getSandboxService(): SandboxService {
     return _sandboxService;
 }
 
+async function writeScaffoldFilesToSandbox(
+    provider: ReturnType<typeof getDaytonaProvider>,
+    sandboxId: string,
+    files: Array<{ path: string; content: string }>,
+): Promise<void> {
+    const basePath = SANDBOX_CONFIG.workspacePath;
+    const HEREDOC = 'XERUS_SCAFFOLD_EOF_9c1a';
+    for (const file of files) {
+        if (file.content.includes(HEREDOC)) {
+            throw new Error(`Scaffold file content for ${file.path} contains reserved heredoc delimiter`);
+        }
+        const fullPath = `${basePath}/${file.path}`;
+        const dirPath = fullPath.substring(0, fullPath.lastIndexOf('/'));
+        const writeCmd = `mkdir -p ${dirPath} && cat > ${fullPath} << '${HEREDOC}'\n${file.content}\n${HEREDOC}`;
+        const { exitCode } = await provider.executeCommand(sandboxId, writeCmd);
+        if (exitCode !== 0) {
+            throw new Error(`Failed to write scaffold file ${file.path} to sandbox (exit ${exitCode})`);
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // workspace.db row types
 // ---------------------------------------------------------------------------
@@ -46,6 +70,20 @@ interface WorkspaceAgentRow {
     updated_at: string;
 }
 
+function formatAgentListResult(rows: WorkspaceAgentRow[]): McpToolResult {
+    return {
+        success: true,
+        data: {
+            agents: rows.map(row => ({
+                slug: row.slug, name: row.name, adapter_type: row.adapter_type,
+                role: row.role, autonomy_level: row.autonomy_level,
+                status: row.status, installed_at: row.installed_at,
+            })),
+            total: rows.length,
+        },
+    };
+}
+
 const router = Router();
 
 // POST /mcp/search_agents
@@ -53,43 +91,19 @@ router.post('/search_agents', async (req: InternalMcpRequest, res: Response, nex
     try {
         const { query: searchQuery } = req.body;
         const userId = req.sandbox!.userId;
-
         if (!searchQuery || typeof searchQuery !== 'string') {
             throw new BadRequestError('query is required');
         }
-
         const sandboxService = getSandboxService();
         const sandboxId = await requireRunningSandbox(sandboxService, userId);
         const provider = getDaytonaProvider(sandboxService);
-
         const escaped = escapeLikePattern(searchQuery);
-
-        // workspace.db is per-user, so all agents are accessible regardless of scope
         const sql = `SELECT slug, name, adapter_type, role, autonomy_level, status, installed_at
                    FROM agents
                    WHERE slug LIKE '%${escaped}%' ESCAPE '\\' OR name LIKE '%${escaped}%' ESCAPE '\\'
-                   ORDER BY slug
-                   LIMIT ${MAX_RESULTS}`;
-
+                   ORDER BY slug LIMIT ${MAX_RESULTS}`;
         const rows = await executeWorkspaceJsonQuery<WorkspaceAgentRow>(provider, sandboxId, sql);
-
-        const mcpResult: McpToolResult = {
-            success: true,
-            data: {
-                agents: rows.map(row => ({
-                    slug: row.slug,
-                    name: row.name,
-                    adapter_type: row.adapter_type,
-                    role: row.role,
-                    autonomy_level: row.autonomy_level,
-                    status: row.status,
-                    installed_at: row.installed_at,
-                })),
-                total: rows.length,
-            },
-        };
-
-        res.json(mcpResult);
+        res.json(formatAgentListResult(rows));
     } catch (error) {
         next(error);
     }
@@ -99,35 +113,13 @@ router.post('/search_agents', async (req: InternalMcpRequest, res: Response, nex
 router.post('/list_agents', async (req: InternalMcpRequest, res: Response, next: NextFunction) => {
     try {
         const userId = req.sandbox!.userId;
-
         const sandboxService = getSandboxService();
         const sandboxId = await requireRunningSandbox(sandboxService, userId);
         const provider = getDaytonaProvider(sandboxService);
-
         const sql = `SELECT slug, name, adapter_type, role, autonomy_level, status, installed_at
-                     FROM agents
-                     ORDER BY status ASC, slug ASC
-                     LIMIT ${MAX_RESULTS}`;
-
+                     FROM agents ORDER BY status ASC, slug ASC LIMIT ${MAX_RESULTS}`;
         const rows = await executeWorkspaceJsonQuery<WorkspaceAgentRow>(provider, sandboxId, sql);
-
-        const mcpResult: McpToolResult = {
-            success: true,
-            data: {
-                agents: rows.map(row => ({
-                    slug: row.slug,
-                    name: row.name,
-                    adapter_type: row.adapter_type,
-                    role: row.role,
-                    autonomy_level: row.autonomy_level,
-                    status: row.status,
-                    installed_at: row.installed_at,
-                })),
-                total: rows.length,
-            },
-        };
-
-        res.json(mcpResult);
+        res.json(formatAgentListResult(rows));
     } catch (error) {
         next(error);
     }
@@ -175,6 +167,52 @@ router.post('/create_agent', async (req: InternalMcpRequest, res: Response, next
             throw new BadRequestError(`Agent with slug "${agentSlug}" already exists`);
         }
 
+        // Write scaffold files (config.json, SOUL.md, STATUS.md, etc.) to sandbox filesystem
+        const scaffoldFiles = buildScaffoldFilesFromRow(
+            {
+                name,
+                description,
+                ai_model: model,
+                autonomy_level: autonomy,
+                thinking_level: null,
+                personality_type: null,
+                domain: null,
+                primary_channel: null,
+                channels: Array.isArray(req.body.channels) ? req.body.channels : [],
+                slug: agentSlug,
+            },
+            agentSlug,
+            [],
+        );
+        await writeScaffoldFilesToSandbox(provider, sandboxId, scaffoldFiles);
+
+        // Write system_prompt as agent.md for the agent
+        const PROMPT_HEREDOC = 'XERUS_PROMPT_EOF_8f3d';
+        if (system_prompt.includes(PROMPT_HEREDOC)) {
+            throw new BadRequestError('system_prompt contains reserved heredoc delimiter');
+        }
+        const promptPath = `${SANDBOX_CONFIG.workspacePath}/agents/${agentSlug}/agent.md`;
+        const writePromptCmd = `cat > ${promptPath} << '${PROMPT_HEREDOC}'\n${system_prompt}\n${PROMPT_HEREDOC}`;
+        const { exitCode: promptExitCode } = await provider.executeCommand(sandboxId, writePromptCmd);
+        if (promptExitCode !== 0) {
+            throw new Error(`Failed to write agent.md for ${agentSlug} (exit ${promptExitCode})`);
+        }
+
+        // Auto-populate channel_members for channels listed in the agent's config
+        const channels: string[] = Array.isArray(req.body.channels) ? req.body.channels : [];
+        if (channels.length > 0) {
+            const memberInserts = channels.map((ch: string) =>
+                `INSERT OR IGNORE INTO channel_members (channel_slug, agent_slug, role) VALUES ('${escapeSQL(String(ch))}', '${escapeSQL(agentSlug)}', 'member')`,
+            );
+            const leadUpdates = channels.map((ch: string) =>
+                `UPDATE channels SET lead_agent_slug = '${escapeSQL(agentSlug)}' WHERE slug = '${escapeSQL(String(ch))}' AND lead_agent_slug IS NULL`,
+            );
+            await executeWorkspaceQuery(
+                provider, sandboxId,
+                `BEGIN;\n${memberInserts.join(';\n')};\n${leadUpdates.join(';\n')};\nCOMMIT;`,
+            );
+        }
+
         const row = rows[0];
         const mcpResult: McpToolResult = {
             success: true,
@@ -190,6 +228,11 @@ router.post('/create_agent', async (req: InternalMcpRequest, res: Response, next
                 },
             },
         };
+
+        workspaceSSEBroadcaster.broadcastFileChanged(userId, {
+            type: 'file_changed', path: `agents/${agentSlug}/config.json`, action: 'created',
+            timestamp: new Date().toISOString(),
+        });
 
         res.json(mcpResult);
     } catch (error) {
@@ -247,6 +290,26 @@ router.post('/clone_agent', async (req: InternalMcpRequest, res: Response, next:
             throw new BadRequestError(`Agent with slug "${cloneSlug}" already exists`);
         }
 
+        // Write scaffold files for the cloned agent
+        const sourceConfig = source.config ? JSON.parse(source.config) : {};
+        const scaffoldFiles = buildScaffoldFilesFromRow(
+            {
+                name,
+                description: sourceConfig.description || '',
+                ai_model: sourceConfig.model || null,
+                autonomy_level: source.autonomy_level,
+                thinking_level: null,
+                personality_type: null,
+                domain: null,
+                primary_channel: null,
+                channels: [],
+                slug: cloneSlug,
+            },
+            cloneSlug,
+            [],
+        );
+        await writeScaffoldFilesToSandbox(provider, sandboxId, scaffoldFiles);
+
         const row = rows[0];
         const mcpResult: McpToolResult = {
             success: true,
@@ -261,6 +324,11 @@ router.post('/clone_agent', async (req: InternalMcpRequest, res: Response, next:
                 cloned_from: source.slug,
             },
         };
+
+        workspaceSSEBroadcaster.broadcastFileChanged(userId, {
+            type: 'file_changed', path: `agents/${cloneSlug}/config.json`, action: 'created',
+            timestamp: new Date().toISOString(),
+        });
 
         res.json(mcpResult);
     } catch (error) {
@@ -309,9 +377,14 @@ router.post('/update_agent', async (req: InternalMcpRequest, res: Response, next
         // system_prompt goes to the agent.md file on the sandbox filesystem
         if (system_prompt && typeof system_prompt === 'string') {
             const PROMPT_HEREDOC = 'XERUS_PROMPT_EOF_8f3d';
-            if (!system_prompt.includes(PROMPT_HEREDOC)) {
-                const writeCmd = `mkdir -p /home/xerus/workspace/agents/${agentSlug} && cat > /home/xerus/workspace/agents/${agentSlug}/agent.md << '${PROMPT_HEREDOC}'\n${system_prompt}\n${PROMPT_HEREDOC}`;
-                await provider.executeCommand(sandboxId, writeCmd);
+            if (system_prompt.includes(PROMPT_HEREDOC)) {
+                throw new BadRequestError('system_prompt contains reserved heredoc delimiter');
+            }
+            const agentDir = `${SANDBOX_CONFIG.workspacePath}/agents/${agentSlug}`;
+            const writeCmd = `mkdir -p ${agentDir} && cat > ${agentDir}/agent.md << '${PROMPT_HEREDOC}'\n${system_prompt}\n${PROMPT_HEREDOC}`;
+            const { exitCode: writeExitCode } = await provider.executeCommand(sandboxId, writeCmd);
+            if (writeExitCode !== 0) {
+                throw new Error(`Failed to write agent.md for ${agentSlug} (exit ${writeExitCode})`);
             }
         }
 
@@ -374,6 +447,11 @@ router.post('/delete_agent', async (req: InternalMcpRequest, res: Response, next
                 agent_slug: existing[0].slug,
             },
         };
+
+        workspaceSSEBroadcaster.broadcastFileChanged(userId, {
+            type: 'file_changed', path: `agents/${existing[0].slug}`, action: 'deleted',
+            timestamp: new Date().toISOString(),
+        });
 
         res.json(mcpResult);
     } catch (error) {
