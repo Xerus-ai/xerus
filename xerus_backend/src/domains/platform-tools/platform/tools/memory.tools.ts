@@ -309,7 +309,7 @@ export class MemoryService implements MemoryServicePort {
      * The workspace_id check (derived from userId via getWorkspaceId) ensures
      * the user can only access memories in their own workspace.
      *
-     * Agent scope still validates against Neon agent_registry (not being dropped).
+     * Agent scope validates via workspace_id boundary (agent_registry dropped in migration 093).
      */
     private async verifyScopeAccess(
         _userId: string,
@@ -327,17 +327,14 @@ export class MemoryService implements MemoryServicePort {
                     throw new InvalidScopeError(scope, scopeId);
                 }
                 return;
-            case 'agent': {
-                // agent_registry table stays in Neon — validate agent belongs to user
-                const accessQuery = `SELECT 1 FROM agent_registry a
-                               WHERE a.id = $1 AND a.user_id = $2`;
-                const accessParams = [parseInt(scopeId, 10), _userId];
-                const result = await query<{ exists: number }>(accessQuery, accessParams);
-                if (result.rows.length === 0) {
-                    throw new ScopeAccessDeniedError(scope, scopeId);
+            case 'agent':
+                // Agent scope: scopeId is now agent_slug (string).
+                // Security boundary is workspace_id in all memory queries.
+                // Validate scopeId is non-empty.
+                if (!scopeId || scopeId.trim().length === 0) {
+                    throw new InvalidScopeError(scope, scopeId);
                 }
                 return;
-            }
             default:
                 return; // company scope - already verified via workspaceId
         }
@@ -353,7 +350,7 @@ export class MemoryService implements MemoryServicePort {
         const SCOPE_COLUMN_MAP: Record<string, string> = {
             'project': 'project_id',
             'channel': 'channel_id',
-            'agent': 'agent_id',
+            'agent': 'agent_slug',
         };
         return SCOPE_COLUMN_MAP[scope] ?? null;
     }
@@ -373,7 +370,7 @@ export class MemoryService implements MemoryServicePort {
             case 'channel':
                 return { columns: 'channel_id', placeholders: '$7', values: [parsed], nextIndex: 8 };
             case 'agent':
-                return { columns: 'agent_id', placeholders: '$7', values: [parsed], nextIndex: 8 };
+                return { columns: 'agent_slug', placeholders: '$7', values: [parsed], nextIndex: 8 };
             default:
                 return { columns: '', placeholders: '', values: [], nextIndex: 7 };
         }
@@ -381,22 +378,14 @@ export class MemoryService implements MemoryServicePort {
 
     /**
      * Parse scope ID to the correct type for the database column.
-     * memory_search_index columns: project_id INTEGER, channel_id INTEGER, agent_id INTEGER
-     * Source tables: domains.id UUID, channels.id UUID, agents.id INTEGER
+     * memory_search_index columns: project_id INTEGER, channel_id INTEGER, agent_slug TEXT
      *
-     * For agent scope: parse to integer (agents.id is INTEGER).
-     * For project/channel scope: pass as-is. The caller is responsible for
-     * providing numeric IDs when writing to memory_search_index INTEGER columns.
-     * If scopeId is a UUID, parseInt returns NaN which will cause a clear DB error
-     * rather than silently matching wrong rows.
+     * For agent scope: return as string (agent_slug is TEXT).
+     * For project/channel scope: parse to integer.
      */
     private parseScopeId(scope: MemoryScope, scopeId: string): number | string {
         if (scope === 'agent') {
-            const parsed = parseInt(scopeId, 10);
-            if (isNaN(parsed)) {
-                throw new InvalidScopeError(scope, scopeId);
-            }
-            return parsed;
+            return scopeId;
         }
         // project_id and channel_id are INTEGER in memory_search_index.
         // Attempt integer parse; throw if scopeId is not a valid integer.

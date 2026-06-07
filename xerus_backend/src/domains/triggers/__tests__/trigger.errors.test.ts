@@ -132,17 +132,17 @@ describe('Trigger Domain Errors', () => {
 
     describe('TriggerAlreadyExistsError', () => {
         it('should have correct status code 409', () => {
-            const error = new TriggerAlreadyExistsError(1, 'gmail', 'new_email');
+            const error = new TriggerAlreadyExistsError('gmail-watcher', 'gmail', 'new_email');
             expect(error.statusCode).toBe(409);
             expect(error.code).toBe('TRIGGER_ALREADY_EXISTS');
-            expect(error.agentId).toBe(1);
+            expect(error.agentSlug).toBe('gmail-watcher');
             expect(error.app).toBe('gmail');
             expect(error.eventType).toBe('new_email');
         });
 
         it('should format message with details', () => {
-            const error = new TriggerAlreadyExistsError(42, 'github', 'pr_opened');
-            expect(error.message).toBe('Trigger github.pr_opened already registered for agent 42');
+            const error = new TriggerAlreadyExistsError('github-bot', 'github', 'pr_opened');
+            expect(error.message).toBe('Trigger github.pr_opened already registered for agent github-bot');
         });
     });
 

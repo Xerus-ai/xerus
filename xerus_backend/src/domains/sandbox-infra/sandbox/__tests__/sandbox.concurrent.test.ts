@@ -33,6 +33,7 @@ class TestDatabase implements SandboxDatabase {
                 sandbox_resume_count: 0,
                 sandbox_template_version: null,
                 sandbox_novnc_url: null,
+                sandbox_plan: null,
             });
             return { rows: [] as T[] };
         }

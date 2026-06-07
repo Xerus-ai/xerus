@@ -63,6 +63,7 @@ function buildInitialModuleClaudeMd(opts: {
     name: string;
     description: string;
     tools: string[];
+    skills: string[];
     autonomyLevel: string;
 }): string {
     let toolsSection: string;
@@ -80,6 +81,16 @@ function buildInitialModuleClaudeMd(opts: {
         toolsSection = 'No tool integrations assigned. Use code-first approach for external API calls.';
     }
 
+    let skillsSection: string;
+    if (opts.skills.length > 0) {
+        const skillLines = opts.skills.map(s =>
+            `- **${s}** (\`.claude/skills/${s}/SKILL.md\`)`
+        ).join('\n');
+        skillsSection = `Installed skills:\n${skillLines}\n\nRead each skill's SKILL.md for detailed instructions. Skills are activated by context — use them when the task matches.`;
+    } else {
+        skillsSection = 'No specialized skills assigned. Use your general capabilities.';
+    }
+
     return `## Identity
 
 You are ${opts.name}, ${opts.description}.
@@ -90,7 +101,7 @@ No documents assigned yet. Use external research tools for information gathering
 
 ## Skills
 
-No specialized skills assigned. Use your general capabilities.
+${skillsSection}
 
 ## Connected Tools
 
@@ -126,37 +137,27 @@ Channel teammates are also available as subagent types (by slug).
 // DB Query Helpers
 // -----------------------------------------------------------------------------
 
-// agent_registry is a thin table (id, slug, user_id, agent_type, created_at).
-// Agent metadata (name, ai_model, description, etc.) lives in config.json on the workspace filesystem.
 // At scaffold time, config.json doesn't exist yet — we use slug-derived defaults.
 // The generated config.json is then written to the workspace and becomes the source of truth.
-const AGENT_ROW_QUERY = `
-    SELECT a.id, a.slug AS name, a.slug AS slug, '' AS description,
-           NULL AS ai_model, NULL AS autonomy_level, NULL AS thinking_level,
-           NULL AS personality_type, NULL AS domain, NULL AS primary_channel,
-           ARRAY[]::text[] AS channels
-     FROM agent_registry a`;
+// No NeonDB agent_registry dependency. Agent metadata is derived from the slug.
 
 /**
- * Batch-fetch agent rows for multiple agent IDs.
- * Used by workspace-health.ts to avoid N+1 queries during agent sync.
+ * Build a default AgentRow from a slug (no DB lookup needed).
+ * Used when scaffolding new agents before config.json exists.
  */
-export async function batchFetchAgentRows(
-    agentIds: number[],
-    deps: ScaffoldPayloadDeps,
-): Promise<Map<number, AgentRow>> {
-    if (agentIds.length === 0) return new Map();
-
-    const { rows } = await deps.db.query<AgentRow & { id: number }>(
-        `${AGENT_ROW_QUERY} WHERE a.id = ANY($1)`,
-        [agentIds],
-    );
-
-    const map = new Map<number, AgentRow>();
-    for (const row of rows) {
-        map.set(row.id, row);
-    }
-    return map;
+function buildDefaultAgentRow(slug: string): AgentRow {
+    return {
+        name: slug,
+        description: '',
+        ai_model: null,
+        autonomy_level: null,
+        thinking_level: null,
+        personality_type: null,
+        domain: null,
+        primary_channel: null,
+        channels: [],
+        slug,
+    };
 }
 
 // -----------------------------------------------------------------------------
@@ -164,23 +165,18 @@ export async function batchFetchAgentRows(
 // -----------------------------------------------------------------------------
 
 export async function buildScaffoldPayload(
-    agentId: number,
+    _agentId: number,
     agentSlug: string,
-    deps: ScaffoldPayloadDeps,
+    _deps: ScaffoldPayloadDeps,
 ): Promise<ScaffoldFile[]> {
-    const { rows } = await deps.db.query<AgentRow>(
-        `${AGENT_ROW_QUERY} WHERE a.id = $1`,
-        [agentId],
-    );
-
-    if (rows.length === 0) {
-        throw new Error(`Agent ID ${agentId} not found`);
-    }
+    // Agent metadata is derived from slug defaults.
+    // config.json becomes the source of truth once written to the workspace.
+    const agentRow = buildDefaultAgentRow(agentSlug);
 
     // Tools now live in config.json (filesystem). At scaffold time, no tools yet.
     const tools: string[] = [];
 
-    return buildScaffoldFilesFromRow(rows[0], agentSlug, tools);
+    return buildScaffoldFilesFromRow(agentRow, agentSlug, tools);
 }
 
 /**
@@ -191,6 +187,7 @@ export function buildScaffoldFilesFromRow(
     agent: AgentRow,
     agentSlug: string,
     tools: string[] = [],
+    skills: string[] = [],
 ): ScaffoldFile[] {
     // Build soul file templates from agent metadata
     const soulFiles = buildAllSoulFiles({
@@ -202,6 +199,7 @@ export function buildScaffoldFilesFromRow(
         slug: agentSlug,
         autonomyLevel: agent.autonomy_level || 'supervised',
         primaryChannel: agent.primary_channel || '',
+        skills,
         tools,
     });
 
@@ -245,6 +243,7 @@ export function buildScaffoldFilesFromRow(
         name: agent.name,
         description: agent.description,
         tools,
+        skills,
         autonomyLevel,
     });
     files.push({

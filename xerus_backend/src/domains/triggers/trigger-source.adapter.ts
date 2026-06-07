@@ -139,8 +139,8 @@ export abstract class BaseTriggerAdapter implements TriggerSourceAdapter {
     /**
      * Helper to build our webhook URL for this provider
      */
-    protected buildWebhookUrl(baseUrl: string, agentId: number): string {
-        return `${baseUrl}/api/v1/webhooks/triggers/${this.provider}/${agentId}`;
+    protected buildWebhookUrl(baseUrl: string, agentSlug: string): string {
+        return `${baseUrl}/api/v1/webhooks/triggers/${this.provider}/${agentSlug}`;
     }
 }
 

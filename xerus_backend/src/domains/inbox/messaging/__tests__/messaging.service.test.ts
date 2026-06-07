@@ -73,17 +73,19 @@ class FilesystemWorkspaceWriter {
 const TEST_PREFIX = 'xmessaging_' + Date.now();
 
 class DatabaseAgentResolver {
+    private knownSlugs = new Set<string>();
+
+    registerSlug(slug: string): void {
+        this.knownSlugs.add(slug);
+    }
+
     async resolveAgent(slug: string): Promise<{ id: number; slug: string; model: string } | null> {
-        const result = await query<{ id: number; slug: string }>(
-            `SELECT id, slug FROM agent_registry WHERE slug = $1 LIMIT 1`,
-            [slug]
-        );
-        if (result.rows.length === 0) return null;
-        return { id: result.rows[0].id, slug: result.rows[0].slug, model: 'claude-3-5-sonnet' };
+        if (!this.knownSlugs.has(slug)) return null;
+        return { id: 0, slug, model: 'claude-3-5-sonnet' };
     }
 
     clear(): void {
-        // No-op for DB-backed resolver
+        this.knownSlugs.clear();
     }
 }
 
@@ -102,31 +104,9 @@ async function seedTestData(): Promise<void> {
         [TEST_USER_ID, email, 'Test User']
     );
 
-    // Create test agents
-    await query(
-        `INSERT INTO agent_registry (slug, user_id, agent_type)
-         VALUES ($1, $2, $3) ON CONFLICT (slug, user_id) DO NOTHING`,
-        [TEST_PREFIX + '_researcher', TEST_USER_ID, 'private']
-    );
-    await query(
-        `INSERT INTO agent_registry (slug, user_id, agent_type)
-         VALUES ($1, $2, $3) ON CONFLICT (slug, user_id) DO NOTHING`,
-        [TEST_PREFIX + '_analyst', TEST_USER_ID, 'private']
-    );
-    await query(
-        `INSERT INTO agent_registry (slug, user_id, agent_type)
-         VALUES ($1, $2, $3) ON CONFLICT (slug, user_id) DO NOTHING`,
-        [TEST_PREFIX + '_coder', TEST_USER_ID, 'private']
-    );
-    await query(
-        `INSERT INTO agent_registry (slug, user_id, agent_type)
-         VALUES ($1, $2, $3) ON CONFLICT (slug, user_id) DO NOTHING`,
-        [TEST_PREFIX + '_helper', TEST_USER_ID, 'private']
-    );
 }
 
 async function cleanupTestData(): Promise<void> {
-    await query(`DELETE FROM agent_registry WHERE slug LIKE $1`, [TEST_PREFIX + '%']);
     await query(`DELETE FROM users WHERE user_id LIKE $1`, [TEST_PREFIX + '%']);
 }
 
@@ -256,6 +236,10 @@ describe('MessageRouter', () => {
 
         workspaceWriter = new FilesystemWorkspaceWriter(tmpDir);
         agentResolver = new DatabaseAgentResolver();
+        agentResolver.registerSlug(RESEARCHER);
+        agentResolver.registerSlug(ANALYST);
+        agentResolver.registerSlug(CODER);
+        agentResolver.registerSlug(HELPER);
 
         const deps: MessageRouterDeps = {
             workspaceWriter,

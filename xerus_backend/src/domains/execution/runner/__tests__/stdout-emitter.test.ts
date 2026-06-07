@@ -76,17 +76,6 @@ describe('StdoutEmitter', () => {
         expect(event.agent_slug).toBe('seo-writer');
     });
 
-    it('emits heartbeat_fired event', () => {
-        const { writable, lines } = createCapture();
-        const emitter = new StdoutEmitter(writable);
-
-        emitter.heartbeatFired('seo-writer');
-
-        const event = parseEvent(lines[0]);
-        expect(event.event).toBe('heartbeat_fired');
-        expect(event.agent_slug).toBe('seo-writer');
-    });
-
     it('emits agent_message event', () => {
         const { writable, lines } = createCapture();
         const emitter = new StdoutEmitter(writable);

@@ -9,6 +9,8 @@ import { authenticateFirebaseToken } from '../../middleware/auth';
 import { agentToolsService } from './service';
 import { AgentUnauthorizedError } from './errors';
 import { resolveAgentParam } from './resolve-agent-param';
+import { getAgentSandboxService } from './routes';
+import { requireRunningSandbox, getDaytonaProvider } from '../sandbox-infra/sandbox/sandbox-route-helpers';
 
 const router = Router();
 const auth = authenticateFirebaseToken;
@@ -21,8 +23,12 @@ router.get('/:id/tools', auth, async (req: AuthenticatedRequest, res: Response, 
             throw new AgentUnauthorizedError();
         }
 
-        const resolved = await resolveAgentParam(req.params.id, req.user.uid);
-        const tools = await agentToolsService.getTools(resolved.id, req.user.uid);
+        const sandboxService = getAgentSandboxService();
+        const sbId = await requireRunningSandbox(sandboxService, req.user.uid);
+        const provider = getDaytonaProvider(sandboxService);
+
+        const resolved = await resolveAgentParam(req.params.id, req.user.uid, provider, sbId);
+        const tools = await agentToolsService.getTools(resolved.id, req.user.uid, provider, sbId);
 
         sendResponse(res, 200, { tools }, startTime);
     } catch (err) {
@@ -38,13 +44,17 @@ router.post('/:id/tools', auth, async (req: AuthenticatedRequest, res: Response,
             throw new AgentUnauthorizedError();
         }
 
-        const resolved = await resolveAgentParam(req.params.id, req.user.uid);
+        const sandboxService = getAgentSandboxService();
+        const sbId = await requireRunningSandbox(sandboxService, req.user.uid);
+        const provider = getDaytonaProvider(sandboxService);
+
+        const resolved = await resolveAgentParam(req.params.id, req.user.uid, provider, sbId);
         const appSlug = req.body.app_slug || req.body.tool_name;
         if (!appSlug) {
             throw new BadRequestError('app_slug is required');
         }
 
-        const tools = await agentToolsService.addTool(resolved.id, appSlug, req.user.uid);
+        const tools = await agentToolsService.addTool(resolved.id, appSlug, req.user.uid, provider, sbId);
 
         sendResponse(res, 201, { tools, added: appSlug }, startTime);
     } catch (err) {
@@ -60,8 +70,12 @@ router.delete('/:id/tools/:appSlug', auth, async (req: AuthenticatedRequest, res
             throw new AgentUnauthorizedError();
         }
 
-        const resolved = await resolveAgentParam(req.params.id, req.user.uid);
-        const tools = await agentToolsService.removeTool(resolved.id, req.params.appSlug, req.user.uid);
+        const sandboxService = getAgentSandboxService();
+        const sbId = await requireRunningSandbox(sandboxService, req.user.uid);
+        const provider = getDaytonaProvider(sandboxService);
+
+        const resolved = await resolveAgentParam(req.params.id, req.user.uid, provider, sbId);
+        const tools = await agentToolsService.removeTool(resolved.id, req.params.appSlug, req.user.uid, provider, sbId);
 
         sendResponse(res, 200, { tools, removed: req.params.appSlug }, startTime);
     } catch (err) {

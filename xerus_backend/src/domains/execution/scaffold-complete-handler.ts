@@ -1,9 +1,8 @@
 // Scaffold Complete Handler
 // Handles the scaffold_complete event from the runner when a new agent is created.
-// Registers the agent in the Neon DB registry and updates the workspace agent index.
+// Updates workspace agent status. workspace.db registration handled by scaffold-sync-hook.
 
 import { logger } from '../../utils/logger';
-import { agentRegistryRepository } from '../agents/agent-registry.repository';
 import type { PipelineContext, ResolvedExecutionDeps } from './execution-pipeline.types';
 import type { StreamEventType } from './types';
 
@@ -42,16 +41,9 @@ export async function handleScaffoldComplete(
 
     const userId = ctx.request.userId;
 
-    try {
-        await agentRegistryRepository.register(data.agent_slug, userId, data.agent_type || 'private');
-        log.info('Agent registered', { slug: data.agent_slug, user_id: userId });
-    } catch (err) {
-        log.error('Failed to register agent in registry', { slug: data.agent_slug, error: (err as Error).message });
-        ctx.stream.send('error' as StreamEventType, {
-            message: `Failed to register agent "${data.agent_slug}" — it may not appear in your agent list until the next sync.`,
-        });
-        return;
-    }
+    // Agent registration in workspace.db is handled by the scaffold-sync-hook
+    // on the sandbox. Here we just update the agent's status to 'idle'.
+    log.info('Agent scaffold complete', { slug: data.agent_slug, user_id: userId });
 
     // Update workspace.db agent status
     try {

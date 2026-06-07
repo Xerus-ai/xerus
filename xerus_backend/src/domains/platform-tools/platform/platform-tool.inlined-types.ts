@@ -430,7 +430,7 @@ export interface DeregisterTriggerInput {
 
 export interface TriggerResult {
     id: number;
-    agentId: number;
+    agentId: string;
     appSlug: string;
     eventType: string;
     webhookUrl: string;

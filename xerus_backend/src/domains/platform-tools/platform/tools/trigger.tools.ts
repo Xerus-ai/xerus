@@ -14,11 +14,10 @@ import type {
     TriggerResult,
 } from '../platform-tool.inlined-types';
 import type { TriggerServicePort } from '../platform-tool.types';
-import { AgentNotFoundError } from '../../../agents/errors';
 import { TriggerNotFoundError, TriggerAlreadyExistsError } from '../../../triggers/trigger.errors';
 
 // Re-export for consumers of this module
-export { AgentNotFoundError, TriggerNotFoundError, TriggerAlreadyExistsError };
+export { TriggerNotFoundError, TriggerAlreadyExistsError };
 
 // -----------------------------------------------------------------------------
 // Constants
@@ -55,7 +54,7 @@ export class UnauthorizedTriggerAccessError extends Error {
 
 interface TriggerRow {
     id: number;
-    agent_id: number;
+    agent_slug: string;
     app_slug: string;
     event_type: string;
     webhook_url: string;
@@ -75,21 +74,16 @@ export class TriggerService implements TriggerServicePort {
         userId: string,
         input: RegisterTriggerInput
     ): Promise<RegisterTriggerResult> {
-        const { agentId, appSlug, eventType, filterConfig = {} } = input;
-
-        const agentExists = await this.verifyAgentOwnership(userId, agentId);
-        if (!agentExists) {
-            throw new AgentNotFoundError(agentId);
-        }
+        const { agentId: agentSlug, appSlug, eventType, filterConfig = {} } = input;
 
         const existingResult = await query<{ id: number }>(
             `SELECT id FROM agent_triggers
-             WHERE agent_id = $1 AND app_slug = $2 AND event_type = $3`,
-            [parseInt(agentId, 10), appSlug, eventType]
+             WHERE agent_slug = $1 AND app_slug = $2 AND event_type = $3 AND user_id = $4`,
+            [agentSlug, appSlug, eventType, userId]
         );
 
         if (existingResult.rows.length > 0) {
-            throw new TriggerAlreadyExistsError(parseInt(agentId, 10), appSlug, eventType);
+            throw new TriggerAlreadyExistsError(agentSlug, appSlug, eventType);
         }
 
         const externalId = crypto.randomBytes(16).toString('hex');
@@ -97,12 +91,12 @@ export class TriggerService implements TriggerServicePort {
 
         const result = await query<TriggerRow>(
             `INSERT INTO agent_triggers (
-                agent_id, user_id, provider_id, app_slug, event_type,
+                agent_slug, user_id, provider_id, app_slug, event_type,
                 external_id, webhook_url, filter_config, enabled, created_at, updated_at
              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, true, NOW(), NOW())
-             RETURNING id, agent_id, app_slug, event_type, webhook_url, enabled,
+             RETURNING id, agent_slug, app_slug, event_type, webhook_url, enabled,
                        filter_config, fire_count, created_at`,
-            [parseInt(agentId, 10), userId, DEFAULT_PROVIDER_ID, appSlug, eventType,
+            [agentSlug, userId, DEFAULT_PROVIDER_ID, appSlug, eventType,
              externalId, webhookUrl, JSON.stringify(filterConfig)]
         );
 
@@ -114,20 +108,15 @@ export class TriggerService implements TriggerServicePort {
         userId: string,
         input: ListTriggersInput
     ): Promise<ListTriggersResult> {
-        const { agentId, enabled } = input;
+        const { agentId: agentSlug, enabled } = input;
 
-        const agentExists = await this.verifyAgentOwnership(userId, agentId);
-        if (!agentExists) {
-            throw new AgentNotFoundError(agentId);
-        }
-
-        let queryText = `SELECT id, agent_id, app_slug, event_type, webhook_url, enabled,
+        let queryText = `SELECT id, agent_slug, app_slug, event_type, webhook_url, enabled,
                                 filter_config, last_fired_at, fire_count, created_at
-                         FROM agent_triggers WHERE agent_id = $1`;
-        const params: unknown[] = [parseInt(agentId, 10)];
+                         FROM agent_triggers WHERE agent_slug = $1 AND user_id = $2`;
+        const params: unknown[] = [agentSlug, userId];
 
         if (enabled !== undefined) {
-            queryText += ` AND enabled = $2`;
+            queryText += ` AND enabled = $3`;
             params.push(enabled);
         }
 
@@ -163,19 +152,10 @@ export class TriggerService implements TriggerServicePort {
         return { triggerId, deregisteredAt: new Date().toISOString() };
     }
 
-    private async verifyAgentOwnership(userId: string, agentId: string): Promise<boolean> {
-        const result = await query<{ id: number }>(
-            `SELECT a.id FROM agent_registry a
-             WHERE a.id = $1 AND a.user_id = $2`,
-            [parseInt(agentId, 10), userId]
-        );
-        return result.rows.length > 0;
-    }
-
     private mapRowToTrigger(row: TriggerRow): TriggerResult {
         return {
             id: row.id,
-            agentId: row.agent_id,
+            agentId: row.agent_slug,
             appSlug: row.app_slug,
             eventType: row.event_type,
             webhookUrl: row.webhook_url,

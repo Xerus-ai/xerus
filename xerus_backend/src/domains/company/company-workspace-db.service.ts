@@ -124,6 +124,12 @@ export async function createChannel(
     name: string,
     description: string,
 ): Promise<ChannelRow> {
+    if (!slug.includes('--')) {
+        throw new Error(
+            `Invalid channel slug "${slug}": must use "domain--channel" format (e.g. "${domainSlug}--${slug}"). ` +
+            `Bare slugs are not allowed because normalizeChannelId() requires the "--" separator.`,
+        );
+    }
     const now = new Date().toISOString();
     const sql = `
         BEGIN;

@@ -18,11 +18,10 @@ export type {
     SyncQueryResult,
 } from './metadata-sync';
 
-// Scaffold exports (used by workspace-health for agent sync)
+// Scaffold exports
 export {
     buildScaffoldPayload,
     buildScaffoldFilesFromRow,
-    batchFetchAgentRows,
 } from './scaffold/scaffold-payload.service';
 export type { ScaffoldPayloadDeps } from './scaffold/scaffold-payload.service';
 export { scaffoldAgent } from './scaffold/scaffold-writer';

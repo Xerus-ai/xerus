@@ -18,6 +18,16 @@ function requireInt(value: string, name: string): number {
     return parsed;
 }
 
+/**
+ * Parse and validate non-empty string input.
+ */
+function requireString(value: unknown, name: string): string {
+    if (typeof value !== 'string' || value.length === 0) {
+        throw new BadRequestError(`${name} must be a non-empty string`);
+    }
+    return value;
+}
+
 const router = Router();
 
 // POST /api/v1/internal/mcp/register_trigger
@@ -26,24 +36,10 @@ router.post('/register_trigger', async (req: InternalMcpRequest, res: Response, 
         const { agent_slug, trigger_type, config } = req.body;
         const userId = req.sandbox!.userId;
 
-        if (!agent_slug) {
-            throw new BadRequestError('agent_slug is required');
-        }
+        requireString(agent_slug, 'agent_slug');
         if (!trigger_type) {
             throw new BadRequestError('trigger_type is required');
         }
-
-        // Look up agent_id from slug
-        const agentResult = await query<{ id: number }>(
-            `SELECT id FROM agent_registry WHERE slug = $1 AND (user_id = $2 OR agent_type = 'system')`,
-            [agent_slug, userId]
-        );
-
-        if (agentResult.rows.length === 0) {
-            throw new BadRequestError(`Agent not found: ${agent_slug}`);
-        }
-
-        const agentId = agentResult.rows[0].id;
 
         // Parse trigger_type into app_slug and event_type
         // Expected format: "app.event" e.g., "slack.new_message"
@@ -53,7 +49,7 @@ router.post('/register_trigger', async (req: InternalMcpRequest, res: Response, 
 
         const triggerService = getTriggerService();
         const result = await triggerService.registerTrigger(userId, {
-            agentId: String(agentId),
+            agentId: agent_slug,
             appSlug,
             eventType,
             filterConfig: config || {},
@@ -112,24 +108,42 @@ router.post('/list_triggers', async (req: InternalMcpRequest, res: Response, nex
         const { agent_slug } = req.body;
         const userId = req.sandbox!.userId;
 
-        let queryText = `SELECT t.id, t.agent_id, ar.slug as agent_slug, t.app_slug,
-                         t.event_type, t.enabled, t.webhook_url, t.created_at
-                         FROM triggers t
-                         JOIN agent_registry ar ON t.agent_id = ar.id
-                         WHERE ar.user_id = $1`;
-        const params: unknown[] = [userId];
+        const triggerService = getTriggerService();
 
         if (agent_slug) {
-            queryText += ` AND ar.slug = $2`;
-            params.push(agent_slug);
+            const listResult = await triggerService.listTriggers(userId, {
+                agentId: agent_slug,
+            });
+
+            const mcpResult: McpToolResult = {
+                success: true,
+                data: {
+                    triggers: listResult.triggers.map(t => ({
+                        trigger_id: t.id,
+                        agent_slug: t.agentId,
+                        app_slug: t.appSlug,
+                        event_type: t.eventType,
+                        enabled: t.enabled,
+                        webhook_url: t.webhookUrl,
+                        created_at: t.createdAt,
+                    })),
+                    total: listResult.totalCount,
+                },
+            };
+
+            res.json(mcpResult);
+            return;
         }
 
-        queryText += ` ORDER BY t.created_at DESC`;
-
+        // No agent_slug filter: list all triggers for the user
         const result = await query<{
             id: number; agent_slug: string; app_slug: string;
             event_type: string; enabled: boolean; webhook_url: string; created_at: Date;
-        }>(queryText, params);
+        }>(
+            `SELECT id, agent_slug, app_slug, event_type, enabled, webhook_url, created_at
+             FROM agent_triggers WHERE user_id = $1 ORDER BY created_at DESC`,
+            [userId]
+        );
 
         const mcpResult: McpToolResult = {
             success: true,

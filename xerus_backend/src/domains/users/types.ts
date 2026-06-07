@@ -111,7 +111,6 @@ export interface DeleteUserResult {
     deleted: boolean;
     user_id: string;
     cleanup: {
-        agents_deleted: number;
         api_keys_deleted: number;
     };
 }

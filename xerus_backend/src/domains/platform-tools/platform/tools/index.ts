@@ -23,7 +23,6 @@ export {
     getTriggerService,
     resetTriggerService,
     TriggerNotFoundError,
-    AgentNotFoundError,
     TriggerAlreadyExistsError,
     UnauthorizedTriggerAccessError,
 } from './trigger.tools';

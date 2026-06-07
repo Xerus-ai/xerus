@@ -49,6 +49,7 @@ class TestDatabase implements SandboxDatabase {
             sandbox_resume_count: 0,
             sandbox_template_version: null,
             sandbox_novnc_url: null,
+            sandbox_plan: null,
         });
         return { rows: [] };
     }
@@ -927,6 +928,7 @@ describe('SandboxService Error Recovery', () => {
             sandbox_resume_count: 0,
             sandbox_template_version: null,
             sandbox_novnc_url: null,
+            sandbox_plan: null,
         });
 
         await provider.create({});
@@ -979,6 +981,7 @@ describe('SandboxService Error Recovery', () => {
             sandbox_resume_count: 0,
             sandbox_template_version: null,
             sandbox_novnc_url: null,
+            sandbox_plan: null,
         });
 
         const result = await service.killSandbox('orphan-user');
@@ -1005,6 +1008,7 @@ describe('SandboxService Error Recovery', () => {
             sandbox_resume_count: 2,
             sandbox_template_version: null,
             sandbox_novnc_url: null,
+            sandbox_plan: null,
         });
 
         const status = await service.getSandboxStatus('user-1');

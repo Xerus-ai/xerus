@@ -184,10 +184,10 @@ export class UserRepository {
         return mapUserRow(result.rows[0]);
     }
 
-    async delete(userId: string): Promise<{ agents_deleted: number; api_keys_deleted: number }> {
+    async delete(userId: string): Promise<{ api_keys_deleted: number }> {
         return transaction(async (client: PoolClient) => {
-            // Delete related Neon data first
-            const agentsResult = await client.query('DELETE FROM agent_registry WHERE user_id = $1', [userId]);
+            // Agents live in workspace-DB (per-sandbox SQLite).
+            // They are cleaned up when the sandbox is deleted.
 
             // Conversations live in workspace-DB (per-sandbox SQLite).
             // They are cleaned up when the sandbox is deleted.
@@ -202,7 +202,6 @@ export class UserRepository {
             }
 
             return {
-                agents_deleted: agentsResult.rowCount || 0,
                 api_keys_deleted: apiKeysResult.rowCount || 0,
             };
         });

@@ -41,7 +41,7 @@ class TestAdapter extends BaseTriggerAdapter {
     async register(config: TriggerRegistration): Promise<TriggerRegistrationResult> {
         return {
             external_id: `sub_${config.app}_${config.event_type}_${Date.now()}`,
-            webhook_url: this.buildWebhookUrl('https://api.xerus.ai', config.agent_id),
+            webhook_url: this.buildWebhookUrl('https://api.xerus.ai', config.agent_slug),
         };
     }
 
@@ -121,17 +121,17 @@ describe('TriggerSourceAdapter Interface', () => {
         describe('register', () => {
             it('should register a trigger and return external_id', async () => {
                 const config: TriggerRegistration = {
-                    agent_id: 1,
+                    agent_slug: 'test-agent',
                     user_id: 'user_123',
                     app: 'gmail',
                     event_type: 'new_email',
                     account_id: 'acct_abc',
-                    webhook_url: 'https://api.xerus.ai/webhooks/triggers/pipedream/1',
+                    webhook_url: 'https://api.xerus.ai/webhooks/triggers/pipedream/test-agent',
                 };
 
                 const result = await adapter.register(config);
                 expect(result.external_id).toContain('sub_gmail_new_email_');
-                expect(result.webhook_url).toBe('https://api.xerus.ai/api/v1/webhooks/triggers/pipedream/1');
+                expect(result.webhook_url).toBe('https://api.xerus.ai/api/v1/webhooks/triggers/pipedream/test-agent');
             });
         });
 
@@ -188,7 +188,7 @@ describe('TriggerSourceAdapter Interface', () => {
         describe('helper methods', () => {
             it('buildWebhookUrl should build correct URL', async () => {
                 const config: TriggerRegistration = {
-                    agent_id: 42,
+                    agent_slug: 'github-bot',
                     user_id: 'user_123',
                     app: 'github',
                     event_type: 'pr_opened',
@@ -197,7 +197,8 @@ describe('TriggerSourceAdapter Interface', () => {
                 };
 
                 const result = await adapter.register(config);
-                expect(result.webhook_url).toBe('https://api.xerus.ai/api/v1/webhooks/triggers/pipedream/42');
+                // webhook URL uses agent_slug from config
+                expect(result.webhook_url).toContain('/api/v1/webhooks/triggers/pipedream/github-bot');
             });
         });
     });

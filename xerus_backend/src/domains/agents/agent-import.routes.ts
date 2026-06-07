@@ -12,6 +12,8 @@ import { validateSlug } from '../../shared/slugify';
 import { parseFrontmatter } from '../../shared/parse-frontmatter';
 import { agentService } from './service';
 import { AgentUnauthorizedError } from './errors';
+import { getAgentSandboxService } from './routes';
+import { requireRunningSandbox, getDaytonaProvider } from '../sandbox-infra/sandbox/sandbox-route-helpers';
 
 const router = Router();
 
@@ -91,8 +93,12 @@ router.post(
                 autonomy_level: frontmatter.autonomy_level || configData.autonomy_level || undefined,
             };
 
-            // Use the existing create pipeline (validation, slug dedup, registry, scaffold, index.json)
-            const agent = await agentService.create(createDto, req.user.uid);
+            // Use the existing create pipeline (validation, slug dedup, workspace.db, scaffold, index.json)
+            const sandboxService = getAgentSandboxService();
+            const sbId = await requireRunningSandbox(sandboxService, req.user.uid);
+            const provider = getDaytonaProvider(sandboxService);
+
+            const agent = await agentService.create(createDto, req.user.uid, provider, sbId);
 
             sendResponse(res, 201, { agent }, startTime);
         } catch (err) {

@@ -6,6 +6,26 @@ import { getSessionControlService } from '../platform/tools/session-control.tool
 import { query } from '../../../database/connection';
 import { BadRequestError } from '../../../utils/errors';
 import { InternalMcpRequest, McpToolResult } from './types';
+import { executeWorkspaceJsonQuery } from '../../conversations/workspace-db.helpers';
+import { requireRunningSandbox, getDaytonaProvider } from '../../sandbox-infra/sandbox/sandbox-route-helpers';
+import type { SandboxService } from '../../sandbox-infra/sandbox/sandbox.service';
+
+// ---------------------------------------------------------------------------
+// Dependencies (injected at startup)
+// ---------------------------------------------------------------------------
+
+let _sandboxService: SandboxService | null = null;
+
+export function setSessionControlRoutesDeps(deps: { sandboxService: SandboxService }): void {
+    _sandboxService = deps.sandboxService;
+}
+
+function getSandboxService(): SandboxService {
+    if (!_sandboxService) {
+        throw new Error('Session control routes dependencies not initialized');
+    }
+    return _sandboxService;
+}
 
 const router = Router();
 
@@ -158,11 +178,14 @@ router.post('/get_status', async (req: InternalMcpRequest, res: Response, next: 
         };
 
         if (include_agents !== false) {
-            const agentResult = await query<{ slug: string; status: string; adapter_type: string }>(
-                `SELECT slug, status, adapter_type FROM agent_registry WHERE (user_id = $1 OR agent_type = 'system') ORDER BY slug`,
-                [userId]
+            const sandboxService = getSandboxService();
+            const sandboxId = await requireRunningSandbox(sandboxService, userId);
+            const provider = getDaytonaProvider(sandboxService);
+            const agents = await executeWorkspaceJsonQuery<{ slug: string; name: string; status: string; adapter_type: string }>(
+                provider, sandboxId,
+                `SELECT slug, name, COALESCE(status, 'active') as status, COALESCE(adapter_type, 'claude') as adapter_type FROM agents ORDER BY slug`
             );
-            statusData.agents = agentResult.rows;
+            statusData.agents = agents;
         }
 
         if (include_sandbox !== false) {

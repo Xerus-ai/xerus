@@ -47,7 +47,7 @@ export interface ConnectedAccountRow {
 
 export interface ToolExecution {
     id: number;
-    agent_id: number | null;
+    agent_slug: string | null;
     app_slug: string;
     action_key: string;
     input: Record<string, unknown>;
@@ -60,7 +60,7 @@ export interface ToolExecution {
 
 export interface ToolExecutionRow {
     id: number;
-    agent_id: number | null;
+    agent_slug: string | null;
     app_slug: string;
     action_key: string;
     input: unknown;
@@ -81,7 +81,7 @@ export interface SaveConnectionInput {
 }
 
 export interface LogExecutionInput {
-    agent_id: number | null;
+    agent_slug: string | null;
     app_slug: string;
     action_key: string;
     input: Record<string, unknown>;

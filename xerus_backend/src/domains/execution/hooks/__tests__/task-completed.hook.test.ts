@@ -260,13 +260,14 @@ describe('TaskCompletedHandler', () => {
     });
 
     describe('event count', () => {
-        it('should emit exactly 3 events per handle call', async () => {
+        it('should emit events for inbox, notification, deliverables, and hook log', async () => {
             const input = createTestInput();
 
             await handler.handle(input);
 
-            // create_inbox_item + push_notification + hook_log
-            expect(buffer.events).toHaveLength(3);
+            // create_inbox_item + push_notification + agent_output per deliverable + hook_log
+            // With 2 deliverables: 1 + 1 + 2 + 1 = 5
+            expect(buffer.events).toHaveLength(5);
         });
     });
 });

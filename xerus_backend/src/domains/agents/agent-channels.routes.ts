@@ -55,7 +55,7 @@ router.get('/:id/channels', auth, async (req: AuthenticatedRequest, res: Respons
         const sbId = await requireRunningSandbox(svc, req.user.uid);
         const provider = getDaytonaProvider(svc);
 
-        const resolved = await resolveAgentParam(req.params.id, req.user.uid);
+        const resolved = await resolveAgentParam(req.params.id, req.user.uid, provider, sbId);
         const channels = await agentChannelService.getChannels(provider, sbId, resolved.id, req.user.uid);
 
         sendResponse(res, 200, { channels }, startTime);
@@ -79,7 +79,7 @@ router.post('/:id/channels', auth, async (req: AuthenticatedRequest, res: Respon
         const sbId = await requireRunningSandbox(svc, req.user.uid);
         const provider = getDaytonaProvider(svc);
 
-        const resolved = await resolveAgentParam(req.params.id, req.user.uid);
+        const resolved = await resolveAgentParam(req.params.id, req.user.uid, provider, sbId);
         const result = await agentChannelService.assignChannel(provider, sbId, resolved.id, channel_slug, req.user.uid);
 
         // System event: agent joined channel
@@ -105,7 +105,7 @@ router.delete('/:id/channels/:channelSlug', auth, async (req: AuthenticatedReque
         const sbId = await requireRunningSandbox(svc, req.user.uid);
         const provider = getDaytonaProvider(svc);
 
-        const resolved = await resolveAgentParam(req.params.id, req.user.uid);
+        const resolved = await resolveAgentParam(req.params.id, req.user.uid, provider, sbId);
         const result = await agentChannelService.removeChannel(provider, sbId, resolved.id, req.params.channelSlug, req.user.uid);
 
         // System event: agent left channel
@@ -131,7 +131,7 @@ router.post('/:id/channels/:channelSlug/primary', auth, async (req: Authenticate
         const sbId = await requireRunningSandbox(svc, req.user.uid);
         const provider = getDaytonaProvider(svc);
 
-        const resolved = await resolveAgentParam(req.params.id, req.user.uid);
+        const resolved = await resolveAgentParam(req.params.id, req.user.uid, provider, sbId);
         const result = await agentChannelService.setPrimaryChannel(provider, sbId, resolved.id, req.params.channelSlug, req.user.uid);
 
         sendResponse(res, 200, result, startTime);

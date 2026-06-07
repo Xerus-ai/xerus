@@ -57,6 +57,7 @@ class InMemoryDatabase {
             sandbox_resume_count: 0,
             sandbox_template_version: null,
             sandbox_novnc_url: null,
+            sandbox_plan: null,
         };
         this.registry.set(userId, entry);
         return { rows: [] };
@@ -207,6 +208,7 @@ describe('InMemoryDatabase', () => {
             sandbox_resume_count: 0,
             sandbox_template_version: null,
             sandbox_novnc_url: null,
+            sandbox_plan: null,
         });
 
         await db.query(`UPDATE workspaces SET sandbox_status = $2, sandbox_paused_at = $3, sandbox_last_activity_at = NOW() WHERE user_id = $1`, [
@@ -237,6 +239,7 @@ describe('InMemoryDatabase', () => {
             sandbox_resume_count: 0,
             sandbox_template_version: null,
             sandbox_novnc_url: null,
+            sandbox_plan: null,
         });
 
         await db.query(`UPDATE workspaces SET sandbox_resume_count = sandbox_resume_count + 1 WHERE user_id = $1`, ['user-1']);
@@ -263,6 +266,7 @@ describe('InMemoryDatabase', () => {
             sandbox_resume_count: 0,
             sandbox_template_version: null,
             sandbox_novnc_url: null,
+            sandbox_plan: null,
         });
 
         const result = await db.query<SandboxRegistryEntry>(
@@ -290,6 +294,7 @@ describe('InMemoryDatabase', () => {
             sandbox_resume_count: 0,
             sandbox_template_version: null,
             sandbox_novnc_url: null,
+            sandbox_plan: null,
         });
 
         const result = await db.query<SandboxRegistryEntry>(

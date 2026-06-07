@@ -126,7 +126,9 @@ const ACME_SLUG = TEST_PREFIX + '_acme-corp';
 // MessageBridgeRepository Tests
 // -----------------------------------------------------------------------------
 
-describe('MessageBridgeRepository', () => {
+// Skipped: depends on NeonDB domains/channels/channel_messages tables dropped in migration 084.
+// These entities now live in workspace.db (SQLite on Daytona sandbox).
+describe.skip('MessageBridgeRepository', () => {
     beforeAll(async () => {
         await cleanupTestData();
         await seedTestData();

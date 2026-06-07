@@ -4,7 +4,6 @@
 
 import { logger } from '../../utils/logger';
 import type { PipelineContext, ResolvedExecutionDeps } from './execution-pipeline.types';
-import { agentRegistryRepository } from '../agents/agent-registry.repository';
 import { createMetadataSyncService } from '../sandbox-infra/metadata-sync/metadata-sync.service';
 import type { SyncEntityType, WorkspaceSyncPayload } from '../sandbox-infra/metadata-sync/metadata-sync.types';
 import { handleTriggerSync, handleNotificationSync, handleKbSync, handleToolSync, handleSessionSync, handleMemorySync } from './entity-sync-handlers';
@@ -75,12 +74,12 @@ export async function handleMetadataSync(
         if (action === 'connect') {
             const appSlug = data.app_slug as string | undefined;
             const agentSlug = data.agent_id as string | undefined;
-            if (appSlug && agentSlug) {
-                const agentCheck = await deps.db.query<{ id: number }>(
-                    `SELECT id FROM agent_registry WHERE slug = $1 AND (user_id = $2 OR agent_type = 'system') LIMIT 1`,
-                    [agentSlug, userId],
-                );
-                if (agentCheck.rows.length > 0) {
+            if (appSlug && agentSlug && ctx.sandboxId) {
+                // Verify agent exists in workspace.db (source of truth)
+                const { agentExists } = await import('../agents/agent-workspace-db.service');
+                const provider = deps.sandboxService.getDaytonaProvider();
+                const exists = await agentExists(provider, ctx.sandboxId, agentSlug);
+                if (exists) {
                     const connectionCheck = await deps.db.query<{ id: number }>(
                         `SELECT id FROM connected_accounts WHERE user_id = $1 AND app_slug = $2 LIMIT 1`,
                         [userId, appSlug],
@@ -133,7 +132,7 @@ export async function handleMetadataSync(
 }
 
 async function handleAgentMetadataSync(
-    data: Record<string, unknown>, action: string, userId: string,
+    data: Record<string, unknown>, action: string, _userId: string,
 ): Promise<void> {
     const slug = data.slug as string | undefined;
     if (!slug) {
@@ -141,24 +140,18 @@ async function handleAgentMetadataSync(
         return;
     }
 
-    // Agent metadata sync now only manages agent_registry entries.
-    // Full agent data lives in config.json (filesystem source of truth).
+    // Agent data lives in workspace.db + config.json (filesystem source of truth).
+    // workspace.db registration is handled by scaffold-sync-hook on the sandbox.
+    // No NeonDB agent_registry writes needed.
     switch (action) {
-        case 'create': {
-            const existing = await agentRegistryRepository.findBySlug(slug, userId);
-            if (!existing) {
-                await agentRegistryRepository.register(slug, userId, 'private');
-            }
-            log.info('metadata_sync agent registered', { slug, user_id: userId });
+        case 'create':
+            log.info('metadata_sync agent create (workspace.db is source of truth)', { slug });
             break;
-        }
         case 'update':
-            // Config.json is the source of truth; registry only tracks slug/id/type
             log.info('metadata_sync agent update (config.json is source of truth)', { slug });
             break;
         case 'delete':
-            await agentRegistryRepository.deleteBySlug(slug, userId);
-            log.info('metadata_sync agent deleted', { slug, user_id: userId });
+            log.info('metadata_sync agent delete (workspace.db is source of truth)', { slug });
             break;
         default:
             log.warn('metadata_sync unknown action for agent', { action, slug });

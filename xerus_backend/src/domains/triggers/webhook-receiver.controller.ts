@@ -134,12 +134,11 @@ function validateProvider(provider: string): TriggerProvider {
     return provider as TriggerProvider;
 }
 
-function validateAgentId(raw: string): number {
-    const agentId = parseInt(raw, 10);
-    if (isNaN(agentId) || agentId < 1) {
-        throw new BadRequestError('Invalid agent ID');
+function validateAgentSlug(raw: string): string {
+    if (!raw || raw.trim().length === 0) {
+        throw new BadRequestError('Invalid agent slug');
     }
-    return agentId;
+    return raw.trim();
 }
 
 // -----------------------------------------------------------------------------
@@ -156,7 +155,7 @@ webhookReceiverRouter.post(
         try {
             // 1. Validate params
             const provider = validateProvider(req.params.provider);
-            const agentId = validateAgentId(req.params.agentId);
+            const agentSlug = validateAgentSlug(req.params.agentId);
 
             // 2. Verify signature
             if (!verifyWebhookSignature(provider, req)) {
@@ -180,14 +179,14 @@ webhookReceiverRouter.post(
             const metadata: EventNormalizationMetadata = {
                 app: extractAppFromPayload(req.body, provider),
                 event_type: extractEventTypeFromPayload(req.body, provider),
-                agent_id: agentId,
+                agent_slug: agentSlug,
             };
 
             const normalizedEvent = adapter.normalize(req.body, metadata);
-            normalizedEvent.agent_id = agentId;
+            normalizedEvent.agent_slug = agentSlug;
 
             // 5. Route to event router (handles trigger matching, queueing, dispatch)
-            const result = await eventRouterService.routeEvent(agentId, normalizedEvent);
+            const result = await eventRouterService.routeEvent(agentSlug, normalizedEvent);
 
             // 6. Always return 200 (webhook endpoints should not return errors to providers)
             sendResponse(res, 200, {

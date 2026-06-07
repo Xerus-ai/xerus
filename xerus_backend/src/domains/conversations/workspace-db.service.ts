@@ -246,7 +246,7 @@ export async function updateConversation(
     provider: DaytonaProvider,
     sandboxId: string,
     conversationId: string,
-    updates: { title?: string; status?: 'active' | 'archived' },
+    updates: { title?: string; status?: 'active' | 'archived'; agent_slug?: string },
 ): Promise<ConversationRow | null> {
     const setClauses: string[] = [];
     if (updates.title !== undefined) {
@@ -254,6 +254,9 @@ export async function updateConversation(
     }
     if (updates.status !== undefined) {
         setClauses.push(`status = '${updates.status}'`);
+    }
+    if (updates.agent_slug !== undefined) {
+        setClauses.push(`agent_slug = '${escapeSQL(updates.agent_slug)}'`);
     }
     if (setClauses.length === 0) {
         return getConversation(provider, sandboxId, conversationId);

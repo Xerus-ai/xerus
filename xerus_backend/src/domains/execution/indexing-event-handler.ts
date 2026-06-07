@@ -4,7 +4,6 @@
 import { logger } from '../../utils/logger';
 import type { PipelineContext, ResolvedExecutionDeps } from './execution-pipeline.types';
 import type { MemoryType, MemoryScope } from '../memory/memory.types';
-import { agentRegistryRepository } from '../agents/agent-registry.repository';
 
 const log = logger('IndexingEventHandler');
 
@@ -12,7 +11,9 @@ export async function handleTriggerIndexing(
     d: Record<string, unknown>, ctx: PipelineContext, deps: ResolvedExecutionDeps,
 ): Promise<void> {
     if (!deps.memorySearchIndex) {
-        logEvent('trigger_indexing', d);
+        log.warn('trigger_indexing event dropped: memorySearchIndex not available (OPENAI_API_KEY missing?)', {
+            content_path: d.content_path, agent_slug: d.agent_slug,
+        });
         return;
     }
 
@@ -31,17 +32,8 @@ export async function handleTriggerIndexing(
         return;
     }
 
-    // Resolve agentId from registry (non-critical — index without it if lookup fails)
-    const agentSlug = (d.agent_slug as string) || ctx.agent?.slug;
-    let agentId: number | undefined;
-    if (agentSlug) {
-        try {
-            const entry = await agentRegistryRepository.findBySlug(agentSlug, ctx.request.userId);
-            agentId = entry?.id;
-        } catch (err) {
-            log.warn('trigger_indexing: agent registry lookup failed', { agent_slug: agentSlug, error: (err as Error).message });
-        }
-    }
+    // Resolve agent slug for indexing metadata
+    const resolvedAgentSlug = (d.agent_slug as string) || ctx.agent?.slug;
 
     // Content included in event (from MemoryIndexer.indexFile)
     const content = d.content as string | undefined;
@@ -55,9 +47,9 @@ export async function handleTriggerIndexing(
             content,
             memoryType,
             scope,
-            agentId,
+            agentSlug: resolvedAgentSlug,
         });
-        log.info('trigger_indexing: indexed', { content_path: contentPath, content_length: content.length, agent_id: agentId });
+        log.info('trigger_indexing: indexed', { content_path: contentPath, content_length: content.length, agent_slug: resolvedAgentSlug });
         return;
     }
 
@@ -76,9 +68,9 @@ export async function handleTriggerIndexing(
                     content: fileContent,
                     memoryType: 'working',
                     scope: 'agent',
-                    agentId,
+                    agentSlug: resolvedAgentSlug,
                 });
-                log.info('trigger_indexing: indexed from sandbox', { content_path: contentPath, agent_id: agentId });
+                log.info('trigger_indexing: indexed from sandbox', { content_path: contentPath, agent_slug: resolvedAgentSlug });
                 return;
             }
         }

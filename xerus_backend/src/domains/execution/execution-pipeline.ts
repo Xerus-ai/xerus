@@ -27,6 +27,7 @@ import {
     getConversation,
     createConversation as createWorkspaceConversation,
 } from '../conversations/workspace-db.service';
+import { findAgentBySlug } from '../agents/agent-workspace-db.service';
 
 // Extracted billing/subscription modules
 export { reserveCredits } from './subscription-guard';
@@ -111,18 +112,23 @@ export interface LoadAgentResult {
     subscriptionPeriodEnd: Date | null;
 }
 
+/**
+ * loadAgent validates the agent exists in workspace.db and fetches subscription info.
+ *
+ * IMPORTANT: This must be called AFTER ensureSandbox() — the workspace.db query
+ * requires a running sandbox. The caller (execution.service.ts) ensures this ordering.
+ */
 export async function loadAgent(
     deps: ResolvedExecutionDeps,
     agentSlug: string,
     userId: string,
+    sandboxId: string,
 ): Promise<LoadAgentResult> {
-    // Parallel: agent_registry, workspaces, and subscription lookups are independent
-    const [registryResult, wsResult, subResult] = await Promise.all([
-        deps.db.query<{ id: number; slug: string; user_id: string | null; agent_type: string }>(
-            `SELECT id, slug, user_id, agent_type FROM agent_registry
-             WHERE slug = $1 AND (user_id = $2 OR user_id IS NULL OR agent_type = 'public')`,
-            [agentSlug, userId],
-        ),
+    const provider = deps.sandboxService.getDaytonaProvider();
+
+    // Parallel: workspace.db agent check, workspaces, and subscription lookups are independent
+    const [agentRow, wsResult, subResult] = await Promise.all([
+        findAgentBySlug(provider, sandboxId, agentSlug),
         deps.db.query<{ id: string }>(
             `SELECT id::text FROM workspaces WHERE user_id = $1 LIMIT 1`,
             [userId],
@@ -136,15 +142,13 @@ export async function loadAgent(
         throw new SDKExecutionError(`No workspace found for user ${userId} — agent cannot run without a workspace`);
     }
     const workspaceId = wsResult.rows[0].id;
-    const entry = registryResult.rows[0];
 
-    if (!entry) {
-        throw new SDKExecutionError(`Agent '${agentSlug}' not found in registry for user '${userId}'`);
+    if (!agentRow) {
+        throw new SDKExecutionError(`Agent '${agentSlug}' not found in workspace for user '${userId}'`);
     }
 
     const subRow = subResult.rows[0];
 
-    // agent_registry is a thin table (id, slug, user_id, agent_type).
     // Agent metadata (name, ai_model, etc.) lives in config.json on the workspace filesystem.
     // The runner reads config.json locally and reports the real model via session_started event,
     // which updates ctx.agent.ai_model in handleSessionStarted.
@@ -152,9 +156,9 @@ export async function loadAgent(
     // adapter_type defaults to 'claudecode' — resolved from config.json by resolveAdapterType().
     return {
         agent: {
-            id: entry.id,
-            name: entry.slug,
-            slug: entry.slug,
+            id: agentRow.rowid,
+            name: agentRow.slug,
+            slug: agentRow.slug,
             description: '',
             ai_model: DEFAULT_MODEL,
             thinking_level: 'medium',
@@ -162,7 +166,7 @@ export async function loadAgent(
             adapter_type: 'claudecode',
             primary_use_case: '',
             workspace_id: workspaceId,
-            user_id: entry.user_id || userId,
+            user_id: userId,
         },
         subscriptionStatus: subRow?.subscription_status ?? null,
         subscriptionPeriodEnd: subRow?.subscription_current_period_end ?? null,

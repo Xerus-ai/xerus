@@ -1,12 +1,11 @@
 // Agent Domain Service
 // Business logic for agent CRUD operations.
-// Source of truth: filesystem (config.json) + agent_registry (ID/slug mapping).
+// Source of truth: filesystem (config.json) + workspace.db agents table.
 //
 // Tool operations: agent-tools.service.ts
 // Marketplace operations: agent-marketplace.service.ts
 // Knowledge base assignment: workspace.connections (file_connections table).
 
-import { AgentRegistryRepository, agentRegistryRepository } from './agent-registry.repository';
 import { AgentFilesystemRepository, AgentConfigFile } from './agent-filesystem.repository';
 import { AgentValidator, agentValidator } from './validators';
 import {
@@ -33,6 +32,15 @@ import { slugify } from '../../shared/slugify';
 import { configToAgent, canUserView, canUserModify } from './agent-helpers';
 import { buildAllSoulFiles } from '../sandbox-infra/workspace/soul-file-templates';
 import { generateOperatingMd } from '../sandbox-infra/workspace/operating-md.template';
+import type { DaytonaProvider } from '../sandbox-infra/sandbox/providers/daytona.provider';
+import {
+    findAgentBySlug,
+    findAgentByRowid,
+    listAgents,
+    countAgents,
+    agentExists,
+    deleteAgentFromWorkspaceDb,
+} from './agent-workspace-db.service';
 
 // Re-export extracted services for convenience
 export { agentToolsService, AgentToolsService } from './agent-tools.service';
@@ -46,7 +54,6 @@ const AGENT_LIMITS = {
 
 export class AgentService {
     constructor(
-        private registry: AgentRegistryRepository = agentRegistryRepository,
         private validator: AgentValidator = agentValidator,
         private fsRepo: AgentFilesystemRepository | null = null,
     ) {}
@@ -64,12 +71,17 @@ export class AgentService {
 
     // ===== CRUD OPERATIONS =====
 
-    async create(data: CreateAgentDTO, userId: string): Promise<Agent> {
+    async create(
+        data: CreateAgentDTO,
+        userId: string,
+        provider: DaytonaProvider,
+        sandboxId: string,
+    ): Promise<Agent> {
         const validatedData = this.validator.validateCreate(data);
         await this.validator.validateModel(validatedData.ai_model || DEFAULT_MODEL);
 
-        // Check agent limit
-        const currentCount = await this.registry.countByUser(userId, 'private');
+        // Check agent limit via workspace.db
+        const currentCount = await countAgents(provider, sandboxId);
         if (currentCount >= AGENT_LIMITS.private) {
             throw new AgentLimitExceededError(AGENT_LIMITS.private, 'private');
         }
@@ -86,18 +98,15 @@ export class AgentService {
         if (!baseSlug) {
             throw new Error(`Cannot generate slug from agent name: "${validatedData.name}"`);
         }
-        // Ensure slug uniqueness against registry
+        // Ensure slug uniqueness against workspace.db
         let slug = baseSlug;
         let counter = 0;
-        while (await this.registry.findBySlug(slug, userId)) {
+        while (await agentExists(provider, sandboxId, slug)) {
             counter++;
             slug = `${baseSlug}-${counter}`;
         }
 
-        // Register in agent_registry
-        const entry = await this.registry.register(slug, userId, 'private');
-
-        // Build config.json
+        // Build config.json — writing it triggers scaffold-sync-hook.sh which INSERTs into workspace.db
         const now = new Date().toISOString();
         const mascot = generateMascotConfig();
         const config: AgentConfigFile = {
@@ -163,23 +172,32 @@ export class AgentService {
         // Update index.json
         await fs.addToIndex(userId, { slug, name: config.name, agent_type: 'private' });
 
+        // Read back the workspace.db row to get the rowid assigned by the hook
+        const row = await findAgentBySlug(provider, sandboxId, slug);
+        const rowid = row?.rowid ?? 0;
+
         return {
-            ...configToAgent(config, entry.id, userId, entry.agent_type),
+            ...configToAgent(config, rowid, userId, 'private'),
             system_prompt: validatedData.system_prompt || '',
         };
     }
 
-    async getById(id: number, userId: string): Promise<AgentDetail> {
-        const entry = await this.registry.findById(id);
-        if (!entry) throw new AgentNotFoundError(id);
+    async getById(
+        id: number,
+        userId: string,
+        provider: DaytonaProvider,
+        sandboxId: string,
+    ): Promise<AgentDetail> {
+        const row = await findAgentByRowid(provider, sandboxId, id);
+        if (!row) throw new AgentNotFoundError(id);
 
         const fs = this.getFs();
-        const config = await fs.getAgentConfig(userId, entry.slug);
+        const config = await fs.getAgentConfig(userId, row.slug);
         if (!config) throw new AgentNotFoundError(id);
 
-        const agentPrompt = await fs.readFile(userId, `agents/${entry.slug}/agent.md`);
+        const agentPrompt = await fs.readFile(userId, `agents/${row.slug}/agent.md`);
         const agent = {
-            ...configToAgent(config, entry.id, entry.user_id, entry.agent_type),
+            ...configToAgent(config, row.rowid, userId, 'private'),
             system_prompt: agentPrompt,
         };
 
@@ -195,32 +213,37 @@ export class AgentService {
         };
     }
 
-    async list(userId: string, options: AgentListOptions = {}): Promise<PaginatedAgents> {
+    async list(
+        userId: string,
+        options: AgentListOptions = {},
+        provider: DaytonaProvider,
+        sandboxId: string,
+    ): Promise<PaginatedAgents> {
         const validatedOptions = this.validator.validateListOptions(options);
         const { filters, sort_by = 'created_at', sort_order = 'desc', page = 1, limit = 20 } = validatedOptions;
 
         const fs = this.getFs();
         const index = await fs.getAgentIndex(userId);
 
-        // Get user's registry entries for ID mapping
-        const userEntries = await this.registry.listByUser(userId);
-        const entryBySlug = new Map(userEntries.map(e => [e.slug, e]));
+        // Get workspace.db rows for rowid mapping
+        const wsRows = await listAgents(provider, sandboxId);
+        const rowBySlug = new Map(wsRows.map(r => [r.slug, r]));
 
         // Batch-read all config.json files for agents in index
         const indexSlugs = index
-            .filter(entry => entryBySlug.has(entry.slug))
+            .filter(entry => rowBySlug.has(entry.slug))
             .map(entry => entry.slug);
         const configs = await fs.getAgentConfigs(userId, indexSlugs);
 
         const agents: Agent[] = [];
         for (const entry of index) {
-            const registryEntry = entryBySlug.get(entry.slug);
-            if (!registryEntry) continue;
+            const wsRow = rowBySlug.get(entry.slug);
+            if (!wsRow) continue;
 
             const config = configs.get(entry.slug);
             if (!config) continue;
 
-            const agent = configToAgent(config, registryEntry.id, registryEntry.user_id, registryEntry.agent_type);
+            const agent = configToAgent(config, wsRow.rowid, userId, 'private');
             if (!canUserView(agent, userId)) continue;
 
             // Apply filters
@@ -269,8 +292,13 @@ export class AgentService {
         };
     }
 
-    async listWithEnrichedTools(userId: string, options: AgentListOptions = {}): Promise<PaginatedAgentsWithTools> {
-        const result = await this.list(userId, options);
+    async listWithEnrichedTools(
+        userId: string,
+        options: AgentListOptions = {},
+        provider: DaytonaProvider,
+        sandboxId: string,
+    ): Promise<PaginatedAgentsWithTools> {
+        const result = await this.list(userId, options, provider, sandboxId);
 
         // Batch fetch enriched tools
         const allToolSlugs = new Set<string>();
@@ -310,26 +338,26 @@ export class AgentService {
         };
     }
 
-    async update(id: number, data: UpdateAgentDTO, userId: string): Promise<Agent> {
-        const entry = await this.registry.findById(id);
-        if (!entry) throw new AgentNotFoundError(id);
+    async update(
+        id: number,
+        data: UpdateAgentDTO,
+        userId: string,
+        provider: DaytonaProvider,
+        sandboxId: string,
+    ): Promise<Agent> {
+        const row = await findAgentByRowid(provider, sandboxId, id);
+        if (!row) throw new AgentNotFoundError(id);
 
         const fs = this.getFs();
-        const config = await fs.getAgentConfig(userId, entry.slug);
+        const config = await fs.getAgentConfig(userId, row.slug);
         if (!config) throw new AgentNotFoundError(id);
 
-        const agent = configToAgent(config, entry.id, entry.user_id, entry.agent_type);
+        const agent = configToAgent(config, row.rowid, userId, 'private');
         if (!canUserModify(agent, userId)) {
             throw new AgentAccessDeniedError(id);
         }
 
         const validatedData = this.validator.validateUpdate(data);
-
-        if (entry.agent_type === 'system') {
-            if (validatedData.name !== undefined || validatedData.description !== undefined) {
-                throw new AgentAccessDeniedError(id);
-            }
-        }
 
         if (validatedData.ai_model) {
             await this.validator.validateModel(validatedData.ai_model);
@@ -337,7 +365,7 @@ export class AgentService {
 
         // Check name uniqueness if changed
         if (validatedData.name && validatedData.name !== config.name) {
-            const conflictSlug = await this.findNameConflictInFs(validatedData.name, userId, agent.agent_type, id);
+            const conflictSlug = await this.findNameConflictInFs(validatedData.name, userId, agent.agent_type, row.slug);
             if (conflictSlug) {
                 throw new AgentNameConflictError(validatedData.name, conflictSlug);
             }
@@ -355,53 +383,51 @@ export class AgentService {
         if (validatedData.thinking_level !== undefined) config.thinking_level = validatedData.thinking_level;
         if (validatedData.autonomy_level !== undefined) config.autonomy_level = validatedData.autonomy_level;
         if (validatedData.adapter_type !== undefined) config.adapter_type = validatedData.adapter_type;
-        if (validatedData.agent_type !== undefined) {
-            await this.registry.updateType(id, validatedData.agent_type);
-        }
         config.updated_at = new Date().toISOString();
 
-        await fs.putAgentConfig(userId, entry.slug, config);
+        await fs.putAgentConfig(userId, row.slug, config);
         if (validatedData.system_prompt !== undefined) {
-            await fs.writeFile(userId, `agents/${entry.slug}/agent.md`, validatedData.system_prompt);
+            await fs.writeFile(userId, `agents/${row.slug}/agent.md`, validatedData.system_prompt);
         }
 
         // Update index if name or agent_type changed
-        const effectiveType = validatedData.agent_type ?? entry.agent_type;
+        const effectiveType = validatedData.agent_type ?? 'private';
         if (validatedData.name !== undefined || validatedData.agent_type !== undefined) {
             await fs.addToIndex(userId, {
-                slug: entry.slug,
+                slug: row.slug,
                 name: config.name,
                 agent_type: effectiveType,
             });
         }
 
         return {
-            ...configToAgent(config, entry.id, entry.user_id, entry.agent_type),
+            ...configToAgent(config, row.rowid, userId, 'private'),
             system_prompt: validatedData.system_prompt !== undefined
                 ? validatedData.system_prompt
-                : await fs.readFile(userId, `agents/${entry.slug}/agent.md`),
+                : await fs.readFile(userId, `agents/${row.slug}/agent.md`),
         };
     }
 
-    async delete(id: number, userId: string): Promise<Agent> {
-        const entry = await this.registry.findById(id);
-        if (!entry) throw new AgentNotFoundError(id);
-
-        if (entry.agent_type === 'system') {
-            throw new AgentAccessDeniedError(id);
-        }
+    async delete(
+        id: number,
+        userId: string,
+        provider: DaytonaProvider,
+        sandboxId: string,
+    ): Promise<Agent> {
+        const row = await findAgentByRowid(provider, sandboxId, id);
+        if (!row) throw new AgentNotFoundError(id);
 
         const fs = this.getFs();
-        const config = await fs.getAgentConfig(userId, entry.slug);
+        const config = await fs.getAgentConfig(userId, row.slug);
         if (!config) throw new AgentNotFoundError(id);
 
-        const agent = configToAgent(config, entry.id, entry.user_id, entry.agent_type);
+        const agent = configToAgent(config, row.rowid, userId, 'private');
         if (!canUserModify(agent, userId)) {
             throw new AgentAccessDeniedError(id);
         }
 
-        await this.registry.delete(id);
-        await fs.removeFromIndex(userId, entry.slug);
+        await deleteAgentFromWorkspaceDb(provider, sandboxId, row.slug);
+        await fs.removeFromIndex(userId, row.slug);
 
         return agent;
     }
@@ -409,18 +435,14 @@ export class AgentService {
     // ===== HELPERS =====
 
     private async findNameConflictInFs(
-        name: string, userId: string, agentType?: string, excludeId?: number,
+        name: string, userId: string, _agentType?: string, excludeSlug?: string,
     ): Promise<string | null> {
         const fs = this.getFs();
         const index = await fs.getAgentIndex(userId);
-        const entries = await this.registry.listByUser(userId);
-        const entryBySlug = new Map(entries.map(e => [e.slug, e]));
 
         for (const ie of index) {
             if (ie.name.toLowerCase() === name.toLowerCase()) {
-                const entry = entryBySlug.get(ie.slug);
-                if (entry && excludeId && entry.id === excludeId) continue;
-                if (agentType && entry && entry.agent_type !== agentType) continue;
+                if (excludeSlug && ie.slug === excludeSlug) continue;
                 return ie.slug;
             }
         }

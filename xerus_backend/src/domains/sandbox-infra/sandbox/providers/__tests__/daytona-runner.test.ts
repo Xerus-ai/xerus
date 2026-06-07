@@ -462,7 +462,7 @@ describe('runAgentInSandbox', () => {
         expect(collected[1].event).toBe('session_ended');
     });
 
-    it('sends initial message as plain text to stdin', async () => {
+    it('sends initial message as stream-json NDJSON to stdin', async () => {
         const captured: string[] = [];
         const sandbox = buildFakeSandbox({
             sendInputCapture: captured,
@@ -475,8 +475,10 @@ describe('runAgentInSandbox', () => {
         }
 
         expect(captured.length).toBeGreaterThanOrEqual(1);
-        // Plain text message sent to CLI stdin (not JSON)
-        expect(captured[0].trim()).toBe('What is 2+2?');
+        // Structured NDJSON for Claude Code's --input-format stream-json
+        const parsed = JSON.parse(captured[0].trim());
+        expect(parsed.type).toBe('user');
+        expect(parsed.message.content).toBe('What is 2+2?');
     });
 
     it('passes OpenRouter API key as env vars', async () => {

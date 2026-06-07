@@ -21,14 +21,14 @@ export interface NormalizedEvent {
     source_provider: TriggerProvider;
     received_at: Date;
     account_id: string;
-    agent_id?: number;
+    agent_slug?: string;
     external_event_id?: string;
 }
 
 export interface EventNormalizationMetadata {
     app: string;
     event_type: string;
-    agent_id?: number;
+    agent_slug?: string;
 }
 
 // -----------------------------------------------------------------------------
@@ -38,7 +38,7 @@ export interface EventNormalizationMetadata {
 export interface TriggerRegistration {
     app: string;
     event_type: string;
-    agent_id: number;
+    agent_slug: string;
     user_id: string;
     account_id: string;
     webhook_url?: string;
@@ -68,7 +68,7 @@ export interface TriggerDefinition {
 
 export interface AgentTriggerRow {
     id: number;
-    agent_id: number;
+    agent_slug: string;
     user_id: string;
     provider_id: number;
     app_slug: string;

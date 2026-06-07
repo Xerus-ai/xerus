@@ -10,6 +10,7 @@ import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
 import type { SandboxService } from '../sandbox-infra/sandbox/sandbox.service';
 import type { DaytonaProvider } from '../sandbox-infra/sandbox/providers/daytona.provider';
 import { requireRunningSandbox, getDaytonaProvider } from '../sandbox-infra/sandbox/sandbox-route-helpers';
+import { escapeSQL, executeWorkspaceJsonQuery } from '../conversations/workspace-db.helpers';
 import { shellEscape } from '../../utils/shell-safety';
 import { sanitizeSlug } from '../../shared/slugify';
 import { VALID_STATUSES, VALID_PRIORITIES } from './task.constants';
@@ -212,7 +213,17 @@ router.get('/channels/:channelId/tasks', auth, async (req: AuthenticatedRequest,
         const sandboxId = await requireRunningSandbox(sandboxService, userId);
         const provider = getDaytonaProvider(sandboxService);
 
-        const result = await listTasksByChannel(provider, sandboxId, channelId, { limit, offset });
+        // Normalize channelId: if it's a bare slug (no --), look up the full domain--channel format
+        let normalizedChannelId = channelId;
+        if (!channelId.includes('--')) {
+            const lookupSql = `SELECT slug FROM channels WHERE slug LIKE '%--${escapeSQL(channelId)}' OR slug = '${escapeSQL(channelId)}' LIMIT 1`;
+            const channelRows = await executeWorkspaceJsonQuery<{ slug: string }>(provider, sandboxId, lookupSql);
+            if (channelRows.length > 0) {
+                normalizedChannelId = channelRows[0].slug;
+            }
+        }
+
+        const result = await listTasksByChannel(provider, sandboxId, normalizedChannelId, { limit, offset });
 
         const allSlugs = result.tasks
             .map(r => r.assigned_agent)

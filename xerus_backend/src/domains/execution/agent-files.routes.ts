@@ -20,6 +20,7 @@ import { requireRunningSandbox, getDaytonaProvider } from '../sandbox-infra/sand
 import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
 import { AGENT_SUBDIRECTORIES } from '../sandbox-infra/workspace/workspace.types';
 import { shellEscapePath } from '../../utils/shell-safety';
+import { agentExists } from '../agents/agent-workspace-db.service';
 
 // -----------------------------------------------------------------------------
 // Path Validation (Two-Tier Security)
@@ -69,55 +70,37 @@ function buildAgentFilePath(agentSlug: string, filePath: string): string {
 // Agent Ownership Verification
 // -----------------------------------------------------------------------------
 
-interface AgentRowRaw {
-    id: number;
-    user_id: string;
-    slug: string | null;
-    name: string;
-    has_running_execution: boolean;
-}
-
 interface VerifiedAgent {
-    id: number;
-    user_id: string;
     slug: string;
-    name: string;
     isRunning: boolean;
 }
 
 async function resolveAndVerifyAgent(
     userId: string,
     agentSlug: string,
+    sandboxService: SandboxService,
+    sandboxId: string,
 ): Promise<VerifiedAgent> {
-    const result = await query<AgentRowRaw>(
-        `SELECT a.id, a.user_id, a.slug, a.slug AS name,
-                EXISTS(
-                    SELECT 1 FROM execution_sessions es
-                    JOIN workspaces w ON es.workspace_id = w.id
-                    WHERE w.user_id = $1 AND es.agent_slug = a.slug AND es.status = 'running'
-                ) AS has_running_execution
-         FROM agent_registry a
-         WHERE (a.user_id = $1 OR a.agent_type = 'system')
-         AND a.slug = $2
-         LIMIT 1`,
-        [userId, agentSlug],
-    );
-
-    if (result.rows.length === 0) {
+    // Verify agent exists in workspace.db (source of truth)
+    const provider = getDaytonaProvider(sandboxService);
+    const exists = await agentExists(provider, sandboxId, agentSlug);
+    if (!exists) {
         throw new NotFoundError('Agent');
     }
 
-    const agent = result.rows[0];
-    if (!agent.slug) {
-        throw new BadRequestError('Agent has no slug — cannot access workspace files');
-    }
+    // Check running status from execution_sessions (still in NeonDB)
+    const runResult = await query<{ has_running: boolean }>(
+        `SELECT EXISTS(
+            SELECT 1 FROM execution_sessions es
+            JOIN workspaces w ON es.workspace_id = w.id
+            WHERE w.user_id = $1 AND es.agent_slug = $2 AND es.status = 'running'
+        ) AS has_running`,
+        [userId, agentSlug],
+    );
 
     return {
-        id: agent.id,
-        user_id: agent.user_id,
-        slug: agent.slug,
-        name: agent.name,
-        isRunning: agent.has_running_execution,
+        slug: agentSlug,
+        isRunning: runResult.rows[0]?.has_running ?? false,
     };
 }
 
@@ -160,10 +143,10 @@ router.get(
 
             const { agentSlug } = req.params;
             validateSlug(agentSlug);
-            const agent = await resolveAndVerifyAgent(req.user.uid, agentSlug);
             const { sandboxService } = getDeps();
 
             const sandboxId = await requireRunningSandbox(sandboxService, req.user.uid);
+            const agent = await resolveAndVerifyAgent(req.user.uid, agentSlug, sandboxService, sandboxId);
             const provider = getDaytonaProvider(sandboxService);
             const agentDir = buildAgentFilePath(agent.slug, '');
             const files = await provider.listFiles(sandboxId, agentDir);
@@ -196,10 +179,10 @@ router.get(
             }
 
             validateFilePath(filePath);
-            const agent = await resolveAndVerifyAgent(req.user.uid, agentSlug);
             const { sandboxService } = getDeps();
 
             const sandboxId = await requireRunningSandbox(sandboxService, req.user.uid);
+            const agent = await resolveAndVerifyAgent(req.user.uid, agentSlug, sandboxService, sandboxId);
             const provider = getDaytonaProvider(sandboxService);
             const fullPath = buildAgentFilePath(agent.slug, filePath);
             const content = await provider.readFile(sandboxId, fullPath);
@@ -243,12 +226,12 @@ router.post(
                 validateFilePath(fileName);
             }
 
-            // Single DB call to verify agent ownership
-            const agent = await resolveAndVerifyAgent(req.user.uid, agentSlug);
             const { sandboxService } = getDeps();
 
-            // Single DB call to check sandbox status
+            // Get sandbox first (needed for workspace.db agent check)
             const sandboxId = await requireRunningSandbox(sandboxService, req.user.uid);
+            // Verify agent exists in workspace.db
+            const agent = await resolveAndVerifyAgent(req.user.uid, agentSlug, sandboxService, sandboxId);
             const provider = getDaytonaProvider(sandboxService);
 
             // Single SSH call: read all files with per-request UUID separator
@@ -304,10 +287,10 @@ router.put(
                 throw new BadRequestError('content is required and must be a string');
             }
 
-            const agent = await resolveAndVerifyAgent(req.user.uid, agentSlug);
             const { sandboxService } = getDeps();
 
             const sandboxId = await requireRunningSandbox(sandboxService, req.user.uid);
+            const agent = await resolveAndVerifyAgent(req.user.uid, agentSlug, sandboxService, sandboxId);
             const provider = getDaytonaProvider(sandboxService);
             const fullPath = buildAgentFilePath(agent.slug, filePath);
             await provider.writeFile(sandboxId, fullPath, content);

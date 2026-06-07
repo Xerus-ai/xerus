@@ -21,7 +21,8 @@ import { DigestExecutionRecordError } from './daily-digest.errors';
 type DigestOutcome = 'success' | 'failure' | 'timeout' | 'suppressed' | 'skipped';
 
 interface RecordDigestExecutionInput {
-    agent_id: number;
+    agent_slug: string;
+    user_id: string;
     heartbeat_config_id: number | null;
     variant: DigestVariant;
     outcome: DigestOutcome;
@@ -33,7 +34,7 @@ interface RecordDigestExecutionInput {
 // Minimal digest execution record (replaces deleted HeartbeatExecution)
 interface DigestExecutionRecord {
     id: string;
-    agent_id: number;
+    agent_slug: string;
     trigger_type: string;
     status: string;
     outcome: DigestOutcome | null;
@@ -209,30 +210,30 @@ export class DailyDigestService {
             `INSERT INTO execution_sessions
              (workspace_id, agent_slug, status, trigger_type, user_prompt,
               input_tokens, started_at, completed_at, created_at)
-             SELECT w.id, ar.slug, $2, 'heartbeat', $3,
+             SELECT w.id, $1, $2, 'heartbeat', $3,
                     $4, $5, $5, $5
-             FROM agent_registry ar
-             JOIN workspaces w ON w.user_id = ar.user_id
-             WHERE ar.id = $1
+             FROM workspaces w
+             WHERE w.user_id = $6
              LIMIT 1
              RETURNING id, created_at`,
             [
-                input.agent_id,
+                input.agent_slug,
                 status,
                 `Digest: ${input.variant}`,
                 input.tokens_used,
                 now,
+                input.user_id,
             ]
         );
 
         if (result.rows.length === 0) {
-            throw new DigestExecutionRecordError(`agent_id=${input.agent_id}`);
+            throw new DigestExecutionRecordError(`agent_slug=${input.agent_slug}`);
         }
 
         const row = result.rows[0];
         return {
             id: row.id,
-            agent_id: input.agent_id,
+            agent_slug: input.agent_slug,
             trigger_type: 'heartbeat',
             status,
             outcome: input.outcome,

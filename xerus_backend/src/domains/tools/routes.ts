@@ -1,12 +1,16 @@
 // Tools Domain Routes
 // REST API endpoints for Pipedream Connect integration
 
-import { Router, Response, NextFunction } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../../types';
 import { sendResponse } from '../../utils/response';
 import { authenticateFirebaseToken, requireRole } from '../../middleware/auth';
 import { toolsService } from './service';
+import { toolsRepository } from './repository';
 import { getPipedreamClient } from '../../shared/clients/pipedream';
+import { logger } from '../../utils/logger';
+
+const log = logger('tools-routes');
 
 const router = Router();
 const auth = authenticateFirebaseToken;
@@ -50,9 +54,13 @@ router.post('/connect-token', auth, async (req: AuthenticatedRequest, res: Respo
             return;
         }
 
+        const baseUrl = process.env.API_BASE_URL || `${req.protocol}://${req.get('host')}`;
+        const webhookUrl = `${baseUrl}/api/v1/tools/webhook/connected`;
+
         const result = await toolsService.startConnection({
             user_id: req.user!.uid,
             allowed_origins,
+            webhook_url: webhookUrl,
         });
 
         // Return format expected by Pipedream SDK tokenCallback
@@ -280,6 +288,40 @@ router.get('/:app_slug', auth, async (req: AuthenticatedRequest, res: Response, 
         sendResponse(res, 200, app, startTime);
     } catch (err) {
         next(err);
+    }
+});
+
+// POST /api/v1/tools/webhook/connected - Pipedream OAuth completion webhook (no auth — server-to-server)
+router.post('/webhook/connected', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const { id, name, external_id, app } = req.body;
+
+        if (!id || !external_id) {
+            res.status(400).json({ error: 'Missing required fields: id, external_id' });
+            return;
+        }
+
+        const appSlug = app?.name_slug || 'unknown';
+        const appName = name || app?.name || appSlug;
+
+        const existing = await toolsRepository.getConnectionByPipedreamId(String(id));
+        if (existing) {
+            log.info('Pipedream account already connected', { pipedream_account_id: id, app_slug: appSlug });
+            res.status(200).json({ status: 'already_connected' });
+            return;
+        }
+
+        await toolsRepository.saveConnection({
+            user_id: String(external_id),
+            pipedream_account_id: String(id),
+            app_slug: appSlug,
+            app_name: appName,
+        });
+
+        log.info('Pipedream account connected', { user_id: external_id, app_slug: appSlug, pipedream_account_id: id });
+        res.status(200).json({ status: 'connected' });
+    } catch (error) {
+        next(error);
     }
 });
 
