@@ -10,8 +10,8 @@ interface UseOnboardingStreamOptions {
 
 interface OnboardingHandoffResult {
   workspace: { id: string; slug: string; name: string }
-  domain: { id: string; slug: string; name: string }
-  channel: { id: string; slug: string; name: string }
+  domain: { slug: string; name: string }
+  channel: { slug: string; name: string }
 }
 
 interface UseOnboardingStreamReturn {
@@ -91,7 +91,7 @@ export function useOnboardingStream({ userId, onWorkspaceCreated }: UseOnboardin
 
       const data = await res.json()
       const result = data.data
-      if (!result?.workspace?.id || !result?.domain?.id || !result?.channel?.id) {
+      if (!result?.workspace?.id || !result?.domain?.slug || !result?.channel?.slug) {
         throw new Error('Invalid handoff response: missing workspace, domain, or channel')
       }
       return result as OnboardingHandoffResult

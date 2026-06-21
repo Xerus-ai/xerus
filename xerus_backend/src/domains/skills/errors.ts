@@ -70,3 +70,10 @@ export class SkillSecretInvalidValueError extends SkillError {
         super(`Invalid value for "${key}": ${reason}`, 422, 'SKILL_SECRET_INVALID_VALUE');
     }
 }
+
+export class SandboxNotReadyError extends Error {
+    constructor(userId: string) {
+        super(`No running sandbox for user ${userId}`);
+        this.name = 'SandboxNotReadyError';
+    }
+}

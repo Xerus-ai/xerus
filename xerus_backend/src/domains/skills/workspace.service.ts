@@ -8,6 +8,7 @@ import type { DaytonaProvider } from '../sandbox-infra/sandbox/providers/daytona
 import type { SandboxFileSystem } from '../sandbox-infra/workspace/workspace.manager';
 import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
 import { SkillInstallScope, SKILL_SLUG_PATTERN } from './types';
+import { SandboxNotReadyError } from './errors';
 import { shellEscapePath } from '../../utils/shell-safety';
 import { logger } from '../../utils/logger';
 
@@ -308,7 +309,7 @@ export class SkillWorkspaceService {
     private async resolveProvider(userId: string): Promise<{ provider: DaytonaProvider; sandboxId: string }> {
         const status = await this.sandboxService.getSandboxStatus(userId);
         if (status.status !== 'running' || !status.sandboxId) {
-            throw new Error(`No running sandbox for user ${userId}`);
+            throw new SandboxNotReadyError(userId);
         }
         const provider = this.sandboxService.getProvider() as DaytonaProvider;
         return { provider, sandboxId: status.sandboxId };

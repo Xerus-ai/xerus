@@ -134,21 +134,23 @@ export async function getConversationWithMessages(
 
     const messages: ConversationMessageRow[] = [];
     for (const row of rows) {
-        // User message
-        messages.push({
-            id: row.id * 2,
-            conversation_id: row.conversation_id,
-            session_id: row.session_id,
-            role: 'user',
-            content: row.user_message,
-            execution_id: row.session_id,
-            created_at: row.created_at,
-            input_tokens: null,
-            output_tokens: null,
-            credits_used: null,
-            thinking: null,
-            message_metadata: null,
-        });
+        // User message (skip empty — e.g. system-seeded welcome messages)
+        if (row.user_message) {
+            messages.push({
+                id: row.id * 2,
+                conversation_id: row.conversation_id,
+                session_id: row.session_id,
+                role: 'user',
+                content: row.user_message,
+                execution_id: row.session_id,
+                created_at: row.created_at,
+                input_tokens: null,
+                output_tokens: null,
+                credits_used: null,
+                thinking: null,
+                message_metadata: null,
+            });
+        }
         // Assistant response (if present)
         if (row.agent_response) {
             // Parse message_metadata from JSON string to object for frontend consumption

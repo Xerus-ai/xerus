@@ -92,6 +92,9 @@ export function buildSDKEnvironment(
         // ANTHROPIC_AUTH_TOKEN is no longer recognized by the CLI.
         ANTHROPIC_API_KEY: apiKey,
         XERUS_WORKSPACE_ROOT: process.env.XERUS_WORKSPACE_ROOT || '/home/daytona',
+        // Platform MCP server needs these to reach the backend from inside the sandbox
+        XERUS_BACKEND_URL: process.env.API_BASE_URL || 'https://api.xerus.ai/api/v1',
+        XERUS_BACKEND_TOKEN: process.env.XERUS_INTERNAL_API_TOKEN || '',
     };
 
     // Inject user's BYOK keys if available.
