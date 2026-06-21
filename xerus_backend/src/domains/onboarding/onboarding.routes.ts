@@ -10,8 +10,9 @@ import { authenticateFirebaseToken } from '../../middleware/auth';
 import { UnauthorizedError, BadRequestError } from '../../utils/errors';
 import { query } from '../../database/connection';
 import type { SandboxService } from '../sandbox-infra';
-import { createDomain, createChannel, createChannelMessage } from '../company/company-workspace-db.service';
-import { createConversation } from '../conversations/workspace-db.service';
+import { createDomain, createChannel } from '../company/company-workspace-db.service';
+import { createConversation, writeChatExecution, incrementConversationMessageCount } from '../conversations/workspace-db.service';
+import { addSystemAgentsToChannel } from '../company/system-agent-assignment.service';
 import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
 import { sanitizeSlug } from '../../shared/slugify';
 import { logger } from '../../utils/logger';
@@ -150,7 +151,12 @@ router.post('/handoff', auth, async (req: AuthenticatedRequest, res: Response, n
         const channelDir = `${domainDir}/channels/general`;
         await provider.executeCommand(sandboxId, `mkdir -p ${shellEscapePath(channelDir)}`);
 
-        // Conversation + welcome message are best-effort: the agents table may
+        // 4. Assign system agents (xerus-master, xerus-cto) to the channel
+        // Mirrors company.routes.ts project creation flow. Uses INSERT OR IGNORE
+        // on agents table, so it's safe even before syncAgentsToWorkspace runs.
+        await addSystemAgentsToChannel(provider, sandboxId, generalSlug);
+
+        // 5. Conversation + welcome message are best-effort: the agents table may
         // not be populated yet (syncAgentsToWorkspace runs after workspace setup),
         // so the FK on conversations.agent_slug can fail. Domain + channel are the
         // critical deliverables — don't let a conversation FK failure block onboarding.
@@ -162,11 +168,12 @@ router.post('/handoff', auth, async (req: AuthenticatedRequest, res: Response, n
             );
             conversationId = conversation.id;
 
-            await createChannelMessage(
-                provider, sandboxId,
-                generalSlug, 'agent', 'xerus-master',
-                welcomeMessage, 'post', {},
+            // Write welcome as a chat_execution so it appears on /chat (not /inbox)
+            await writeChatExecution(
+                provider, sandboxId, conversationId,
+                null, '', welcomeMessage, 0, null, null,
             );
+            await incrementConversationMessageCount(provider, sandboxId, conversationId);
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             if (msg.includes('FOREIGN KEY') || msg.includes('constraint')) {

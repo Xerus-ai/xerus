@@ -16,6 +16,7 @@ import type {
     UpdateSkillDTO,
 } from './types';
 import type { SkillWorkspaceService } from './workspace.service';
+import { SandboxNotReadyError } from './errors';
 import { slugify } from '../../shared/slugify';
 import { generatePuzzleConfig } from './skill-avatar';
 
@@ -72,7 +73,13 @@ export class SkillRepository {
 
     async listInstalled(userId: string): Promise<Skill[]> {
         const ws = this.requireWorkspace();
-        const entries = await ws.batchReadInstalled(userId);
+        let entries;
+        try {
+            entries = await ws.batchReadInstalled(userId);
+        } catch (err) {
+            if (err instanceof SandboxNotReadyError) return [];
+            throw err;
+        }
         const skills: Skill[] = [];
         for (const entry of entries) {
             if (entry.type === 'config') {
@@ -336,7 +343,13 @@ export class SkillRepository {
 
     private async listMarketplaceSkillsAll(userId: string): Promise<Skill[]> {
         const ws = this.requireWorkspace();
-        const entries = await ws.batchReadMarketplace(userId);
+        let entries;
+        try {
+            entries = await ws.batchReadMarketplace(userId);
+        } catch (err) {
+            if (err instanceof SandboxNotReadyError) return [];
+            throw err;
+        }
         const skills: Skill[] = [];
         for (const entry of entries) {
             if (entry.type === 'xerushub') {
