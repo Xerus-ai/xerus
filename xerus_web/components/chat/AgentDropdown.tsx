@@ -78,7 +78,20 @@ export function AgentDropdown({
   const [open, setOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
 
-  const PINNED_AGENTS = [XERUS_AGENT, CTO_AGENT]
+  // Resolve pinned agents against the real agents list so their mascot config
+  // (avatarUrl from the DB) is used once loaded. Falls back to the static
+  // constant until the matching agent arrives — prevents the avatar flash.
+  const PINNED_AGENTS = useMemo(() => {
+    return [XERUS_AGENT, CTO_AGENT].map((pinned) => {
+      const real = agents.find((a) => a.slug === pinned.slug)
+      return real ? { ...pinned, ...real } : pinned
+    })
+  }, [agents])
+
+  const resolvePinned = (slug: string | null | undefined, fallback: Agent): Agent => {
+    const real = slug ? agents.find((a) => a.slug === slug) : undefined
+    return real ? { ...fallback, ...real } : fallback
+  }
 
   // Filter agents by search, excluding pinned agents from the grouped list
   const filteredAgents = useMemo(() => {
@@ -124,8 +137,8 @@ export function AgentDropdown({
         >
           {(() => {
             const raw = selectedAgent ?? XERUS_AGENT
-            const display = raw.slug === XERUS_MASTER_SLUG ? { ...raw, ...XERUS_AGENT, id: raw.id || XERUS_AGENT.id }
-              : raw.slug === XERUS_CTO_SLUG ? { ...raw, ...CTO_AGENT, id: raw.id || CTO_AGENT.id }
+            const display = raw.slug === XERUS_MASTER_SLUG ? { ...resolvePinned(XERUS_MASTER_SLUG, XERUS_AGENT), id: raw.id || XERUS_AGENT.id }
+              : raw.slug === XERUS_CTO_SLUG ? { ...resolvePinned(XERUS_CTO_SLUG, CTO_AGENT), id: raw.id || CTO_AGENT.id }
               : raw
             return (
               <div className="flex items-center gap-2 overflow-hidden">

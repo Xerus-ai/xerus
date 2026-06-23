@@ -13,6 +13,10 @@ import { DEFAULT_SDK_MODEL } from '../../agents/types';
 
 const log = logger('WorkspaceHealth');
 
+// Agent configs live under either `agents/` or `.claude/agents/`.
+// Scan both, with `agents/` taking priority on slug collisions.
+const AGENT_CONFIG_DIRS = ['agents', '.claude/agents'] as const;
+
 // Critical files that must exist for a workspace to be functional.
 // If any are missing, the workspace needs volume restore or reinitialization.
 const CRITICAL_FILES = [
@@ -116,15 +120,27 @@ export async function syncAgentsToWorkspace(
     const basePath = SANDBOX_CONFIG.workspacePath;
 
     // Fix stale model in ALL agent configs (S3 restore may bring back old values).
-    // Scan all agent dirs on disk — xerus-master and other
-    // platform agents come from the workspace template.
-    const agentsDirPath = `${basePath}/agents`;
+    // Scan all agent dirs on disk — agents live under either `agents/` or
+    // `.claude/agents/`. xerus-master and other platform agents come from the
+    // workspace template. Dedupe by slug, with `agents/` taking priority.
+    const agentDirConfigs = new Map<string, string>();
+    for (const dir of AGENT_CONFIG_DIRS) {
+        const agentsDirPath = `${basePath}/${dir}`;
+        try {
+            const contents = await sandboxFs.list(agentsDirPath);
+            for (const slug of contents) {
+                if (slug === 'index.json') continue;
+                if (agentDirConfigs.has(slug)) continue;
+                agentDirConfigs.set(slug, `${agentsDirPath}/${slug}/config.json`);
+            }
+        } catch {
+            // This agents dir might not exist yet
+        }
+    }
+
     let modelFixCount = 0;
     try {
-        const agentDirContents = await sandboxFs.list(agentsDirPath);
-        const agentDirs = agentDirContents.filter(name => name !== 'index.json');
-        for (const slug of agentDirs) {
-            const configPath = `${agentsDirPath}/${slug}/config.json`;
+        for (const configPath of agentDirConfigs.values()) {
             try {
                 const raw = await sandboxFs.readFile(configPath);
                 const config = JSON.parse(raw) as Record<string, unknown>;
@@ -143,8 +159,7 @@ export async function syncAgentsToWorkspace(
         // Build agents/index.json from filesystem (workspace.db is source of truth,
         // but index.json is a convenience file for the runner)
         const agents: Record<string, { name: string; role: string }> = {};
-        for (const slug of agentDirs) {
-            const configPath = `${agentsDirPath}/${slug}/config.json`;
+        for (const [slug, configPath] of agentDirConfigs) {
             try {
                 const raw = await sandboxFs.readFile(configPath);
                 const config = JSON.parse(raw) as Record<string, unknown>;

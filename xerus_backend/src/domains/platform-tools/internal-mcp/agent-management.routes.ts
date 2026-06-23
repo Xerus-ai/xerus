@@ -11,6 +11,8 @@ import type { SandboxService } from '../../sandbox-infra/sandbox/sandbox.service
 import { buildScaffoldFilesFromRow } from '../../sandbox-infra/scaffold/scaffold-payload.service';
 import { SANDBOX_CONFIG } from '../../sandbox-infra/sandbox/sandbox.config';
 import { workspaceSSEBroadcaster } from '../../drive';
+import { assignAgentToChannel, registerAgentInIndex } from '../../company/system-agent-assignment.service';
+import { writeScaffoldFilesToSandbox } from './sandbox-file-writer';
 
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 const MAX_RESULTS = 100;
@@ -30,27 +32,6 @@ function getSandboxService(): SandboxService {
         throw new Error('Agent management routes dependencies not initialized');
     }
     return _sandboxService;
-}
-
-async function writeScaffoldFilesToSandbox(
-    provider: ReturnType<typeof getDaytonaProvider>,
-    sandboxId: string,
-    files: Array<{ path: string; content: string }>,
-): Promise<void> {
-    const basePath = SANDBOX_CONFIG.workspacePath;
-    const HEREDOC = 'XERUS_SCAFFOLD_EOF_9c1a';
-    for (const file of files) {
-        if (file.content.includes(HEREDOC)) {
-            throw new Error(`Scaffold file content for ${file.path} contains reserved heredoc delimiter`);
-        }
-        const fullPath = `${basePath}/${file.path}`;
-        const dirPath = fullPath.substring(0, fullPath.lastIndexOf('/'));
-        const writeCmd = `mkdir -p ${dirPath} && cat > ${fullPath} << '${HEREDOC}'\n${file.content}\n${HEREDOC}`;
-        const { exitCode } = await provider.executeCommand(sandboxId, writeCmd);
-        if (exitCode !== 0) {
-            throw new Error(`Failed to write scaffold file ${file.path} to sandbox (exit ${exitCode})`);
-        }
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -154,6 +135,45 @@ router.post('/create_agent', async (req: InternalMcpRequest, res: Response, next
         const model = model_id || 'claude-sonnet';
         const configJson = escapeSQL(JSON.stringify({ model, system_prompt, description }));
 
+        // Idempotent creation: if an agent with this slug already exists, return it
+        // instead of erroring or re-scaffolding. Prevents duplicate-agent attempts
+        // from the agent calling create_agent twice with the same name/slug.
+        const existingAgentRows = await executeWorkspaceJsonQuery<WorkspaceAgentRow>(
+            provider, sandboxId,
+            `SELECT slug, name, adapter_type, role, autonomy_level, status, config, marketplace_ref, installed_at, updated_at
+             FROM agents WHERE slug = '${escapeSQL(agentSlug)}'`,
+        );
+        if (existingAgentRows.length > 0) {
+            const existing = existingAgentRows[0];
+            let existingDescription = description;
+            if (existing.config) {
+                try {
+                    const parsed = JSON.parse(existing.config) as { description?: string; model?: string };
+                    if (typeof parsed.description === 'string') {
+                        existingDescription = parsed.description;
+                    }
+                } catch {
+                    // config not JSON — fall back to request description
+                }
+            }
+            const existingResult: McpToolResult = {
+                success: true,
+                data: {
+                    agent: {
+                        slug: existing.slug,
+                        name: existing.name,
+                        description: existingDescription,
+                        model_id: model,
+                        autonomy_level: existing.autonomy_level,
+                        status: existing.status,
+                        installed_at: existing.installed_at,
+                    },
+                },
+            };
+            res.json(existingResult);
+            return;
+        }
+
         const sql = `
             INSERT INTO agents (slug, name, adapter_type, role, autonomy_level, status, config)
             VALUES ('${escapeSQL(agentSlug)}', '${escapeSQL(name)}', 'claudecode', NULL, '${escapeSQL(autonomy)}', 'idle', '${configJson}');
@@ -167,7 +187,9 @@ router.post('/create_agent', async (req: InternalMcpRequest, res: Response, next
             throw new BadRequestError(`Agent with slug "${agentSlug}" already exists`);
         }
 
-        // Write scaffold files (config.json, SOUL.md, STATUS.md, etc.) to sandbox filesystem
+        // Write scaffold files (config.json, SOUL.md, STATUS.md, etc.) to sandbox filesystem.
+        // Channels are left empty here; assignAgentToChannel is the single writer of
+        // channel state (config.json channels[], index.json, channel_members, lead).
         const scaffoldFiles = buildScaffoldFilesFromRow(
             {
                 name,
@@ -178,7 +200,7 @@ router.post('/create_agent', async (req: InternalMcpRequest, res: Response, next
                 personality_type: null,
                 domain: null,
                 primary_channel: null,
-                channels: Array.isArray(req.body.channels) ? req.body.channels : [],
+                channels: [],
                 slug: agentSlug,
             },
             agentSlug,
@@ -198,19 +220,25 @@ router.post('/create_agent', async (req: InternalMcpRequest, res: Response, next
             throw new Error(`Failed to write agent.md for ${agentSlug} (exit ${promptExitCode})`);
         }
 
-        // Auto-populate channel_members for channels listed in the agent's config
-        const channels: string[] = Array.isArray(req.body.channels) ? req.body.channels : [];
-        if (channels.length > 0) {
-            const memberInserts = channels.map((ch: string) =>
-                `INSERT OR IGNORE INTO channel_members (channel_slug, agent_slug, role) VALUES ('${escapeSQL(String(ch))}', '${escapeSQL(agentSlug)}', 'member')`,
-            );
-            const leadUpdates = channels.map((ch: string) =>
-                `UPDATE channels SET lead_agent_slug = '${escapeSQL(agentSlug)}' WHERE slug = '${escapeSQL(String(ch))}' AND lead_agent_slug IS NULL`,
-            );
-            await executeWorkspaceQuery(
-                provider, sandboxId,
-                `BEGIN;\n${memberInserts.join(';\n')};\n${leadUpdates.join(';\n')};\nCOMMIT;`,
-            );
+        // Register the agent in agents/index.json so it appears on the agents list
+        // (the list endpoint iterates index.json). assignAgentToChannel updates the
+        // same entry with channel data when channels are provided.
+        await registerAgentInIndex(provider, sandboxId, agentSlug, name);
+
+        // Assign the agent to each requested channel, keeping config.json channels[],
+        // index.json, channel_members, and lead_agent_slug in sync. Without this the
+        // agent is invisible in every channel (frontend reads config.json channels[]).
+        const channels: string[] = Array.isArray(req.body.channels)
+            ? req.body.channels.map((ch: unknown) => String(ch)).filter((ch: string) => ch.length > 0)
+            : [];
+        const primaryChannel = typeof req.body.primary_channel === 'string' ? req.body.primary_channel : '';
+        const orderedChannels = primaryChannel && !channels.includes(primaryChannel)
+            ? [primaryChannel, ...channels]
+            : primaryChannel
+                ? [primaryChannel, ...channels.filter((ch) => ch !== primaryChannel)]
+                : channels;
+        for (const channelSlug of orderedChannels) {
+            await assignAgentToChannel(provider, sandboxId, agentSlug, channelSlug);
         }
 
         const row = rows[0];
@@ -309,6 +337,10 @@ router.post('/clone_agent', async (req: InternalMcpRequest, res: Response, next:
             [],
         );
         await writeScaffoldFilesToSandbox(provider, sandboxId, scaffoldFiles);
+
+        // Register the clone in agents/index.json so it appears on the agents list
+        // (the list endpoint iterates index.json).
+        await registerAgentInIndex(provider, sandboxId, cloneSlug, name);
 
         const row = rows[0];
         const mcpResult: McpToolResult = {

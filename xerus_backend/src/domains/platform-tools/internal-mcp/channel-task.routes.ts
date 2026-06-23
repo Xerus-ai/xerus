@@ -11,7 +11,7 @@ import { requireRunningSandbox, getDaytonaProvider } from '../../sandbox-infra/s
 import type { SandboxService } from '../../sandbox-infra/sandbox/sandbox.service';
 import { workspaceSSEBroadcaster } from '../../drive';
 import { scaffoldChannel } from '../../company/workspace-scaffold.service';
-import { addSystemAgentsToChannel } from '../../company/system-agent-assignment.service';
+import { addSystemAgentsToChannel, assignAgentToChannel } from '../../company/system-agent-assignment.service';
 
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 
@@ -73,8 +73,8 @@ router.post('/create_channel', async (req: InternalMcpRequest, res: Response, ne
             throw new BadRequestError('name is required');
         }
 
-        const channelSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-        if (!SLUG_PATTERN.test(channelSlug)) {
+        const bareSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        if (!SLUG_PATTERN.test(bareSlug)) {
             throw new BadRequestError(`Invalid channel name: ${name}. Slug must match ${SLUG_PATTERN}`);
         }
 
@@ -84,6 +84,34 @@ router.post('/create_channel', async (req: InternalMcpRequest, res: Response, ne
 
         // Ensure the domain exists (use project_id as domain_slug, default to 'default')
         const domainSlug = project_id || 'default';
+        const channelSlug = `${domainSlug}--${bareSlug}`;
+
+        // Idempotent creation: if a channel with this slug already exists, return it
+        // instead of erroring or re-scaffolding. Prevents duplicate-channel attempts
+        // from the agent calling create_channel twice with the same name.
+        const existingChannelRows = await executeWorkspaceJsonQuery<ChannelRow>(
+            provider, sandboxId,
+            `SELECT slug, name, domain_slug, lead_agent_slug, description, created_at FROM channels WHERE slug = '${escapeSQL(channelSlug)}'`,
+        );
+        if (existingChannelRows.length > 0) {
+            const existing = existingChannelRows[0];
+            const existingResult: McpToolResult = {
+                success: true,
+                data: {
+                    channel: {
+                        slug: existing.slug,
+                        name: existing.name,
+                        description: existing.description || '',
+                        domain_slug: existing.domain_slug,
+                        lead_agent_slug: existing.lead_agent_slug || null,
+                        agent_ids: agent_ids || [],
+                        created_at: existing.created_at,
+                    },
+                },
+            };
+            res.json(existingResult);
+            return;
+        }
 
         // Determine lead agent (first in agent_ids list, if provided)
         const leadAgent = Array.isArray(agent_ids) && agent_ids.length > 0
@@ -176,22 +204,37 @@ router.post('/add_to_channel', async (req: InternalMcpRequest, res: Response, ne
         const provider = getDaytonaProvider(sandboxService);
 
         // agent_id is treated as slug in workspace.db
-        const agentSlug = escapeSQL(String(agent_id));
+        const agentSlugRaw = String(agent_id);
         const agentRows = await executeWorkspaceJsonQuery<AgentRow>(
             provider, sandboxId,
-            `SELECT slug, name FROM agents WHERE slug = '${agentSlug}'`,
+            `SELECT slug, name FROM agents WHERE slug = '${escapeSQL(agentSlugRaw)}'`,
         );
 
         if (agentRows.length === 0) {
             throw new BadRequestError(`Agent not found: ${agent_id}`);
         }
 
-        const memberRole = role || 'member';
-        const sql = `INSERT INTO channel_members (channel_slug, agent_slug, role)
-                     VALUES ('${escapeSQL(channel_id)}', '${agentSlug}', '${escapeSQL(memberRole)}')
-                     ON CONFLICT(channel_slug, agent_slug) DO UPDATE SET role = '${escapeSQL(memberRole)}'`;
+        // Sync every source of truth: config.json channels[], index.json, the
+        // channel_members row, and lead_agent_slug. Updating only channel_members
+        // leaves the agent invisible in the channel (frontend reads config.json).
+        await assignAgentToChannel(provider, sandboxId, agentSlugRaw, channel_id);
 
-        await executeWorkspaceQuery(provider, sandboxId, sql);
+        // Honor an explicit role override (e.g. promoting to lead). The helper
+        // assigns 'lead' only for the agent's primary channel, so apply the
+        // caller's role here when supplied.
+        const memberRole = typeof role === 'string' && role.length > 0 ? role : null;
+        if (memberRole) {
+            await executeWorkspaceQuery(
+                provider, sandboxId,
+                `UPDATE channel_members SET role = '${escapeSQL(memberRole)}' WHERE channel_slug = '${escapeSQL(channel_id)}' AND agent_slug = '${escapeSQL(agentSlugRaw)}'`,
+            );
+            if (memberRole === 'lead') {
+                await executeWorkspaceQuery(
+                    provider, sandboxId,
+                    `UPDATE channels SET lead_agent_slug = '${escapeSQL(agentSlugRaw)}', updated_at = '${new Date().toISOString()}' WHERE slug = '${escapeSQL(channel_id)}'`,
+                );
+            }
+        }
 
         const mcpResult: McpToolResult = {
             success: true,
@@ -199,7 +242,7 @@ router.post('/add_to_channel', async (req: InternalMcpRequest, res: Response, ne
                 added: true,
                 channel_id,
                 agent_slug: agentRows[0].slug,
-                role: memberRole,
+                role: memberRole || 'member',
             },
         };
 
@@ -248,6 +291,37 @@ router.post('/create_task', async (req: InternalMcpRequest, res: Response, next:
                 }
                 // If still not found, use as-is — the insert will fail with a clear error downstream
             }
+        }
+
+        // Idempotent creation: if a task with the same title already exists in this
+        // channel, return it instead of inserting a duplicate. Task IDs are generated
+        // per-call, so without this check repeated create_task calls always duplicate.
+        const existingTaskRows = await executeWorkspaceJsonQuery<TaskRow>(
+            provider, sandboxId,
+            `SELECT id, project_slug, title, description, status, priority, assigned_agent, created_at
+             FROM tasks WHERE project_slug = '${escapeSQL(normalizedChannelId)}' AND title = '${escapeSQL(title)}' LIMIT 1`,
+        );
+        if (existingTaskRows.length > 0) {
+            const existing = existingTaskRows[0];
+            const existingResult: McpToolResult = {
+                success: true,
+                data: {
+                    task: {
+                        id: existing.id,
+                        channel_id,
+                        title: existing.title,
+                        description: existing.description || '',
+                        assigned_agent_ids: existing.assigned_agent ? [existing.assigned_agent] : [],
+                        priority: existing.priority,
+                        subtasks: subtasks || [],
+                        status: existing.status,
+                        created_by: userId,
+                        created_at: existing.created_at,
+                    },
+                },
+            };
+            res.json(existingResult);
+            return;
         }
 
         const taskId = `task-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
