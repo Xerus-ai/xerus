@@ -372,6 +372,8 @@ export const TOOLS = [
                 tool_slugs: { type: 'array', items: { type: 'string' }, description: 'Pipedream app slugs to assign' },
                 skill_slugs: { type: 'array', items: { type: 'string' }, description: 'Skill slugs to install on the agent' },
                 kb_collection_ids: { type: 'array', items: { type: 'string' }, description: 'KB collections to assign' },
+                channels: { type: 'array', items: { type: 'string' }, description: 'Channel slugs to add the agent to so it is visible in those channels. Without this the agent is created but appears in no channel.' },
+                primary_channel: { type: 'string', description: 'Slug of the agent primary channel (made the channel lead if the channel has none). Defaults to the first entry of channels.' },
             },
             required: ['name', 'description', 'system_prompt'],
         },

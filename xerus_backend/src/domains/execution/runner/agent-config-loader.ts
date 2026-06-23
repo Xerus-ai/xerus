@@ -60,6 +60,10 @@ function resolveModelAlias(model: string): 'sonnet' | 'opus' | 'haiku' | 'inheri
     return 'inherit';
 }
 
+// Agent configs live under either `agents/{slug}` or `.claude/agents/{slug}`.
+// Try `agents/` first, fall back to `.claude/agents/`.
+const AGENT_CONFIG_DIRS = ['agents', '.claude/agents'] as const;
+
 export class AgentConfigLoader {
     private readonly workspacePath: string;
     private readonly emitter: StdoutEmitter;
@@ -69,11 +73,22 @@ export class AgentConfigLoader {
         this.emitter = emitter;
     }
 
-    loadConfig(agentSlug: string): AgentConfig | null {
-        const agentDir = path.join(this.workspacePath, 'agents', agentSlug);
-        const configPath = path.join(agentDir, 'config.json');
+    // Resolve an agent's directory by checking `agents/{slug}` then `.claude/agents/{slug}`.
+    // Returns the first directory containing config.json, or null if none exists.
+    private resolveAgentDir(agentSlug: string): string | null {
+        for (const dir of AGENT_CONFIG_DIRS) {
+            const agentDir = path.join(this.workspacePath, dir, agentSlug);
+            if (fs.existsSync(path.join(agentDir, 'config.json'))) {
+                return agentDir;
+            }
+        }
+        return null;
+    }
 
-        if (!fs.existsSync(configPath)) return null;
+    loadConfig(agentSlug: string): AgentConfig | null {
+        const agentDir = this.resolveAgentDir(agentSlug);
+        if (!agentDir) return null;
+        const configPath = path.join(agentDir, 'config.json');
 
         try {
             const raw = fs.readFileSync(configPath, 'utf-8');
@@ -193,9 +208,9 @@ export class AgentConfigLoader {
     }
 
     buildChannelScopedDefinitions(agentSlug: string): Record<string, SubagentDefinition> {
-        const agentDir = path.join(this.workspacePath, 'agents', agentSlug);
+        const agentDir = this.resolveAgentDir(agentSlug);
+        if (!agentDir) return {};
         const configPath = path.join(agentDir, 'config.json');
-        if (!fs.existsSync(configPath)) return {};
 
         let agentChannels: string[];
         try {
@@ -218,8 +233,9 @@ export class AgentConfigLoader {
         for (const slug of allSlugs) {
             if (slug === agentSlug) continue;
 
-            const otherConfigPath = path.join(this.workspacePath, 'agents', slug, 'config.json');
-            if (!fs.existsSync(otherConfigPath)) continue;
+            const otherDir = this.resolveAgentDir(slug);
+            if (!otherDir) continue;
+            const otherConfigPath = path.join(otherDir, 'config.json');
 
             try {
                 const raw = fs.readFileSync(otherConfigPath, 'utf-8');
@@ -242,9 +258,9 @@ export class AgentConfigLoader {
     }
 
     private readAgentAsDefinition(slug: string): SubagentDefinition | null {
-        const agentDir = path.join(this.workspacePath, 'agents', slug);
+        const agentDir = this.resolveAgentDir(slug);
+        if (!agentDir) return null;
         const configPath = path.join(agentDir, 'config.json');
-        if (!fs.existsSync(configPath)) return null;
 
         try {
             const raw = fs.readFileSync(configPath, 'utf-8');
@@ -269,27 +285,33 @@ export class AgentConfigLoader {
     }
 
     private listAgentSlugs(): string[] {
-        const agentsDir = path.join(this.workspacePath, 'agents');
-        if (!fs.existsSync(agentsDir)) return [];
+        const slugs = new Set<string>();
 
-        const indexPath = path.join(agentsDir, 'index.json');
+        for (const dir of AGENT_CONFIG_DIRS) {
+            const agentsDir = path.join(this.workspacePath, dir);
+            if (!fs.existsSync(agentsDir)) continue;
 
-        if (fs.existsSync(indexPath)) {
-            try {
-                const index = JSON.parse(fs.readFileSync(indexPath, 'utf-8')) as Record<string, unknown>;
-                const agents = (index.agents || {}) as Record<string, unknown>;
-                return Object.keys(agents);
-            } catch (error) {
-                throw new AgentConfigLoadError(
-                    'agents/index.json',
-                    error instanceof Error ? error.message : String(error),
-                );
+            const indexPath = path.join(agentsDir, 'index.json');
+            if (fs.existsSync(indexPath)) {
+                try {
+                    const index = JSON.parse(fs.readFileSync(indexPath, 'utf-8')) as Record<string, unknown>;
+                    const agents = (index.agents || {}) as Record<string, unknown>;
+                    for (const slug of Object.keys(agents)) slugs.add(slug);
+                    continue;
+                } catch (error) {
+                    throw new AgentConfigLoadError(
+                        `${dir}/index.json`,
+                        error instanceof Error ? error.message : String(error),
+                    );
+                }
+            }
+
+            for (const entry of fs.readdirSync(agentsDir, { withFileTypes: true })) {
+                if (entry.isDirectory()) slugs.add(entry.name);
             }
         }
 
-        return fs.readdirSync(agentsDir, { withFileTypes: true })
-            .filter(d => d.isDirectory())
-            .map(d => d.name);
+        return [...slugs];
     }
 
     private resolveAgentCwd(agentSlug: string, config: Record<string, unknown>): string {
@@ -316,6 +338,7 @@ export class AgentConfigLoader {
             }
         }
 
-        return path.join(this.workspacePath, 'agents', agentSlug);
+        return this.resolveAgentDir(agentSlug)
+            ?? path.join(this.workspacePath, 'agents', agentSlug);
     }
 }

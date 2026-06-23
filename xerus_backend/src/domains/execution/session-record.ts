@@ -177,14 +177,21 @@ export async function updateSessionRecord(
     }
 
     // Post-execution syncs: bridge agent-created data to workspace.db for frontend visibility.
-    // Non-critical — fire and forget so session completion isn't blocked.
     if (ctx.sandboxId) {
         const provider = deps.sandboxService.getDaytonaProvider();
 
-        syncBeadsToTasks(provider, ctx.sandboxId).catch(err =>
-            log.warn('Post-execution beads sync failed', { error: (err as Error).message }),
-        );
+        // Beads tasks must be synced before the pipeline emits `done`, because the
+        // frontend task board fetches /tasks immediately on completion. A fire-and-forget
+        // sync races that fetch and leaves the board empty until the next reload.
+        // Failure is non-critical — log and continue so session completion isn't blocked.
+        try {
+            const result = await syncBeadsToTasks(provider, ctx.sandboxId);
+            log.debug('Post-execution beads sync complete', { synced: result.synced, skipped: result.skipped });
+        } catch (err) {
+            log.warn('Post-execution beads sync failed', { error: (err as Error).message });
+        }
 
+        // Posts and deliverables surface in feeds that poll independently — fire and forget.
         syncPostsJsonlToChannelMessages(provider, ctx.sandboxId).catch(err =>
             log.warn('Post-execution posts sync failed', { error: (err as Error).message }),
         );

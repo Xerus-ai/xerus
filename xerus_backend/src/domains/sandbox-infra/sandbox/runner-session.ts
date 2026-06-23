@@ -60,12 +60,16 @@ export async function getOrCreateRunnerSession(
         const envChanged = !envVarsEqual(existing.envVars, envVars);
         const convChanged = conversationId != null && existing.conversationId != null
             && existing.conversationId !== conversationId;
-        if (envChanged || convChanged) {
+        const modelChanged = model != null && existing.model != null
+            && existing.model !== model;
+        if (envChanged || convChanged || modelChanged) {
             log.info('Session invalidated, restarting', {
                 agent_slug: slug, user_id: userId,
-                reason: envChanged ? 'env_changed' : 'conversation_changed',
+                reason: envChanged ? 'env_changed' : modelChanged ? 'model_changed' : 'conversation_changed',
                 old_conv: existing.conversationId?.slice(0, 8),
                 new_conv: conversationId?.slice(0, 8),
+                old_model: existing.model,
+                new_model: model,
             });
             session.agentSessions.delete(slug);
         } else {
@@ -128,7 +132,7 @@ export async function getOrCreateRunnerSession(
     handle.lastUsedAt = Date.now();
 
     // Cache in per-agent map
-    session.agentSessions.set(slug, { handle, envVars: { ...envVars }, conversationId });
+    session.agentSessions.set(slug, { handle, envVars: { ...envVars }, conversationId, model });
 
     // Also set legacy handle for backward compat
     session.runnerHandle = handle;

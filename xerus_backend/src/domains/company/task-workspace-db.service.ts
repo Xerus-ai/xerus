@@ -305,11 +305,15 @@ export async function listChannelDeliverables(
 // Beads JSONL → tasks sync
 // -----------------------------------------------------------------------------
 
+// Mirrors the JSONL records written by the `bd` CLI (beads). Field names match
+// the on-disk format exactly: `status` (not `state`), `issue_type`, `assignee`,
+// and `description`. The CLI also emits `body` in some versions, so both are read.
 interface BeadsIssue {
     id: string;
     title?: string;
+    description?: string;
     body?: string;
-    state?: string;
+    status?: string;
     assignee?: string;
     priority?: number;
     labels?: string[];
@@ -327,7 +331,9 @@ const BEADS_STATUS_MAP: Record<string, string> = {
     cancelled: 'cancelled',
 };
 
+// Beads priorities are 0-4 (0 = critical, 4 = backlog). See CLI_REFERENCE.md.
 const PRIORITY_MAP: Record<number, string> = {
+    0: 'critical',
     1: 'critical',
     2: 'high',
     3: 'medium',
@@ -369,8 +375,11 @@ export async function syncBeadsToTasks(
                 const issue = JSON.parse(line) as BeadsIssue;
                 if (!issue.id || !issue.title) { skipped++; continue; }
 
-                const status = BEADS_STATUS_MAP[issue.state ?? 'open'] ?? 'open';
-                const priority = PRIORITY_MAP[issue.priority ?? 3] ?? 'medium';
+                const status = BEADS_STATUS_MAP[issue.status ?? 'open'] ?? 'open';
+                const priority = issue.priority !== undefined
+                    ? (PRIORITY_MAP[issue.priority] ?? 'medium')
+                    : 'medium';
+                const description = issue.description ?? issue.body ?? null;
                 const now = new Date().toISOString();
                 const issueProject = issue.project ?? projectSlug;
 
@@ -380,7 +389,7 @@ export async function syncBeadsToTasks(
                         '${escapeSQL(issue.id)}',
                         '${escapeSQL(issueProject)}',
                         '${escapeSQL(issue.title)}',
-                        ${issue.body ? `'${escapeSQL(issue.body)}'` : 'NULL'},
+                        ${description !== null ? `'${escapeSQL(description)}'` : 'NULL'},
                         '${status}',
                         '${priority}',
                         ${issue.assignee ? `'${escapeSQL(issue.assignee)}'` : 'NULL'},

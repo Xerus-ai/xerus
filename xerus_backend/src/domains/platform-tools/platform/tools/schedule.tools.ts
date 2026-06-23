@@ -197,6 +197,16 @@ export class ScheduleService {
     ): Promise<CreateScheduleResult> {
         await ensureScheduleConfigColumn(this.provider, sandboxId);
 
+        // Idempotent creation: schedules.name is UNIQUE. If a schedule with this name
+        // already exists, return it instead of letting the INSERT fail. Prevents
+        // duplicate-schedule attempts from the agent calling create_schedule twice.
+        const existingSql = `SELECT * FROM schedules WHERE name = '${escapeSQL(input.name)}' LIMIT 1;`;
+        const existingResult = await this.provider.executeCommand(sandboxId, buildSqliteCommand(existingSql));
+        const existingRows = parseJsonResult<ScheduleEntry>(existingResult.result);
+        if (existingRows[0]) {
+            return { schedule: existingRows[0] };
+        }
+
         const id = randomUUID();
         const now = Math.floor(Date.now() / 1000);
         const adapterType = input.adapter_type ?? 'claudecode';

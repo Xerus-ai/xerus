@@ -131,6 +131,46 @@ router.post('/create_skill', async (req: InternalMcpRequest, res: Response, next
         const descEscaped = escapeSQL(description);
         const skillPath = `.claude/skills/${skillSlug}/SKILL.md`;
 
+        // Idempotent creation: if a skill with this slug already exists, return it
+        // instead of erroring or overwriting. Prevents duplicate-skill attempts from
+        // the agent calling create_skill twice with the same name.
+        const existingSkillRows = await executeWorkspaceJsonQuery<SkillRow>(
+            provider, sandboxId,
+            `SELECT slug, name, version, source, source_ref, description, categories, installed_at, updated_at
+             FROM skills WHERE slug = '${escapeSQL(skillSlug)}'`,
+        );
+        if (existingSkillRows.length > 0) {
+            const existing = existingSkillRows[0];
+            let existingCategory = cat;
+            if (existing.categories) {
+                try {
+                    const parsed = JSON.parse(existing.categories) as string[];
+                    if (Array.isArray(parsed) && typeof parsed[0] === 'string') {
+                        existingCategory = parsed[0];
+                    }
+                } catch {
+                    // categories not JSON — fall back to request category
+                }
+            }
+            const existingResult: McpToolResult = {
+                success: true,
+                data: {
+                    skill: {
+                        slug: existing.slug,
+                        name: existing.name,
+                        description: existing.description || description,
+                        category: existingCategory,
+                        agent_id: agent_id || null,
+                        user_id: userId,
+                        path: existing.source_ref || skillPath,
+                        created_at: existing.installed_at || new Date().toISOString(),
+                    },
+                },
+            };
+            res.json(existingResult);
+            return;
+        }
+
         const sql = `
             INSERT INTO skills (slug, name, version, source, source_ref, description, categories)
             VALUES ('${escapeSQL(skillSlug)}', '${escapeSQL(name)}', '1.0.0', 'local', '${escapeSQL(skillPath)}', '${descEscaped}', '${categoriesJson}');

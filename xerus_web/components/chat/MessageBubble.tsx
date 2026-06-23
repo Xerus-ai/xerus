@@ -115,16 +115,18 @@ export const MessageBubble = memo(function MessageBubble({
   // actually produced by a specific agent. Fall back to the canonical XERUS_AGENT
   // so the header always renders with a real agent identity (no hardcoded logos).
   const resolvedAgent: Agent = agent ?? (() => {
-    // System agents use their static definitions (correct SVG avatars)
-    if (message.agentSlug === XERUS_MASTER_SLUG) return XERUS_AGENT
-    if (message.agentSlug === XERUS_CTO_SLUG) return CTO_AGENT
-    if (agents && (message.agentSlug || message.agentName)) {
-      return agents.find((a) =>
-        (message.agentSlug && a.slug === message.agentSlug) ||
-        (message.agentName && a.name === message.agentName)
-      ) ?? XERUS_AGENT
-    }
-    return XERUS_AGENT
+    // Prefer the real agent from the list (carries the mascot config avatarUrl
+    // from the DB). Merge over the static constant so system agents keep their
+    // canonical name/id while gaining the real avatar once loaded.
+    const fromList = agents && (message.agentSlug || message.agentName)
+      ? agents.find((a) =>
+          (message.agentSlug && a.slug === message.agentSlug) ||
+          (message.agentName && a.name === message.agentName)
+        )
+      : undefined
+    if (message.agentSlug === XERUS_MASTER_SLUG) return fromList ? { ...XERUS_AGENT, ...fromList } : XERUS_AGENT
+    if (message.agentSlug === XERUS_CTO_SLUG) return fromList ? { ...CTO_AGENT, ...fromList } : CTO_AGENT
+    return fromList ?? XERUS_AGENT
   })()
   void onViewExecution
 
