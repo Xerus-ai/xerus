@@ -9,6 +9,7 @@ import { installRunnerBundle } from './runner-installer';
 import { personalizeWorkspace } from '../workspace/workspace-personalizer.service';
 import { syncPipedreamMcpConfig } from '../workspace/mcp-config.service';
 import { ensureWorkspaceIntegrity, syncAgentsToWorkspace } from './workspace-health';
+import { syncWorkspaceTemplate } from './workspace-template-sync';
 import { GIT_MEMORY_CONFIG } from '../../memory/git-memory/git-memory.types';
 import type { DaytonaProvider } from './providers/daytona.provider';
 import type { SandboxFileSystem } from '../workspace/workspace.manager';
@@ -102,6 +103,25 @@ export async function runWorkspaceHealthCheck(
     };
 
     await ensureWorkspaceIntegrity(sandboxFs, userId, deps.db, cloneWorkspace, installRunner);
+
+    // Sync platform-owned template files (CLAUDE.md, hooks, rules, skills, agents)
+    // on every resume. Ensures fixes pushed to xerus-workspace reach existing sandboxes.
+    const provider = deps.getDaytonaProvider();
+    try {
+        const syncResult = await syncWorkspaceTemplate(provider, sandboxId);
+        if (syncResult.updatedPaths.length > 0) {
+            log.info('Template sync updated files', {
+                sandbox_id: sandboxId,
+                updated: syncResult.updatedPaths,
+                duration_ms: syncResult.durationMs,
+            });
+        }
+    } catch (syncErr) {
+        log.warn('Template sync failed (non-blocking)', {
+            sandbox_id: sandboxId,
+            error: (syncErr as Error).message,
+        });
+    }
 
     // Run schema migrations (init-db.sh) on every resume.
     // S3-restored databases may predate newer schema tables (e.g. file_connections).
