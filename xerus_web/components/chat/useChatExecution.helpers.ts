@@ -50,7 +50,7 @@ export const MODEL_CONTEXT: Record<string, number> = {
   'deepseek-chat': 128000,
 }
 
-export const INFRA_NOISE = new Set(['sandbox', 'executing', 'provisioning', 'connecting'])
+export const INFRA_NOISE = new Set(['sandbox', 'executing', 'provisioning', 'connecting', 'queued'])
 export const VIEWABLE_EXTS = new Set([
   '.md', '.mdx', '.html', '.htm', '.svg', '.json', '.txt', '.css', '.scss', '.csv',
   '.ts', '.tsx', '.js', '.jsx', '.py', '.rb', '.go', '.rs', '.java',
