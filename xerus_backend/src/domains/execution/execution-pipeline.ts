@@ -20,7 +20,7 @@ import {
 } from './errors';
 import { routeEventWithResilience, createResilienceState } from './event-resilience';
 import { AgentAlreadyRunningError, QueueFullError } from './queue/execution-queue.errors';
-import { sendCommand, sendMessage, streamEvents } from '../sandbox-infra/sandbox';
+import { sendMessage, streamEvents } from '../sandbox-infra/sandbox';
 import type { SessionHandle } from '../sandbox-infra/sandbox';
 import { createHealthGuard, type HealthGuard } from './execution-health-guard';
 import {
@@ -321,7 +321,10 @@ async function processEventStream(
     for await (const event of streamEvents(handle, combinedSignal, ctx.streamOffset)) {
         if (eventsProcessed === 0) clearTimeout(firstEventTimer);
         if (ctx.stream.isClosed()) {
-            await sendCommand(handle, { type: 'interrupt', agent_slug: expectedSlug });
+            // SSE stream closed (frontend disconnected). Break the event loop on the
+            // backend side. The runner process keeps running intentionally — if the
+            // user reconnects, they'll see the completed result via conversation reload.
+            // stdin-based interrupts don't work (Claude Code ignores unknown types).
             break;
         }
 

@@ -3,7 +3,7 @@
 
 import { ExecutionQueueService } from '../execution-queue.service';
 import { CreateExecutionRequest, TRIGGER_PRIORITIES, TriggerType } from '../execution-lane.types';
-import { AgentAlreadyRunningError, QueueFullError, LaneNotFoundError } from '../execution-queue.errors';
+import { QueueFullError, LaneNotFoundError } from '../execution-queue.errors';
 
 describe('ExecutionQueueService', () => {
     const TEST_USER_ID = 'test-user-001';
@@ -63,11 +63,14 @@ describe('ExecutionQueueService', () => {
             expect(pos3.position).toBe(2);
         });
 
-        it('should throw AgentAlreadyRunningError when agent is queued', () => {
+        it('should allow multiple pending messages for the same agent', () => {
             const service = new ExecutionQueueService();
-            service.enqueue(createRequest(TEST_AGENT_SLUG_1));
+            const pos1 = service.enqueue(createRequest(TEST_AGENT_SLUG_1));
+            const pos2 = service.enqueue(createRequest(TEST_AGENT_SLUG_1));
 
-            expect(() => service.enqueue(createRequest(TEST_AGENT_SLUG_1))).toThrow(AgentAlreadyRunningError);
+            expect(pos1.position).toBe(0);
+            expect(pos2.position).toBe(1);
+            expect(service.getPendingCount(TEST_USER_ID)).toBe(2);
         });
 
         it('should throw QueueFullError when queue limit reached', () => {
@@ -323,15 +326,16 @@ describe('ExecutionQueueService', () => {
             expect(service.getPendingCount(TEST_USER_ID)).toBe(1);
         });
 
-        it('should throw when trying to enqueue agent already queued (pending)', () => {
+        it('should allow multiple pending messages for same agent while running', () => {
             const service = new ExecutionQueueService();
             service.enqueue(createRequest(TEST_AGENT_SLUG_1));
             service.acquire(TEST_USER_ID);
-            // Enqueue second while running — allowed
+            // Enqueue second while running
             service.enqueue(createRequest(TEST_AGENT_SLUG_1));
-
-            // Third enqueue for same agent — rejected (already has a pending request)
-            expect(() => service.enqueue(createRequest(TEST_AGENT_SLUG_1))).toThrow(AgentAlreadyRunningError);
+            // Third enqueue for same agent — also allowed now
+            const pos = service.enqueue(createRequest(TEST_AGENT_SLUG_1));
+            expect(pos.position).toBe(1);
+            expect(service.getPendingCount(TEST_USER_ID)).toBe(2);
         });
     });
 

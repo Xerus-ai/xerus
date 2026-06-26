@@ -168,6 +168,22 @@ export function useChatState({ initialAgentId, conversationId, initialMessage }:
     // eslint-disable-next-line react-hooks/exhaustive-deps -- connectStream is stable via ref
   }, [state.conversationId, isAuthReady])
 
+  // ---- Reconnect + reload on tab return (visibility change) ----
+  const loadConversationDetailsRef2 = useRef(loadConversationDetails)
+  loadConversationDetailsRef2.current = loadConversationDetails
+  useEffect(() => {
+    const handler = () => {
+      if (document.visibilityState !== 'visible') return
+      const convId = state.conversationId
+      if (!convId || !isAuthReady) return
+      executionStream.connectStream(convId)
+      loadConversationDetailsRef2.current(convId)
+    }
+    document.addEventListener('visibilitychange', handler)
+    return () => document.removeEventListener('visibilitychange', handler)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refs carry live values
+  }, [state.conversationId, isAuthReady, executionStream])
+
   // ---- Send message ----
   const sendMessageRef = useCallback(
     async (content: string, metadata?: { attachedFiles?: string[] }) => {

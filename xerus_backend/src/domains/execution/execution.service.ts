@@ -75,6 +75,8 @@ interface ActiveExecution {
     handle: SessionHandle;
     agentSlug: string;
     stream: StreamSink;
+    sandboxId: string;
+    userId: string;
 }
 
 export class ExecutionService {
@@ -266,6 +268,8 @@ export class ExecutionService {
                 handle,
                 agentSlug: agentForTracking.slug,
                 stream,
+                sandboxId: ctx.sandboxId!,
+                userId: request.userId,
             });
             stream.send('progress', { phase: 'executing', message: 'Starting agent', percent: 20 });
             ctx.sessionId = await createSessionRecord(resolved, ctx);
@@ -449,10 +453,15 @@ export class ExecutionService {
             return false;
         }
 
-        // Send interrupt command to the runner process.
-        // The runner's processManager.interruptAgent() aborts the SDK query.
-        sendCommand(active.handle, { type: 'interrupt', agent_slug: active.agentSlug })
-            .catch(err => log.error('Failed to send interrupt', { error: (err as Error).message }));
+        // Kill the Daytona session to terminate the CLI process.
+        // stdin-based interrupts don't work — Claude Code's stream-json input
+        // only handles 'user' and 'control_request' types, ignoring 'interrupt'.
+        const resolved = this.resolveDeps();
+        const provider = resolved.sandboxService.getDaytonaProvider();
+        provider.getSandboxInstance(active.sandboxId)
+            .then(sandbox => sandbox.process.deleteSession(active.handle.sessionId))
+            .then(() => log.info('Cancelled: deleted runner session', { execution_id: executionId, session: active.handle.sessionId }))
+            .catch(err => log.error('Failed to delete runner session', { execution_id: executionId, error: (err as Error).message }));
 
         // Send stop event — do NOT close the stream (it belongs to the conversation, not the execution)
         if (!active.stream.isClosed()) {

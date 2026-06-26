@@ -424,20 +424,12 @@ export class ExecutionQueueService extends EventEmitter {
     // -------------------------------------------------------------------------
 
     /**
-     * Check for conflicts before adding to queue
+     * Check for conflicts before adding to queue.
+     * Multiple pending messages per agent are allowed (the frontend queues
+     * messages client-side and drains them one at a time). Only the total
+     * queue size is enforced to prevent unbounded growth.
      */
-    private checkConflicts(userId: string, agentSlug: string): ConflictCheckResult {
-        // Same agent already QUEUED (pending) — reject to prevent unbounded queue
-        // Same agent already RUNNING — allowed (caller waits for lane via waitForAgentAvailable)
-        if (this.isAgentQueued(userId, agentSlug)) {
-            return {
-                conflict: true,
-                reason: 'agent_already_running',
-                message: `Agent ${agentSlug} already has a pending request`,
-            };
-        }
-
-        // Check queue size limit
+    private checkConflicts(userId: string, _agentSlug: string): ConflictCheckResult {
         const pendingCount = this.getPendingCount(userId);
         if (pendingCount >= this.config.max_queue_size) {
             return {

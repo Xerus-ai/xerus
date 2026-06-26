@@ -173,6 +173,11 @@ export const MessageBubble = memo(function MessageBubble({
             AI
           </span>
         )}
+        {isUser && message.isQueued && (
+          <span className="text-[10px] font-medium text-amber-500 bg-amber-500/10 rounded-full px-1.5 py-0.5 shrink-0">
+            Queued
+          </span>
+        )}
         <span className="text-[11px] text-text-muted tabular-nums shrink-0">
           {formatTime(message.timestamp)}
         </span>
