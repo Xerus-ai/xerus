@@ -78,19 +78,19 @@ export function AgentDropdown({
   const [open, setOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
 
-  // Resolve pinned agents against the real agents list so their mascot config
-  // (avatarUrl from the DB) is used once loaded. Falls back to the static
-  // constant until the matching agent arrives — prevents the avatar flash.
+  // Resolve pinned agents against the real agents list so they get the real id
+  // and other metadata, but KEEP the static avatarUrl (the DB mascot config
+  // generates a generic robot icon, not the branded Xerus/CTO logo).
   const PINNED_AGENTS = useMemo(() => {
     return [XERUS_AGENT, CTO_AGENT].map((pinned) => {
       const real = agents.find((a) => a.slug === pinned.slug)
-      return real ? { ...pinned, ...real } : pinned
+      return real ? { ...pinned, ...real, avatarUrl: pinned.avatarUrl } : pinned
     })
   }, [agents])
 
   const resolvePinned = (slug: string | null | undefined, fallback: Agent): Agent => {
     const real = slug ? agents.find((a) => a.slug === slug) : undefined
-    return real ? { ...fallback, ...real } : fallback
+    return real ? { ...fallback, ...real, avatarUrl: fallback.avatarUrl } : fallback
   }
 
   // Filter agents by search, excluding pinned agents from the grouped list

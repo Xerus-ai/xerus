@@ -124,8 +124,8 @@ export const MessageBubble = memo(function MessageBubble({
           (message.agentName && a.name === message.agentName)
         )
       : undefined
-    if (message.agentSlug === XERUS_MASTER_SLUG) return fromList ? { ...XERUS_AGENT, ...fromList } : XERUS_AGENT
-    if (message.agentSlug === XERUS_CTO_SLUG) return fromList ? { ...CTO_AGENT, ...fromList } : CTO_AGENT
+    if (message.agentSlug === XERUS_MASTER_SLUG) return fromList ? { ...XERUS_AGENT, ...fromList, avatarUrl: XERUS_AGENT.avatarUrl } : XERUS_AGENT
+    if (message.agentSlug === XERUS_CTO_SLUG) return fromList ? { ...CTO_AGENT, ...fromList, avatarUrl: CTO_AGENT.avatarUrl } : CTO_AGENT
     return fromList ?? XERUS_AGENT
   })()
   void onViewExecution

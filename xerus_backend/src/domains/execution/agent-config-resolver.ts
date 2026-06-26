@@ -115,16 +115,20 @@ export async function resolveAgentIdentity(
     let moduleContent = '';
     let rulesContent = '';
     let operatingContent = '';
+    let agentMdContent = '';
+    let bootstrapContent = '';
 
     for (const base of pathSets) {
         if (!soulContent) soulContent = await tryRead(`${base}/SOUL.md`);
         if (!moduleContent) moduleContent = await tryRead(`${base}/CLAUDE.md`);
         if (!rulesContent) rulesContent = await tryRead(`${base}/RULES.md`);
         if (!operatingContent) operatingContent = await tryRead(`${base}/OPERATING.md`);
+        if (!agentMdContent) agentMdContent = await tryRead(`${base}/agent.md`);
+        if (!bootstrapContent) bootstrapContent = await tryRead(`${base}/BOOTSTRAP.md`);
         if (soulContent || moduleContent) break;
     }
 
-    if (!soulContent && !moduleContent) return '';
+    if (!soulContent && !moduleContent && !agentMdContent) return '';
 
     const sections: string[] = [
         '# AGENT IDENTITY — SUPERSEDES ALL PRIOR IDENTITY',
@@ -138,12 +142,53 @@ export async function resolveAgentIdentity(
     if (soulContent) {
         sections.push(soulContent.trim(), '');
     }
-    if (rulesContent) {
-        sections.push(rulesContent.trim(), '');
-    }
     if (operatingContent) {
         sections.push(operatingContent.trim(), '');
     }
+    if (agentMdContent) {
+        sections.push(agentMdContent.trim(), '');
+    }
+    if (rulesContent) {
+        sections.push(rulesContent.trim(), '');
+    }
+
+    // Include bootstrap checklist if not yet completed
+    if (bootstrapContent) {
+        const completedMatch = bootstrapContent.match(/completed_at:\s*(.+)/);
+        const isCompleted = completedMatch && completedMatch[1].trim() !== 'null' && completedMatch[1].trim() !== '';
+        if (!isCompleted) {
+            sections.push('== First Run ==', bootstrapContent.trim(), '');
+        }
+    }
+
+    // Inject working memory from previous sessions so the agent has continuity
+    const memoryDir = `${ws}/.memory/agents/${agentSlug}`;
+    const MAX_WORKING = 4000;
+    const MAX_EXPERTISE = 2000;
+
+    const working = await tryRead(`${memoryDir}/working.md`);
+    const workingTrimmed = working.trim();
+    if (workingTrimmed.length > 20) {
+        const lastNl = workingTrimmed.lastIndexOf('\n', MAX_WORKING);
+        const capped = lastNl > 0 ? workingTrimmed.slice(0, lastNl) : workingTrimmed.slice(0, MAX_WORKING);
+        sections.push('== Working Memory (from previous session) ==', capped, '');
+    }
+
+    const expertise = await tryRead(`${memoryDir}/expertise.md`);
+    const expertiseTrimmed = expertise.trim();
+    if (expertiseTrimmed.length > 20) {
+        const lastNl = expertiseTrimmed.lastIndexOf('\n', MAX_EXPERTISE);
+        const capped = lastNl > 0 ? expertiseTrimmed.slice(0, lastNl) : expertiseTrimmed.slice(0, MAX_EXPERTISE);
+        sections.push('== Expertise ==', capped, '');
+    }
+
+    // Workspace awareness: inject agents/index.json so the agent knows its team
+    const agentIndex = await tryRead(`${ws}/agents/index.json`);
+    if (agentIndex.trim().length > 10) {
+        sections.push('== Current Agents ==', agentIndex.trim(), '');
+    }
+
+    // Module CLAUDE.md last (reference material, lowest priority for context)
     if (moduleContent) {
         sections.push(moduleContent.trim(), '');
     }

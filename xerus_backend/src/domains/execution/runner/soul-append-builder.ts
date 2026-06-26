@@ -94,7 +94,7 @@ export function buildMemoryAppend(workspacePath: string, agentSlug: string): str
 
     const working = readFileContent(path.join(memoryDir, 'working.md'));
     const workingContent = working.trim();
-    if (workingContent.length > 80 && !workingContent.includes('No previous session state')) {
+    if (workingContent.length > 20 && !workingContent.includes('No previous session state')) {
         const lastNewline = workingContent.lastIndexOf('\n', 4000);
         const trimmed = lastNewline > 0 ? workingContent.slice(0, lastNewline) : workingContent.slice(0, 4000);
         parts.push(`== Working Memory (from previous session) ==\n${trimmed}`);
