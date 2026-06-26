@@ -167,7 +167,6 @@ export function makeOnMeta(ctx: HandlerCtx) {
     if (content.model) {
       refs.tokenCount = 0
       refs.modelContextSize = modelContextSize(content.model)
-      ctx.dispatch({ type: 'SET_TOKEN_USAGE', convId, tokenUsage: { used: 0, total: refs.modelContextSize } })
     }
     if (content.agentName) {
       let turn = createStreamingTurn(content.agentSlug ?? refs.respondingAgent.agentSlug, content.agentName ?? refs.respondingAgent.agentName)
