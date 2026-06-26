@@ -430,6 +430,10 @@ export class ExecutionService {
     /**
      * Send HITL response to runner for a paused execution.
      * Called by POST /:id/respond route after DB state is updated.
+     *
+     * For AskUserQuestion: also writes a response file to /tmp/xerus-hitl/{pauseId}.response
+     * in the sandbox. The PreToolUse hook is blocking on this file and will unblock
+     * when it appears, allowing the tool execution to proceed.
      */
     async respondToHitl(executionId: string, pauseId: string, approved: boolean, feedback?: string): Promise<boolean> {
         const active = this.activeExecutions.get(executionId);
@@ -443,6 +447,17 @@ export class ExecutionService {
             approved,
             feedback,
         });
+
+        // Write response file for AskUserQuestion PreToolUse hook (which blocks on this file)
+        const resolved = this.resolveDeps();
+        const provider = resolved.sandboxService.getDaytonaProvider();
+        const responseContent = JSON.stringify({ approved, feedback: feedback || '', timestamp: new Date().toISOString() });
+        provider.getSandboxInstance(active.sandboxId)
+            .then(sandbox => sandbox.fs.uploadFile(
+                Buffer.from(responseContent, 'utf-8'),
+                `/tmp/xerus-hitl/${pauseId}.response`,
+            ))
+            .catch(err => log.warn('Failed to write HITL response file', { error: (err as Error).message }));
 
         return true;
     }

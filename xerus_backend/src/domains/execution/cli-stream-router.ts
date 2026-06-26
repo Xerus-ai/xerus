@@ -104,6 +104,25 @@ export async function handleCliStreamEvent(
                                         ctx.stream.send('tool_call' as StreamEventType, { toolName, arguments: args, callId });
                                     }
                                 }
+
+                                // AskUserQuestion HITL bridge: emit guidance event so the
+                                // frontend renders the question UI. The PreToolUse hook in
+                                // the sandbox blocks tool execution until the user responds.
+                                if (toolName === 'AskUserQuestion' && Object.keys(args).length > 0) {
+                                    const questions = args.questions as Array<{ question?: string; options?: Array<{ label: string }> }> | undefined;
+                                    const firstQ = questions?.[0];
+                                    ctx.stream.send('guidance' as StreamEventType, {
+                                        question: firstQ?.question || 'The agent has a question for you',
+                                        options: firstQ?.options?.map((o: { label: string }) => o.label),
+                                        pause_id: callId,
+                                        scenario: 'ask_user',
+                                        tool_name: 'AskUserQuestion',
+                                        agent_slug: ctx.agent?.slug,
+                                        execution_id: ctx.sessionId,
+                                        ui_hint: 'question',
+                                    });
+                                    log.info('AskUserQuestion guidance emitted', { call_id: callId, agent: ctx.agent?.slug });
+                                }
                                 break;
                             }
                             case 'tool_result': {
