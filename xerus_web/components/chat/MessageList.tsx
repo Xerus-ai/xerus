@@ -61,11 +61,38 @@ function MessageListComponent({
   agents,
 }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const userScrolledUpRef = useRef(false)
 
-  // Auto-scroll to bottom on new messages or streaming updates
+  // Detect when user scrolls away from bottom — pause auto-scroll
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const el = containerRef.current
+    if (!el) return
+    const onScroll = () => {
+      const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+      userScrolledUpRef.current = distFromBottom > 150
+    }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [])
+
+  // Auto-scroll only if user hasn't scrolled up. Reset on new user message.
+  useEffect(() => {
+    if (!userScrolledUpRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
   }, [messages, streamingTurn])
+
+  // Reset scroll lock when user sends a new message
+  const prevMsgCount = useRef(messages.length)
+  useEffect(() => {
+    const lastMsg = messages[messages.length - 1]
+    if (messages.length > prevMsgCount.current && lastMsg?.role === 'user') {
+      userScrolledUpRef.current = false
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+    prevMsgCount.current = messages.length
+  }, [messages])
 
   // Combine messages with streaming turn
   const allMessages: ChatMessageExtended[] = [...messages]
@@ -97,7 +124,7 @@ function MessageListComponent({
   }
 
   return (
-    <div data-testid="message-list" className={cn('flex-1 overflow-y-auto scrollbar-thin [contain:layout_style]', className)}>
+    <div ref={containerRef} data-testid="message-list" className={cn('flex-1 overflow-y-auto scrollbar-thin [contain:layout_style]', className)}>
       <div className="max-w-3xl mx-auto pb-4 animate-[fadeInUp_0.4s_ease-out]">
         {/* Messages — pass currentAgent only as hint for messages without their own
             agentSlug; MessageBubble prefers per-message agent resolution to preserve

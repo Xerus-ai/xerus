@@ -57,11 +57,6 @@ export function useChatExecution({ dispatch }: UseChatExecutionOptions) {
     refs.turn = appendToken(refs.turn, refs.pendingTokenText)
     refs.pendingTokenText = ''
     dispatchRef.current({ type: 'SET_STREAMING_TURN', convId, turn: refs.turn })
-    dispatchRef.current({
-      type: 'SET_TOKEN_USAGE',
-      convId,
-      tokenUsage: { used: refs.tokenCount, total: refs.modelContextSize },
-    })
   }, [getRefs])
 
   const resetStreamContent = useCallback((convId: string, agentHint?: { agentSlug?: string; agentName?: string }) => {
