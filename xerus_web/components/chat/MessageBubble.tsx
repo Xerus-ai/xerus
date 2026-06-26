@@ -124,8 +124,8 @@ export const MessageBubble = memo(function MessageBubble({
           (message.agentName && a.name === message.agentName)
         )
       : undefined
-    if (message.agentSlug === XERUS_MASTER_SLUG) return fromList ? { ...XERUS_AGENT, ...fromList } : XERUS_AGENT
-    if (message.agentSlug === XERUS_CTO_SLUG) return fromList ? { ...CTO_AGENT, ...fromList } : CTO_AGENT
+    if (message.agentSlug === XERUS_MASTER_SLUG) return fromList ? { ...XERUS_AGENT, ...fromList, avatarUrl: XERUS_AGENT.avatarUrl } : XERUS_AGENT
+    if (message.agentSlug === XERUS_CTO_SLUG) return fromList ? { ...CTO_AGENT, ...fromList, avatarUrl: CTO_AGENT.avatarUrl } : CTO_AGENT
     return fromList ?? XERUS_AGENT
   })()
   void onViewExecution
@@ -171,6 +171,11 @@ export const MessageBubble = memo(function MessageBubble({
         {!isUser && !isStreaming && (
           <span className="text-[10px] font-medium text-text-muted bg-surface-hover rounded-full px-1.5 py-0.5 shrink-0">
             AI
+          </span>
+        )}
+        {isUser && message.isQueued && (
+          <span className="text-[10px] font-medium text-amber-500 bg-amber-500/10 rounded-full px-1.5 py-0.5 shrink-0">
+            Queued
           </span>
         )}
         <span className="text-[11px] text-text-muted tabular-nums shrink-0">

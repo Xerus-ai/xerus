@@ -228,10 +228,23 @@ router.post('/create_agent', async (req: InternalMcpRequest, res: Response, next
         // Assign the agent to each requested channel, keeping config.json channels[],
         // index.json, channel_members, and lead_agent_slug in sync. Without this the
         // agent is invisible in every channel (frontend reads config.json channels[]).
-        const channels: string[] = Array.isArray(req.body.channels)
+        let channels: string[] = Array.isArray(req.body.channels)
             ? req.body.channels.map((ch: unknown) => String(ch)).filter((ch: string) => ch.length > 0)
             : [];
         const primaryChannel = typeof req.body.primary_channel === 'string' ? req.body.primary_channel : '';
+
+        // Safety net: if no channels provided, find the first available channel in the
+        // workspace so the agent isn't silently invisible. Prefer a general channel.
+        if (channels.length === 0 && !primaryChannel) {
+            const fallbackRows = await executeWorkspaceJsonQuery<{ slug: string }>(
+                provider, sandboxId,
+                `SELECT slug FROM channels ORDER BY CASE WHEN slug LIKE '%--general' THEN 0 ELSE 1 END, created_at ASC LIMIT 1`,
+            );
+            if (fallbackRows.length > 0) {
+                channels = [fallbackRows[0].slug];
+            }
+        }
+
         const orderedChannels = primaryChannel && !channels.includes(primaryChannel)
             ? [primaryChannel, ...channels]
             : primaryChannel

@@ -13,6 +13,7 @@ export interface Message {
   agentName?: string
   timestamp: number
   isStreaming?: boolean
+  isQueued?: boolean
   metadata?: {
     model?: string
     tools?: string[]

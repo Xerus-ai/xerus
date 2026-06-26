@@ -216,18 +216,42 @@ export function useChatExecution({ dispatch }: UseChatExecutionOptions) {
     }
     wasDisconnectedRef.current = true
     if (disconnectTimerRef.current) return
+    // 60s grace period — SSE reconnects can take time on mobile/tab switch.
+    // Don't clear streaming refs on disconnect; keep them so content survives
+    // short disconnections. Only mark execution as lost after the full timeout.
     disconnectTimerRef.current = setTimeout(() => {
       disconnectTimerRef.current = null
       const convId = getConvIdRef.current()
       if (!convId) return
+      // Commit any partial turn as an assistant message so it's not lost
+      const refs = refsByConv.current.get(convId)
+      if (refs?.turn && refs.turn.parts.length > 0) {
+        const committedTurn = commitTurn(refs.turn, refs.rawText || undefined)
+        if (committedTurn.parts.length > 0) {
+          dispatchRef.current({
+            type: 'APPEND_ASSISTANT_MESSAGE',
+            convId,
+            message: {
+              id: committedTurn.id,
+              role: 'assistant',
+              content: extractTextFromParts(committedTurn.parts),
+              agentSlug: refs.respondingAgent.agentSlug,
+              agentName: refs.respondingAgent.agentName,
+              timestamp: committedTurn.timestamp,
+              parts: committedTurn.parts,
+              writtenFiles: committedTurn.writtenFiles,
+            },
+          })
+        }
+      }
       refsByConv.current.delete(convId)
       dispatchRef.current({
         type: 'EXECUTION_FINISHED',
         convId,
         result: 'error',
-        errorMessage: 'Connection lost. Please resend your message.',
+        errorMessage: 'Connection lost. The agent may still be working — switch back to check.',
       })
-    }, 5000)
+    }, 60_000)
   }, [])
 
   // Memoize handler factories so the callbacks identity is stable.

@@ -222,6 +222,16 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
     case 'QUEUE_MESSAGE':
       return {
         ...state,
+        messages: [
+          ...state.messages,
+          {
+            id: `msg_${Date.now()}_queued_${state.messages.length}`,
+            role: 'user' as const,
+            content: action.content,
+            timestamp: Date.now(),
+            isQueued: true,
+          },
+        ],
         execByConversation: updateExec(state, action.convId, prev => ({
           ...prev,
           pendingMessages: [...prev.pendingMessages, action.content],

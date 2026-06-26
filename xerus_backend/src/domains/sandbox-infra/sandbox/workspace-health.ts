@@ -10,6 +10,7 @@ import type { DaytonaProvider } from './providers/daytona.provider';
 import { personalizeWorkspace } from '../workspace/workspace-personalizer.service';
 import type { SandboxDatabase } from './sandbox.service';
 import { DEFAULT_SDK_MODEL } from '../../agents/types';
+import { executeWorkspaceQuery } from '../../conversations/workspace-db.helpers';
 
 const log = logger('WorkspaceHealth');
 
@@ -129,9 +130,16 @@ export async function syncAgentsToWorkspace(
         try {
             const contents = await sandboxFs.list(agentsDirPath);
             for (const slug of contents) {
-                if (slug === 'index.json') continue;
+                if (slug === 'index.json' || slug === '.gitkeep') continue;
+                if (slug.endsWith('.md')) continue;
                 if (agentDirConfigs.has(slug)) continue;
-                agentDirConfigs.set(slug, `${agentsDirPath}/${slug}/config.json`);
+                const configPath = `${agentsDirPath}/${slug}/config.json`;
+                try {
+                    await sandboxFs.readFile(configPath);
+                    agentDirConfigs.set(slug, configPath);
+                } catch {
+                    // No config.json — not a real agent directory
+                }
             }
         } catch {
             // This agents dir might not exist yet
@@ -168,7 +176,7 @@ export async function syncAgentsToWorkspace(
                     role: (config.role as string) || 'specialist',
                 };
             } catch {
-                agents[slug] = { name: slug, role: 'specialist' };
+                // config.json already validated in scan phase — skip broken entries
             }
         }
         if (!agents['xerus-master']) {
@@ -177,6 +185,28 @@ export async function syncAgentsToWorkspace(
         const indexPath = `${basePath}/agents/index.json`;
         const indexContent = JSON.stringify({ agents, updated_at: new Date().toISOString() }, null, 2);
         await sandboxFs.writeFile(indexPath, indexContent);
+
+        // Sync agents to workspace.db with correct role and autonomy from config.json.
+        // The scaffold-sync-hook only fires on PostToolUse Write, so system agents
+        // (xerus-master, xerus-cto) from the template clone are never registered.
+        if (_provider && _sandboxId) {
+            for (const [slug, configPath] of agentDirConfigs) {
+                try {
+                    const raw = await sandboxFs.readFile(configPath);
+                    const config = JSON.parse(raw) as Record<string, unknown>;
+                    const name = String(config.name || slug).replace(/'/g, "''");
+                    const role = String(config.role || 'specialist').replace(/'/g, "''");
+                    const autonomy = String(config.autonomy_level || 'supervised').replace(/'/g, "''");
+                    await executeWorkspaceQuery(
+                        _provider, _sandboxId,
+                        `INSERT OR REPLACE INTO agents (slug, name, adapter_type, role, autonomy_level, status)
+                         VALUES ('${slug}', '${name}', 'claudecode', '${role}', '${autonomy}', 'idle')`,
+                    );
+                } catch {
+                    // Skip agents with unreadable configs
+                }
+            }
+        }
     } catch {
         // agents/ dir might not exist yet
     }
