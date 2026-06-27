@@ -54,8 +54,10 @@ router.post('/connect-token', auth, async (req: AuthenticatedRequest, res: Respo
             return;
         }
 
-        const baseUrl = process.env.API_BASE_URL || `${req.protocol}://${req.get('host')}`;
+        const rawBaseUrl = process.env.API_BASE_URL || `${req.protocol}://${req.get('host')}`;
+        const baseUrl = rawBaseUrl.replace(/\/api\/v1\/?$/, '');
         const webhookUrl = `${baseUrl}/api/v1/tools/webhook/connected`;
+        log.info('Connect token requested', { webhook_url: webhookUrl, user_id: req.user!.uid });
 
         const result = await toolsService.startConnection({
             user_id: req.user!.uid,
@@ -294,9 +296,18 @@ router.get('/:app_slug', auth, async (req: AuthenticatedRequest, res: Response, 
 // POST /api/v1/tools/webhook/connected - Pipedream OAuth completion webhook (no auth — server-to-server)
 router.post('/webhook/connected', async (req: Request, res: Response, next: NextFunction) => {
     try {
+        log.info('Webhook /connected received', {
+            body_keys: Object.keys(req.body),
+            has_id: !!req.body.id,
+            has_external_id: !!req.body.external_id,
+            has_app: !!req.body.app,
+            ip: req.ip,
+        });
+
         const { id, name, external_id, app } = req.body;
 
         if (!id || !external_id) {
+            log.info('Webhook /connected rejected: missing fields', { id, external_id });
             res.status(400).json({ error: 'Missing required fields: id, external_id' });
             return;
         }
@@ -318,9 +329,15 @@ router.post('/webhook/connected', async (req: Request, res: Response, next: Next
             app_name: appName,
         });
 
-        log.info('Pipedream account connected', { user_id: external_id, app_slug: appSlug, pipedream_account_id: id });
+        log.info('Pipedream account connected successfully', {
+            user_id: external_id,
+            app_slug: appSlug,
+            app_name: appName,
+            pipedream_account_id: id,
+        });
         res.status(200).json({ status: 'connected' });
     } catch (error) {
+        log.error('Webhook /connected failed', error instanceof Error ? error : new Error(String(error)));
         next(error);
     }
 });

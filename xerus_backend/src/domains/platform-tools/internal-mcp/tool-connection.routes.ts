@@ -47,6 +47,7 @@ router.post('/connect_tool', async (req: InternalMcpRequest, res: Response, next
 router.post('/search_tools', async (req: InternalMcpRequest, res: Response, next: NextFunction) => {
     try {
         const { query: searchQuery, category } = req.body;
+        const userId = req.sandbox?.userId || (req.body.user_id as string | undefined);
 
         if (!searchQuery) {
             throw new BadRequestError('query is required');
@@ -59,6 +60,15 @@ router.post('/search_tools', async (req: InternalMcpRequest, res: Response, next
             limit: 20,
         });
 
+        // Enrich with connection state so the agent knows which tools are usable
+        const connectedSlugs = new Set<string>();
+        if (userId) {
+            const accounts = await toolsService.getConnectedAccounts({ user_id: userId });
+            for (const acct of accounts) {
+                connectedSlugs.add(acct.app_slug);
+            }
+        }
+
         const mcpResult: McpToolResult = {
             success: true,
             data: {
@@ -68,8 +78,10 @@ router.post('/search_tools', async (req: InternalMcpRequest, res: Response, next
                     description: app.description,
                     categories: app.categories,
                     logo_url: app.img_src,
+                    is_connected: connectedSlugs.has(app.name_slug),
                 })),
                 total_count: result.pagination.total,
+                connected_count: connectedSlugs.size,
                 query: searchQuery,
                 category,
             },

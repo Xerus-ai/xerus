@@ -267,6 +267,29 @@ router.post('/create_agent', async (req: InternalMcpRequest, res: Response, next
             await assignAgentToChannel(provider, sandboxId, agentSlug, channelSlug);
         }
 
+        // Write tool_slugs into agent config.json so the agent has access to connected apps
+        const toolSlugs: string[] = Array.isArray(req.body.tool_slugs)
+            ? req.body.tool_slugs.map((s: unknown) => String(s)).filter((s: string) => s.length > 0)
+            : [];
+        if (toolSlugs.length > 0) {
+            const configPath = `${SANDBOX_CONFIG.workspacePath}/agents/${agentSlug}/config.json`;
+            try {
+                const rawConfig = await provider.readFile(sandboxId, configPath);
+                const agentConfig = JSON.parse(rawConfig) as Record<string, unknown>;
+                agentConfig.tools = toolSlugs;
+                const CONF_HEREDOC = 'XERUS_CONF_EOF_7e2a';
+                const configContent = JSON.stringify(agentConfig, null, 2);
+                const writeConfigCmd = `cat > ${configPath} << '${CONF_HEREDOC}'\n${configContent}\n${CONF_HEREDOC}`;
+                await provider.executeCommand(sandboxId, writeConfigCmd);
+            } catch {
+                // config.json not yet written by scaffold — write tools-only config
+                const CONF_HEREDOC = 'XERUS_CONF_EOF_7e2a';
+                const configContent = JSON.stringify({ tools: toolSlugs }, null, 2);
+                const writeConfigCmd = `cat > ${configPath} << '${CONF_HEREDOC}'\n${configContent}\n${CONF_HEREDOC}`;
+                await provider.executeCommand(sandboxId, writeConfigCmd);
+            }
+        }
+
         const row = rows[0];
         const mcpResult: McpToolResult = {
             success: true,
@@ -279,6 +302,7 @@ router.post('/create_agent', async (req: InternalMcpRequest, res: Response, next
                     autonomy_level: row.autonomy_level,
                     status: row.status,
                     installed_at: row.installed_at,
+                    tools: toolSlugs.length > 0 ? toolSlugs : undefined,
                 },
             },
         };

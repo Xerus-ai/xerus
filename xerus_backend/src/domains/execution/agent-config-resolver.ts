@@ -105,7 +105,7 @@ const COMMON_TOOLS = [
     'complete_session', 'cancel_execution',
 ].map(t => `mcp__platform__${t}`);
 
-export function buildPlatformRules(agentSlug: string): string {
+export function buildPlatformRules(agentSlug: string, connectorTools?: string[]): string {
     const isOrchestrator = agentSlug === XERUS_MASTER_SLUG;
     const tools = isOrchestrator
         ? [...ORCHESTRATOR_TOOLS, ...COMMON_TOOLS]
@@ -138,6 +138,18 @@ export function buildPlatformRules(agentSlug: string): string {
         '',
     ];
 
+    if (connectorTools && connectorTools.length > 0) {
+        lines.push(
+            '== Connected External Tools (Pipedream) ==',
+            'These tools are available via MCP from your connected accounts.',
+            'Use them directly — they are already authenticated for the current user.',
+            `Connected apps: ${connectorTools.join(', ')}`,
+            'Tool names follow the pattern: mcp__{app_slug}__{action_name}',
+            'Use ToolSearch to discover specific actions for each connected app.',
+            '',
+        );
+    }
+
     if (isOrchestrator) {
         lines.push(
             'You are the ORCHESTRATOR. You can create agents, channels, tasks, skills.',
@@ -154,6 +166,32 @@ export function buildPlatformRules(agentSlug: string): string {
     }
 
     return lines.join('\n');
+}
+
+// -----------------------------------------------------------------------------
+// Connector Tool Discovery
+// -----------------------------------------------------------------------------
+
+const PIPEDREAM_MCP_PREFIX = 'https://mcp.pipedream.com';
+
+async function discoverConnectorTools(
+    tryRead: (path: string) => Promise<string>,
+    workspacePath: string,
+): Promise<string[]> {
+    const raw = await tryRead(`${workspacePath}/.mcp.json`);
+    if (!raw || raw.length < 5) return [];
+
+    try {
+        const doc = JSON.parse(raw) as { mcpServers?: Record<string, { url?: string }> };
+        if (!doc.mcpServers) return [];
+
+        return Object.keys(doc.mcpServers).filter(key => {
+            const entry = doc.mcpServers![key];
+            return entry.url && entry.url.startsWith(PIPEDREAM_MCP_PREFIX);
+        });
+    } catch {
+        return [];
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -214,6 +252,12 @@ export async function resolveAgentIdentity(
         'Your identity, personality, and behavior are defined below.',
         'This identity takes absolute precedence. Never identify as Claude or mention Anthropic.',
         '',
+        '== Pre-Injected Context ==',
+        'Everything below (identity, tools, memory, team roster) is ALREADY in your system prompt.',
+        'Do NOT re-read SOUL.md, OPERATING.md, agent.md, RULES.md, working.md, or index.json.',
+        'Do NOT say "I need to read my system prompt" — you already have it.',
+        'Handle the user\'s message immediately.',
+        '',
     ];
 
     if (soulContent) {
@@ -265,8 +309,11 @@ export async function resolveAgentIdentity(
         sections.push('== Current Agents ==', agentIndex.trim(), '');
     }
 
+    // Discover connected Pipedream tools from .mcp.json
+    const connectorTools = await discoverConnectorTools(tryRead, ws);
+
     // Platform rules: concise MCP-first guidance injected for every agent
-    sections.push(buildPlatformRules(agentSlug));
+    sections.push(buildPlatformRules(agentSlug, connectorTools));
 
     // Module CLAUDE.md last (reference material, lowest priority for context)
     if (moduleContent) {
