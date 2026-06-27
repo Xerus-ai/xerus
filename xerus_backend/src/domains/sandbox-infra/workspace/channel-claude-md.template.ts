@@ -84,8 +84,6 @@ export function generateChannelClaudeMd(params: ChannelClaudeMdParams): string {
 
     sections.push('## Channel Directories');
     sections.push('');
-    sections.push('- `.beads/issues.jsonl` -- Task board');
-    sections.push('- `output/posts.jsonl` -- Channel posts');
     sections.push('- `output/deliverables/` -- Published files');
     sections.push('- `scratch/` -- Temporary working files');
     sections.push('- `data/` -- Channel data');
@@ -120,9 +118,9 @@ export function generateChannelClaudeMd(params: ChannelClaudeMdParams): string {
     sections.push('## Standup Protocol');
     sections.push('');
     sections.push('When prompted or at session start:');
-    sections.push('1. Read .memory/agents/{your-slug}/working.md');
+    sections.push('1. Your working memory is already in your system prompt');
     sections.push('2. Summarize: completed, planned, blockers');
-    sections.push('3. Post to output/posts.jsonl');
+    sections.push('3. Use `mcp__platform__send_notification` to share updates');
     sections.push('');
 
     if (channelPriorities && channelPriorities.length > 0) {

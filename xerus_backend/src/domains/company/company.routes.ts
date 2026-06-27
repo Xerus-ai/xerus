@@ -453,7 +453,7 @@ router.get('/channels/:channelId/messages', auth, async (req: AuthenticatedReque
             throw new UnauthorizedError();
         }
 
-        const channelId = sanitizeSlug(req.params.channelId);
+        let channelId = sanitizeSlug(req.params.channelId);
         const limit = Math.min(parseInt(req.query.limit as string, 10) || 50, 100);
         const offset = parseInt(req.query.offset as string, 10) || 0;
 
@@ -463,6 +463,16 @@ router.get('/channels/:channelId/messages', auth, async (req: AuthenticatedReque
         const { sandboxService } = companyDeps;
         const sandboxId = await requireRunningSandbox(sandboxService, userId);
         const provider = getDaytonaProvider(sandboxService);
+
+        // Normalize bare slugs to domain--channel format
+        if (!channelId.includes('--')) {
+            const safeCh = channelId.replace(/'/g, "''");
+            const lookupSql = `SELECT slug FROM channels WHERE slug LIKE '%--${safeCh}' OR slug = '${safeCh}' LIMIT 1`;
+            const channelRows = await execWsQuery<{ slug: string }>(provider, sandboxId, lookupSql);
+            if (channelRows.length > 0) {
+                channelId = channelRows[0].slug;
+            }
+        }
 
         // Verify channel exists in workspace DB
         const channelInfo = await getChannelWithDomain(provider, sandboxId, channelId);

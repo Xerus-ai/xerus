@@ -50,13 +50,17 @@ export async function triggerChannelExecution(
     agentSlug: string,
     messageContent: string,
     channelSlug: string,
+    triggerType: 'channel_message' | 'task_assigned' = 'channel_message',
 ): Promise<void> {
     // Debounce: prevent concurrent executions for the same agent+channel pair
     if (!acquireLock(userId, agentSlug, channelSlug)) {
-        log.debug('Execution already in progress for agent+channel, skipping', {
+        log.info('Execution locked for agent+channel, writing to inbox instead', {
             channel: channelSlug,
             agent: agentSlug,
+            trigger: triggerType,
         });
+        // Write to agent's inbox so it's picked up on next session start
+        await writeToAgentInbox(provider, sandboxId, agentSlug, messageContent, channelSlug, triggerType);
         return;
     }
 
@@ -88,22 +92,41 @@ export async function triggerChannelExecution(
                 userId,
                 conversationId: conversation.id,
                 context: {
-                    trigger: 'channel_message',
+                    trigger: triggerType,
                     channel_slug: channelSlug,
                 },
             },
             stream,
-            triggerType: 'channel_message',
+            triggerType,
         });
     } finally {
         releaseLock(userId, agentSlug, channelSlug);
     }
 }
 
+async function writeToAgentInbox(
+    provider: DaytonaProvider,
+    sandboxId: string,
+    agentSlug: string,
+    content: string,
+    channelSlug: string,
+    trigger: string,
+): Promise<void> {
+    const ws = SANDBOX_CONFIG.workspacePath;
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    const inboxDir = `${ws}/agents/${sanitizeSlug(agentSlug)}/inbox`;
+    const filename = `${ts}-${trigger}.json`;
+    const entry = JSON.stringify({ trigger, channel: channelSlug, content, created_at: new Date().toISOString() });
+    const cmd = `mkdir -p ${shellEscapePath(inboxDir)} && printf '%s\\n' ${shellEscape(entry)} > ${shellEscapePath(`${inboxDir}/${filename}`)}`;
+    await provider.executeCommand(sandboxId, cmd).catch(err => {
+        log.warn('Failed to write to agent inbox', { agent: agentSlug, error: (err as Error).message });
+    });
+}
+
 /**
- * Append a message entry to the channel's posts.jsonl file on sandbox.
- * This is the agent IPC (inter-process communication) dual-write -- agents
- * read posts.jsonl via ChannelWatcher to discover new messages.
+ * @deprecated Posts.jsonl is being replaced by workspace.db channel_messages.
+ * This dual-write is kept as a transition — agents with old prompts still
+ * read posts.jsonl. Remove once all agents read from workspace.db.
  */
 export async function syncMessageToSandbox(
     sandboxService: SandboxService,

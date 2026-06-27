@@ -12,7 +12,10 @@ import type { SandboxService } from '../../sandbox-infra/sandbox/sandbox.service
 import { workspaceSSEBroadcaster } from '../../drive';
 import { scaffoldChannel } from '../../company/workspace-scaffold.service';
 import { addSystemAgentsToChannel, assignAgentToChannel } from '../../company/system-agent-assignment.service';
+import { logMcpActivity } from './activity-logger';
+import { logger } from '../../../utils/logger';
 
+const log = logger('channel-task-routes');
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 
 // ---------------------------------------------------------------------------
@@ -180,6 +183,12 @@ router.post('/create_channel', async (req: InternalMcpRequest, res: Response, ne
             timestamp: new Date().toISOString(),
         });
 
+        await logMcpActivity(provider, sandboxId, {
+            channelSlug,
+            action: 'channel_created',
+            summary: `Channel "${name}" created in ${domainSlug}`,
+        });
+
         res.json(mcpResult);
     } catch (error) {
         next(error);
@@ -245,6 +254,12 @@ router.post('/add_to_channel', async (req: InternalMcpRequest, res: Response, ne
                 role: memberRole || 'member',
             },
         };
+
+        await logMcpActivity(provider, sandboxId, {
+            channelSlug: channel_id,
+            action: 'agent_added_to_channel',
+            summary: `@${agentRows[0].slug} added to #${channel_id} as ${memberRole || 'member'}`,
+        });
 
         res.json(mcpResult);
     } catch (error) {
@@ -380,6 +395,59 @@ router.post('/create_task', async (req: InternalMcpRequest, res: Response, next:
             type: 'file_changed', path: `tasks/${taskId}`, action: 'created',
             timestamp: new Date().toISOString(),
         });
+
+        const assignedLabel = Array.isArray(assigned_agent_ids) && assigned_agent_ids.length > 0
+            ? ` and assigned to @${assigned_agent_ids[0]}`
+            : '';
+        await logMcpActivity(provider, sandboxId, {
+            channelSlug: normalizedChannelId,
+            action: 'task_created',
+            summary: `Task "${title}" created${assignedLabel}`,
+        });
+
+        // Agent wakeup: if task is assigned, trigger execution for the assigned agent
+        if (Array.isArray(assigned_agent_ids) && assigned_agent_ids.length > 0) {
+            const assignedSlug = String(assigned_agent_ids[0]);
+            const taskPrompt = [
+                `You have been assigned a new task:`,
+                ``,
+                `**Title**: ${title}`,
+                description ? `**Description**: ${description}` : '',
+                `**Priority**: ${taskPriority}`,
+                `**Task ID**: ${taskId}`,
+                `**Channel**: ${channel_id}`,
+                ``,
+                `Work on this task now.`,
+            ].filter(Boolean).join('\n');
+
+            try {
+                const { triggerChannelExecution } = await import('../../company/channel-execution.service');
+                const { getExecutionService } = await import('../../execution/execution.routes');
+                const execService = getExecutionService();
+                triggerChannelExecution(
+                    execService,
+                    provider,
+                    sandboxId,
+                    userId,
+                    assignedSlug,
+                    taskPrompt,
+                    normalizedChannelId,
+                    'task_assigned',
+                ).catch(err => {
+                    log.warn('Task-assigned wakeup failed (non-blocking)', {
+                        agent: assignedSlug,
+                        task: taskId,
+                        error: err instanceof Error ? err.message : String(err),
+                    });
+                });
+            } catch (err) {
+                log.warn('Task-assigned wakeup skipped (service not ready)', {
+                    agent: assignedSlug,
+                    task: taskId,
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            }
+        }
 
         res.json(mcpResult);
     } catch (error) {

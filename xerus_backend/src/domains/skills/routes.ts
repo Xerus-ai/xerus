@@ -65,21 +65,20 @@ function normalizeChannelId(channelId: string): string {
         if (!domain || !channel) {
             throw new SkillValidationError([{ field: 'channel_id', message: 'channel_id must be in "domain--channel" or "domain/channel" format' }]);
         }
-        if (!SLUG_PATTERN.test(domain) || !SLUG_PATTERN.test(channel)) {
-            throw new SkillValidationError([{ field: 'channel_id', message: `Invalid slug segment in channel_id` }]);
-        }
         return `${domain}/${channel}`;
     }
-    const parts = channelId.split('/');
-    if (parts.length !== 2 || !parts[0] || !parts[1]) {
-        throw new SkillValidationError([{ field: 'channel_id', message: 'channel_id must be in "domain--channel" or "domain/channel" format' }]);
-    }
-    for (const part of parts) {
-        if (!SLUG_PATTERN.test(part)) {
-            throw new SkillValidationError([{ field: 'channel_id', message: `Invalid slug segment in channel_id` }]);
+    if (channelId.includes('/')) {
+        const parts = channelId.split('/');
+        if (parts.length !== 2 || !parts[0] || !parts[1]) {
+            throw new SkillValidationError([{ field: 'channel_id', message: 'channel_id must be in "domain--channel" or "domain/channel" format' }]);
         }
+        return channelId;
     }
-    return channelId;
+    // Bare slug (e.g. "general") — treat as default domain
+    if (channelId && SLUG_PATTERN.test(channelId)) {
+        return `default/${channelId}`;
+    }
+    throw new SkillValidationError([{ field: 'channel_id', message: 'channel_id must be in "domain--channel" or "domain/channel" format' }]);
 }
 
 // GET /api/v1/skills - Unified: all skills with is_installed flag + categories
