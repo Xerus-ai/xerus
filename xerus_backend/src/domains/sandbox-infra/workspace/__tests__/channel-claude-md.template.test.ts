@@ -42,8 +42,6 @@ describe('generateChannelClaudeMd', () => {
 
     it('should include channel directory structure', () => {
         const result = generateChannelClaudeMd(DEFAULT_PARAMS);
-        expect(result).toContain('.beads/issues.jsonl');
-        expect(result).toContain('output/posts.jsonl');
         expect(result).toContain('output/deliverables/');
         expect(result).toContain('scratch/');
     });

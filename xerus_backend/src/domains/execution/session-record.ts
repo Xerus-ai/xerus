@@ -191,7 +191,8 @@ export async function updateSessionRecord(
             log.warn('Post-execution beads sync failed', { error: (err as Error).message });
         }
 
-        // Posts and deliverables surface in feeds that poll independently — fire and forget.
+        // DEPRECATED: posts.jsonl sync is now redundant — MCP mutations auto-log activity.
+        // Kept as safety net for agents still writing to posts.jsonl with old prompts.
         syncPostsJsonlToChannelMessages(provider, ctx.sandboxId).catch(err =>
             log.warn('Post-execution posts sync failed', { error: (err as Error).message }),
         );

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useCallback } from 'react'
 import useSWR from 'swr'
 import { apiGet, apiPost, apiPatch } from '@/lib/api/client'
 import { toast } from '@/lib/toast'
@@ -153,57 +153,50 @@ interface UseChannelTasksReturn {
   refetch: () => void
 }
 
+const TASK_POLL_INTERVAL_MS = 10_000
+
+const fetchChannelTasks = async ([, id]: readonly [string, string]): Promise<KanbanTask[]> => {
+  const result = await apiGet<{ data?: { tasks: KanbanTask[] }; tasks?: KanbanTask[] }>(
+    `/channels/${id}/tasks`,
+  )
+  const payload = result.data ?? result
+  return payload.tasks ?? []
+}
+
 export function useChannelTasks(channelId: string): UseChannelTasksReturn {
-  const [tasks, setTasks] = useState<KanbanTask[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const channelIdRef = useRef(channelId)
-  const inFlightRef = useRef(false)
+  const swrKey = channelId ? (['channel-tasks', channelId] as const) : null
 
-  const fetchTasks = useCallback(async (signal?: AbortSignal) => {
-    if (!channelId) return
-    if (inFlightRef.current) return
-    inFlightRef.current = true
-    setIsLoading(true)
-    setError(null)
-    try {
-      const result = await apiGet<{ data?: { tasks: KanbanTask[] }; tasks?: KanbanTask[] }>(
-        `/channels/${channelId}/tasks`,
-        signal ? { signal } : undefined,
-      )
-      if (signal?.aborted || channelIdRef.current !== channelId) return
-      const payload = result.data ?? result
-      setTasks(payload.tasks ?? [])
-    } catch (err) {
-      if (signal?.aborted || (err instanceof Error && err.name === 'AbortError')) return
-      setError(err instanceof Error ? err.message : 'Failed to fetch tasks')
-    } finally {
-      inFlightRef.current = false
-      if (!signal?.aborted && channelIdRef.current === channelId) {
-        setIsLoading(false)
-      }
-    }
-  }, [channelId])
+  const { data, isLoading, error: swrError, mutate } = useSWR<KanbanTask[]>(
+    swrKey,
+    fetchChannelTasks,
+    {
+      refreshInterval: TASK_POLL_INTERVAL_MS,
+      refreshWhenHidden: false,
+      onErrorRetry: (_err, _key, _config, revalidate, { retryCount }) => {
+        const delay = Math.min(POLL_MAX_BACKOFF_MS, TASK_POLL_INTERVAL_MS * 2 ** retryCount)
+        setTimeout(() => revalidate({ retryCount }), delay)
+      },
+    },
+  )
 
-  useEffect(() => {
-    channelIdRef.current = channelId
-    inFlightRef.current = false
-    const controller = new AbortController()
-    fetchTasks(controller.signal)
-    return () => controller.abort()
-  }, [channelId, fetchTasks])
+  const tasks = data ?? []
+  const error = swrError instanceof Error ? swrError.message : (swrError ? 'Failed to fetch tasks' : null)
 
   const updateTaskStatus = useCallback(async (taskId: string, newStatus: string) => {
-    const previous = tasks
-    setTasks(prev => prev.map(t => (t.id === taskId ? { ...t, status: newStatus } : t)))
-    try {
-      await apiPost(`/tasks/${taskId}/status`, { status: newStatus })
-    } catch (err) {
-      setTasks(previous)
+    await mutate(
+      async (current) => {
+        await apiPost(`/tasks/${taskId}/status`, { status: newStatus })
+        return (current ?? []).map(t => (t.id === taskId ? { ...t, status: newStatus } : t))
+      },
+      {
+        optimisticData: (current) => (current ?? []).map(t => (t.id === taskId ? { ...t, status: newStatus } : t)),
+        rollbackOnError: true,
+        revalidate: false,
+      },
+    ).catch(() => {
       toast.error("Couldn't update that task -- reverting", { description: 'Your changes could not be saved. The task has been restored.' })
-      throw err
-    }
-  }, [tasks])
+    })
+  }, [mutate])
 
   const createTaskFn = useCallback(async (chId: string, payload: CreateTaskPayload): Promise<KanbanTask | null> => {
     try {
@@ -213,14 +206,14 @@ export function useChannelTasks(channelId: string): UseChannelTasksReturn {
       )
       const saved = result.data?.task ?? result.task ?? null
       if (saved) {
-        setTasks(prev => [saved, ...prev])
+        await mutate((current) => [saved, ...(current ?? [])], { revalidate: false })
       }
       return saved
     } catch {
       toast.error("Couldn't create that task", { description: 'Please try again.' })
       return null
     }
-  }, [])
+  }, [mutate])
 
   const updateTaskFn = useCallback(async (taskId: string, payload: UpdateTaskPayload): Promise<KanbanTask | null> => {
     try {
@@ -230,14 +223,14 @@ export function useChannelTasks(channelId: string): UseChannelTasksReturn {
       )
       const updated = result.data?.task ?? result.task ?? null
       if (updated) {
-        setTasks(prev => prev.map(t => (t.id === taskId ? updated : t)))
+        await mutate((current) => (current ?? []).map(t => (t.id === taskId ? updated : t)), { revalidate: false })
       }
       return updated
     } catch {
       toast.error("Couldn't update that task", { description: 'Please try again.' })
       return null
     }
-  }, [])
+  }, [mutate])
 
   const getTaskFn = useCallback(async (taskId: string): Promise<KanbanTask | null> => {
     try {
@@ -250,6 +243,8 @@ export function useChannelTasks(channelId: string): UseChannelTasksReturn {
     }
   }, [])
 
+  const refetch = useCallback(() => { mutate() }, [mutate])
+
   return {
     tasks,
     isLoading,
@@ -258,7 +253,7 @@ export function useChannelTasks(channelId: string): UseChannelTasksReturn {
     createTask: createTaskFn,
     updateTask: updateTaskFn,
     getTask: getTaskFn,
-    refetch: fetchTasks,
+    refetch,
   }
 }
 
@@ -273,45 +268,38 @@ interface UseChannelDeliverablesReturn {
   refetch: () => void
 }
 
+const DELIVERABLE_POLL_INTERVAL_MS = 15_000
+
+const fetchChannelDeliverables = async ([, id]: readonly [string, string]): Promise<Deliverable[]> => {
+  const raw = await apiGet<{ data?: { deliverables: Deliverable[] }; deliverables?: Deliverable[] }>(
+    `/channels/${id}/deliverables`,
+  )
+  const payload = raw.data ?? raw
+  return payload.deliverables ?? []
+}
+
 export function useChannelDeliverables(channelId: string): UseChannelDeliverablesReturn {
-  const [deliverables, setDeliverables] = useState<Deliverable[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const channelIdRef = useRef(channelId)
-  const inFlightRef = useRef(false)
+  const swrKey = channelId ? (['channel-deliverables', channelId] as const) : null
 
-  const fetchDeliverables = useCallback(async (signal?: AbortSignal) => {
-    if (!channelId) return
-    if (inFlightRef.current) return
-    inFlightRef.current = true
-    setIsLoading(true)
-    setError(null)
-    try {
-      const raw = await apiGet<{ data?: { deliverables: Deliverable[] }; deliverables?: Deliverable[] }>(
-        `/channels/${channelId}/deliverables`,
-        signal ? { signal } : undefined,
-      )
-      if (signal?.aborted || channelIdRef.current !== channelId) return
-      const payload = raw.data ?? raw
-      setDeliverables(payload.deliverables ?? [])
-    } catch (err) {
-      if (signal?.aborted || (err instanceof Error && err.name === 'AbortError')) return
-      setError(err instanceof Error ? err.message : 'Failed to fetch deliverables')
-    } finally {
-      inFlightRef.current = false
-      if (!signal?.aborted && channelIdRef.current === channelId) {
-        setIsLoading(false)
-      }
-    }
-  }, [channelId])
+  const { data, isLoading, error: swrError, mutate } = useSWR<Deliverable[]>(
+    swrKey,
+    fetchChannelDeliverables,
+    {
+      refreshInterval: DELIVERABLE_POLL_INTERVAL_MS,
+      refreshWhenHidden: false,
+      onErrorRetry: (_err, _key, _config, revalidate, { retryCount }) => {
+        const delay = Math.min(POLL_MAX_BACKOFF_MS, DELIVERABLE_POLL_INTERVAL_MS * 2 ** retryCount)
+        setTimeout(() => revalidate({ retryCount }), delay)
+      },
+    },
+  )
 
-  useEffect(() => {
-    channelIdRef.current = channelId
-    inFlightRef.current = false
-    const controller = new AbortController()
-    fetchDeliverables(controller.signal)
-    return () => controller.abort()
-  }, [channelId, fetchDeliverables])
+  const refetch = useCallback(() => { mutate() }, [mutate])
 
-  return { deliverables, isLoading, error, refetch: fetchDeliverables }
+  return {
+    deliverables: data ?? [],
+    isLoading,
+    error: swrError instanceof Error ? swrError.message : (swrError ? 'Failed to fetch deliverables' : null),
+    refetch,
+  }
 }

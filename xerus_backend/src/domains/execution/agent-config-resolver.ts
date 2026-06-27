@@ -80,6 +80,83 @@ export async function resolveAdapterType(
 }
 
 // -----------------------------------------------------------------------------
+// Platform Rules (injected into every agent's system prompt)
+// -----------------------------------------------------------------------------
+
+const XERUS_MASTER_SLUG = 'xerus-master';
+
+const ORCHESTRATOR_TOOLS = [
+    'create_agent', 'clone_agent', 'update_agent', 'delete_agent',
+    'create_channel', 'add_to_channel', 'create_task',
+    'upload_kb', 'assign_kb',
+    'create_skill', 'install_skill', 'uninstall_skill',
+    'connect_tool', 'register_trigger', 'deregister_trigger',
+    'create_schedule', 'update_schedule', 'delete_schedule',
+].map(t => `mcp__platform__${t}`);
+
+const COMMON_TOOLS = [
+    'search_agents', 'list_agents', 'search_kb',
+    'query_memory', 'write_memory', 'analyze_memory_patterns',
+    'search_outputs', 'send_notification',
+    'get_status', 'get_billing_status',
+    'search_skills', 'search_tools', 'list_domains',
+    'list_triggers', 'list_schedules',
+    'pause_execution', 'resume_execution', 'get_session_state',
+    'complete_session', 'cancel_execution',
+].map(t => `mcp__platform__${t}`);
+
+export function buildPlatformRules(agentSlug: string): string {
+    const isOrchestrator = agentSlug === XERUS_MASTER_SLUG;
+    const tools = isOrchestrator
+        ? [...ORCHESTRATOR_TOOLS, ...COMMON_TOOLS]
+        : COMMON_TOOLS;
+
+    const lines = [
+        '== Platform Rules ==',
+        '',
+        'GOLDEN RULE: MCP tools for anything the USER sees. Filesystem for your own work.',
+        '',
+        'UI-VISIBLE (always use MCP tools):',
+        '  Tasks      → mcp__platform__create_task',
+        '  Channels   → mcp__platform__create_channel',
+        '  Agents     → mcp__platform__create_agent',
+        '  Notify     → mcp__platform__send_notification',
+        '  Activity is AUTOMATIC — every MCP mutation logs an activity entry.',
+        '',
+        'AGENT-INTERNAL (use filesystem):',
+        '  Research, scratch files  → scratch/',
+        '  Deliverables (files)     → output/deliverables/',
+        '  Working memory           → .memory/agents/{your-slug}/working.md',
+        '  Personal subtasks        → beads (only you see these)',
+        '',
+        'NEVER:',
+        '  sqlite3 data/workspace.db "INSERT/UPDATE..."  — bypasses activity logging + SSE',
+        '  Write to output/posts.jsonl                   — deprecated',
+        '  Create agents/channels/tasks via filesystem    — use MCP tools',
+        '',
+        `Your MCP tools: ${tools.join(', ')}`,
+        '',
+    ];
+
+    if (isOrchestrator) {
+        lines.push(
+            'You are the ORCHESTRATOR. You can create agents, channels, tasks, skills.',
+            'Delegate to agents in their channels. Max delegation depth: 3, concurrent: 5.',
+            '',
+        );
+    } else {
+        lines.push(
+            'You are an AGENT. Work within your assigned channel.',
+            'You cannot create agents or modify workspace structure.',
+            'Max delegation depth: 1, concurrent: 2.',
+            '',
+        );
+    }
+
+    return lines.join('\n');
+}
+
+// -----------------------------------------------------------------------------
 // Agent Identity Resolution
 // -----------------------------------------------------------------------------
 
@@ -187,6 +264,9 @@ export async function resolveAgentIdentity(
     if (agentIndex.trim().length > 10) {
         sections.push('== Current Agents ==', agentIndex.trim(), '');
     }
+
+    // Platform rules: concise MCP-first guidance injected for every agent
+    sections.push(buildPlatformRules(agentSlug));
 
     // Module CLAUDE.md last (reference material, lowest priority for context)
     if (moduleContent) {

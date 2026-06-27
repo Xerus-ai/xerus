@@ -2,6 +2,9 @@
 // Generates OPERATING.md that teaches agents HOW to operate autonomously.
 // Placed at /workspace/agents/{slug}/OPERATING.md
 // Kept under 800 tokens to respect context budget.
+// NOTE: working.md, expertise.md, agents/index.json, and platform rules
+// are already injected into the system prompt by resolveAgentIdentity().
+// Do NOT tell agents to re-read them here.
 
 // -----------------------------------------------------------------------------
 // Types
@@ -57,22 +60,24 @@ export function generateOperatingMd(params: OperatingMdParams): string {
     sections.push(buildBehaviorSection(params));
     sections.push('');
 
-    // Context Gathering
-    sections.push('## Context Gathering');
+    // Session Start Protocol
+    sections.push('## Session Start');
     sections.push('');
-    sections.push('1. Read `' + memBase + '/agents/' + params.agentSlug + '/working.md` (last session state)');
-    sections.push('2. Read `.beads/issues.jsonl` (task board)');
-    sections.push('3. Read `' + memBase + '/agents/' + params.agentSlug + '/expertise.md` (capabilities)');
+    sections.push('Your working memory, expertise, team roster, and platform rules are already in your system prompt.');
+    sections.push('Do NOT re-read working.md, expertise.md, or agents/index.json — they are already injected.');
+    sections.push('');
+    sections.push('1. Handle the user\'s message immediately');
+    sections.push('2. Read files only when the current task requires them');
+    sections.push('3. Check `agents/' + params.agentSlug + '/inbox/` for coordination messages');
     if (params.channelSlug) {
-        sections.push('4. Read channel CLAUDE.md for mission/priorities');
+        sections.push('4. If channel lead: check for handoffs in `.channel/state/handoffs/`');
     }
-    sections.push('Use Explore subagent for reading >5 files.');
     sections.push('');
 
     // Delegation
     sections.push('## Delegation');
     sections.push('');
-    sections.push('You have SDK-native subagent types via the Task tool:');
+    sections.push('SDK-native subagent types via the Task tool:');
     sections.push('| Type | Purpose |');
     sections.push('|------|---------|');
     sections.push('| Explore | Read-only context gathering |');
@@ -86,18 +91,20 @@ export function generateOperatingMd(params: OperatingMdParams): string {
     sections.push('## Skills First');
     sections.push('');
     sections.push('Before implementing from scratch:');
-    sections.push("1. Search installed skills: `Glob('**/.claude/skills/*/SKILL.md')` (finds both channel and global skills)");
+    sections.push("1. Search installed skills: `Glob('**/.claude/skills/*/SKILL.md')`");
     sections.push('2. If matching skill exists, follow its framework');
     sections.push('');
 
-    // Plan-First Workflow
-    sections.push('## Plan-First Workflow');
+    // Output Rules
+    sections.push('## Output Rules');
     sections.push('');
-    sections.push('For tasks with >3 steps:');
-    sections.push('1. Gather context (Explore subagent)');
-    sections.push('2. Create plan');
-    sections.push('3. Execute step by step');
-    sections.push('4. Verify (general-purpose subagent)');
+    sections.push('Follow the "Platform Rules" section in your system prompt.');
+    sections.push('- Tasks → `mcp__platform__create_task` (NEVER beads for team-visible tasks)');
+    sections.push('- Activity → automatic (every MCP mutation creates an activity entry)');
+    sections.push('- Deliverables → write file to `output/deliverables/`, register via MCP if needed');
+    sections.push('- Status updates → `mcp__platform__send_notification`');
+    sections.push('- Personal subtasks → beads (only you see these)');
+    sections.push('- Notify user → `mcp__platform__send_notification`');
     sections.push('');
 
     // Memory Efficiency
@@ -116,41 +123,14 @@ export function generateOperatingMd(params: OperatingMdParams): string {
     sections.push('2. Address issues before marking complete');
     sections.push('');
 
-    // Session Start Protocol
-    sections.push('## Session Start');
-    sections.push('');
-    sections.push('1. Read `' + memBase + '/agents/' + params.agentSlug + '/.task-context.md` (your assignment)');
-    sections.push('2. If BLOCKED: output blocked message, end session');
-    sections.push('3. If READY: execute the task described, nothing else');
-    sections.push('4. If IDLE: read HEARTBEAT.md for proactive tasks, then read working.md');
-    sections.push('5. Check `agents/' + params.agentSlug + '/inbox/` for coordination messages');
-    if (params.channelSlug) {
-        sections.push('6. If channel lead: check `.channel/state/handoffs/` for recent handoff from previous shift');
-    }
-    sections.push('');
-
     // Channel Lead Duties
     if (params.channelSlug) {
         sections.push('## If Channel Lead');
         sections.push('');
-        sections.push('- On first session of the day: TeamCreate with all channel_members');
         sections.push('- Distribute tasks to teammates via TaskCreate');
         sections.push('- Monitor teammate progress via SendMessage');
-        sections.push('- Run daily standup: collect updates from each agent, post summary');
         sections.push('');
     }
-
-    // Communication
-    sections.push('## Communication');
-    sections.push('');
-    sections.push('- Post updates to `output/posts.jsonl` in your channel');
-    sections.push('- For agent-to-agent: use coordination message with `target_agent` in metadata');
-    sections.push('- For escalation: set `metadata.requires_approval: true`');
-    if (params.channelSlug && params.domainSlug) {
-        sections.push('- For cross-channel: post to target channel\'s `output/posts.jsonl`');
-    }
-    sections.push('- When blocked: write to `agents/xerus-master/inbox/`');
-    sections.push('');
 
     // Before Session End
     sections.push('## Before Session End');

@@ -13,6 +13,7 @@ import { SANDBOX_CONFIG } from '../../sandbox-infra/sandbox/sandbox.config';
 import { workspaceSSEBroadcaster } from '../../drive';
 import { assignAgentToChannel, registerAgentInIndex } from '../../company/system-agent-assignment.service';
 import { writeScaffoldFilesToSandbox } from './sandbox-file-writer';
+import { logMcpActivity } from './activity-logger';
 
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 const MAX_RESULTS = 100;
@@ -63,6 +64,18 @@ function formatAgentListResult(rows: WorkspaceAgentRow[]): McpToolResult {
             total: rows.length,
         },
     };
+}
+
+async function findAgentChannel(
+    provider: ReturnType<typeof getDaytonaProvider>,
+    sandboxId: string,
+    agentSlug: string,
+): Promise<string | null> {
+    const rows = await executeWorkspaceJsonQuery<{ channel_slug: string }>(
+        provider, sandboxId,
+        `SELECT channel_slug FROM channel_members WHERE agent_slug = '${escapeSQL(agentSlug)}' LIMIT 1`,
+    );
+    return rows.length > 0 ? rows[0].channel_slug : null;
 }
 
 const router = Router();
@@ -275,6 +288,15 @@ router.post('/create_agent', async (req: InternalMcpRequest, res: Response, next
             timestamp: new Date().toISOString(),
         });
 
+        const createdChannelRows = await findAgentChannel(provider, sandboxId, agentSlug);
+        if (createdChannelRows) {
+            await logMcpActivity(provider, sandboxId, {
+                channelSlug: createdChannelRows,
+                action: 'agent_created',
+                summary: `Agent "${name}" (@${agentSlug}) created`,
+            });
+        }
+
         res.json(mcpResult);
     } catch (error) {
         next(error);
@@ -374,6 +396,15 @@ router.post('/clone_agent', async (req: InternalMcpRequest, res: Response, next:
             type: 'file_changed', path: `agents/${cloneSlug}/config.json`, action: 'created',
             timestamp: new Date().toISOString(),
         });
+
+        const cloneChannel = await findAgentChannel(provider, sandboxId, source.slug);
+        if (cloneChannel) {
+            await logMcpActivity(provider, sandboxId, {
+                channelSlug: cloneChannel,
+                action: 'agent_cloned',
+                summary: `Agent "${name}" (@${cloneSlug}) cloned from @${source.slug}`,
+            });
+        }
 
         res.json(mcpResult);
     } catch (error) {
@@ -479,6 +510,9 @@ router.post('/delete_agent', async (req: InternalMcpRequest, res: Response, next
             throw new BadRequestError('Agent not found or access denied');
         }
 
+        // Query channel membership BEFORE delete (cascade removes rows)
+        const deleteChannel = await findAgentChannel(provider, sandboxId, slug);
+
         // workspace.db agents table has ON DELETE CASCADE for related tables
         await executeWorkspaceQuery(
             provider, sandboxId,
@@ -497,6 +531,14 @@ router.post('/delete_agent', async (req: InternalMcpRequest, res: Response, next
             type: 'file_changed', path: `agents/${existing[0].slug}`, action: 'deleted',
             timestamp: new Date().toISOString(),
         });
+
+        if (deleteChannel) {
+            await logMcpActivity(provider, sandboxId, {
+                channelSlug: deleteChannel,
+                action: 'agent_deleted',
+                summary: `Agent @${existing[0].slug} removed`,
+            });
+        }
 
         res.json(mcpResult);
     } catch (error) {

@@ -12,6 +12,7 @@ export const TRIGGER_PRIORITIES = {
     user_message: 1, // Highest - user is waiting
     channel_message: 1, // Same priority as user_message - human sent in channel
     mention: 2, // User-initiated via @mention
+    task_assigned: 2, // Task assigned to agent - auto-wakeup
     team: 3, // Another agent delegated
     schedule: 4, // Scheduled trigger
     heartbeat: 5, // Lowest - proactive check
