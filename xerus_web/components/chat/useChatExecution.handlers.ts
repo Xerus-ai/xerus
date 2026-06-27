@@ -152,10 +152,14 @@ export function makeOnToolResult(ctx: HandlerCtx) {
 
 export function makeOnMeta(ctx: HandlerCtx) {
   return (event: StreamEvent<'meta'>) => {
-    const content = event.content as MetaEventContent & { conversationId?: string }
+    const content = event.content as MetaEventContent & { conversationId?: string; executionId?: string }
     const convId = content?.conversationId ?? ctx.getConvId()
     if (!convId) return
     const refs = ctx.getRefs(convId)
+
+    if (content.executionId) {
+      ctx.dispatch({ type: 'SET_ACTIVE_EXECUTION_ID', convId, executionId: content.executionId })
+    }
 
     if (content.agentSlug || content.agentName) {
       refs.respondingAgent = {

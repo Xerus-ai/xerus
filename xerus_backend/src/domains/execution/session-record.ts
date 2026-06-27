@@ -1,7 +1,6 @@
 // Session Record Management — creates, updates, and summarizes execution session records.
 // Extracted from execution-pipeline.ts to keep the pipeline under 400 lines.
 
-import { randomUUID } from 'crypto';
 import { logger } from '../../utils/logger';
 import { BillingType, ExecutionSummary } from './types';
 import { SDKExecutionError } from './errors';
@@ -56,7 +55,8 @@ export async function createSessionRecord(
     ctx: PipelineContext,
 ): Promise<string> {
     const agent = requireAgent(ctx);
-    const sessionId = randomUUID();
+    // Use ctx.executionId so the DB row, SSE envelope, and activeExecutions map all share the same ID.
+    const sessionId = ctx.executionId;
 
     await deps.db.query(
         `INSERT INTO execution_sessions (id, workspace_id, agent_slug, sandbox_id, status, trigger_type, conversation_id, user_prompt, key_source, started_at, created_at)

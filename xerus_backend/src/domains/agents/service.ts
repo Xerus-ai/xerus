@@ -223,24 +223,15 @@ export class AgentService {
         const { filters, sort_by = 'created_at', sort_order = 'desc', page = 1, limit = 20 } = validatedOptions;
 
         const fs = this.getFs();
-        const index = await fs.getAgentIndex(userId);
 
-        // Get workspace.db rows for rowid mapping
+        // workspace.db is the source of truth for which agents exist
         const wsRows = await listAgents(provider, sandboxId);
-        const rowBySlug = new Map(wsRows.map(r => [r.slug, r]));
-
-        // Batch-read all config.json files for agents in index
-        const indexSlugs = index
-            .filter(entry => rowBySlug.has(entry.slug))
-            .map(entry => entry.slug);
-        const configs = await fs.getAgentConfigs(userId, indexSlugs);
+        const allSlugs = wsRows.map(r => r.slug);
+        const configs = await fs.getAgentConfigs(userId, allSlugs);
 
         const agents: Agent[] = [];
-        for (const entry of index) {
-            const wsRow = rowBySlug.get(entry.slug);
-            if (!wsRow) continue;
-
-            const config = configs.get(entry.slug);
+        for (const wsRow of wsRows) {
+            const config = configs.get(wsRow.slug);
             if (!config) continue;
 
             const agent = configToAgent(config, wsRow.rowid, userId, 'private');
