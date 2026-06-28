@@ -8,6 +8,17 @@ import { isMascotConfig } from '@/lib/mascot-config'
 import { MascotAvatar } from '@/components/agents/MascotAvatar'
 import type { Agent } from './PresenceAvatars'
 
+export interface SubtaskItem {
+  text: string
+  done: boolean
+}
+
+export interface AttachmentRef {
+  name: string
+  path: string
+  type: string
+}
+
 export interface KanbanTask {
   id: string
   title: string
@@ -18,6 +29,8 @@ export interface KanbanTask {
   channelTag?: string
   labels?: { name: string; color: string }[]
   subtasks?: { total: number; completed: number }
+  subtaskItems?: SubtaskItem[]
+  attachments?: AttachmentRef[]
   commentCount?: number
   attachmentCount?: number
   startDate?: string

@@ -283,6 +283,7 @@ export class ExecutionService {
             };
             stream.send('meta', {
                 conversationId: ctx.conversationId,
+                executionId,
                 agentSlug: agentForTracking.slug,
                 agentName: DISPLAY_NAMES[agentForTracking.slug] || agentForTracking.name || agentForTracking.slug,
             });
