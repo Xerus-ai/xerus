@@ -1,14 +1,13 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
-import { Hash, User, Calendar, CheckCircle2, Circle, Paperclip, Tag, FileText, Pencil, X } from 'lucide-react'
+import { Hash, User, Calendar, CheckCircle2, Circle, Paperclip, Tag, FileText, Pencil, X, Clock } from 'lucide-react'
 import { PresenceAvatars } from '@/components/common/PresenceAvatars'
 import type { KanbanTask } from '@/components/common/KanbanBoard'
-// board-data.reference.ts has dummy data for UI reference (DUMMY_SUBTASK_NAMES, DUMMY_SUBTASK_NOTES, DUMMY_FILES)
-// Subtasks, notes, and files are populated from the task object itself or show empty states
+import { apiGet } from '@/lib/api/client'
 
 function CircularProgress({ completed, total }: { completed: number; total: number }) {
   const pct = total > 0 ? (completed / total) * 100 : 0
@@ -36,12 +35,48 @@ function CircularProgress({ completed, total }: { completed: number; total: numb
   )
 }
 
+interface ActivityEntry {
+  id: string
+  agent: string
+  action: string
+  timestamp: string
+}
+
+function timeAgo(ts: string): string {
+  const diff = Date.now() - new Date(ts).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
+
 interface TaskDetailSheetProps {
   selectedTask: KanbanTask | null
   onClose: () => void
 }
 
 export function TaskDetailSheet({ selectedTask, onClose }: TaskDetailSheetProps) {
+  const [activities, setActivities] = useState<ActivityEntry[]>([])
+  const [activitiesLoading, setActivitiesLoading] = useState(false)
+
+  useEffect(() => {
+    if (!selectedTask) {
+      setActivities([])
+      return
+    }
+    setActivitiesLoading(true)
+    apiGet<{ data?: { activities: ActivityEntry[] } }>(`/tasks/${selectedTask.id}/activities`)
+      .then((res) => {
+        const data = res.data ?? res
+        setActivities((data as { activities?: ActivityEntry[] }).activities ?? [])
+      })
+      .catch(() => setActivities([]))
+      .finally(() => setActivitiesLoading(false))
+  }, [selectedTask?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <Sheet
       open={selectedTask !== null}
@@ -169,9 +204,9 @@ export function TaskDetailSheet({ selectedTask, onClose }: TaskDetailSheetProps)
                     <span className="text-[13px] text-text-muted">Description</span>
                   </div>
                   <div className="bg-surface-alt/50 rounded-xl px-4 py-3.5">
-                    <p className="text-[13px] text-text-secondary leading-relaxed">
+                    <div className="text-[13px] text-text-secondary leading-relaxed whitespace-pre-wrap">
                       {selectedTask.description}
-                    </p>
+                    </div>
                   </div>
                 </div>
               )}
@@ -182,11 +217,31 @@ export function TaskDetailSheet({ selectedTask, onClose }: TaskDetailSheetProps)
                   <div className="flex items-center gap-2">
                     <Paperclip className="w-4 h-4 text-text-muted" strokeWidth={1.5} />
                     <span className="text-[13px] text-text-muted">
-                      Attachments{selectedTask.attachmentCount ? ` (${selectedTask.attachmentCount})` : ''}
+                      Attachments{selectedTask.attachments && selectedTask.attachments.length > 0 ? ` (${selectedTask.attachments.length})` : ''}
                     </span>
                   </div>
                 </div>
-                <p className="text-xs text-text-muted py-4 text-center">No attachments</p>
+                {selectedTask.attachments && selectedTask.attachments.length > 0 ? (
+                  <div className="space-y-2">
+                    {selectedTask.attachments.map((file, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-surface-alt/50 hover:bg-surface-alt transition-colors"
+                      >
+                        <FileText className="w-4 h-4 text-primary flex-shrink-0" strokeWidth={1.5} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] font-medium text-text truncate">{file.name}</p>
+                          <p className="text-[11px] text-text-muted truncate">{file.path}</p>
+                        </div>
+                        <span className="text-[10px] text-text-muted uppercase px-1.5 py-0.5 bg-surface rounded-md">
+                          {file.type}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-text-muted py-4 text-center">No attachments</p>
+                )}
               </div>
 
               {/* Tabs: Subtasks | Comments | Activity */}
@@ -203,47 +258,71 @@ export function TaskDetailSheet({ selectedTask, onClose }: TaskDetailSheetProps)
                     className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-text data-[state=active]:shadow-none px-4 pb-2.5 pt-0 text-[13px] font-medium text-text-muted"
                   >
                     Comments
-                    {selectedTask.commentCount !== undefined && selectedTask.commentCount > 0 && (
-                      <span className="ml-1.5 bg-surface-alt rounded-md px-1.5 py-0.5 text-[10px] font-semibold">
-                        {selectedTask.commentCount}
-                      </span>
-                    )}
                   </TabsTrigger>
                   <TabsTrigger
                     value="activity"
                     className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-text data-[state=active]:shadow-none px-4 pb-2.5 pt-0 text-[13px] font-medium text-text-muted"
                   >
                     Activities
+                    {activities.length > 0 && (
+                      <span className="ml-1.5 bg-surface-alt rounded-md px-1.5 py-0.5 text-[10px] font-semibold">
+                        {activities.length}
+                      </span>
+                    )}
                   </TabsTrigger>
                 </TabsList>
 
                 {/* Subtasks checklist */}
                 <TabsContent value="subtasks" className="mt-5">
-                  {selectedTask.subtasks && selectedTask.subtasks.total > 0 ? (
+                  {selectedTask.subtaskItems && selectedTask.subtaskItems.length > 0 ? (
+                    <>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-semibold text-text">Subtasks</h3>
+                        <CircularProgress
+                          completed={selectedTask.subtaskItems.filter(s => s.done).length}
+                          total={selectedTask.subtaskItems.length}
+                        />
+                      </div>
+
+                      <div className="space-y-0.5">
+                        {selectedTask.subtaskItems.map((item, i) => (
+                          <div key={i}>
+                            <div className="flex items-start gap-2.5 py-2 px-1.5 rounded-lg hover:bg-surface-alt/30 transition-colors group">
+                              {item.done ? (
+                                <CheckCircle2 className="w-[18px] h-[18px] text-[#22C55E] flex-shrink-0 mt-px" />
+                              ) : (
+                                <Circle className="w-[18px] h-[18px] text-surface-active flex-shrink-0 mt-px" strokeWidth={1.5} />
+                              )}
+                              <span className={cn(
+                                'text-[13px] flex-1',
+                                item.done ? 'text-text-muted line-through' : 'text-text'
+                              )}>
+                                {item.text}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : selectedTask.subtasks && selectedTask.subtasks.total > 0 ? (
                     <>
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="text-sm font-semibold text-text">Subtasks</h3>
                         <CircularProgress completed={selectedTask.subtasks.completed} total={selectedTask.subtasks.total} />
                       </div>
-
                       <div className="space-y-0.5">
                         {Array.from({ length: selectedTask.subtasks.total }, (_, i) => {
                           const done = i < selectedTask.subtasks!.completed
                           return (
-                            <div key={i}>
-                              <div className="flex items-start gap-2.5 py-2 px-1.5 rounded-lg hover:bg-surface-alt/30 transition-colors group">
-                                {done ? (
-                                  <CheckCircle2 className="w-[18px] h-[18px] text-[#22C55E] flex-shrink-0 mt-px" />
-                                ) : (
-                                  <Circle className="w-[18px] h-[18px] text-surface-active flex-shrink-0 mt-px" strokeWidth={1.5} />
-                                )}
-                                <span className={cn(
-                                  'text-[13px] flex-1',
-                                  done ? 'text-text-muted line-through' : 'text-text'
-                                )}>
-                                  Subtask details not yet available
-                                </span>
-                              </div>
+                            <div key={i} className="flex items-start gap-2.5 py-2 px-1.5 rounded-lg">
+                              {done ? (
+                                <CheckCircle2 className="w-[18px] h-[18px] text-[#22C55E] flex-shrink-0 mt-px" />
+                              ) : (
+                                <Circle className="w-[18px] h-[18px] text-surface-active flex-shrink-0 mt-px" strokeWidth={1.5} />
+                              )}
+                              <span className={cn('text-[13px] flex-1', done ? 'text-text-muted line-through' : 'text-text')}>
+                                Subtask {i + 1}
+                              </span>
                             </div>
                           )
                         })}
@@ -261,7 +340,29 @@ export function TaskDetailSheet({ selectedTask, onClose }: TaskDetailSheetProps)
 
                 {/* Activity */}
                 <TabsContent value="activity" className="mt-5">
-                  <p className="text-xs text-text-muted py-6 text-center">No activity recorded</p>
+                  {activitiesLoading ? (
+                    <p className="text-xs text-text-muted py-6 text-center">Loading activities...</p>
+                  ) : activities.length > 0 ? (
+                    <div className="space-y-3">
+                      {activities.map((a) => (
+                        <div key={a.id} className="flex items-start gap-3 py-1.5">
+                          <div className="w-6 h-6 rounded-full bg-surface-alt flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <Clock className="w-3 h-3 text-text-muted" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[13px] text-text leading-snug">{a.action}</p>
+                            <p className="text-[11px] text-text-muted mt-0.5">
+                              {a.agent !== 'system' && <span className="font-medium">@{a.agent}</span>}
+                              {a.agent !== 'system' && ' · '}
+                              {timeAgo(a.timestamp)}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-text-muted py-6 text-center">No activity recorded</p>
+                  )}
                 </TabsContent>
               </Tabs>
             </div>

@@ -5,6 +5,7 @@ import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
 import type { AdapterType } from './types';
 import type { ResolvedExecutionDeps } from './execution-pipeline.types';
 import { parseAgentYamlFields } from '../../shared/agent-yaml-parser';
+import { buildWorkspaceStateSummary } from './workspace-state-builder';
 
 // -----------------------------------------------------------------------------
 // Agent Config Resolution
@@ -154,6 +155,14 @@ export function buildPlatformRules(agentSlug: string, connectorTools?: string[])
         lines.push(
             'You are the ORCHESTRATOR. You can create agents, channels, tasks, skills.',
             'Delegate to agents in their channels. Max delegation depth: 3, concurrent: 5.',
+            '',
+            'TASK CREATION RULES:',
+            '- ALWAYS set assigned_agent_ids when creating tasks — unassigned tasks are invisible to agents',
+            '- ALWAYS set channel_id to the channel where the assigned agent works',
+            '- Check the "Workspace State" section above to find the right channel and agent',
+            '- Write a detailed description — the assigned agent uses it as their brief',
+            '- If the task description is long, write it to a markdown file in the channel first,',
+            '  then reference the file path in the description',
             '',
         );
     } else {
@@ -307,6 +316,13 @@ export async function resolveAgentIdentity(
     const agentIndex = await tryRead(`${ws}/agents/index.json`);
     if (agentIndex.trim().length > 10) {
         sections.push('== Current Agents ==', agentIndex.trim(), '');
+    }
+
+    // Workspace topology: channels, agent assignments, task counts
+    // Critical for orchestrator to know WHERE to route tasks and WHO to assign
+    const workspaceState = await buildWorkspaceStateSummary(provider, sandboxId);
+    if (workspaceState) {
+        sections.push(workspaceState);
     }
 
     // Discover connected Pipedream tools from .mcp.json

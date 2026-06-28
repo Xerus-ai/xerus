@@ -9,6 +9,7 @@ import { InternalMcpRequest, McpToolResult } from './types';
 import { escapeSQL, executeWorkspaceJsonQuery, executeWorkspaceQuery } from '../../conversations/workspace-db.helpers';
 import { requireRunningSandbox, getDaytonaProvider } from '../../sandbox-infra/sandbox/sandbox-route-helpers';
 import type { SandboxService } from '../../sandbox-infra/sandbox/sandbox.service';
+import { SANDBOX_CONFIG } from '../../sandbox-infra/sandbox/sandbox.config';
 import { workspaceSSEBroadcaster } from '../../drive';
 import { scaffoldChannel } from '../../company/workspace-scaffold.service';
 import { addSystemAgentsToChannel, assignAgentToChannel } from '../../company/system-agent-assignment.service';
@@ -17,6 +18,21 @@ import { logger } from '../../../utils/logger';
 
 const log = logger('channel-task-routes');
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
+
+interface SubtaskItem { text: string; done: boolean }
+interface AttachmentItem { name: string; path: string; type: string }
+
+function parseDependencies(raw: string | null): { subtasks: SubtaskItem[]; attachments: AttachmentItem[] } {
+    if (!raw) return { subtasks: [], attachments: [] };
+    try {
+        const parsed = JSON.parse(raw) as Record<string, unknown>;
+        const subtasks = Array.isArray(parsed.subtasks) ? parsed.subtasks as SubtaskItem[] : [];
+        const attachments = Array.isArray(parsed.attachments) ? parsed.attachments as AttachmentItem[] : [];
+        return { subtasks, attachments };
+    } catch {
+        return { subtasks: [], attachments: [] };
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Dependencies (injected at startup)
@@ -270,7 +286,7 @@ router.post('/add_to_channel', async (req: InternalMcpRequest, res: Response, ne
 // POST /mcp/create_task
 router.post('/create_task', async (req: InternalMcpRequest, res: Response, next: NextFunction) => {
     try {
-        const { channel_id, title, description, assigned_agent_ids, priority, subtasks } = req.body;
+        const { channel_id, title, description, description_file, assigned_agent_ids, priority, subtasks } = req.body;
         const userId = req.sandbox!.userId;
 
         if (!channel_id || typeof channel_id !== 'string') {
@@ -288,6 +304,29 @@ router.post('/create_task', async (req: InternalMcpRequest, res: Response, next:
         const sandboxService = getSandboxService();
         const sandboxId = await requireRunningSandbox(sandboxService, userId);
         const provider = getDaytonaProvider(sandboxService);
+
+        // Resolve description_file: if the agent wrote a detailed description to a file,
+        // read it and use it as the full description + store as attachment metadata
+        let resolvedDescription = description || null;
+        let attachmentPath: string | null = null;
+        if (description_file && typeof description_file === 'string') {
+            try {
+                const ws = SANDBOX_CONFIG.workspacePath;
+                const filePath = description_file.startsWith('/')
+                    ? description_file
+                    : `${ws}/${description_file}`;
+                const fileContent = await provider.readFile(sandboxId, filePath);
+                if (fileContent && fileContent.trim().length > 0) {
+                    resolvedDescription = fileContent.trim();
+                    attachmentPath = description_file;
+                }
+            } catch (err) {
+                log.debug('description_file read failed, using inline description', {
+                    file: description_file,
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            }
+        }
 
         // Normalize channel_id to domain--channel format for project_slug
         let normalizedChannelId = channel_id;
@@ -311,13 +350,14 @@ router.post('/create_task', async (req: InternalMcpRequest, res: Response, next:
         // Idempotent creation: if a task with the same title already exists in this
         // channel, return it instead of inserting a duplicate. Task IDs are generated
         // per-call, so without this check repeated create_task calls always duplicate.
-        const existingTaskRows = await executeWorkspaceJsonQuery<TaskRow>(
+        const existingTaskRows = await executeWorkspaceJsonQuery<TaskRow & { dependencies: string | null }>(
             provider, sandboxId,
-            `SELECT id, project_slug, title, description, status, priority, assigned_agent, created_at
+            `SELECT id, project_slug, title, description, status, priority, assigned_agent, dependencies, created_at
              FROM tasks WHERE project_slug = '${escapeSQL(normalizedChannelId)}' AND title = '${escapeSQL(title)}' LIMIT 1`,
         );
         if (existingTaskRows.length > 0) {
             const existing = existingTaskRows[0];
+            const existingDeps = parseDependencies(existing.dependencies);
             const existingResult: McpToolResult = {
                 success: true,
                 data: {
@@ -328,7 +368,8 @@ router.post('/create_task', async (req: InternalMcpRequest, res: Response, next:
                         description: existing.description || '',
                         assigned_agent_ids: existing.assigned_agent ? [existing.assigned_agent] : [],
                         priority: existing.priority,
-                        subtasks: subtasks || [],
+                        subtasks: existingDeps.subtasks,
+                        attachments: existingDeps.attachments,
                         status: existing.status,
                         created_by: userId,
                         created_at: existing.created_at,
@@ -341,17 +382,37 @@ router.post('/create_task', async (req: InternalMcpRequest, res: Response, next:
 
         const taskId = `task-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
         const taskPriority = priority || 'medium';
-        const descValue = description ? `'${escapeSQL(description)}'` : 'NULL';
-        const assignedAgent = Array.isArray(assigned_agent_ids) && assigned_agent_ids.length > 0
-            ? `'${escapeSQL(String(assigned_agent_ids[0]))}'`
+        const descValue = resolvedDescription ? `'${escapeSQL(resolvedDescription)}'` : 'NULL';
+        const assignedAgentSlug = Array.isArray(assigned_agent_ids) && assigned_agent_ids.length > 0
+            ? String(assigned_agent_ids[0])
+            : null;
+        const assignedAgent = assignedAgentSlug
+            ? `'${escapeSQL(assignedAgentSlug)}'`
             : 'NULL';
-        const labelsValue = subtasks && Array.isArray(subtasks) && subtasks.length > 0
-            ? `'${escapeSQL(JSON.stringify(subtasks))}'`
+        // Subtasks are checklist items — store as structured JSON in dependencies column.
+        // Previously these were incorrectly stored in the labels column.
+        const subtaskItems = subtasks && Array.isArray(subtasks) && subtasks.length > 0
+            ? subtasks.map((s: string) => ({ text: String(s), done: false }))
+            : [];
+        const depsPayload: Record<string, unknown> = {};
+        if (subtaskItems.length > 0) depsPayload.subtasks = subtaskItems;
+        if (attachmentPath) depsPayload.attachments = [{ name: attachmentPath.split('/').pop() || 'description.md', path: attachmentPath, type: 'markdown' }];
+        const depsValue = Object.keys(depsPayload).length > 0
+            ? `'${escapeSQL(JSON.stringify(depsPayload))}'`
             : 'NULL';
+
+        // Ensure the assigned agent exists in the agents table before inserting the task.
+        // Without this, the FK constraint (assigned_agent REFERENCES agents(slug)) rejects
+        // the entire INSERT and the task silently fails to create.
+        const ensureAgentSql = assignedAgentSlug
+            ? `INSERT OR IGNORE INTO agents (slug, name, adapter_type, role, autonomy_level, status)
+               VALUES ('${escapeSQL(assignedAgentSlug)}', '${escapeSQL(assignedAgentSlug)}', 'claudecode', 'specialist', 'supervised', 'idle');`
+            : '';
 
         const sql = `
             BEGIN;
-            INSERT INTO tasks (id, project_slug, title, description, status, priority, assigned_agent, labels)
+            ${ensureAgentSql}
+            INSERT INTO tasks (id, project_slug, title, description, status, priority, assigned_agent, dependencies)
             VALUES (
                 '${escapeSQL(taskId)}',
                 '${escapeSQL(normalizedChannelId)}',
@@ -360,19 +421,20 @@ router.post('/create_task', async (req: InternalMcpRequest, res: Response, next:
                 'open',
                 '${escapeSQL(taskPriority)}',
                 ${assignedAgent},
-                ${labelsValue}
+                ${depsValue}
             );
-            SELECT id, project_slug, title, description, status, priority, assigned_agent, created_at
+            SELECT id, project_slug, title, description, status, priority, assigned_agent, dependencies, created_at
             FROM tasks WHERE id = '${escapeSQL(taskId)}';
             COMMIT;
         `;
 
-        const rows = await executeWorkspaceJsonQuery<TaskRow>(provider, sandboxId, sql);
+        const rows = await executeWorkspaceJsonQuery<TaskRow & { dependencies: string | null }>(provider, sandboxId, sql);
 
         const row = rows[0];
         if (!row) {
             throw new BadRequestError('Failed to create task — database insert returned no result');
         }
+        const parsedDeps = parseDependencies(row.dependencies);
         const mcpResult: McpToolResult = {
             success: true,
             data: {
@@ -383,7 +445,8 @@ router.post('/create_task', async (req: InternalMcpRequest, res: Response, next:
                     description: row.description || '',
                     assigned_agent_ids: assigned_agent_ids || [],
                     priority: row.priority,
-                    subtasks: subtasks || [],
+                    subtasks: parsedDeps.subtasks,
+                    attachments: parsedDeps.attachments,
                     status: row.status,
                     created_by: userId,
                     created_at: row.created_at,
@@ -412,7 +475,7 @@ router.post('/create_task', async (req: InternalMcpRequest, res: Response, next:
                 `You have been assigned a new task:`,
                 ``,
                 `**Title**: ${title}`,
-                description ? `**Description**: ${description}` : '',
+                resolvedDescription ? `**Description**: ${resolvedDescription}` : '',
                 `**Priority**: ${taskPriority}`,
                 `**Task ID**: ${taskId}`,
                 `**Channel**: ${channel_id}`,

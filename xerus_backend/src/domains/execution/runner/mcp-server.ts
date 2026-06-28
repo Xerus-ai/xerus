@@ -466,18 +466,19 @@ export const TOOLS = [
     },
     {
         name: 'create_task',
-        description: 'Create a task in a channel with agent assignments.',
+        description: 'Create a task in a channel with agent assignments. ALWAYS assign agents and use the correct channel.',
         inputSchema: {
             type: 'object' as const,
             properties: {
-                channel_id: { type: 'string', description: 'Channel to create the task in' },
+                channel_id: { type: 'string', description: 'Channel to create the task in (must match the assigned agent\'s channel)' },
                 title: { type: 'string', description: 'Task title' },
-                description: { type: 'string', description: 'Task description' },
-                assigned_agent_ids: { type: 'array', items: { type: 'string' }, description: 'Agent IDs to assign' },
+                description: { type: 'string', description: 'Task description (inline text or brief summary)' },
+                description_file: { type: 'string', description: 'Path to a markdown file with detailed task description (relative to workspace root). If provided, file content becomes the full description and the file is attached to the task.' },
+                assigned_agent_ids: { type: 'array', items: { type: 'string' }, description: 'Agent slugs to assign. REQUIRED — unassigned tasks are invisible to agents.' },
                 priority: { type: 'string', enum: ['low', 'medium', 'high', 'critical'], description: 'Task priority' },
                 subtasks: { type: 'array', items: { type: 'string' }, description: 'Checklist items for the task' },
             },
-            required: ['channel_id', 'title'],
+            required: ['channel_id', 'title', 'assigned_agent_ids'],
         },
     },
     // Skills (2) — backend DB + workspace filesystem

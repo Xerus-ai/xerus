@@ -10,7 +10,7 @@ import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
 import type { SandboxService } from '../sandbox-infra/sandbox/sandbox.service';
 import type { DaytonaProvider } from '../sandbox-infra/sandbox/providers/daytona.provider';
 import { requireRunningSandbox, getDaytonaProvider } from '../sandbox-infra/sandbox/sandbox-route-helpers';
-import { escapeSQL, executeWorkspaceJsonQuery } from '../conversations/workspace-db.helpers';
+import { escapeSQL, escapeLikePattern, executeWorkspaceJsonQuery } from '../conversations/workspace-db.helpers';
 import { shellEscape } from '../../utils/shell-safety';
 import { sanitizeSlug } from '../../shared/slugify';
 import { VALID_STATUSES, VALID_PRIORITIES } from './task.constants';
@@ -81,6 +81,41 @@ function extractAvatarUrl(config: string | null): string | null {
     }
 }
 
+// Workspace DB stores: open, in_progress, blocked, completed, cancelled
+// Kanban board expects: todo, in_progress, done, needs_approval
+const STATUS_TO_KANBAN: Record<string, string> = {
+    open: 'todo',
+    in_progress: 'in_progress',
+    blocked: 'needs_approval',
+    completed: 'done',
+    cancelled: 'done',
+    todo: 'todo',
+    done: 'done',
+    needs_approval: 'needs_approval',
+};
+
+const KANBAN_TO_DB_STATUS: Record<string, string> = {
+    todo: 'open',
+    done: 'completed',
+    needs_approval: 'blocked',
+    in_progress: 'in_progress',
+};
+
+interface SubtaskItem { text: string; done: boolean }
+interface AttachmentRef { name: string; path: string; type: string }
+
+function parseDependenciesPayload(raw: string | null): { subtaskItems: SubtaskItem[]; attachments: AttachmentRef[] } {
+    if (!raw) return { subtaskItems: [], attachments: [] };
+    try {
+        const parsed = JSON.parse(raw) as Record<string, unknown>;
+        const subtaskItems = Array.isArray(parsed.subtasks) ? parsed.subtasks as SubtaskItem[] : [];
+        const attachments = Array.isArray(parsed.attachments) ? parsed.attachments as AttachmentRef[] : [];
+        return { subtaskItems, attachments };
+    } catch {
+        return { subtaskItems: [], attachments: [] };
+    }
+}
+
 function formatTask(row: WorkspaceTaskRow, agentMap: Map<string, WorkspaceAgentRow>) {
     const assignedAgents: Array<{ id: string; name: string; slug: string; status: string; avatar_url: string | null }> = [];
     if (row.assigned_agent) {
@@ -98,16 +133,22 @@ function formatTask(row: WorkspaceTaskRow, agentMap: Map<string, WorkspaceAgentR
         );
     }
 
+    const deps = parseDependenciesPayload(row.dependencies);
+    const completedCount = deps.subtaskItems.filter(s => s.done).length;
+
     return {
         id: row.id,
         title: row.title,
         description: row.description || undefined,
-        status: row.status,
+        status: STATUS_TO_KANBAN[row.status] || row.status,
         priority: row.priority,
         assignedAgents,
         channelTag: row.project_slug || undefined,
         labels: parseLabels(row.labels),
-        subtasks: { total: 0, completed: 0 },
+        subtasks: { total: deps.subtaskItems.length, completed: completedCount },
+        subtaskItems: deps.subtaskItems,
+        attachments: deps.attachments,
+        attachmentCount: deps.attachments.length,
         dueDate: row.due_date || undefined,
         createdAt: row.created_at,
         metadata: {},
@@ -381,10 +422,11 @@ router.patch('/tasks/:taskId', auth, strictRateLimit, async (req: AuthenticatedR
                 : null;
         }
         if (status !== undefined) {
-            if (!VALID_STATUSES.has(status)) {
+            const dbStatus = KANBAN_TO_DB_STATUS[status] || status;
+            if (!VALID_STATUSES.has(dbStatus)) {
                 throw new BadRequestError(`Invalid status. Must be one of: ${[...VALID_STATUSES].join(', ')}`);
             }
-            fields.status = status;
+            fields.status = dbStatus;
         }
 
         if (Object.keys(fields).length === 0) {
@@ -452,7 +494,8 @@ router.post('/tasks/:taskId/status', auth, async (req: AuthenticatedRequest, res
         }
 
         const { taskId } = req.params;
-        const { status } = req.body;
+        const rawStatus: string = req.body.status;
+        const status = KANBAN_TO_DB_STATUS[rawStatus] || rawStatus;
 
         if (!status || !VALID_STATUSES.has(status)) {
             throw new BadRequestError(`Invalid status. Must be one of: ${[...VALID_STATUSES].join(', ')}`);
@@ -527,6 +570,55 @@ router.get('/channels/:channelId/deliverables', auth, async (req: AuthenticatedR
         });
 
         sendResponse(res, 200, { deliverables }, startTime);
+    } catch (err) {
+        next(err);
+    }
+});
+
+// GET /api/v1/tasks/:taskId/activities - Activity log for a task
+router.get('/tasks/:taskId/activities', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const startTime = res.locals.startTime || Date.now();
+    try {
+        const userId = req.user?.uid;
+        if (!userId) throw new UnauthorizedError();
+
+        const { taskId } = req.params;
+
+        const { sandboxService } = getDeps();
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
+
+        const row = await getTask(provider, sandboxId, taskId);
+        if (!row) throw new NotFoundError('Task');
+
+        const channelSlug = row.project_slug;
+        const sql = `
+            SELECT cm.id, cm.agent_slug, cm.content, cm.message_type, cm.metadata, cm.posted_at
+            FROM channel_messages cm
+            WHERE cm.channel_slug = '${escapeSQL(channelSlug)}'
+              AND cm.message_type = 'system'
+              AND cm.metadata LIKE '%${escapeLikePattern(taskId)}%' ESCAPE '\\'
+            ORDER BY cm.posted_at DESC
+            LIMIT 50
+        `;
+        const activities = await executeWorkspaceJsonQuery<{
+            id: number; agent_slug: string; content: string;
+            message_type: string; metadata: string | null; posted_at: string;
+        }>(provider, sandboxId, sql);
+
+        sendResponse(res, 200, {
+            activities: activities.map(a => {
+                let meta = {};
+                try { meta = a.metadata ? JSON.parse(a.metadata) : {}; } catch { /* malformed */ }
+                return {
+                    id: String(a.id),
+                    agent: a.agent_slug,
+                    action: a.content,
+                    timestamp: a.posted_at,
+                    metadata: meta,
+                };
+            }),
+        }, startTime);
     } catch (err) {
         next(err);
     }
