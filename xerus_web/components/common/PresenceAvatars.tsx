@@ -3,6 +3,8 @@
 import React from 'react'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
+import { isMascotConfig } from '@/lib/mascot-config'
+import { MascotAvatar } from '@/components/agents/MascotAvatar'
 
 export interface Agent {
   id: string
@@ -87,7 +89,9 @@ export function PresenceAvatars({
               height: avatarSize,
             }}
           >
-            {agent.avatar_url ? (
+            {isMascotConfig(agent.avatar_url) ? (
+              <MascotAvatar config={agent.avatar_url!} size={avatarSize} className="w-full h-full" alt={agent.name} />
+            ) : agent.avatar_url ? (
               <AvatarImage src={agent.avatar_url} alt={agent.name} />
             ) : null}
             <AvatarFallback

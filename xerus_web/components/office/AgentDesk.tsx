@@ -3,6 +3,8 @@
 import React from 'react'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
+import { isMascotConfig } from '@/lib/mascot-config'
+import { MascotAvatar } from '@/components/agents/MascotAvatar'
 
 interface AgentDeskProps {
   agent: {
@@ -68,7 +70,9 @@ export function AgentDesk({ agent, onClick }: AgentDeskProps) {
       {/* Avatar with status dot */}
       <div className="relative flex-shrink-0">
         <Avatar className="w-10 h-10">
-          {agent.avatar_url ? (
+          {isMascotConfig(agent.avatar_url) ? (
+            <MascotAvatar config={agent.avatar_url!} size={40} className="w-full h-full" alt={agent.name} />
+          ) : agent.avatar_url ? (
             <AvatarImage src={agent.avatar_url} alt={agent.name} />
           ) : null}
           <AvatarFallback className="text-sm text-text-secondary bg-surface-hover">
