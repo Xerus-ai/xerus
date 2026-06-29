@@ -354,7 +354,16 @@ async function processEventStream(
         }
 
         eventsProcessed++;
-        if (healthGuard) healthGuard.recordActivity();
+        // Only reset health guard on events from THIS agent's execution.
+        // Transport/system events (health probe responses) prove the runner
+        // process is alive but NOT that the agent is making progress.
+        // Without this filter, a stuck LLM call keeps the health guard happy
+        // via probe responses while the agent produces no output.
+        // Check both agent_slug (new style) and agent (RunnerEventBase) fields.
+        const isSystemEvent = eventSlug === '_transport'
+            || raw.agent === '_transport'
+            || eventType === 'health';
+        if (healthGuard && !isSystemEvent) healthGuard.recordActivity();
 
         await routeEventWithResilience(eventType, raw, ctx, deps, resilience);
 
