@@ -122,8 +122,20 @@ export function useChannelAgents(channelSlug: string): UseChannelAgentsReturn {
     channelSlugRef.current = channelSlug
     const controller = new AbortController()
     fetchAgents(controller.signal)
-    return () => controller.abort()
-  }, [channelSlug, fetchAgents])
+
+    // Poll assigned agents every 10s so status changes (idle → running → idle)
+    // are reflected in the header's online count and execution indicator.
+    const pollInterval = setInterval(() => {
+      if (!document.hidden) {
+        fetchAssigned(controller.signal).catch(() => {})
+      }
+    }, 10_000)
+
+    return () => {
+      controller.abort()
+      clearInterval(pollInterval)
+    }
+  }, [channelSlug, fetchAgents, fetchAssigned])
 
   // Mutations only refresh the assigned list — the workspace agents catalogue
   // doesn't change when membership flips, so re-fetching it is wasted work.

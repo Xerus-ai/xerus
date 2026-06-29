@@ -364,6 +364,11 @@
   }
 }
 
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 /* ===== Stagger animations (Emil: 30-80ms between items) ===== */
 @keyframes staggerFadeIn {
   from { opacity: 0; transform: translateY(8px); }
