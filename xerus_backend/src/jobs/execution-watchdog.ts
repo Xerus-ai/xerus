@@ -26,7 +26,7 @@ const CRON_SCHEDULE = '*/5 * * * *';
 // avoid false positives (the health guard handles agent-level inactivity
 // within ~2 minutes). Note: this checks created_at, not last activity,
 // so any execution exceeding this threshold is killed unconditionally.
-const EXECUTION_TIMEOUT_MINUTES = 15;
+const EXECUTION_TIMEOUT_MINUTES = 25;
 
 interface ReapedRow {
     id: string;

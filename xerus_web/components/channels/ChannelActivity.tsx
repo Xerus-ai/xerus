@@ -147,7 +147,7 @@ export function ChannelActivity({ channelId, className, assignedAgents, onManage
   // Execution streaming state
   const [execution, setExecution] = useState<ExecutionState | null>(null)
   const executionContextRef = useRef<ChannelExecutionContext | null>(null)
-  const tokenBufferRef = useRef('')
+  const lastLineRef = useRef('')
 
   const { connectStream, close: closeStream } = useExecutionStream({
     onMeta: () => {
@@ -155,10 +155,17 @@ export function ChannelActivity({ channelId, className, assignedAgents, onManage
     },
     onToken: (evt) => {
       const text = (evt.content as { text?: string })?.text ?? ''
-      tokenBufferRef.current += text
-      const lines = tokenBufferRef.current.split('\n').filter(l => l.trim())
-      const lastLine = lines[lines.length - 1] || ''
-      setExecution(prev => prev ? { ...prev, status: 'streaming', currentLine: lastLine } : prev)
+      for (const ch of text) {
+        if (ch === '\n') {
+          lastLineRef.current = ''
+        } else {
+          lastLineRef.current += ch
+        }
+      }
+      const line = lastLineRef.current.trim()
+      if (line) {
+        setExecution(prev => prev ? { ...prev, status: 'streaming', currentLine: line } : prev)
+      }
     },
     onToolCall: (evt) => {
       const toolName = (evt.content as { tool_name?: string })?.tool_name ?? 'tool'
@@ -167,7 +174,7 @@ export function ChannelActivity({ channelId, className, assignedAgents, onManage
     },
     onDone: () => {
       setExecution(null)
-      tokenBufferRef.current = ''
+      lastLineRef.current = ''
       executionContextRef.current = null
       refetch()
     },
@@ -178,7 +185,7 @@ export function ChannelActivity({ channelId, className, assignedAgents, onManage
         currentLine: '',
         errorMessage: err.message || 'Execution failed',
       } : prev)
-      tokenBufferRef.current = ''
+      lastLineRef.current = ''
     },
   })
 
@@ -262,10 +269,16 @@ export function ChannelActivity({ channelId, className, assignedAgents, onManage
 
   const handleSend = useCallback(
     async (content: string) => {
-      const execCtx = await sendMessage(content)
+      let execCtx: ChannelExecutionContext | null = null
+      try {
+        execCtx = await sendMessage(content)
+      } catch {
+        return
+      }
+
       if (execCtx?.conversationId && execCtx?.targetAgent) {
         executionContextRef.current = execCtx
-        tokenBufferRef.current = ''
+        lastLineRef.current = ''
         setExecution({
           agentSlug: execCtx.targetAgent,
           status: 'connecting',
@@ -278,25 +291,36 @@ export function ChannelActivity({ channelId, className, assignedAgents, onManage
             errorMessage: 'Failed to connect to agent stream',
           } : prev)
         })
+      } else if (hasAssignedAgents) {
+        // Backend couldn't resolve execution context (conversation creation
+        // failed or message dispatched to running session). Show a minimal
+        // indicator — execution may still happen in the background.
+        setExecution({
+          agentSlug: assignedAgents?.[0]?.slug ?? 'agent',
+          status: 'thinking',
+          currentLine: 'working on it...',
+        })
       }
     },
-    [sendMessage, connectStream],
+    [sendMessage, connectStream, hasAssignedAgents, assignedAgents],
   )
 
   const handleRetry = useCallback(() => {
     setExecution(null)
-    tokenBufferRef.current = ''
+    lastLineRef.current = ''
     closeStream()
   }, [closeStream])
 
-  // Clear execution when agent response arrives via polling (fallback for no-SSE case)
+  // Clear execution when agent response arrives via polling (fallback for no-SSE case).
+  // Only clear on actual agent responses, not system events (which may arrive
+  // mid-execution from error logging without meaning the agent is done).
   useEffect(() => {
     if (!execution) return
     const latest = messages[messages.length - 1]
     if (!latest) return
-    if (latest.sender_type !== 'human') {
+    if (latest.sender_type === 'agent') {
       setExecution(null)
-      tokenBufferRef.current = ''
+      lastLineRef.current = ''
       closeStream()
     }
   }, [messages, execution, closeStream])

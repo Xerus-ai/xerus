@@ -613,68 +613,68 @@ router.post('/channels/:channelId/messages', auth, strictRateLimit, async (req: 
 
         // Resolve target agent BEFORE response so frontend knows which agent
         // will execute and can open an SSE connection to the conversation.
-        // Priority: explicit selection > @mention > channel lead > first member
-        const requestedAgent = typeof req.body.agent_slug === 'string' ? req.body.agent_slug.trim() : null;
-        const mentionMatch = content.trim().match(/(?:^|[\s])@([a-zA-Z][a-zA-Z0-9_-]*)/);
-        let targetAgent = requestedAgent || (mentionMatch ? mentionMatch[1] : null);
+        // Wrapped in try/catch so resolution failures don't block the 201 response.
+        let targetAgent: string | null = null;
+        let executionContext: { conversationId: string; targetAgent: string } | null = null;
 
-        if (!targetAgent) {
-            targetAgent = await findChannelLead(provider, sandboxId, channelId);
-        }
+        try {
+            const requestedAgent = typeof req.body.agent_slug === 'string' ? req.body.agent_slug.trim() : null;
+            const mentionMatch = content.trim().match(/(?:^|[\s])@([a-zA-Z][a-zA-Z0-9_-]*)/);
+            targetAgent = requestedAgent || (mentionMatch ? mentionMatch[1] : null);
 
-        if (!targetAgent) {
-            const { escapeSQL: esc } = await import('../conversations/workspace-db.helpers');
-            const memberRows = await execWsQuery<{ agent_slug: string }>(
-                provider, sandboxId,
-                `SELECT agent_slug FROM channel_members WHERE channel_slug = '${esc(channelId)}' LIMIT 1`,
-            ).catch(() => [] as Array<{ agent_slug: string }>);
+            if (!targetAgent) {
+                targetAgent = await findChannelLead(provider, sandboxId, channelId);
+            }
 
-            if (memberRows.length > 0) {
-                targetAgent = memberRows[0].agent_slug;
-            } else {
-                const wsAgents = await execWsQuery<{ slug: string }>(
+            if (!targetAgent) {
+                const { escapeSQL: esc } = await import('../conversations/workspace-db.helpers');
+                const memberRows = await execWsQuery<{ agent_slug: string }>(
                     provider, sandboxId,
-                    `SELECT slug FROM agents ORDER BY installed_at DESC LIMIT 50`,
-                ).catch(() => [] as Array<{ slug: string }>);
-                for (const row of wsAgents) {
-                    try {
-                        const cfgRaw = await provider.readFile(
-                            sandboxId,
-                            `${SANDBOX_CONFIG.workspacePath}/agents/${row.slug}/config.json`,
-                        );
-                        const cfg = JSON.parse(cfgRaw);
-                        if (Array.isArray(cfg.channels) && cfg.channels.includes(channelId)) {
-                            targetAgent = row.slug;
-                            break;
-                        }
-                    } catch { /* skip */ }
+                    `SELECT agent_slug FROM channel_members WHERE channel_slug = '${esc(channelId)}' LIMIT 1`,
+                ).catch(() => [] as Array<{ agent_slug: string }>);
+
+                if (memberRows.length > 0) {
+                    targetAgent = memberRows[0].agent_slug;
+                } else {
+                    const wsAgents = await execWsQuery<{ slug: string }>(
+                        provider, sandboxId,
+                        `SELECT slug FROM agents ORDER BY installed_at DESC LIMIT 50`,
+                    ).catch(() => [] as Array<{ slug: string }>);
+                    for (const row of wsAgents) {
+                        try {
+                            const cfgRaw = await provider.readFile(
+                                sandboxId,
+                                `${SANDBOX_CONFIG.workspacePath}/agents/${row.slug}/config.json`,
+                            );
+                            const cfg = JSON.parse(cfgRaw);
+                            if (Array.isArray(cfg.channels) && cfg.channels.includes(channelId)) {
+                                targetAgent = row.slug;
+                                break;
+                            }
+                        } catch { /* skip */ }
+                    }
+                }
+
+                if (targetAgent) {
+                    const { escapeSQL: esc2 } = await import('../conversations/workspace-db.helpers');
+                    log.info('Auto-setting channel lead', { channel: channelId, agent: targetAgent });
+                    execWsQuery(provider, sandboxId,
+                        `UPDATE channels SET lead_agent_slug = '${esc2(targetAgent)}' WHERE slug = '${esc2(channelId)}' AND lead_agent_slug IS NULL`,
+                    ).catch(() => {});
                 }
             }
 
             if (targetAgent) {
-                const { escapeSQL: esc2 } = await import('../conversations/workspace-db.helpers');
-                log.info('Auto-setting channel lead', { channel: channelId, agent: targetAgent });
-                await execWsQuery(provider, sandboxId,
-                    `UPDATE channels SET lead_agent_slug = '${esc2(targetAgent)}' WHERE slug = '${esc2(channelId)}' AND lead_agent_slug IS NULL`,
-                ).catch(() => {});
-            }
-        }
-
-        // Find or create conversation for the agent+channel pair so the frontend
-        // can open an SSE connection before execution starts.
-        let executionContext: { conversationId: string; targetAgent: string } | null = null;
-        if (targetAgent) {
-            try {
                 const conversation = await findOrCreateChannelConversation(
                     provider, sandboxId, targetAgent, channelId,
                 );
                 executionContext = { conversationId: conversation.id, targetAgent };
-            } catch (convErr) {
-                log.warn('Failed to resolve channel conversation', {
-                    channel: channelId, agent: targetAgent,
-                    error: convErr instanceof Error ? convErr.message : String(convErr),
-                });
             }
+        } catch (resolveErr) {
+            log.warn('Agent resolution failed, execution will proceed via fallback', {
+                channel: channelId,
+                error: resolveErr instanceof Error ? resolveErr.message : String(resolveErr),
+            });
         }
 
         sendResponse(res, 201, {
@@ -693,12 +693,12 @@ router.post('/channels/:channelId/messages', auth, strictRateLimit, async (req: 
         }, startTime);
 
         // Fire-and-forget: dispatch to running session or trigger new execution.
-        // Runs AFTER the response is sent so the frontend can open SSE first.
-        if (targetAgent && companyDeps?.executionService) {
+        // messageBridge dispatch is separate from executionService guard so messages
+        // reach running agents even if executionService isn't initialized yet.
+        if (targetAgent) {
             (async () => {
                 log.info('Routing channel message to agent', { channel: channelId, target: targetAgent });
 
-                // Try forwarding to already-running agent session (dispatch-only, no DB write)
                 let dispatched = false;
                 if (companyDeps?.messageBridge) {
                     dispatched = await companyDeps.messageBridge.trySendToAgent(
@@ -708,16 +708,19 @@ router.post('/channels/:channelId/messages', auth, strictRateLimit, async (req: 
                     );
                 }
 
-                // If no active session, trigger new execution.
-                // Wait briefly for the frontend SSE connection to appear in the registry,
-                // then pass the real stream (or fall back to NullStreamingResponse).
-                if (!dispatched && companyDeps?.executionService && executionContext) {
-                    const convId = executionContext.conversationId;
-                    let stream = sseRegistry.get(userId, convId);
-                    if (!stream) {
-                        await new Promise(r => setTimeout(r, 3000));
-                        stream = sseRegistry.get(userId, convId);
+                if (!dispatched && companyDeps?.executionService) {
+                    // Poll sseRegistry for frontend SSE connection (200ms intervals, up to 5s).
+                    // Falls back to NullStreamingResponse if frontend doesn't connect in time.
+                    let stream: import('../execution/streaming/stream.handler').StreamingResponse | undefined;
+                    if (executionContext) {
+                        const convId = executionContext.conversationId;
+                        for (let i = 0; i < 25; i++) {
+                            stream = sseRegistry.get(userId, convId);
+                            if (stream) break;
+                            await new Promise(r => setTimeout(r, 200));
+                        }
                     }
+
                     await triggerChannelExecution(
                         companyDeps.executionService,
                         provider,
@@ -728,16 +731,6 @@ router.post('/channels/:channelId/messages', auth, strictRateLimit, async (req: 
                         channelId,
                         'channel_message',
                         stream ?? undefined,
-                    );
-                } else if (!dispatched && companyDeps?.executionService) {
-                    await triggerChannelExecution(
-                        companyDeps.executionService,
-                        provider,
-                        sandboxId,
-                        userId,
-                        targetAgent!,
-                        content.trim(),
-                        channelId,
                     );
                 }
             })().catch(async (err) => {
