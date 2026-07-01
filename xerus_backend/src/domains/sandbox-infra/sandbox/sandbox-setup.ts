@@ -64,8 +64,9 @@ export async function runAgentSync(
 }
 
 /**
- * Sync Pipedream MCP servers into .mcp.json based on user's connected accounts.
- * Adds entries for connected apps, removes entries for disconnected apps.
+ * Sync MCP servers into .mcp.json: enforces canonical static platform entries
+ * (platform, ipc — including legacy-name migration) and syncs Pipedream entries
+ * from the user's connected accounts.
  * Called at workspace create and resume so agents always have up-to-date MCP tools.
  */
 export async function runMcpConfigSync(
@@ -76,13 +77,14 @@ export async function runMcpConfigSync(
     const sandboxFs = await deps.getSandboxFs(sandboxId);
     const mcpJsonPath = `${SANDBOX_CONFIG.workspacePath}/.mcp.json`;
     const result = await syncPipedreamMcpConfig(sandboxFs, mcpJsonPath, userId, deps.db);
-    if (result.added.length > 0 || result.removed.length > 0) {
+    if (result.added.length > 0 || result.removed.length > 0 || result.normalized.length > 0) {
         log.info('MCP config synced', {
             sandbox_id: sandboxId,
             added: result.added.length,
             added_servers: result.added.join(', ') || 'none',
             removed: result.removed.length,
             removed_servers: result.removed.join(', ') || 'none',
+            normalized_servers: result.normalized.join(', ') || 'none',
             total: result.total,
         });
     }
@@ -122,6 +124,15 @@ export async function runWorkspaceHealthCheck(
             error: (syncErr as Error).message,
         });
     }
+
+    // Re-install the runner bundle on every resume, AFTER template sync.
+    // The bundle (.xerus/runner/mcp-server.js) is backend-owned and must track
+    // the deployed backend version — without this, sandboxes created before a
+    // backend deploy run a stale platform MCP server forever, and any sandbox
+    // whose bundle was lost (e.g. the pre-fix template sync replaced it with
+    // the template stub) never recovers. Cheap: one file upload; npm install
+    // only runs when node_modules is missing.
+    await runRunnerInstall(sandboxId, deps);
 
     // Run schema migrations (init-db.sh) on every resume.
     // S3-restored databases may predate newer schema tables (e.g. file_connections).

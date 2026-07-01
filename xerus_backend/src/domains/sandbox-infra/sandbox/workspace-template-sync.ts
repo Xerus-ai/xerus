@@ -21,9 +21,26 @@ const VALID_GIT_URL_PATTERN = /^https:\/\/[a-zA-Z0-9._-]+\/[a-zA-Z0-9_./-]+\.git
 // removed). Files are replaced as-is. .claude/settings.json is intentionally
 // excluded — it carries personalized env vars and is owned by
 // workspace-personalizer.service.ts.
+//
+// .xerus MUST NOT be overlaid as a whole directory: directory overlays do
+// `rm -rf` + copy, and .xerus/runner contains backend-owned artifacts that do
+// not exist in the template — mcp-server.js (uploaded by runner-installer.ts
+// from dist/runner-bundle) and node_modules (pre-installed by the sandbox
+// snapshot). Blanket-syncing .xerus destroys the platform MCP server on every
+// resume. Template-owned .xerus content is enumerated explicitly instead;
+// new template files under .xerus must be added here to sync.
 const PLATFORM_OVERLAY_PATHS: ReadonlyArray<string> = [
     'CLAUDE.md',
-    '.xerus',
+    '.xerus/ipc',
+    '.xerus/templates',
+    '.xerus/manifest.yaml',
+    '.xerus/version.json',
+    '.xerus/runner/adapters',
+    '.xerus/runner/db.ts',
+    '.xerus/runner/index.ts',
+    '.xerus/runner/scheduler.ts',
+    '.xerus/runner/session-manager.ts',
+    '.xerus/runner/sync-agents-md.py',
     '.claude/skills',
     '.claude/hooks',
     '.claude/rules',

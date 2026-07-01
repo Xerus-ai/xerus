@@ -161,9 +161,12 @@ export class AgentConfigLoader {
                 system_prompt = { type: 'preset' as const, preset: 'claude_code' as const, append };
             }
 
-            // Auto-inject platform MCP server for master orchestrator.
-            // The 'stdio' marker is resolved to an in-process SDK MCP server
-            // by ProcessManager.resolveMcpServers() at execution time.
+            // Platform MCP tools are NOT served through this config. The CLI
+            // inside the sandbox discovers them natively via the workspace
+            // .mcp.json (enforced by mcp-config.service.ts), which points the
+            // 'platform' server at .xerus/runner/mcp-server.js (uploaded by
+            // runner-installer.ts). This marker only mirrors that setup for
+            // consumers of AgentConfig.mcp_servers.
             const baseMcpServers = parsed.mcp_servers as Record<string, unknown> | undefined;
             const mcp_servers = isMaster
                 ? { ...baseMcpServers, 'platform': { type: 'stdio' } }
