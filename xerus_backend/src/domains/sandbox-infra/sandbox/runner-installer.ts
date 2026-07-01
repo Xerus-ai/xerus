@@ -61,13 +61,16 @@ export async function installRunnerBundle(
     const sandboxFs = await provider.createFileSystem(sandboxId);
     await sandboxFs.mkdir(runnerDir);
 
-    // Upload MCP server bundle (backend-coupled tools)
-    if (fs.existsSync(MCP_BUNDLE_PATH)) {
-        const mcpContent = fs.readFileSync(MCP_BUNDLE_PATH, 'utf-8');
-        await sandboxFs.writeFile(`${runnerDir}/mcp-server.js`, mcpContent);
-    } else {
-        log.error('MCP server bundle not found — platform tools will be unavailable. Run: npm run bundle:runner', { path: MCP_BUNDLE_PATH });
+    // Upload MCP server bundle (backend-coupled tools).
+    // Fail-fast: a sandbox without the platform MCP server silently degrades
+    // agents to raw sqlite3/filesystem writes — better to fail setup loudly.
+    if (!fs.existsSync(MCP_BUNDLE_PATH)) {
+        throw new Error(
+            `MCP server bundle not found at ${MCP_BUNDLE_PATH} — platform tools cannot be served. Run: npm run build:runner`,
+        );
     }
+    const mcpContent = fs.readFileSync(MCP_BUNDLE_PATH, 'utf-8');
+    await sandboxFs.writeFile(`${runnerDir}/mcp-server.js`, mcpContent);
 
     // Verify node_modules exists for pre-installed snapshots.
     // If snapshot is broken (e.g., Dockerfile build failed), deps won't be there.
