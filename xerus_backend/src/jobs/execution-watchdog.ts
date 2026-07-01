@@ -20,8 +20,13 @@ const log = logger('Job:ExecutionWatchdog');
 // Every 5 minutes
 const CRON_SCHEDULE = '*/5 * * * *';
 
-// Anything older than this still in pending/running gets reaped
-const EXECUTION_TIMEOUT_MINUTES = 30;
+// Anything older than this still in pending/running gets reaped.
+// This is a safety net for cases where health guard + pipeline cleanup
+// both fail. Keep this longer than the longest legitimate execution to
+// avoid false positives (the health guard handles agent-level inactivity
+// within ~2 minutes). Note: this checks created_at, not last activity,
+// so any execution exceeding this threshold is killed unconditionally.
+const EXECUTION_TIMEOUT_MINUTES = 25;
 
 interface ReapedRow {
     id: string;

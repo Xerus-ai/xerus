@@ -30,11 +30,16 @@ export interface Deliverable {
 const POLL_INTERVAL_MS = 8000
 const POLL_MAX_BACKOFF_MS = 60_000
 
+export interface ChannelExecutionContext {
+  conversationId: string
+  targetAgent: string
+}
+
 interface UseChannelMessagesReturn {
   messages: ChannelMessage[]
   isLoading: boolean
   error: string | null
-  sendMessage: (content: string) => Promise<void>
+  sendMessage: (content: string) => Promise<ChannelExecutionContext | null>
   refetch: () => void
 }
 
@@ -64,8 +69,8 @@ export function useChannelMessages(channelId: string): UseChannelMessagesReturn 
     },
   )
 
-  const sendMessage = useCallback(async (content: string) => {
-    if (!channelId) return
+  const sendMessage = useCallback(async (content: string): Promise<ChannelExecutionContext | null> => {
+    if (!channelId) return null
     const optimistic: ChannelMessage = {
       id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       channel_id: channelId,
@@ -77,15 +82,25 @@ export function useChannelMessages(channelId: string): UseChannelMessagesReturn 
       created_at: new Date().toISOString(),
     }
 
+    let executionContext: ChannelExecutionContext | null = null
+
     try {
       await mutate(
         async (current) => {
-          const result = await apiPost<{ data?: { message: ChannelMessage }; message?: ChannelMessage }>(
+          const result = await apiPost<{
+            data?: { message: ChannelMessage; execution?: { conversationId: string; targetAgent: string } }
+            message?: ChannelMessage
+            execution?: { conversationId: string; targetAgent: string }
+          }>(
             `/company/channels/${channelId}/messages`,
             { content, sender_type: 'human' },
           )
           const savedPayload = result.data ?? result
           const saved = savedPayload.message ?? optimistic
+          const exec = savedPayload.execution
+          if (exec?.conversationId && exec?.targetAgent) {
+            executionContext = { conversationId: exec.conversationId, targetAgent: exec.targetAgent }
+          }
           const base = (current ?? []).filter(m => m.id !== optimistic.id)
           return [...base, saved]
         },
@@ -99,6 +114,8 @@ export function useChannelMessages(channelId: string): UseChannelMessagesReturn 
       toast.error("Your message wasn't sent", { description: 'Please try again.' })
       throw err
     }
+
+    return executionContext
   }, [channelId, mutate])
 
   const refetch = useCallback(() => {

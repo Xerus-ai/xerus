@@ -22,6 +22,7 @@ const TASK_2_1_TOOLS = [
     'create_channel',
     'add_to_channel',
     'create_task',
+    'update_task',
     'search_skills',
     'create_skill',
     'install_skill',
@@ -33,8 +34,8 @@ const TASK_2_1_TOOLS = [
 ];
 
 describe('MCP Server Tool Definitions', () => {
-    it('should define exactly 38 tools', () => {
-        expect(TOOLS).toHaveLength(38);
+    it('should define exactly 39 tools', () => {
+        expect(TOOLS).toHaveLength(39);
     });
 
     it('every tool should have name, description, and inputSchema', () => {

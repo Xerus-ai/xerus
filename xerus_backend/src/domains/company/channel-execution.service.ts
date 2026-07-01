@@ -6,8 +6,9 @@
 import type { DaytonaProvider } from '../sandbox-infra/sandbox/providers/daytona.provider';
 import type { SandboxService } from '../sandbox-infra/sandbox/sandbox.service';
 import type { ExecutionService } from '../execution/execution.service';
-import { NullStreamingResponse } from '../execution/streaming/stream.handler';
+import { NullStreamingResponse, type StreamSink } from '../execution/streaming/stream.handler';
 import { findOrCreateChannelConversation } from '../conversations/workspace-db.service';
+import { createSystemEvent } from './company-workspace-db.service';
 import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
 import { shellEscape, shellEscapePath } from '../../utils/shell-safety';
 import { sanitizeSlug } from '../../shared/slugify';
@@ -37,9 +38,9 @@ function releaseLock(userId: string, agentSlug: string, channelSlug: string): vo
 
 /**
  * Trigger agent execution for a channel message.
- * Creates a NullStreamingResponse (no SSE listener) and delegates to ExecutionService.
- * The agent's response flows back to channel_messages via the runner's outbound
- * message-bridge pipeline (runner -> message-bridge.handleOutboundMessage -> workspace DB).
+ * If an SSE stream is provided (frontend connected), uses it for real-time progress.
+ * Otherwise creates a NullStreamingResponse for background execution.
+ * The agent's response is also written to channel_messages at execution end.
  * Uses an in-memory lock to prevent duplicate concurrent executions per agent+channel.
  */
 export async function triggerChannelExecution(
@@ -51,6 +52,7 @@ export async function triggerChannelExecution(
     messageContent: string,
     channelSlug: string,
     triggerType: 'channel_message' | 'task_assigned' = 'channel_message',
+    existingStream?: StreamSink,
 ): Promise<void> {
     // Debounce: prevent concurrent executions for the same agent+channel pair
     if (!acquireLock(userId, agentSlug, channelSlug)) {
@@ -59,13 +61,11 @@ export async function triggerChannelExecution(
             agent: agentSlug,
             trigger: triggerType,
         });
-        // Write to agent's inbox so it's picked up on next session start
         await writeToAgentInbox(provider, sandboxId, agentSlug, messageContent, channelSlug, triggerType);
         return;
     }
 
     try {
-        // Find or create a conversation linked to this agent+channel
         const conversation = await findOrCreateChannelConversation(
             provider,
             sandboxId,
@@ -73,17 +73,15 @@ export async function triggerChannelExecution(
             channelSlug,
         );
 
+        const stream = existingStream ?? new NullStreamingResponse();
+
         log.info('Triggering channel execution', {
             channel: channelSlug,
             agent: agentSlug,
             conversation_id: conversation.id,
             user_id: userId,
+            has_sse: !!existingStream,
         });
-
-        // Use a NullStreamingResponse since there is no frontend SSE connection.
-        // The agent's response will be written to channel_messages by the runner's
-        // outbound message flow (runner -> message-bridge -> workspace DB).
-        const stream = new NullStreamingResponse();
 
         await executionService.startExecution({
             request: {
@@ -99,6 +97,15 @@ export async function triggerChannelExecution(
             stream,
             triggerType,
         });
+    } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        log.error('Channel execution failed', { channel: channelSlug, agent: agentSlug, error: errorMsg });
+        createSystemEvent(provider, sandboxId, channelSlug,
+            `Agent ${agentSlug} couldn't respond: ${errorMsg}`,
+            { error_type: 'execution_failure', agent_slug: agentSlug },
+        ).catch(sysErr => log.warn('Failed to write execution error as system event', {
+            error: sysErr instanceof Error ? sysErr.message : String(sysErr),
+        }));
     } finally {
         releaseLock(userId, agentSlug, channelSlug);
     }

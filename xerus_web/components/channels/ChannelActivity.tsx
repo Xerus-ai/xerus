@@ -12,11 +12,14 @@ import { PostMessage, EscalationMessage, CoordinationMessage } from './activity-
 import { MentionInput } from './MentionInput'
 import { SkillsRibbon } from './SkillsRibbon'
 import { ExecutionDetail } from './ExecutionDetail'
-import { useChannelMessages } from '@/hooks/useChannelData'
+import { useChannelMessages, type ChannelExecutionContext } from '@/hooks/useChannelData'
 import { getAssistants } from '@/lib/api/agents'
 import type { Agent } from '@/components/common/PresenceAvatars'
 import type { ChannelAgent } from '@/hooks/useChannelAgents'
-import { Users, AlertCircle } from 'lucide-react'
+import { Users, AlertCircle, RotateCcw } from 'lucide-react'
+import { isMascotConfig } from '@/lib/mascot-config'
+import { MascotAvatar } from '@/components/agents/MascotAvatar'
+import { useExecutionStream } from '@/hooks/useExecutionStream'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -125,15 +128,66 @@ function groupMessages(messages: ChannelMessage[]): MessageGroup[] {
 // Main component
 // ---------------------------------------------------------------------------
 
+interface ExecutionState {
+  agentSlug: string
+  status: 'connecting' | 'thinking' | 'streaming' | 'tool_call' | 'done' | 'error'
+  currentLine: string
+  errorMessage?: string
+}
+
 export function ChannelActivity({ channelId, className, assignedAgents, onManageAgents }: ChannelActivityProps) {
   const { messages, isLoading, error, sendMessage, refetch } = useChannelMessages(channelId)
   const [viewingExecution, setViewingExecution] = useState<string | null>(null)
   const [channelAgents, setChannelAgents] = useState<Agent[]>([])
-  const [pendingSince, setPendingSince] = useState<number | null>(null)
   const insertRef = useRef<((text: string) => void) | null>(null)
   const hasAssignedAgents = (assignedAgents?.length ?? 0) > 0
 
   const [agentError, setAgentError] = useState<string | null>(null)
+
+  // Execution streaming state
+  const [execution, setExecution] = useState<ExecutionState | null>(null)
+  const executionContextRef = useRef<ChannelExecutionContext | null>(null)
+  const lastLineRef = useRef('')
+
+  const { connectStream, close: closeStream } = useExecutionStream({
+    onMeta: () => {
+      setExecution(prev => prev ? { ...prev, status: 'thinking', currentLine: 'thinking...' } : prev)
+    },
+    onToken: (evt) => {
+      const text = (evt.content as { text?: string })?.text ?? ''
+      for (const ch of text) {
+        if (ch === '\n') {
+          lastLineRef.current = ''
+        } else {
+          lastLineRef.current += ch
+        }
+      }
+      const line = lastLineRef.current.trim()
+      if (line) {
+        setExecution(prev => prev ? { ...prev, status: 'streaming', currentLine: line } : prev)
+      }
+    },
+    onToolCall: (evt) => {
+      const toolName = (evt.content as { tool_name?: string })?.tool_name ?? 'tool'
+      const shortName = toolName.replace(/^mcp__platform__/, '').replace(/^mcp__/, '')
+      setExecution(prev => prev ? { ...prev, status: 'tool_call', currentLine: `using ${shortName}` } : prev)
+    },
+    onDone: () => {
+      setExecution(null)
+      lastLineRef.current = ''
+      executionContextRef.current = null
+      refetch()
+    },
+    onError: (err) => {
+      setExecution(prev => prev ? {
+        ...prev,
+        status: 'error',
+        currentLine: '',
+        errorMessage: err.message || 'Execution failed',
+      } : prev)
+      lastLineRef.current = ''
+    },
+  })
 
   useEffect(() => {
     let cancelled = false
@@ -214,28 +268,62 @@ export function ChannelActivity({ channelId, className, assignedAgents, onManage
   )
 
   const handleSend = useCallback(
-    (content: string) => {
-      sendMessage(content)
-      // Show "agent working" indicator if agents are assigned — cleared when next
-      // non-human message arrives via polling. Honest about the gap: inbox polls,
-      // chat streams. User at least sees acknowledgement instead of silent wait.
-      if (hasAssignedAgents) {
-        setPendingSince(Date.now())
+    async (content: string) => {
+      let execCtx: ChannelExecutionContext | null = null
+      try {
+        execCtx = await sendMessage(content)
+      } catch {
+        return
+      }
+
+      if (execCtx?.conversationId && execCtx?.targetAgent) {
+        executionContextRef.current = execCtx
+        lastLineRef.current = ''
+        setExecution({
+          agentSlug: execCtx.targetAgent,
+          status: 'connecting',
+          currentLine: 'connecting...',
+        })
+        connectStream(execCtx.conversationId).catch(() => {
+          setExecution(prev => prev ? {
+            ...prev,
+            status: 'error',
+            errorMessage: 'Failed to connect to agent stream',
+          } : prev)
+        })
+      } else if (hasAssignedAgents) {
+        // Backend couldn't resolve execution context (conversation creation
+        // failed or message dispatched to running session). Show a minimal
+        // indicator — execution may still happen in the background.
+        setExecution({
+          agentSlug: assignedAgents?.[0]?.slug ?? 'agent',
+          status: 'thinking',
+          currentLine: 'working on it...',
+        })
       }
     },
-    [sendMessage, hasAssignedAgents]
+    [sendMessage, connectStream, hasAssignedAgents, assignedAgents],
   )
 
-  // Clear pending indicator when a non-human message arrives after our send
+  const handleRetry = useCallback(() => {
+    setExecution(null)
+    lastLineRef.current = ''
+    closeStream()
+  }, [closeStream])
+
+  // Clear execution when agent response arrives via polling (fallback for no-SSE case).
+  // Only clear on actual agent responses, not system events (which may arrive
+  // mid-execution from error logging without meaning the agent is done).
   useEffect(() => {
-    if (!pendingSince) return
+    if (!execution) return
     const latest = messages[messages.length - 1]
     if (!latest) return
-    const latestTime = new Date(latest.created_at).getTime()
-    if (latest.sender_type !== 'human' && latestTime >= pendingSince) {
-      setPendingSince(null)
+    if (latest.sender_type === 'agent') {
+      setExecution(null)
+      lastLineRef.current = ''
+      closeStream()
     }
-  }, [messages, pendingSince])
+  }, [messages, execution, closeStream])
 
   if (isLoading) {
     return (
@@ -330,43 +418,71 @@ export function ChannelActivity({ channelId, className, assignedAgents, onManage
             }
           })}
 
-          {/* Agent working indicator — shown after send until next non-human message arrives */}
-          {pendingSince && assignedAgents && assignedAgents.length > 0 && (
-            <div className="flex items-start gap-3 py-3 px-1" data-testid="channel-pending-indicator" aria-live="polite">
-              <div className="flex -space-x-1.5 shrink-0 mt-0.5">
-                {assignedAgents.slice(0, 3).map((agent) => (
-                  <div
-                    key={agent.id}
-                    className="w-7 h-7 rounded-lg overflow-hidden bg-surface-hover border border-surface ring-2 ring-card"
+          {/* Execution progress indicator — shows which agent is working and what it's doing */}
+          {execution && (() => {
+            const agentData = assignedAgents?.find(a => a.slug === execution.agentSlug)
+            const agentName = agentData?.name ?? execution.agentSlug
+            const avatarUrl = agentData?.avatar_url
+
+            if (execution.status === 'error') {
+              return (
+                <div className="flex items-center gap-3 py-3 px-2 rounded-xl bg-red-50/50 dark:bg-red-950/20" data-testid="channel-execution-error" role="alert">
+                  <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-red-600 dark:text-red-400">
+                      {agentName} couldn&apos;t respond
+                    </p>
+                    <p className="text-xs text-text-muted truncate">{execution.errorMessage}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRetry}
+                    className="text-xs font-medium text-primary hover:text-primary/80 flex items-center gap-1 shrink-0"
                   >
-                    {agent.avatar_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={agent.avatar_url} alt={agent.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="w-full h-full flex items-center justify-center bg-secondary/10 text-secondary text-[10px] font-semibold">
-                        {agent.name.substring(0, 2).toUpperCase()}
+                    <RotateCcw className="w-3 h-3" />
+                    Dismiss
+                  </button>
+                </div>
+              )
+            }
+
+            return (
+              <div className="flex items-start gap-3 py-3 px-1" data-testid="channel-execution-indicator" aria-live="polite">
+                <div className="w-7 h-7 rounded-lg overflow-hidden bg-surface-hover border border-surface ring-2 ring-card shrink-0 mt-0.5">
+                  {isMascotConfig(avatarUrl) ? (
+                    <MascotAvatar config={avatarUrl!} size={28} className="w-full h-full" alt={agentName} />
+                  ) : avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={avatarUrl} alt={agentName} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="w-full h-full flex items-center justify-center bg-secondary/10 text-secondary text-[10px] font-semibold">
+                      {agentName.substring(0, 2).toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0 pt-0.5">
+                  <p className="text-xs font-medium text-secondary mb-0.5">{agentName}</p>
+                  <div className="flex items-center gap-1.5 text-xs text-text-secondary">
+                    {execution.status !== 'streaming' && (
+                      <span className="inline-flex gap-0.5">
+                        <span className="w-1 h-1 rounded-full bg-secondary/60 animate-[pulse_1.4s_ease-in-out_infinite]" />
+                        <span className="w-1 h-1 rounded-full bg-secondary/60 animate-[pulse_1.4s_ease-in-out_0.2s_infinite]" />
+                        <span className="w-1 h-1 rounded-full bg-secondary/60 animate-[pulse_1.4s_ease-in-out_0.4s_infinite]" />
                       </span>
                     )}
+                    <span
+                      key={execution.currentLine}
+                      className="truncate max-w-[400px] animate-[fadeIn_0.2s_ease-in-out]"
+                    >
+                      {execution.status === 'streaming'
+                        ? `"${execution.currentLine}"`
+                        : execution.currentLine}
+                    </span>
                   </div>
-                ))}
-              </div>
-              <div className="flex-1 min-w-0 pt-0.5">
-                <p className="text-xs font-medium text-secondary mb-1">
-                  {assignedAgents.length === 1
-                    ? assignedAgents[0].name
-                    : `${assignedAgents.length} agents`}
-                </p>
-                <div className="flex items-center gap-1.5 text-xs text-text-secondary">
-                  <span className="inline-flex gap-0.5">
-                    <span className="w-1 h-1 rounded-full bg-secondary/60 animate-[pulse_1.4s_ease-in-out_infinite]" />
-                    <span className="w-1 h-1 rounded-full bg-secondary/60 animate-[pulse_1.4s_ease-in-out_0.2s_infinite]" />
-                    <span className="w-1 h-1 rounded-full bg-secondary/60 animate-[pulse_1.4s_ease-in-out_0.4s_infinite]" />
-                  </span>
-                  <span>working on it...</span>
                 </div>
               </div>
-            </div>
-          )}
+            )
+          })()}
         </div>
       </ScrollArea>
 

@@ -6,6 +6,8 @@ import remarkGfm from 'remark-gfm'
 import { ArrowRight, Check, X, MessageSquare, Loader2 } from 'lucide-react'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
+import { isMascotConfig } from '@/lib/mascot-config'
+import { MascotAvatar } from '@/components/agents/MascotAvatar'
 import type { ChannelMessage } from './ChannelActivity'
 
 // ---------------------------------------------------------------------------
@@ -60,7 +62,9 @@ export function PostMessage({
   return (
     <div className="flex gap-3 py-3 px-2 group" role="article" aria-label={`Message from ${name}`}>
       <Avatar className="w-8 h-8 flex-shrink-0 ring-2 ring-card">
-        {avatarUrl ? <AvatarImage src={avatarUrl} alt={name} /> : null}
+        {isMascotConfig(avatarUrl) ? (
+          <MascotAvatar config={avatarUrl!} size={32} className="w-full h-full" alt={name} />
+        ) : avatarUrl ? <AvatarImage src={avatarUrl} alt={name} /> : null}
         <AvatarFallback className="text-xs text-text-secondary bg-surface-hover">
           {getInitials(name)}
         </AvatarFallback>
@@ -191,7 +195,9 @@ export function EscalationMessage({
       aria-label={`Escalation from ${displayName(message)}`}
     >
       <Avatar className="w-8 h-8 flex-shrink-0 ring-2 ring-card">
-        {avatarUrl ? <AvatarImage src={avatarUrl} alt={displayName(message)} /> : null}
+        {isMascotConfig(avatarUrl) ? (
+          <MascotAvatar config={avatarUrl!} size={32} className="w-full h-full" alt={displayName(message)} />
+        ) : avatarUrl ? <AvatarImage src={avatarUrl} alt={displayName(message)} /> : null}
         <AvatarFallback className="text-xs text-text-secondary bg-surface-hover">
           {getInitials(displayName(message))}
         </AvatarFallback>

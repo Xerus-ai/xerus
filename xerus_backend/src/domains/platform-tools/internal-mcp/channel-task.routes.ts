@@ -466,6 +466,7 @@ router.post('/create_task', async (req: InternalMcpRequest, res: Response, next:
             channelSlug: normalizedChannelId,
             action: 'task_created',
             summary: `Task "${title}" created${assignedLabel}`,
+            taskId: taskId,
         });
 
         // Agent wakeup: if task is assigned, trigger execution for the assigned agent
@@ -511,6 +512,127 @@ router.post('/create_task', async (req: InternalMcpRequest, res: Response, next:
                 });
             }
         }
+
+        res.json(mcpResult);
+    } catch (error) {
+        next(error);
+    }
+});
+
+// POST /mcp/update_task
+router.post('/update_task', async (req: InternalMcpRequest, res: Response, next: NextFunction) => {
+    try {
+        const { task_id, status, comment, attachments } = req.body;
+        const userId = req.sandbox!.userId;
+
+        if (!task_id || typeof task_id !== 'string') {
+            throw new BadRequestError('task_id is required');
+        }
+
+        const validStatuses = ['open', 'in_progress', 'completed', 'blocked'];
+        if (status && !validStatuses.includes(status)) {
+            throw new BadRequestError(`Invalid status: ${status}. Must be one of: ${validStatuses.join(', ')}`);
+        }
+
+        const sandboxService = getSandboxService();
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
+
+        // Verify task exists
+        const existingRows = await executeWorkspaceJsonQuery<TaskRow & { dependencies: string | null }>(
+            provider, sandboxId,
+            `SELECT id, project_slug, title, description, status, priority, assigned_agent, dependencies, created_at
+             FROM tasks WHERE id = '${escapeSQL(task_id)}'`,
+        );
+        if (existingRows.length === 0) {
+            throw new BadRequestError(`Task not found: ${task_id}`);
+        }
+        const existing = existingRows[0];
+
+        // Build SET clauses
+        const setClauses: string[] = [];
+        if (status) {
+            setClauses.push(`status = '${escapeSQL(status)}'`);
+        }
+
+        // Merge attachments into dependencies JSON
+        if (Array.isArray(attachments) && attachments.length > 0) {
+            const deps = parseDependencies(existing.dependencies);
+            for (const att of attachments) {
+                if (att && typeof att === 'object' && att.name && att.path) {
+                    deps.attachments.push({
+                        name: String(att.name),
+                        path: String(att.path),
+                        type: String(att.type || 'file'),
+                    });
+                }
+            }
+            const depsJson = JSON.stringify({ subtasks: deps.subtasks, attachments: deps.attachments });
+            setClauses.push(`dependencies = '${escapeSQL(depsJson)}'`);
+        }
+
+        // Build combined multi-statement SQL to minimize sandbox round-trips
+        const callingAgent = req.sandbox!.agentSlug || existing.assigned_agent || 'system';
+        const statements: string[] = [];
+
+        if (setClauses.length > 0) {
+            setClauses.push(`updated_at = '${new Date().toISOString()}'`);
+            statements.push(`UPDATE tasks SET ${setClauses.join(', ')} WHERE id = '${escapeSQL(task_id)}'`);
+        }
+
+        if (comment && typeof comment === 'string' && comment.trim()) {
+            const commentMeta = JSON.stringify({
+                event_type: 'task_comment',
+                task_id: task_id,
+                source: 'agent',
+            });
+            statements.push(`INSERT INTO channel_messages (channel_slug, agent_slug, content, message_type, metadata)
+                VALUES ('${escapeSQL(existing.project_slug)}', '${escapeSQL(callingAgent)}', '${escapeSQL(comment.trim())}', 'system', '${escapeSQL(commentMeta)}')`);
+        }
+
+        // Re-fetch in the same round-trip
+        statements.push(`SELECT id, project_slug, title, description, status, priority, assigned_agent, dependencies, created_at
+             FROM tasks WHERE id = '${escapeSQL(task_id)}'`);
+
+        const updatedRows = await executeWorkspaceJsonQuery<TaskRow & { dependencies: string | null }>(
+            provider, sandboxId, statements.join(';\n'),
+        );
+        const row = updatedRows[0] || existing;
+        const updatedDeps = parseDependencies(row.dependencies);
+
+        const mcpResult: McpToolResult = {
+            success: true,
+            data: {
+                task: {
+                    id: row.id,
+                    channel_id: row.project_slug,
+                    title: row.title,
+                    description: row.description || '',
+                    assigned_agent_ids: row.assigned_agent ? [row.assigned_agent] : [],
+                    priority: row.priority,
+                    subtasks: updatedDeps.subtasks,
+                    attachments: updatedDeps.attachments,
+                    status: row.status,
+                    created_at: row.created_at,
+                },
+            },
+        };
+
+        workspaceSSEBroadcaster.broadcastFileChanged(userId, {
+            type: 'file_changed', path: `tasks/${task_id}`, action: 'modified',
+            timestamp: new Date().toISOString(),
+        });
+
+        const summaryParts: string[] = [];
+        if (status) summaryParts.push(`status → ${status}`);
+        if (comment) summaryParts.push('added comment');
+        if (Array.isArray(attachments) && attachments.length > 0) summaryParts.push(`${attachments.length} attachment(s)`);
+        await logMcpActivity(provider, sandboxId, {
+            channelSlug: existing.project_slug,
+            action: 'task_updated',
+            summary: `Task "${existing.title}" updated: ${summaryParts.join(', ')}`,
+            taskId: task_id,
+        });
 
         res.json(mcpResult);
     } catch (error) {

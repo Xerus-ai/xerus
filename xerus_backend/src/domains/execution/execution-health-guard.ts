@@ -18,14 +18,17 @@ const log = logger('HealthGuard');
 // Configuration
 // -----------------------------------------------------------------------------
 
-/** How long without any event before we consider the runner potentially stale. */
-const ACTIVITY_TIMEOUT_MS = 60_000;
+/** How long without any agent-specific event before we consider the execution stale. */
+const ACTIVITY_TIMEOUT_MS = 90_000;
 
 /** How often to check for activity staleness. */
 const CHECK_INTERVAL_MS = 15_000;
 
-/** How long to wait for a health probe response before declaring the runner dead. */
-const PROBE_RESPONSE_TIMEOUT_MS = 10_000;
+/** How long to wait for a genuine agent event after sending a health probe.
+ *  Must be > CHECK_INTERVAL_MS so the check has at least one tick to evaluate.
+ *  If no agent-specific event arrives within this window, the runner is declared
+ *  unresponsive and the stream is aborted. */
+const PROBE_RESPONSE_TIMEOUT_MS = 20_000;
 
 // -----------------------------------------------------------------------------
 // Types
@@ -45,15 +48,17 @@ export interface HealthGuard {
 // -----------------------------------------------------------------------------
 
 /**
- * Create a health guard that monitors runner liveness during event streaming.
+ * Create a health guard that monitors agent-level activity during event streaming.
  *
  * The guard starts a periodic interval. On each tick it checks whether any
- * events have been received within ACTIVITY_TIMEOUT_MS. If not, it sends a
- * health probe to the runner. If the runner does not produce any event within
- * PROBE_RESPONSE_TIMEOUT_MS after the probe, the guard aborts its signal.
+ * agent-specific events have been received within ACTIVITY_TIMEOUT_MS. Transport
+ * events (health probe responses, system events) do NOT reset the timer — only
+ * events from the expected agent count as activity. If the agent is silent beyond
+ * the threshold, a health probe is sent to verify the runner is alive. If no
+ * genuine agent event arrives within PROBE_RESPONSE_TIMEOUT_MS, the guard aborts.
  *
  * The caller must:
- * 1. Call `recordActivity()` on every received event
+ * 1. Call `recordActivity()` only on agent-specific events (not transport/health)
  * 2. Include `guard.signal` in the combined AbortSignal for streamEvents
  * 3. Call `guard.stop()` in the finally block
  */

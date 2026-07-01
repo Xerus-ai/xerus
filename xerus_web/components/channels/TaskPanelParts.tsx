@@ -1,13 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Paperclip, Download, Plus } from 'lucide-react'
+import { X, Paperclip } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { KanbanTask } from '@/components/common/TaskCard'
 import {
   getLabelColorByName, fmtDateLong, timeAgo,
   STATUS_CFG, FILE_TYPE_COLORS, getFileExtension,
 } from '@/lib/task-utils'
+import { TaskComments } from '@/components/common/TaskComments'
 
 // ---------------------------------------------------------------------------
 // Tag suggestions for non-technical business workflows
@@ -84,38 +85,39 @@ export function TagInput({ labels, labelInput, onLabelInputChange, onAddLabel, o
 // AttachmentSection
 // ---------------------------------------------------------------------------
 
-export function AttachmentSection({ count }: { count: number }) {
+interface AttachmentData { name: string; path: string; type?: string }
+
+export function AttachmentSection({ count, items }: { count: number; items?: AttachmentData[] }) {
+  const attachments = items && items.length > 0 ? items : []
+  if (attachments.length === 0 && count === 0) return null
+
   return (
     <div className="mb-6">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Paperclip className="w-4 h-4 text-text-muted" />
-          <span className="text-sm font-semibold text-text">Attachment ({count})</span>
+          <span className="text-sm font-semibold text-text">Attachments ({attachments.length || count})</span>
         </div>
-        <button className="text-xs font-medium text-primary hover:text-primary/80 flex items-center gap-1 transition-colors">
-          <Download className="w-3 h-3" />
-          Download All
-        </button>
       </div>
-      <div className="flex items-center gap-3">
-        {['document.pdf', 'config.json'].slice(0, count).map((name) => {
-          const ext = getFileExtension(name)
+      <div className="flex flex-wrap items-center gap-3">
+        {attachments.map((att) => {
+          const ext = getFileExtension(att.name)
           const colors = FILE_TYPE_COLORS[ext] || { bg: '#F3F4F6', text: '#4B5563' }
           return (
-            <div key={name} className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-surface border border-border/10 min-w-[180px]">
+            <div key={att.path} className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-surface border border-border/10 min-w-[180px]">
               <div className="w-10 h-10 rounded-lg flex items-center justify-center text-[10px] font-bold uppercase tracking-wide" style={{ backgroundColor: colors.bg, color: colors.text }}>
                 {ext}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-text truncate">{name}</p>
-                <p className="text-[11px] text-text-muted">48 KB</p>
+                <p className="text-sm text-text truncate">{att.name}</p>
+                <p className="text-[11px] text-text-muted truncate">{att.path}</p>
               </div>
             </div>
           )
         })}
-        <button className="w-10 h-10 rounded-xl border-2 border-dashed border-border flex items-center justify-center hover:border-primary/40 hover:bg-primary/5 transition-colors">
-          <Plus className="w-4 h-4 text-text-muted" />
-        </button>
+        {attachments.length === 0 && (
+          <p className="text-xs text-text-muted">No attachments</p>
+        )}
       </div>
     </div>
   )
@@ -126,24 +128,32 @@ export function AttachmentSection({ count }: { count: number }) {
 // ---------------------------------------------------------------------------
 
 export function ActivityTabs({ task }: { task: KanbanTask }) {
-  const [tab, setTab] = useState<'subtasks' | 'comments' | 'activities'>('activities')
+  const subtaskItems = task.subtaskItems || []
+  const [tab, setTab] = useState<'subtasks' | 'comments' | 'activities'>(subtaskItems.length > 0 ? 'subtasks' : 'activities')
   return (
     <div>
       <div className="flex items-center gap-6 border-b border-border/30 mb-4">
-        {(['subtasks', 'comments', 'activities'] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={cn(
-              'pb-2 text-sm transition-colors border-b-2',
-              tab === t
-                ? 'border-primary text-text font-semibold'
-                : 'border-transparent text-text-muted hover:text-text-secondary',
-            )}
-          >
-            {t === 'subtasks' ? 'Subtasks' : t === 'comments' ? `Comments${task.commentCount ? ` ${task.commentCount}` : ''}` : 'Activities'}
-          </button>
-        ))}
+        {(['subtasks', 'comments', 'activities'] as const).map((t) => {
+          const label = t === 'subtasks'
+            ? `Subtasks${subtaskItems.length > 0 ? ` ${subtaskItems.filter(s => s.done).length}/${subtaskItems.length}` : ''}`
+            : t === 'comments'
+              ? `Comments${task.commentCount ? ` ${task.commentCount}` : ''}`
+              : 'Activities'
+          return (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={cn(
+                'pb-2 text-sm transition-colors border-b-2',
+                tab === t
+                  ? 'border-primary text-text font-semibold'
+                  : 'border-transparent text-text-muted hover:text-text-secondary',
+              )}
+            >
+              {label}
+            </button>
+          )
+        })}
       </div>
       {tab === 'activities' && (
         <div className="space-y-4 pb-2">
@@ -163,11 +173,25 @@ export function ActivityTabs({ task }: { task: KanbanTask }) {
         </div>
       )}
       {tab === 'subtasks' && (
-        <p className="text-xs text-text-muted py-4 text-center">No subtasks yet.</p>
+        subtaskItems.length > 0 ? (
+          <div className="space-y-2 pb-2">
+            {subtaskItems.map((item, i) => (
+              <div key={i} className="flex items-center gap-3 px-3 py-2 rounded-xl bg-surface border border-border/10">
+                <div className={cn(
+                  'w-4 h-4 rounded border-2 flex items-center justify-center shrink-0',
+                  item.done ? 'bg-primary border-primary' : 'border-border',
+                )}>
+                  {item.done && <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                </div>
+                <span className={cn('text-sm', item.done ? 'text-text-muted line-through' : 'text-text')}>{item.text}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-text-muted py-4 text-center">No subtasks yet</p>
+        )
       )}
-      {tab === 'comments' && (
-        <p className="text-xs text-text-muted py-4 text-center">No comments yet.</p>
-      )}
+      {tab === 'comments' && <TaskComments taskId={task.id} />}
     </div>
   )
 }

@@ -10,7 +10,7 @@ import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
 import type { SandboxService } from '../sandbox-infra/sandbox/sandbox.service';
 import type { DaytonaProvider } from '../sandbox-infra/sandbox/providers/daytona.provider';
 import { requireRunningSandbox, getDaytonaProvider } from '../sandbox-infra/sandbox/sandbox-route-helpers';
-import { escapeSQL, escapeLikePattern, executeWorkspaceJsonQuery } from '../conversations/workspace-db.helpers';
+import { escapeSQL, executeWorkspaceJsonQuery, executeWorkspaceQuery } from '../conversations/workspace-db.helpers';
 import { shellEscape } from '../../utils/shell-safety';
 import { sanitizeSlug } from '../../shared/slugify';
 import { VALID_STATUSES, VALID_PRIORITIES } from './task.constants';
@@ -588,16 +588,18 @@ router.get('/tasks/:taskId/activities', auth, async (req: AuthenticatedRequest, 
         const sandboxId = await requireRunningSandbox(sandboxService, userId);
         const provider = getDaytonaProvider(sandboxService);
 
-        const row = await getTask(provider, sandboxId, taskId);
-        if (!row) throw new NotFoundError('Task');
+        const taskCheck = await executeWorkspaceJsonQuery<{ id: string }>(
+            provider, sandboxId,
+            `SELECT id FROM tasks WHERE id = '${escapeSQL(taskId)}' LIMIT 1`,
+        );
+        if (taskCheck.length === 0) throw new NotFoundError('Task');
 
-        const channelSlug = row.project_slug;
         const sql = `
             SELECT cm.id, cm.agent_slug, cm.content, cm.message_type, cm.metadata, cm.posted_at
             FROM channel_messages cm
-            WHERE cm.channel_slug = '${escapeSQL(channelSlug)}'
+            WHERE cm.channel_slug = (SELECT project_slug FROM tasks WHERE id = '${escapeSQL(taskId)}')
               AND cm.message_type = 'system'
-              AND cm.metadata LIKE '%${escapeLikePattern(taskId)}%' ESCAPE '\\'
+              AND json_extract(cm.metadata, '$.task_id') = '${escapeSQL(taskId)}'
             ORDER BY cm.posted_at DESC
             LIMIT 50
         `;
@@ -619,6 +621,97 @@ router.get('/tasks/:taskId/activities', auth, async (req: AuthenticatedRequest, 
                 };
             }),
         }, startTime);
+    } catch (err) {
+        next(err);
+    }
+});
+
+// GET /api/v1/tasks/:taskId/comments - Comments for a task
+router.get('/tasks/:taskId/comments', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const startTime = res.locals.startTime || Date.now();
+    try {
+        const userId = req.user?.uid;
+        if (!userId) throw new UnauthorizedError();
+
+        const { taskId } = req.params;
+
+        const { sandboxService } = getDeps();
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
+
+        const taskCheck = await executeWorkspaceJsonQuery<{ id: string }>(
+            provider, sandboxId,
+            `SELECT id FROM tasks WHERE id = '${escapeSQL(taskId)}' LIMIT 1`,
+        );
+        if (taskCheck.length === 0) throw new NotFoundError('Task');
+
+        const sql = `
+            SELECT cm.id, cm.agent_slug, cm.content, cm.message_type, cm.metadata, cm.posted_at
+            FROM channel_messages cm
+            WHERE cm.channel_slug = (SELECT project_slug FROM tasks WHERE id = '${escapeSQL(taskId)}')
+              AND cm.message_type = 'system'
+              AND json_extract(cm.metadata, '$.task_id') = '${escapeSQL(taskId)}'
+              AND json_extract(cm.metadata, '$.event_type') = 'task_comment'
+            ORDER BY cm.posted_at ASC
+            LIMIT 100
+        `;
+        const comments = await executeWorkspaceJsonQuery<{
+            id: number; agent_slug: string; content: string;
+            message_type: string; metadata: string | null; posted_at: string;
+        }>(provider, sandboxId, sql);
+
+        sendResponse(res, 200, {
+            comments: comments.map(c => {
+                const meta = JSON.parse(c.metadata || '{}') as Record<string, unknown>;
+                return {
+                    id: String(c.id),
+                    author: c.agent_slug,
+                    content: c.content,
+                    timestamp: c.posted_at,
+                    source: typeof meta.source === 'string' ? meta.source : 'agent',
+                };
+            }),
+        }, startTime);
+    } catch (err) {
+        next(err);
+    }
+});
+
+// POST /api/v1/tasks/:taskId/comments - Human posts a comment on a task
+router.post('/tasks/:taskId/comments', auth, strictRateLimit, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const startTime = res.locals.startTime || Date.now();
+    try {
+        const userId = req.user?.uid;
+        if (!userId) throw new UnauthorizedError();
+
+        const { taskId } = req.params;
+        const { content } = req.body;
+
+        if (!content || typeof content !== 'string' || !content.trim()) {
+            throw new BadRequestError('content is required');
+        }
+
+        const { sandboxService } = getDeps();
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
+
+        const taskCheck = await executeWorkspaceJsonQuery<{ id: string; project_slug: string }>(
+            provider, sandboxId,
+            `SELECT id, project_slug FROM tasks WHERE id = '${escapeSQL(taskId)}' LIMIT 1`,
+        );
+        if (taskCheck.length === 0) throw new NotFoundError('Task');
+
+        const commentMeta = JSON.stringify({
+            event_type: 'task_comment',
+            task_id: taskId,
+            source: 'user',
+            user_id: userId,
+        });
+        const sql = `INSERT INTO channel_messages (channel_slug, agent_slug, content, message_type, metadata)
+            VALUES ('${escapeSQL(taskCheck[0].project_slug)}', 'user', '${escapeSQL(content.trim())}', 'system', '${escapeSQL(commentMeta)}')`;
+        await executeWorkspaceQuery(provider, sandboxId, sql);
+
+        sendResponse(res, 201, { posted: true, task_id: taskId }, startTime);
     } catch (err) {
         next(err);
     }

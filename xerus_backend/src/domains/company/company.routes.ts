@@ -16,6 +16,8 @@ import type { MessageBridgeService } from '../inbox/messaging/message-bridge.ser
 import { findChannelLead } from '../inbox/messaging/message-bridge.repository';
 import type { ExecutionService } from '../execution/execution.service';
 import { triggerChannelExecution, syncMessageToSandbox } from './channel-execution.service';
+import { findOrCreateChannelConversation } from '../conversations/workspace-db.service';
+import { sseRegistry } from '../execution/streaming/sse-registry';
 import { shellEscapePath } from '../../utils/shell-safety';
 import { slugify, sanitizeSlug } from '../../shared/slugify';
 import { strictRateLimit } from '../../middleware/rate-limit';
@@ -609,24 +611,23 @@ router.post('/channels/:channelId/messages', auth, strictRateLimit, async (req: 
             log.warn('Sandbox sync failed for message', { error: err instanceof Error ? err.message : String(err) }),
         );
 
-        // Resolve target agent: @mention > channel lead > first channel member
-        // Then forward to running session or trigger new execution.
-        (async () => {
-            // 1. Parse @mention from human message content (e.g. "@strategist do X")
-            const mentionMatch = content.trim().match(/(?:^|[\s])@([a-zA-Z][a-zA-Z0-9_-]*)/);
-            let targetAgent = mentionMatch ? mentionMatch[1] : null;
+        // Resolve target agent BEFORE response so frontend knows which agent
+        // will execute and can open an SSE connection to the conversation.
+        // Wrapped in try/catch so resolution failures don't block the 201 response.
+        let targetAgent: string | null = null;
+        let executionContext: { conversationId: string; targetAgent: string } | null = null;
 
-            // 2. Fall back to channel lead
+        try {
+            const requestedAgent = typeof req.body.agent_slug === 'string' ? req.body.agent_slug.trim() : null;
+            const mentionMatch = content.trim().match(/(?:^|[\s])@([a-zA-Z][a-zA-Z0-9_-]*)/);
+            targetAgent = requestedAgent || (mentionMatch ? mentionMatch[1] : null);
+
             if (!targetAgent) {
                 targetAgent = await findChannelLead(provider, sandboxId, channelId);
             }
 
-            // 3. Fall back to first agent assigned to this channel via config.json
-            //    (channel_members table may be empty for pre-existing assignments)
             if (!targetAgent) {
                 const { escapeSQL: esc } = await import('../conversations/workspace-db.helpers');
-
-                // First try channel_members table
                 const memberRows = await execWsQuery<{ agent_slug: string }>(
                     provider, sandboxId,
                     `SELECT agent_slug FROM channel_members WHERE channel_slug = '${esc(channelId)}' LIMIT 1`,
@@ -635,7 +636,6 @@ router.post('/channels/:channelId/messages', auth, strictRateLimit, async (req: 
                 if (memberRows.length > 0) {
                     targetAgent = memberRows[0].agent_slug;
                 } else {
-                    // Fallback: scan agent configs from filesystem
                     const wsAgents = await execWsQuery<{ slug: string }>(
                         provider, sandboxId,
                         `SELECT slug FROM agents ORDER BY installed_at DESC LIMIT 50`,
@@ -655,64 +655,27 @@ router.post('/channels/:channelId/messages', auth, strictRateLimit, async (req: 
                     }
                 }
 
-                // Backfill lead_agent_slug so future messages route directly
                 if (targetAgent) {
+                    const { escapeSQL: esc2 } = await import('../conversations/workspace-db.helpers');
                     log.info('Auto-setting channel lead', { channel: channelId, agent: targetAgent });
-                    await execWsQuery(provider, sandboxId,
-                        `UPDATE channels SET lead_agent_slug = '${esc(targetAgent)}' WHERE slug = '${esc(channelId)}' AND lead_agent_slug IS NULL`,
+                    execWsQuery(provider, sandboxId,
+                        `UPDATE channels SET lead_agent_slug = '${esc2(targetAgent)}' WHERE slug = '${esc2(channelId)}' AND lead_agent_slug IS NULL`,
                     ).catch(() => {});
                 }
             }
 
-            if (!targetAgent) {
-                log.debug('No agents in channel, skipping execution', { channel: channelId });
-                return;
-            }
-
-            log.info('Routing channel message to agent', { channel: channelId, target: targetAgent });
-
-            // Try forwarding to already-running agent session (dispatch-only, no DB write)
-            let dispatched = false;
-            if (companyDeps?.messageBridge) {
-                dispatched = await companyDeps.messageBridge.trySendToAgent(
-                    userId, targetAgent,
-                    channelInfo.domain_slug, channelInfo.channel_slug,
-                    'user', content.trim(),
+            if (targetAgent) {
+                const conversation = await findOrCreateChannelConversation(
+                    provider, sandboxId, targetAgent, channelId,
                 );
+                executionContext = { conversationId: conversation.id, targetAgent };
             }
-
-            // If no active session, trigger execution via execution service
-            if (!dispatched && companyDeps?.executionService) {
-                await triggerChannelExecution(
-                    companyDeps.executionService,
-                    provider,
-                    sandboxId,
-                    userId,
-                    targetAgent,
-                    content.trim(),
-                    channelId,
-                );
-            }
-        })().catch(async (err) => {
-            const errorMsg = err instanceof Error ? err.message : String(err);
-            log.error('Channel agent dispatch failed', {
+        } catch (resolveErr) {
+            log.warn('Agent resolution failed, execution will proceed via fallback', {
                 channel: channelId,
-                error: errorMsg,
+                error: resolveErr instanceof Error ? resolveErr.message : String(resolveErr),
             });
-            // Write a system message to channel_messages so the user sees the error in the activity tab
-            try {
-                const { createSystemEvent } = await import('./company-workspace-db.service');
-                await createSystemEvent(provider, sandboxId, channelId,
-                    `Agent dispatch failed: ${errorMsg}`,
-                    { error_type: 'dispatch_failure' },
-                );
-            } catch (sysErr) {
-                log.error('Failed to write dispatch error as system event', {
-                    channel: channelId,
-                    error: sysErr instanceof Error ? sysErr.message : String(sysErr),
-                });
-            }
-        });
+        }
 
         sendResponse(res, 201, {
             message: {
@@ -726,7 +689,70 @@ router.post('/channels/:channelId/messages', auth, strictRateLimit, async (req: 
                 metadata: metadata ?? {},
                 created_at: inserted.posted_at,
             },
+            execution: executionContext,
         }, startTime);
+
+        // Fire-and-forget: dispatch to running session or trigger new execution.
+        // messageBridge dispatch is separate from executionService guard so messages
+        // reach running agents even if executionService isn't initialized yet.
+        if (targetAgent) {
+            (async () => {
+                log.info('Routing channel message to agent', { channel: channelId, target: targetAgent });
+
+                let dispatched = false;
+                if (companyDeps?.messageBridge) {
+                    dispatched = await companyDeps.messageBridge.trySendToAgent(
+                        userId, targetAgent!,
+                        channelInfo.domain_slug, channelInfo.channel_slug,
+                        'user', content.trim(),
+                    );
+                }
+
+                if (!dispatched && companyDeps?.executionService) {
+                    // Poll sseRegistry for frontend SSE connection (200ms intervals, up to 5s).
+                    // Falls back to NullStreamingResponse if frontend doesn't connect in time.
+                    let stream: import('../execution/streaming/stream.handler').StreamingResponse | undefined;
+                    if (executionContext) {
+                        const convId = executionContext.conversationId;
+                        for (let i = 0; i < 25; i++) {
+                            stream = sseRegistry.get(userId, convId);
+                            if (stream) break;
+                            await new Promise(r => setTimeout(r, 200));
+                        }
+                    }
+
+                    await triggerChannelExecution(
+                        companyDeps.executionService,
+                        provider,
+                        sandboxId,
+                        userId,
+                        targetAgent!,
+                        content.trim(),
+                        channelId,
+                        'channel_message',
+                        stream ?? undefined,
+                    );
+                }
+            })().catch(async (err) => {
+                const errorMsg = err instanceof Error ? err.message : String(err);
+                log.error('Channel agent dispatch failed', {
+                    channel: channelId,
+                    error: errorMsg,
+                });
+                try {
+                    const { createSystemEvent } = await import('./company-workspace-db.service');
+                    await createSystemEvent(provider, sandboxId, channelId,
+                        `Agent dispatch failed: ${errorMsg}`,
+                        { error_type: 'dispatch_failure' },
+                    );
+                } catch (sysErr) {
+                    log.error('Failed to write dispatch error as system event', {
+                        channel: channelId,
+                        error: sysErr instanceof Error ? sysErr.message : String(sysErr),
+                    });
+                }
+            });
+        }
     } catch (err) {
         next(err);
     }

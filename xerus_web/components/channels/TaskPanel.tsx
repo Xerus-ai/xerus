@@ -369,8 +369,8 @@ export function TaskPanel({
             </div>
 
             {/* Attachments (view mode only) */}
-            {mode === 'view' && task?.attachmentCount !== undefined && task.attachmentCount > 0 && (
-              <AttachmentSection count={task.attachmentCount} />
+            {mode === 'view' && task && ((task.attachments?.length ?? 0) > 0 || (task.attachmentCount ?? 0) > 0) && (
+              <AttachmentSection count={task.attachmentCount || 0} items={task.attachments} />
             )}
 
             {/* Bottom tabs (view mode only) */}
