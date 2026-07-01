@@ -11,6 +11,7 @@ interface ActivityParams {
     agentSlug?: string;
     action: string;
     summary: string;
+    taskId?: string;
 }
 
 export async function logMcpActivity(
@@ -19,7 +20,9 @@ export async function logMcpActivity(
     params: ActivityParams,
 ): Promise<void> {
     const sender = params.agentSlug || DEFAULT_SENDER;
-    const metadata = JSON.stringify({ action: params.action, auto_logged: true });
+    const metaObj: Record<string, unknown> = { action: params.action, auto_logged: true };
+    if (params.taskId) metaObj.task_id = params.taskId;
+    const metadata = JSON.stringify(metaObj);
 
     const sql = `INSERT INTO channel_messages (channel_slug, agent_slug, content, message_type, metadata)
         VALUES ('${escapeSQL(params.channelSlug)}', '${escapeSQL(sender)}', '${escapeSQL(params.summary)}', 'system', '${escapeSQL(metadata)}')`;

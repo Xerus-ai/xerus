@@ -21,13 +21,11 @@ router.get('/', auth, async (req: AuthenticatedRequest, res: Response, next: Nex
             return;
         }
 
-        const agentId = req.query.agentId as string | undefined;
-        if (!agentId) {
-            res.status(400).json({ success: false, error: { code: 'BAD_REQUEST', message: 'agentId query parameter is required' } });
+        const agentSlug = req.query.agentSlug as string | undefined;
+        if (!agentSlug) {
+            res.status(400).json({ success: false, error: { code: 'BAD_REQUEST', message: 'agentSlug query parameter is required' } });
             return;
         }
-
-        const agentIdNum = parseInt(agentId, 10);
 
         // Resolve workspace for authenticated user
         const wsResult = await query<{ id: string }>(
@@ -35,7 +33,6 @@ router.get('/', auth, async (req: AuthenticatedRequest, res: Response, next: Nex
             [userId]
         );
         if (wsResult.rows.length === 0) {
-            // User hasn't completed onboarding yet — no memories can exist
             sendResponse(res, 200, [], startTime);
             return;
         }
@@ -47,10 +44,10 @@ router.get('/', auth, async (req: AuthenticatedRequest, res: Response, next: Nex
         const result = await query(
             `SELECT id, content, file_path, memory_type, scope, created_at
              FROM memory_search_index
-             WHERE workspace_id = $1::uuid AND agent_id = $2
+             WHERE workspace_id = $1::uuid AND agent_slug = $2
              ORDER BY memory_type, created_at DESC
              LIMIT $3 OFFSET $4`,
-            [workspaceId, agentIdNum, limit, offset]
+            [workspaceId, agentSlug, limit, offset]
         );
 
         sendResponse(res, 200, result.rows, startTime);

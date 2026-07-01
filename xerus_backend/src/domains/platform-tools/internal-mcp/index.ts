@@ -33,21 +33,22 @@
 // 27. upload_kb                - Upload KB document
 // 28. assign_kb                - Assign KB to agent
 //
-// Channels & tasks (3):
+// Channels & tasks (4):
 // 29. create_channel           - Create inbox channel
 // 30. add_to_channel           - Add agent to channel
 // 31. create_task              - Create task in channel
+// 32. update_task              - Update task status, comments, attachments
 //
 // Skills & execution (5):
-// 32. search_skills            - Search skills
-// 33. create_skill             - Create new skill
-// 34. install_skill            - Install skill on agent
-// 35. uninstall_skill          - Remove skill from agent
-// 36. cancel_execution         - Cancel running session
+// 33. search_skills            - Search skills
+// 34. create_skill             - Create new skill
+// 35. install_skill            - Install skill on agent
+// 36. uninstall_skill          - Remove skill from agent
+// 37. cancel_execution         - Cancel running session
 //
 // Outputs & domains (2):
-// 37. search_outputs           - Search execution outputs
-// 38. list_domains             - List workspace domains
+// 38. search_outputs           - Search execution outputs
+// 39. list_domains             - List workspace domains
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticateInternalMcp } from './middleware';

@@ -32,9 +32,9 @@ function mapRow(row: MemoryRow): MemoryEntry {
   };
 }
 
-export async function getAgentMemories(agentId: number): Promise<MemoryEntry[]> {
+export async function getAgentMemories(agentSlug: string): Promise<MemoryEntry[]> {
   const response = await apiGet<{ data: MemoryRow[] }>(
-    `/memory?agentId=${agentId}`
+    `/memory?agentSlug=${encodeURIComponent(agentSlug)}`
   );
   return (response.data || []).map(mapRow);
 }

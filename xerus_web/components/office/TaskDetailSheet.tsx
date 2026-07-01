@@ -8,6 +8,7 @@ import { Hash, User, Calendar, CheckCircle2, Circle, Paperclip, Tag, FileText, P
 import { PresenceAvatars } from '@/components/common/PresenceAvatars'
 import type { KanbanTask } from '@/components/common/KanbanBoard'
 import { apiGet } from '@/lib/api/client'
+import { TaskComments as TaskCommentsShared } from '@/components/common/TaskComments'
 
 function CircularProgress({ completed, total }: { completed: number; total: number }) {
   const pct = total > 0 ? (completed / total) * 100 : 0
@@ -335,7 +336,7 @@ export function TaskDetailSheet({ selectedTask, onClose }: TaskDetailSheetProps)
 
                 {/* Comments */}
                 <TabsContent value="comments" className="mt-5">
-                  <p className="text-xs text-text-muted py-6 text-center">No comments yet</p>
+                  <TaskCommentsShared taskId={selectedTask.id} cardClassName="bg-surface-alt/50" />
                 </TabsContent>
 
                 {/* Activity */}

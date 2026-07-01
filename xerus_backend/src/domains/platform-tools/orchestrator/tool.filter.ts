@@ -121,8 +121,12 @@ export interface ToolFilterResult {
 // Helper Functions
 // -----------------------------------------------------------------------------
 
+const SPECIALIST_ALLOWED_PLATFORM_TOOLS = new Set([
+    'mcp__platform__create_task',
+    'mcp__platform__update_task',
+]);
+
 function isPlatformTool(toolName: string): boolean {
-    // Match canonical names (platform.*) and MCP-registered names (mcp__platform__*)
     return PLATFORM_TOOL_PREFIXES.some(prefix => toolName.startsWith(prefix))
         || toolName.startsWith('mcp__platform__');
 }
@@ -162,9 +166,12 @@ export function validateToolAccess(
         return { allowed: true };
     }
 
-    // Platform tools are master Xerus only
+    // Platform tools: master Xerus gets all, specialists get task tools only
     if (isPlatformTool(toolName)) {
         if (isMasterOrchestrator) {
+            return { allowed: true };
+        }
+        if (SPECIALIST_ALLOWED_PLATFORM_TOOLS.has(toolName)) {
             return { allowed: true };
         }
         return {

@@ -16,7 +16,7 @@ const MEMORY_FILTERS: { value: MemoryFilter; label: string }[] = [
 ]
 
 interface MemoryTabProps {
-    agent: { id: number | string }
+    agent: { id: number | string; slug?: string | null; name?: string | null }
 }
 
 function formatRelativeTime(dateStr: string): string {
@@ -43,7 +43,8 @@ export function MemoryTab({ agent }: MemoryTabProps) {
         async function fetchMemories() {
             setIsLoading(true)
             try {
-                const data = await getAgentMemories(Number(agent.id))
+                const slug = agent.slug ?? (agent.name ? agent.name.toLowerCase().replace(/\s+/g, '-') : String(agent.id))
+                const data = await getAgentMemories(slug)
                 if (!cancelled) setMemories(data)
             } catch (err) {
                 if (!cancelled) {

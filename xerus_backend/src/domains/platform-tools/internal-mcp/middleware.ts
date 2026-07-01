@@ -67,6 +67,7 @@ export async function authenticateInternalMcp(
         req.sandbox = {
             userId,
             workspaceId: req.body.workspace_id,
+            agentSlug: typeof req.body._agent_slug === 'string' ? req.body._agent_slug : undefined,
         };
 
         next();

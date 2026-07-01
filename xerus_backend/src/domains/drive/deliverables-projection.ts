@@ -21,7 +21,7 @@ import { logger } from '../../utils/logger';
 const log = logger('DeliverablesProjection');
 
 const DELIVERABLES_ROOT = 'projects';
-const DELIVERABLES_LIST_DEPTH = 5; // projects/<domain>/channels/<channel>/output/deliverables/<file>
+const DELIVERABLES_LIST_DEPTH = 6; // <domain>/channels/<channel>/output/deliverables/<file> = 6 levels under projects/
 
 // -----------------------------------------------------------------------------
 // Types

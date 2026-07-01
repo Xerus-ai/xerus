@@ -11,6 +11,7 @@ export interface InternalMcpRequest extends Request {
     sandbox?: {
         userId: string;
         workspaceId?: string;
+        agentSlug?: string;
     };
 }
 

@@ -1,7 +1,7 @@
 // Xerus Platform MCP Server
-// MCP server with 38 backend-coupled tools that CLIs access
+// MCP server with 39 backend-coupled tools that CLIs access
 //
-// 38 tools that require backend state:
+// 39 tools that require backend state:
 //  1. pause_execution          — Session control (needs backend state machine)
 //  2. resume_execution         — HITL approval (needs backend state)
 //  3. get_session_state        — Distributed state query (needs backend DB)
@@ -95,6 +95,9 @@ const USER_ID = process.env.XERUS_USER_ID;
 if (!USER_ID && process.env.NODE_ENV === 'production') {
     throw new Error('XERUS_USER_ID is required — set via .claude/settings.json env');
 }
+
+// Agent slug injected by daytona-runner.ts into the CLI process env
+const AGENT_SLUG = process.env.XERUS_AGENT_SLUG || '';
 
 // -----------------------------------------------------------------------------
 // Tool Definitions
@@ -481,6 +484,20 @@ export const TOOLS = [
             required: ['channel_id', 'title', 'assigned_agent_ids'],
         },
     },
+    {
+        name: 'update_task',
+        description: 'Update an existing task: change status, add a comment, or attach deliverables. Use this to mark tasks done and report results.',
+        inputSchema: {
+            type: 'object' as const,
+            properties: {
+                task_id: { type: 'string', description: 'The task ID to update' },
+                status: { type: 'string', enum: ['open', 'in_progress', 'completed', 'blocked'], description: 'New task status' },
+                comment: { type: 'string', description: 'Comment to add to the task (visible to user)' },
+                attachments: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, path: { type: 'string' }, type: { type: 'string' } }, required: ['name', 'path'] }, description: 'Files to attach (deliverables, reports)' },
+            },
+            required: ['task_id'],
+        },
+    },
     // Skills (2) — backend DB + workspace filesystem
     {
         name: 'search_skills',
@@ -614,8 +631,8 @@ async function callBackendApi(
     path: string,
     body: Record<string, unknown>,
 ): Promise<unknown> {
-    // Inject user_id into every request — backend middleware requires it
-    const enrichedBody = { ...body, user_id: USER_ID };
+    // Inject user_id and agent_slug into every request
+    const enrichedBody = { ...body, user_id: USER_ID, _agent_slug: AGENT_SLUG };
 
     let response: Response;
     try {
@@ -693,7 +710,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main(): Promise<void> {
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    process.stderr.write('[mcp-server] Running with 38 backend-coupled tools\n');
+    process.stderr.write('[mcp-server] Running with 39 backend-coupled tools\n');
 }
 
 main().catch((err) => {
