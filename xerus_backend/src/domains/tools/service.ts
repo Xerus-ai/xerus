@@ -3,6 +3,7 @@
 
 import { getPipedreamClient } from '../../shared/clients/pipedream';
 import { toolsRepository } from './repository';
+import { reconcileConnectedAccounts } from './connection-reconciler';
 import { toolValidator } from './validators';
 import { toolsCache } from '../../shared/cache/tools-cache';
 import { ToolNotConnectedError, ToolExecutionError, UnauthorizedAccessError } from './errors';
@@ -124,6 +125,15 @@ export class ToolsService {
         }
 
         return connections;
+    }
+
+    /**
+     * Reconcile a user's connected_accounts against Pipedream (source of truth) so the
+     * table converges on every sandbox MCP sync and backfills connections dropped by
+     * fire-and-forget webhooks. Delegates to connection-reconciler; see that module.
+     */
+    async reconcileConnectedAccounts(input: { user_id: string }): Promise<{ added: number; removed: number; total: number }> {
+        return reconcileConnectedAccounts(this.pipedream, input.user_id);
     }
 
     async disconnectAccount(input: DisconnectAccountInput): Promise<void> {

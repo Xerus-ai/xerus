@@ -1,7 +1,7 @@
 // Tools Domain Repository
 // Database operations for connected_accounts and tool_executions
 
-import { query } from '../../database/connection';
+import { query, transaction } from '../../database/connection';
 import type {
     ConnectedAccount,
     ConnectedAccountRow,
@@ -71,6 +71,57 @@ export class ToolsRepository {
         );
 
         return mapConnectedAccountRow(result.rows[0]);
+    }
+
+    /**
+     * Converge a user's connected_accounts with the authoritative set of accounts
+     * Pipedream reports for them. Backfills rows missed by dropped webhook deliveries
+     * (this is the automatic repair for connections broken by the old parse bug),
+     * repairs drifted app_slug/app_name, and removes rows Pipedream no longer knows
+     * (revoked/deleted upstream). Runs in one transaction so the table is never left
+     * half-converged. The caller MUST pass a complete list (all pages fetched) —
+     * a partial list would delete live rows.
+     */
+    async reconcileConnections(
+        user_id: string,
+        accounts: SaveConnectionInput[],
+    ): Promise<{ added: number; removed: number; total: number }> {
+        return transaction(async (client) => {
+            const existing = await client.query<{ pipedream_account_id: string }>(
+                `SELECT pipedream_account_id FROM connected_accounts WHERE user_id = $1`,
+                [user_id],
+            );
+            const existingIds = new Set(existing.rows.map((r) => r.pipedream_account_id));
+            const remoteIds = accounts.map((a) => a.pipedream_account_id);
+
+            for (const acct of accounts) {
+                await client.query(
+                    `INSERT INTO connected_accounts (user_id, pipedream_account_id, app_slug, app_name, created_at, last_used_at)
+                     VALUES ($1, $2, $3, $4, NOW(), NULL)
+                     ON CONFLICT (pipedream_account_id) DO UPDATE SET
+                        user_id = EXCLUDED.user_id,
+                        app_slug = EXCLUDED.app_slug,
+                        app_name = EXCLUDED.app_name`,
+                    [acct.user_id, acct.pipedream_account_id, acct.app_slug, acct.app_name],
+                );
+            }
+
+            const deleteResult = remoteIds.length > 0
+                ? await client.query(
+                    `DELETE FROM connected_accounts WHERE user_id = $1 AND NOT (pipedream_account_id = ANY($2::text[]))`,
+                    [user_id, remoteIds],
+                )
+                : await client.query(
+                    `DELETE FROM connected_accounts WHERE user_id = $1`,
+                    [user_id],
+                );
+
+            const added = remoteIds.filter((id) => !existingIds.has(id)).length;
+            const removed = deleteResult.rowCount ?? 0;
+            const total = new Set(remoteIds).size;
+
+            return { added, removed, total };
+        });
     }
 
     async getConnections(user_id: string): Promise<ConnectedAccount[]> {

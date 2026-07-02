@@ -28,7 +28,9 @@ import { setKnowledgeBaseRoutesDeps } from './domains/platform-tools/internal-mc
 import { setChannelTaskRoutesDeps } from './domains/platform-tools/internal-mcp/channel-task.routes';
 import { setSkillManagementRoutesDeps } from './domains/platform-tools/internal-mcp/skill-management.routes';
 import { setSearchOutputsRoutesDeps } from './domains/platform-tools/internal-mcp/search-outputs.routes';
+import { setNotificationRoutesDeps } from './domains/platform-tools/internal-mcp/notification.routes';
 import { webhookReceiverRouter } from './domains/triggers';
+import { internalExecutionRouter, setInternalExecutionDeps } from './domains/execution/internal-execution.routes';
 import { ExecutionService, setExecutionApiKeyLookup } from './domains/execution/execution.service';
 import { apiKeyService } from './domains/users/api-key-service';
 import { query } from './database/connection';
@@ -56,6 +58,8 @@ import { ActiveStreamEmitter } from './domains/execution/hitl/active-stream-emit
 import { sseRegistry } from './domains/execution/streaming/sse-registry';
 import { createMemorySearchIndexService } from './domains/memory/git-memory/memory-search-index.service';
 import { startHeartbeatDaemon, stopHeartbeatDaemon } from './domains/execution/background/heartbeat-daemon';
+import { startWakeDaemon, stopWakeDaemon } from './domains/execution/background/wake-daemon';
+import { findInvalidPipedreamEnvVars } from './shared/clients/pipedream';
 
 const log = logger('Server');
 
@@ -86,9 +90,10 @@ app.use((req, res, next) => {
 });
 
 app.use(helmet());
-// Webhook route needs raw body as Buffer for HMAC signature verification.
+// Webhook routes need the raw body as a Buffer for HMAC signature verification.
 // Must come BEFORE express.json() which would parse the body into an object.
 app.use('/api/v1/billing/webhooks/polar', express.raw({ type: 'application/json' }));
+app.use('/api/v1/tools/webhook/connected', express.raw({ type: 'application/json' }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(requestMeta);
@@ -126,6 +131,7 @@ app.use('/api/v1/skills', skillRoutes);
 app.use('/api/v1/invite-codes', inviteCodeRoutes);
 app.use('/api/v1/billing', billingRoutes);
 app.use('/api/v1/internal/mcp', internalMcpRouter);
+app.use('/internal/v1', internalExecutionRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
@@ -135,6 +141,15 @@ const PORT = parseInt(process.env.PORT || '5001', 10);
 async function startServer(): Promise<void> {
     await testConnection();
     await warmPool();
+
+    const invalidPipedreamVars = findInvalidPipedreamEnvVars();
+    if (invalidPipedreamVars.length > 0) {
+        log.warn('Pipedream integration disabled — connector tools will fail until these env vars are set to real values', {
+            missing_or_placeholder: invalidPipedreamVars,
+        });
+    } else {
+        log.info('Pipedream configuration validated');
+    }
 
     const server = app.listen(PORT, () => {
         log.info('Server running', { port: PORT });
@@ -163,6 +178,7 @@ async function startServer(): Promise<void> {
         shutdownSseAuth();
         sseRegistry.shutdown();
         stopHeartbeatDaemon();
+        stopWakeDaemon();
         server.close();
     });
 
@@ -271,6 +287,7 @@ async function startServer(): Promise<void> {
             activeStreamEmitter,
         });
         setExecutionService(executionService);
+        setInternalExecutionDeps({ executionService });
         setExecutionRoutesDeps({ sandboxService });
         setAgentFilesDeps({ sandboxService });
         setConversationRoutesDeps({ sandboxService });
@@ -282,6 +299,7 @@ async function startServer(): Promise<void> {
         setChannelTaskRoutesDeps({ sandboxService });
         setSkillManagementRoutesDeps({ sandboxService });
         setSearchOutputsRoutesDeps({ sandboxService });
+        setNotificationRoutesDeps({ sandboxService });
         setAgentRoutesDeps({ sandboxService });
         setAgentChannelsDeps({ sandboxService });
         setTaskRoutesDeps({ sandboxService, executionService });
@@ -320,6 +338,7 @@ async function startServer(): Promise<void> {
         // Gated by the same flag as cron jobs so ops can disable all background polling.
         if (process.env.ENABLE_CRON_JOBS !== 'false') {
             startHeartbeatDaemon({ sandboxService, executionService });
+            startWakeDaemon(sandboxService);
         } else {
             log.info('Heartbeat daemon disabled (ENABLE_CRON_JOBS=false)');
         }

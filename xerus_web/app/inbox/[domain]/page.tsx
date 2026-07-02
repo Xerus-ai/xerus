@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import useSWR from 'swr'
 import { useAuth } from '@/utils/AuthContext'
 import { ErrorBoundary } from '@/components/common/ErrorBoundary'
+import { BusinessDataSection } from '@/components/company/BusinessDataSection'
 
 interface ChannelOverview {
   slug: string
@@ -171,6 +172,9 @@ function ProjectHubInner() {
           <p className="text-sm text-text-tertiary italic">No agents assigned to this project</p>
         )}
       </section>
+
+      {/* Company knowledge — business data agents write to company.db */}
+      <BusinessDataSection />
 
       {/* Recent activity */}
       {overview.recent_sessions.length > 0 && (

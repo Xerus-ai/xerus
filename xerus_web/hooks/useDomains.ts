@@ -9,6 +9,8 @@ export interface Channel {
   name: string
   description?: string
   agent_count: number
+  message_count: number
+  last_message_at: string | null
 }
 
 export interface Domain {
@@ -38,6 +40,7 @@ export function useDomains(): UseDomainReturn {
 
   const { data, error, isLoading, mutate } = useSWR<{ data: DomainsResponse }>(
     isAuthReady ? SWR_KEY : null,
+    { refreshInterval: 10_000, refreshWhenHidden: false },
   )
 
   const response = data?.data ?? data

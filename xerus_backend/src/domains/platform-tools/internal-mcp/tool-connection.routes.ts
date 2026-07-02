@@ -5,6 +5,7 @@ import { Router, Response, NextFunction } from 'express';
 // TECH DEBT: Cross-domain import. Should use interface injection.
 // See: docs/planning/execution/sqlite-neon-sync.md#cross-domain-dependencies
 import { toolsService } from '../../tools/service';
+import { resolvePipedreamWebhookUrl } from '../../tools/pipedream-webhook';
 import { BadRequestError } from '../../../utils/errors';
 import { InternalMcpRequest, McpToolResult } from './types';
 
@@ -20,10 +21,13 @@ router.post('/connect_tool', async (req: InternalMcpRequest, res: Response, next
             throw new BadRequestError('tool_slug is required');
         }
 
-        // Start OAuth connection flow via Pipedream Connect
+        // Start OAuth connection flow via Pipedream Connect.
+        // Pass the SAME webhook_url the user-initiated flow uses so agent-initiated
+        // OAuth completions reach the (signature-verified) webhook and persist.
         const connectionResult = await toolsService.startConnection({
             user_id: userId,
             allowed_origins: process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()) ?? [],
+            webhook_url: resolvePipedreamWebhookUrl(),
         });
 
         const mcpResult: McpToolResult = {

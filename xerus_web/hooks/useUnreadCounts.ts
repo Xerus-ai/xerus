@@ -1,27 +1,22 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useDomains } from './useDomains'
 
-const STORAGE_KEY = 'xerus_unread_counts'
-const UNREAD_UPDATE_EVENT = 'xerus:unread_update'
+const SEEN_KEY = 'xerus_last_seen_counts'
 
-interface UnreadCounts {
+interface SeenCounts {
   [channelId: string]: number
 }
 
-interface UnreadUpdateDetail {
-  channelId: string
-  count: number
-}
-
-function loadFromStorage(): UnreadCounts {
+function loadSeen(): SeenCounts {
   if (typeof window === 'undefined') return {}
-  const stored = localStorage.getItem(STORAGE_KEY)
+  const stored = localStorage.getItem(SEEN_KEY)
   if (!stored) return {}
   try {
     const parsed: unknown = JSON.parse(stored)
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return {}
-    const result: UnreadCounts = {}
+    const result: SeenCounts = {}
     for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
       if (typeof value === 'number' && value >= 0) {
         result[key] = value
@@ -29,64 +24,67 @@ function loadFromStorage(): UnreadCounts {
     }
     return result
   } catch {
-    localStorage.removeItem(STORAGE_KEY)
+    localStorage.removeItem(SEEN_KEY)
     return {}
   }
 }
 
-function persistToStorage(counts: UnreadCounts): void {
+function persistSeen(seen: SeenCounts): void {
   if (typeof window === 'undefined') return
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(counts))
+  localStorage.setItem(SEEN_KEY, JSON.stringify(seen))
 }
 
 export function useUnreadCounts() {
-  const [counts, setCounts] = useState<UnreadCounts>(loadFromStorage)
+  const { domains } = useDomains()
+  const [seen, setSeen] = useState<SeenCounts>(loadSeen)
 
-  const totalUnread = Object.values(counts).reduce((sum, count) => sum + count, 0)
+  const counts = useMemo(() => {
+    const result: Record<string, number> = {}
+    for (const domain of domains) {
+      for (const channel of domain.channels) {
+        const lastSeen = seen[channel.id] ?? 0
+        const unread = Math.max(0, (channel.message_count ?? 0) - lastSeen)
+        if (unread > 0) {
+          result[channel.id] = unread
+        }
+      }
+    }
+    return result
+  }, [domains, seen])
+
+  const totalUnread = useMemo(
+    () => Object.values(counts).reduce((sum, n) => sum + n, 0),
+    [counts],
+  )
 
   const markRead = useCallback((channelId: string) => {
-    setCounts((prev) => {
-      const next = { ...prev }
-      delete next[channelId]
-      persistToStorage(next)
+    const channel = domains
+      .flatMap(d => d.channels)
+      .find(c => c.id === channelId)
+    if (!channel) return
+
+    setSeen(prev => {
+      const next = { ...prev, [channelId]: channel.message_count ?? 0 }
+      persistSeen(next)
       return next
     })
-  }, [])
+  }, [domains])
 
   const resetAll = useCallback(() => {
-    setCounts({})
-    persistToStorage({})
-  }, [])
-
-  useEffect(() => {
-    function handleUnreadUpdate(event: Event) {
-      const customEvent = event as CustomEvent<UnreadUpdateDetail>
-      const { channelId, count } = customEvent.detail
-      if (typeof channelId !== 'string' || typeof count !== 'number') return
-
-      setCounts((prev) => {
-        const next = { ...prev }
-        if (count <= 0) {
-          delete next[channelId]
-        } else {
-          next[channelId] = count
-        }
-        persistToStorage(next)
-        return next
-      })
+    const next: SeenCounts = {}
+    for (const domain of domains) {
+      for (const channel of domain.channels) {
+        next[channel.id] = channel.message_count ?? 0
+      }
     }
+    setSeen(next)
+    persistSeen(next)
+  }, [domains])
 
-    window.addEventListener(UNREAD_UPDATE_EVENT, handleUnreadUpdate)
-    return () => {
-      window.removeEventListener(UNREAD_UPDATE_EVENT, handleUnreadUpdate)
-    }
-  }, [])
-
-  // Sync across tabs via storage event
   useEffect(() => {
     function handleStorageChange(event: StorageEvent) {
-      if (event.key !== STORAGE_KEY) return
-      setCounts(loadFromStorage())
+      if (event.key !== SEEN_KEY) return
+      setSeen(loadSeen())
     }
 
     window.addEventListener('storage', handleStorageChange)

@@ -15,6 +15,12 @@ import {
     COMMON_TOOLS,
     TOOL_FILTER_CATEGORIES,
 } from '../tool.filter';
+import {
+    COMMON_PLATFORM_TOOLS,
+    ALL_ORCHESTRATOR_PLATFORM_TOOLS,
+    ORCHESTRATOR_ONLY_PLATFORM_TOOLS,
+} from '../tool-access.constants';
+import { buildPlatformRules } from '../../../execution/agent-config-resolver';
 
 describe('Tool Filter', () => {
     describe('validateToolAccess', () => {
@@ -329,6 +335,77 @@ describe('Tool Filter', () => {
             expect(TOOL_FILTER_CATEGORIES.specialist).toBe(SPECIALIST_TOOLS);
             expect(TOOL_FILTER_CATEGORIES.common).toBe(COMMON_TOOLS);
             expect(TOOL_FILTER_CATEGORIES.platform).toEqual(['platform.']);
+        });
+    });
+
+    describe('specialist platform tool access (mcp__platform__*)', () => {
+        it('allows all 21 COMMON_PLATFORM_TOOLS for specialists', () => {
+            for (const tool of COMMON_PLATFORM_TOOLS) {
+                const result = validateToolAccess(tool, 'specialist');
+                expect(result.allowed).toBe(true);
+            }
+        });
+
+        it('denies orchestrator-only platform tools for specialists', () => {
+            for (const tool of ORCHESTRATOR_ONLY_PLATFORM_TOOLS) {
+                const result = validateToolAccess(tool, 'specialist');
+                expect(result.allowed).toBe(false);
+            }
+        });
+
+        it('allows all platform tools for master orchestrator', () => {
+            for (const tool of ALL_ORCHESTRATOR_PLATFORM_TOOLS) {
+                const result = validateToolAccess(tool, 'orchestrator', true);
+                expect(result.allowed).toBe(true);
+            }
+        });
+    });
+
+    describe('CONTRACT: prompt-rendered tools ⊆ filter-allowed tools', () => {
+        function extractToolsFromPrompt(promptText: string): string[] {
+            const match = promptText.match(/Your MCP tools: (.+)/);
+            if (!match) return [];
+            return match[1].split(', ').map(t => t.trim()).filter(Boolean);
+        }
+
+        it('specialist prompt tools are all allowed by the filter', () => {
+            const prompt = buildPlatformRules('some-specialist-agent');
+            const promptTools = extractToolsFromPrompt(prompt);
+            expect(promptTools.length).toBeGreaterThan(0);
+
+            for (const tool of promptTools) {
+                const result = validateToolAccess(tool, 'specialist');
+                expect({ tool, ...result }).toEqual(expect.objectContaining({
+                    tool,
+                    allowed: true,
+                }));
+            }
+        });
+
+        it('orchestrator prompt tools are all allowed by the filter for master', () => {
+            const prompt = buildPlatformRules('xerus-master');
+            const promptTools = extractToolsFromPrompt(prompt);
+            expect(promptTools.length).toBeGreaterThan(0);
+
+            for (const tool of promptTools) {
+                const result = validateToolAccess(tool, 'orchestrator', true);
+                expect({ tool, ...result }).toEqual(expect.objectContaining({
+                    tool,
+                    allowed: true,
+                }));
+            }
+        });
+
+        it('specialist prompt has exactly COMMON_PLATFORM_TOOLS', () => {
+            const prompt = buildPlatformRules('some-specialist-agent');
+            const promptTools = extractToolsFromPrompt(prompt);
+            expect(new Set(promptTools)).toEqual(new Set(COMMON_PLATFORM_TOOLS));
+        });
+
+        it('orchestrator prompt has exactly ALL_ORCHESTRATOR_PLATFORM_TOOLS', () => {
+            const prompt = buildPlatformRules('xerus-master');
+            const promptTools = extractToolsFromPrompt(prompt);
+            expect(new Set(promptTools)).toEqual(new Set(ALL_ORCHESTRATOR_PLATFORM_TOOLS));
         });
     });
 

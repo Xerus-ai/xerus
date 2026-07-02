@@ -3,6 +3,7 @@
 // See: docs/planning/execution/subagents.md, docs/planning/tools/system-tools.md
 
 import { DomainError } from '../../../utils/errors';
+import { COMMON_PLATFORM_TOOLS } from './tool-access.constants';
 
 // -----------------------------------------------------------------------------
 // Agent Types
@@ -121,10 +122,7 @@ export interface ToolFilterResult {
 // Helper Functions
 // -----------------------------------------------------------------------------
 
-const SPECIALIST_ALLOWED_PLATFORM_TOOLS = new Set([
-    'mcp__platform__create_task',
-    'mcp__platform__update_task',
-]);
+const SPECIALIST_ALLOWED_PLATFORM_TOOLS = new Set(COMMON_PLATFORM_TOOLS);
 
 function isPlatformTool(toolName: string): boolean {
     return PLATFORM_TOOL_PREFIXES.some(prefix => toolName.startsWith(prefix))

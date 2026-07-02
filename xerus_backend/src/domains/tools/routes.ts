@@ -8,6 +8,13 @@ import { authenticateFirebaseToken, requireRole } from '../../middleware/auth';
 import { toolsService } from './service';
 import { toolsRepository } from './repository';
 import { getPipedreamClient } from '../../shared/clients/pipedream';
+import type { PipedreamConnectWebhookPayload } from './types';
+import {
+    resolvePipedreamWebhookUrl,
+    getPipedreamWebhookSecret,
+    verifyPipedreamWebhookSignature,
+    PipedreamWebhookSignatureError,
+} from './pipedream-webhook';
 import { logger } from '../../utils/logger';
 
 const log = logger('tools-routes');
@@ -54,9 +61,7 @@ router.post('/connect-token', auth, async (req: AuthenticatedRequest, res: Respo
             return;
         }
 
-        const rawBaseUrl = process.env.API_BASE_URL || `${req.protocol}://${req.get('host')}`;
-        const baseUrl = rawBaseUrl.replace(/\/api\/v1\/?$/, '');
-        const webhookUrl = `${baseUrl}/api/v1/tools/webhook/connected`;
+        const webhookUrl = resolvePipedreamWebhookUrl(`${req.protocol}://${req.get('host')}`);
         log.info('Connect token requested', { webhook_url: webhookUrl, user_id: req.user!.uid });
 
         const result = await toolsService.startConnection({
@@ -293,47 +298,93 @@ router.get('/:app_slug', auth, async (req: AuthenticatedRequest, res: Response, 
     }
 });
 
-// POST /api/v1/tools/webhook/connected - Pipedream OAuth completion webhook (no auth — server-to-server)
+// POST /api/v1/tools/webhook/connected - Pipedream OAuth completion webhook (no auth — server-to-server).
+// Body arrives as a raw Buffer (express.raw mounted for this path in index.ts) so the x-pd-signature
+// HMAC is checked over the exact bytes Pipedream signed — otherwise anyone could insert rows.
 router.post('/webhook/connected', async (req: Request, res: Response, next: NextFunction) => {
     try {
-        log.info('Webhook /connected received', {
-            body_keys: Object.keys(req.body),
-            has_id: !!req.body.id,
-            has_external_id: !!req.body.external_id,
-            has_app: !!req.body.app,
-            ip: req.ip,
-        });
-
-        const { id, name, external_id, app } = req.body;
-
-        if (!id || !external_id) {
-            log.info('Webhook /connected rejected: missing fields', { id, external_id });
-            res.status(400).json({ error: 'Missing required fields: id, external_id' });
+        const rawBody = Buffer.isBuffer(req.body) ? req.body.toString('utf-8')
+            : typeof req.body === 'string' ? req.body : '';
+        if (rawBody === '') {
+            res.status(400).json({ error: 'Empty webhook body' });
             return;
         }
 
-        const appSlug = app?.name_slug || 'unknown';
-        const appName = name || app?.name || appSlug;
+        // Fail-fast if the signing secret is unset — never skip verification silently.
+        const webhookSecret = getPipedreamWebhookSecret();
+        try {
+            verifyPipedreamWebhookSignature({
+                rawBody,
+                signatureHeader: req.header('x-pd-signature'),
+                secret: webhookSecret,
+            });
+        } catch (verifyError) {
+            if (verifyError instanceof PipedreamWebhookSignatureError) {
+                log.warn('Webhook /connected signature verification failed', {
+                    reason: verifyError.message,
+                    ip: req.ip,
+                });
+                res.status(401).json({ error: 'Invalid webhook signature' });
+                return;
+            }
+            throw verifyError;
+        }
 
-        const existing = await toolsRepository.getConnectionByPipedreamId(String(id));
+        const { event, account, error: connectionError } = JSON.parse(rawBody) as PipedreamConnectWebhookPayload;
+
+        log.info('Webhook /connected received', {
+            event,
+            has_account: !!account,
+            has_account_id: !!account?.id,
+            has_external_id: !!account?.external_id,
+            ip: req.ip,
+        });
+
+        if (event === 'CONNECTION_ERROR') {
+            log.warn('Pipedream connection error webhook received', {
+                event,
+                external_id: account?.external_id,
+                app_slug: account?.app?.name_slug,
+                error: connectionError,
+            });
+            res.status(200).json({ status: 'ignored', reason: 'connection_error' });
+            return;
+        }
+
+        if (!account || !account.id || !account.external_id || !account.name || !account.app?.name_slug) {
+            log.info('Webhook /connected rejected: missing fields', {
+                event,
+                has_account: !!account,
+                account_id: account?.id,
+                external_id: account?.external_id,
+                app_slug: account?.app?.name_slug,
+            });
+            res.status(400).json({ error: 'Missing required fields: account.id, account.external_id, account.name, account.app.name_slug' });
+            return;
+        }
+
+        const appSlug = account.app.name_slug;
+        const appName = account.name;
+
+        const existing = await toolsRepository.getConnectionByPipedreamId(String(account.id));
         if (existing) {
-            log.info('Pipedream account already connected', { pipedream_account_id: id, app_slug: appSlug });
+            log.info('Pipedream account already connected', { pipedream_account_id: account.id, app_slug: appSlug });
             res.status(200).json({ status: 'already_connected' });
             return;
         }
 
         await toolsRepository.saveConnection({
-            user_id: String(external_id),
-            pipedream_account_id: String(id),
+            user_id: String(account.external_id),
+            pipedream_account_id: String(account.id),
             app_slug: appSlug,
             app_name: appName,
         });
 
         log.info('Pipedream account connected successfully', {
-            user_id: external_id,
+            user_id: account.external_id,
             app_slug: appSlug,
             app_name: appName,
-            pipedream_account_id: id,
+            pipedream_account_id: account.id,
         });
         res.status(200).json({ status: 'connected' });
     } catch (error) {

@@ -147,6 +147,14 @@ describe('createAgentSession', () => {
         await expect(createAgentSession(sandbox, {}, defaultAgentOpts)).rejects.toThrow('Session creation failed');
     });
 
+    it('throws when agentSlug is empty (fail-fast — no identity for hooks)', async () => {
+        const sandbox = buildFakeSandbox();
+
+        await expect(
+            createAgentSession(sandbox, {}, { ...defaultAgentOpts, agentSlug: '' }),
+        ).rejects.toThrow('agentSlug is empty');
+    });
+
     it('throws when executeSessionCommand returns no cmdId', async () => {
         const sandbox = buildFakeSandbox({
             executeSessionCommandResult: { cmdId: '' },

@@ -9,6 +9,7 @@
     "test": "jest --runInBand --forceExit",
     "test:watch": "jest --watch --runInBand",
     "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
     "format": "prettier --write \"src/**/*.ts\"",
     "sync-apps": "ts-node --transpile-only src/scripts/syncPipedreamApps.ts",
     "build:runner": "ts-node --transpile-only scripts/bundle-runner.ts",

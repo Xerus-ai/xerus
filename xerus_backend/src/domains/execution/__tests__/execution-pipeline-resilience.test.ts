@@ -40,6 +40,24 @@ class HealthyDatabase implements ExecutionDatabase {
     }
 }
 
+// Throws a PostgreSQL schema error (undefined table). SQLSTATE class 42 marks a
+// query/schema bug — a programmer error the wrapper must surface, not degrade.
+class SchemaErrorDatabase implements ExecutionDatabase {
+    async query<T>(_sql: string, _params?: unknown[]): Promise<{ rows: T[] }> {
+        const err = new Error('relation "workspaces" does not exist') as Error & { code: string };
+        err.code = '42P01';
+        throw err;
+    }
+}
+
+// Throws a TypeError, standing in for a code defect that surfaces inside a
+// handler (e.g. calling an undefined function). Must be surfaced, not degraded.
+class TypeErrorDatabase implements ExecutionDatabase {
+    async query<T>(_sql: string, _params?: unknown[]): Promise<{ rows: T[] }> {
+        throw new TypeError('deps.provider.run is not a function');
+    }
+}
+
 class InMemoryCreditService implements CreditService {
     public currentBalance = 100;
 
@@ -185,62 +203,45 @@ function getStream(ctx: PipelineContext): FakeStream {
 // -----------------------------------------------------------------------------
 
 describe('routeEventWithResilience', () => {
-    describe('non-fatal handler errors', () => {
-        it('does not throw when a handler fails for a non-invariant reason', async () => {
+    // sandbox_lifecycle routes straight through deps.db.query with no other
+    // dependency, so the injected database controls exactly which error surfaces.
+    const sandboxLifecycleEvent = { data: { sandbox_id: 'sbx-001', action: 'start' } };
+
+    describe('transient handler errors (degraded, never swallowed)', () => {
+        it('does not re-throw when a handler fails for a transient reason', async () => {
             const ctx = createTestContext();
             const deps = createDeps(new FailingDatabase());
             const state = createResilienceState();
 
-            // create_inbox_item routes through deps.db.query, which throws.
-            // The wrapper should catch and degrade — not propagate.
             await expect(
-                routeEventWithResilience(
-                    'create_inbox_item',
-                    { data: { content: 'hello world', priority: 'normal' } },
-                    ctx,
-                    deps,
-                    state,
-                ),
+                routeEventWithResilience('sandbox_lifecycle', sandboxLifecycleEvent, ctx, deps, state),
             ).resolves.toBeUndefined();
 
             expect(state.consecutiveErrors).toBe(1);
         });
 
-        it('emits a notification stream event when degrading a handler error', async () => {
+        it('surfaces a transient failure as an error notification (never silent)', async () => {
             const ctx = createTestContext();
             const deps = createDeps(new FailingDatabase());
             const state = createResilienceState();
 
-            await routeEventWithResilience(
-                'create_inbox_item',
-                { data: { content: 'hello world' } },
-                ctx,
-                deps,
-                state,
-            );
+            await routeEventWithResilience('sandbox_lifecycle', sandboxLifecycleEvent, ctx, deps, state);
 
-            const stream = getStream(ctx);
-            const notifications = stream.sentEvents.filter(e => e.type === 'notification');
+            const notifications = getStream(ctx).sentEvents.filter(e => e.type === 'notification');
             expect(notifications).toHaveLength(1);
             const content = notifications[0].content as { priority: string; message: string };
             expect(content.priority).toBe('error');
             expect(content.message).toMatch(/agent is still running/i);
         });
 
-        it('does not emit a notification when the stream is already closed', async () => {
+        it('still counts the error when the stream is already closed', async () => {
             const ctx = createTestContext();
             const stream = getStream(ctx);
             stream.closed = true;
             const deps = createDeps(new FailingDatabase());
             const state = createResilienceState();
 
-            await routeEventWithResilience(
-                'create_inbox_item',
-                { data: { content: 'hello' } },
-                ctx,
-                deps,
-                state,
-            );
+            await routeEventWithResilience('sandbox_lifecycle', sandboxLifecycleEvent, ctx, deps, state);
 
             expect(stream.sentEvents).toHaveLength(0);
             expect(state.consecutiveErrors).toBe(1);
@@ -250,20 +251,46 @@ describe('routeEventWithResilience', () => {
             const ctx = createTestContext();
             const deps = createDeps(new HealthyDatabase());
             const state = createResilienceState();
-
-            // First, simulate prior failures by setting state.
             state.consecutiveErrors = 3;
 
-            // create_inbox_item against HealthyDatabase succeeds.
+            // credit_usage succeeds with no external dependency.
             await routeEventWithResilience(
-                'create_inbox_item',
-                { data: { content: 'success' } },
+                'credit_usage',
+                { data: { credits_consumed: 5 } },
                 ctx,
                 deps,
                 state,
             );
 
             expect(state.consecutiveErrors).toBe(0);
+        });
+    });
+
+    describe('programmer errors (fail-fast, surfaced not swallowed)', () => {
+        it('re-throws a database schema error (undefined table, SQLSTATE 42P01)', async () => {
+            const ctx = createTestContext();
+            const deps = createDeps(new SchemaErrorDatabase());
+            const state = createResilienceState();
+
+            await expect(
+                routeEventWithResilience('sandbox_lifecycle', sandboxLifecycleEvent, ctx, deps, state),
+            ).rejects.toThrow(/does not exist/);
+
+            expect(state.consecutiveErrors).toBe(0);
+            expect(getStream(ctx).sentEvents.filter(e => e.type === 'notification')).toHaveLength(0);
+        });
+
+        it('re-throws a TypeError (undefined function) without degrading', async () => {
+            const ctx = createTestContext();
+            const deps = createDeps(new TypeErrorDatabase());
+            const state = createResilienceState();
+
+            await expect(
+                routeEventWithResilience('sandbox_lifecycle', sandboxLifecycleEvent, ctx, deps, state),
+            ).rejects.toBeInstanceOf(TypeError);
+
+            expect(state.consecutiveErrors).toBe(0);
+            expect(getStream(ctx).sentEvents.filter(e => e.type === 'notification')).toHaveLength(0);
         });
     });
 
@@ -303,7 +330,7 @@ describe('routeEventWithResilience', () => {
     });
 
     describe('escalation after MAX_CONSECUTIVE_HANDLER_ERRORS', () => {
-        it('escalates to fatal after 5 in a row, without emitting an extra notification', async () => {
+        it('escalates to fatal after 5 transient failures in a row, without an extra notification', async () => {
             expect(MAX_CONSECUTIVE_HANDLER_ERRORS).toBe(5);
 
             const ctx = createTestContext();
@@ -311,16 +338,10 @@ describe('routeEventWithResilience', () => {
             const state = createResilienceState();
             const stream = getStream(ctx);
 
-            // First (MAX - 1) calls degrade silently and emit one notification each.
+            // First (MAX - 1) calls degrade and emit one notification each.
             for (let i = 0; i < MAX_CONSECUTIVE_HANDLER_ERRORS - 1; i++) {
                 await expect(
-                    routeEventWithResilience(
-                        'create_inbox_item',
-                        { data: { content: `attempt ${i}` } },
-                        ctx,
-                        deps,
-                        state,
-                    ),
+                    routeEventWithResilience('sandbox_lifecycle', sandboxLifecycleEvent, ctx, deps, state),
                 ).resolves.toBeUndefined();
             }
             expect(state.consecutiveErrors).toBe(MAX_CONSECUTIVE_HANDLER_ERRORS - 1);
@@ -329,13 +350,7 @@ describe('routeEventWithResilience', () => {
 
             // The MAXth call must re-throw and NOT emit a notification.
             await expect(
-                routeEventWithResilience(
-                    'create_inbox_item',
-                    { data: { content: 'final' } },
-                    ctx,
-                    deps,
-                    state,
-                ),
+                routeEventWithResilience('sandbox_lifecycle', sandboxLifecycleEvent, ctx, deps, state),
             ).rejects.toThrow('database unavailable');
 
             expect(state.consecutiveErrors).toBe(MAX_CONSECUTIVE_HANDLER_ERRORS);

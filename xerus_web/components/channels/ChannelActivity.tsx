@@ -20,6 +20,7 @@ import { Users, AlertCircle, RotateCcw } from 'lucide-react'
 import { isMascotConfig } from '@/lib/mascot-config'
 import { MascotAvatar } from '@/components/agents/MascotAvatar'
 import { useExecutionStream } from '@/hooks/useExecutionStream'
+import type { DoneEventContent } from '@/hooks/useExecutionStream'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -172,7 +173,21 @@ export function ChannelActivity({ channelId, className, assignedAgents, onManage
       const shortName = toolName.replace(/^mcp__platform__/, '').replace(/^mcp__/, '')
       setExecution(prev => prev ? { ...prev, status: 'tool_call', currentLine: `using ${shortName}` } : prev)
     },
-    onDone: () => {
+    onDone: (evt) => {
+      // A `done` event with success:false (or an error payload) is a failed run,
+      // not a completion. Surface it as the error card instead of clearing —
+      // otherwise the failure vanishes silently.
+      const content = evt.content as DoneEventContent
+      if (evt.success === false || content?.error) {
+        setExecution(prev => prev ? {
+          ...prev,
+          status: 'error',
+          currentLine: '',
+          errorMessage: content?.error?.message ?? 'The agent run failed',
+        } : prev)
+        lastLineRef.current = ''
+        return
+      }
       setExecution(null)
       lastLineRef.current = ''
       executionContextRef.current = null
@@ -316,6 +331,9 @@ export function ChannelActivity({ channelId, className, assignedAgents, onManage
   // mid-execution from error logging without meaning the agent is done).
   useEffect(() => {
     if (!execution) return
+    // A surfaced error stays until the user dismisses it — don't let a
+    // coincidental agent message clear the failure silently.
+    if (execution.status === 'error') return
     const latest = messages[messages.length - 1]
     if (!latest) return
     if (latest.sender_type === 'agent') {

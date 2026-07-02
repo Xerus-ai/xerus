@@ -123,6 +123,17 @@ export interface PipedreamAccount {
     updated_at: string;
 }
 
+export type PipedreamConnectEvent = 'CONNECTION_SUCCESS' | 'CONNECTION_ERROR';
+
+// Payload delivered to the Connect webhook (webhook_uri) after an OAuth attempt.
+// Account fields are nested under `account`; the event distinguishes success from error.
+export interface PipedreamConnectWebhookPayload {
+    event: PipedreamConnectEvent;
+    account?: PipedreamAccount;
+    error?: string;
+    connect_token?: string;
+}
+
 export interface PipedreamAction {
     key: string;
     name: string;

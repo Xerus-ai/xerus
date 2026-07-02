@@ -50,6 +50,7 @@ import { checkHookHealth } from '../sandbox-infra/sandbox/hook-health';
 import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
 import { createChannelMessage } from '../company/company-workspace-db.service';
 import { syncMessageToSandbox } from '../company/channel-execution.service';
+import { escapeSQL, executeWorkspaceJsonQuery } from '../conversations/workspace-db.helpers';
 
 const log = logger('ExecutionService');
 // -----------------------------------------------------------------------------
@@ -319,26 +320,48 @@ export class ExecutionService {
 
             // Channel message routing: write agent response to channel_messages
             // so it appears in the /inbox activity feed (not just /chat).
-            const channelSlug = ctx.request.context?.channel_slug as string | undefined;
-            if (ctx.triggerType === 'channel_message' && channelSlug && ctx.responseText && ctx.sandboxId) {
+            // Supports: channel_message (explicit channel), schedule/task_assigned (resolve from membership).
+            const responseText = ctx.responseText || ctx.responseChunks.join('');
+            if (responseText && ctx.sandboxId) {
                 const agentSlug = ctx.agent?.slug || ctx.request.agentSlug;
-                log.info('Writing agent response to channel_messages', {
-                    channel: channelSlug, agent: agentSlug, length: ctx.responseText.length,
-                });
+                let targetChannel = ctx.request.context?.channel_slug as string | undefined;
 
-                // Join response chunks if responseText is empty but chunks exist
-                const responseText = ctx.responseText || ctx.responseChunks.join('');
-                if (responseText) {
+                // For non-channel triggers, resolve the agent's primary channel from workspace.db
+                if (!targetChannel && (ctx.triggerType === 'schedule' || ctx.triggerType === 'task_assigned')) {
+                    try {
+                        const rows = await executeWorkspaceJsonQuery<{ channel_slug: string }>(
+                            daytonaProvider, ctx.sandboxId,
+                            `SELECT channel_slug FROM channel_members WHERE agent_slug = '${escapeSQL(agentSlug)}' LIMIT 1`,
+                        );
+                        targetChannel = rows[0]?.channel_slug;
+                    } catch (err) {
+                        log.warn('Failed to resolve agent channel for autonomous post', {
+                            agent: agentSlug, error: err instanceof Error ? err.message : String(err),
+                        });
+                    }
+                }
+
+                const shouldWriteChannel = targetChannel && (
+                    ctx.triggerType === 'channel_message' ||
+                    ctx.triggerType === 'schedule' ||
+                    ctx.triggerType === 'task_assigned'
+                );
+
+                if (shouldWriteChannel && targetChannel) {
+                    log.info('Writing agent response to channel_messages', {
+                        channel: targetChannel, agent: agentSlug, trigger: ctx.triggerType,
+                        length: responseText.length,
+                    });
+
                     await createChannelMessage(
                         daytonaProvider, ctx.sandboxId,
-                        channelSlug, 'agent', agentSlug,
+                        targetChannel, 'agent', agentSlug,
                         responseText, 'post', {},
                     ).catch(err => log.warn('Failed to write agent response to channel_messages', {
                         error: err instanceof Error ? err.message : String(err),
                     }));
 
-                    // Also sync to posts.jsonl for agent IPC
-                    const parts = channelSlug.split('--');
+                    const parts = targetChannel.split('--');
                     if (parts.length === 2) {
                         const channelTag = `${parts[0]}/${parts[1]}`;
                         syncMessageToSandbox(resolved.sandboxService, request.userId, channelTag, {
