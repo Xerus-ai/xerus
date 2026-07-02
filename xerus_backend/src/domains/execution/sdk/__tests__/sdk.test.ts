@@ -121,6 +121,45 @@ describe('buildSDKEnvironment', () => {
         // ANTHROPIC_BASE_URL, ANTHROPIC_API_KEY, XERUS_WORKSPACE_ROOT
         expect(Object.keys(env).length).toBeGreaterThanOrEqual(3);
     });
+
+    // XERUS_BACKEND_URL contract: bare origin, no path. mcp-server.ts appends
+    // /api/v1/internal/mcp/<tool> — a versioned API_BASE_URL passed verbatim
+    // double-prefixes the URL and 404s every platform tool call.
+    describe('XERUS_BACKEND_URL normalization', () => {
+        const ORIGINAL_API_BASE_URL = process.env.API_BASE_URL;
+
+        afterEach(() => {
+            if (ORIGINAL_API_BASE_URL === undefined) {
+                delete process.env.API_BASE_URL;
+            } else {
+                process.env.API_BASE_URL = ORIGINAL_API_BASE_URL;
+            }
+        });
+
+        it('strips /api/v1 suffix from API_BASE_URL', () => {
+            process.env.API_BASE_URL = 'https://api.xerus.ai/api/v1';
+            const env = buildSDKEnvironment('test-key');
+            expect(env.XERUS_BACKEND_URL).toBe('https://api.xerus.ai');
+        });
+
+        it('strips /api/v1 with trailing slash', () => {
+            process.env.API_BASE_URL = 'http://localhost:5001/api/v1/';
+            const env = buildSDKEnvironment('test-key');
+            expect(env.XERUS_BACKEND_URL).toBe('http://localhost:5001');
+        });
+
+        it('passes a bare origin through unchanged', () => {
+            process.env.API_BASE_URL = 'http://localhost:5001';
+            const env = buildSDKEnvironment('test-key');
+            expect(env.XERUS_BACKEND_URL).toBe('http://localhost:5001');
+        });
+
+        it('defaults to the production origin when API_BASE_URL is unset', () => {
+            delete process.env.API_BASE_URL;
+            const env = buildSDKEnvironment('test-key');
+            expect(env.XERUS_BACKEND_URL).toBe('https://api.xerus.ai');
+        });
+    });
 });
 
 // -----------------------------------------------------------------------------

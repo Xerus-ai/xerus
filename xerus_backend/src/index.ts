@@ -55,6 +55,7 @@ import { HITLPauseRepositoryImpl } from './domains/execution/hitl/hitl-pause.rep
 import { ActiveStreamEmitter } from './domains/execution/hitl/active-stream-emitter';
 import { sseRegistry } from './domains/execution/streaming/sse-registry';
 import { createMemorySearchIndexService } from './domains/memory/git-memory/memory-search-index.service';
+import { startHeartbeatDaemon, stopHeartbeatDaemon } from './domains/execution/background/heartbeat-daemon';
 
 const log = logger('Server');
 
@@ -161,6 +162,7 @@ async function startServer(): Promise<void> {
         log.info('SIGTERM received, cleaning up...');
         shutdownSseAuth();
         sseRegistry.shutdown();
+        stopHeartbeatDaemon();
         server.close();
     });
 
@@ -312,6 +314,14 @@ async function startServer(): Promise<void> {
         } catch (error) {
             log.error('Failed to start background jobs', error instanceof Error ? error : new Error(String(error)));
             throw error;
+        }
+
+        // Start heartbeat scheduler daemon (polls workspace schedules -> executions).
+        // Gated by the same flag as cron jobs so ops can disable all background polling.
+        if (process.env.ENABLE_CRON_JOBS !== 'false') {
+            startHeartbeatDaemon({ sandboxService, executionService });
+        } else {
+            log.info('Heartbeat daemon disabled (ENABLE_CRON_JOBS=false)');
         }
     } catch (error) {
         log.error('Failed to initialize ExecutionService', error instanceof Error ? error : new Error(String(error)));

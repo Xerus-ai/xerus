@@ -6,6 +6,7 @@
 // that mirrors a real Daytona workspace. No mocks — real filesystem, real sqlite3.
 
 import fs from 'fs/promises';
+import { writeFileSync, unlinkSync } from 'fs';
 import path from 'path';
 import os from 'os';
 import { execSync } from 'child_process';
@@ -18,9 +19,18 @@ const SCHEMA_FILE = path.resolve(__dirname, '..', '..', '..', '..', '..', '..', 
 let tmpDir: string;
 
 function hasBash(): boolean {
+    // Bash must exist AND be able to execute scripts at host filesystem paths.
+    // (On Windows, WSL bash shadows Git Bash in PATH but cannot read C:\ paths,
+    // so probing `bash --version` alone gives a false positive.)
     try {
-        execSync('bash --version', { stdio: 'pipe' });
-        return true;
+        const probe = path.join(os.tmpdir(), `xerus-bash-probe-${process.pid}.sh`);
+        writeFileSync(probe, 'echo ok\n');
+        try {
+            const out = execSync(`bash "${probe.replace(/\\/g, '/')}"`, { stdio: 'pipe', timeout: 10000 }).toString().trim();
+            return out === 'ok';
+        } finally {
+            unlinkSync(probe);
+        }
     } catch {
         return false;
     }
@@ -80,21 +90,23 @@ async function createWorkspaceStructure(root: string): Promise<void> {
 }
 
 function runHook(root: string, toolName: string, filePath: string): { stdout: string; stderr: string; exitCode: number } {
-    const hookPath = path.join(root, '.claude', 'hooks', 'scripts', 'scaffold-sync-hook.sh');
-    const hookInput = JSON.stringify({ tool_input: { file_path: filePath } });
+    // Claude Code delivers hook input as JSON on stdin ({tool_name, tool_input, ...}).
+    // There are no CLAUDE_TOOL_NAME / CLAUDE_TOOL_INPUT_* env vars.
+    const hookPath = path.join(root, '.claude', 'hooks', 'scripts', 'scaffold-sync-hook.sh').replace(/\\/g, '/');
+    const hookInput = JSON.stringify({ tool_name: toolName, tool_input: { file_path: filePath } });
     const env = {
         ...process.env,
         XERUS_WORKSPACE_ROOT: root,
         XERUS_AGENT_SLUG: 'xerus-master',
-        CLAUDE_TOOL_NAME: toolName,
         PATH: process.env.PATH || '',
         HOME: process.env.HOME || os.homedir(),
     };
 
     try {
-        const stdout = execSync(`echo '${hookInput.replace(/'/g, "'\\''")}' | bash "${hookPath}"`, {
+        const stdout = execSync(`bash "${hookPath}"`, {
             env,
             cwd: root,
+            input: hookInput,
             stdio: ['pipe', 'pipe', 'pipe'],
             timeout: 10000,
         }).toString();
@@ -301,10 +313,6 @@ describeIfBash('scaffold-sync-hook.sh', () => {
                 expect(exists).toBe(true);
             }
 
-            // Assert posts.jsonl initialized
-            const postsExists = await fs.access(path.join(channelDir, 'output', 'posts.jsonl')).then(() => true).catch(() => false);
-            expect(postsExists).toBe(true);
-
             // Assert beads issues initialized
             const beadsExists = await fs.access(path.join(channelDir, '.beads', 'issues.jsonl')).then(() => true).catch(() => false);
             expect(beadsExists).toBe(true);
@@ -331,15 +339,15 @@ describeIfBash('scaffold-sync-hook.sh', () => {
             await fs.mkdir(channelDir, { recursive: true });
             await fs.writeFile(path.join(channelDir, 'CLAUDE.md'), '# Outreach');
 
-            // Write a file to output/ before hook runs
-            await fs.mkdir(path.join(channelDir, 'output'), { recursive: true });
-            await fs.writeFile(path.join(channelDir, 'output', 'posts.jsonl'), '{"test":"existing"}\n');
+            // Write beads issues before hook runs
+            await fs.mkdir(path.join(channelDir, '.beads'), { recursive: true });
+            await fs.writeFile(path.join(channelDir, '.beads', 'issues.jsonl'), '{"test":"existing"}\n');
 
             runHook(tmpDir, 'Write', path.join(channelDir, 'CLAUDE.md'));
 
-            // Existing posts.jsonl should not be truncated (touch is append-safe)
-            const posts = await fs.readFile(path.join(channelDir, 'output', 'posts.jsonl'), 'utf-8');
-            expect(posts).toContain('{"test":"existing"}');
+            // Existing issues.jsonl should not be truncated (touch is append-safe)
+            const issues = await fs.readFile(path.join(channelDir, '.beads', 'issues.jsonl'), 'utf-8');
+            expect(issues).toContain('{"test":"existing"}');
         });
     });
 
