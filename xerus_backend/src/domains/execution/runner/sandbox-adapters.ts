@@ -15,6 +15,7 @@ import { GitMemoryRepository } from '../../memory/git-memory/git-memory.reposito
 import { MemoryFileWriterService } from '../../memory/git-memory/memory-file-writer.service';
 import { DRMCompressionService } from '../../memory/git-memory/drm-compression.service';
 import type { MemoryIndexer, IndexFileOptions } from '../../memory/git-memory/memory-search-index.service';
+import { inferMemoryType, inferMemoryScope } from '../../memory/git-memory/memory-path-inference';
 import type { StdoutEmitter } from './stdout-emitter';
 import { LEGACY_LIGHT_MODEL } from '../../agents/types';
 
@@ -292,37 +293,4 @@ export function createSandboxDRMCompressor(
             return { entriesCompressed: total };
         },
     };
-}
-
-// -----------------------------------------------------------------------------
-// Memory file type/scope inference from .memory/ file paths
-// Paths follow: agents/{slug}/{type}.md or shared/{type}.md or company/{type}.md
-// -----------------------------------------------------------------------------
-
-const MEMORY_TYPE_MAP: Record<string, string> = {
-    'working': 'working',
-    'expertise': 'expertise',
-    'episodic': 'episodic',
-    'semantic': 'semantic',
-    'procedural': 'procedural',
-    'learnings': 'semantic',
-    'patterns': 'procedural',
-    'digest': 'context',
-    'context': 'context',
-};
-
-function inferMemoryType(filePath: string): string {
-    const basename = path.basename(filePath, '.md');
-    return MEMORY_TYPE_MAP[basename] || 'working';
-}
-
-function inferMemoryScope(filePath: string): string {
-    if (filePath.startsWith('agents/')) return 'agent';
-    if (filePath.startsWith('shared/')) return 'company';
-    if (filePath.startsWith('company/')) return 'company';
-    if (filePath.startsWith('user/')) return 'user';
-    if (filePath.startsWith('entities/')) return 'entity';
-    if (filePath.startsWith('topics/')) return 'topic';
-    if (filePath.startsWith('projects/')) return 'project';
-    return 'agent';
 }

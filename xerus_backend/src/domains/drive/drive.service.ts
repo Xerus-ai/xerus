@@ -90,14 +90,14 @@ export class DriveService {
         sandboxId: string,
         provider: DaytonaProvider,
     ): Promise<void> {
-        const map = await this.getProjectMap(sandboxId, provider);
-        if (map.size === 0) return;
-
-        // Deliverables live 6 levels deep under workspace root; the default tree depth (5)
-        // usually cuts them off, so fetch them directly from the projects/ subtree.
+        // Deliverables live below the default tree depth, so fetch them directly. The
+        // project map only decorates them with display names — an empty map still projects
+        // top-level deliverables and slug-named unregistered projects, so we key the decision
+        // on the deliverables, not the map.
         const deliverables = await loadDeliverablesDeep(provider, sandboxId);
         if (deliverables.length === 0) return;
 
+        const map = await this.getProjectMap(sandboxId, provider);
         injectDeliverablesProjection(root, deliverables, map);
     }
 

@@ -8,15 +8,20 @@ import { BadRequestError } from '../../../utils/errors';
 import { InternalMcpRequest, McpToolResult } from './types';
 import { ScheduleService } from '../platform/tools/schedule.tools';
 import type { SandboxService } from '../../sandbox-infra/sandbox/sandbox.service';
+import { recomputeWakeSchedule } from '../../execution/background/wake-daemon';
+import { executeWorkspaceJsonQuery } from '../../conversations/workspace-db.helpers';
+import type { DaytonaProvider } from '../../sandbox-infra/sandbox/providers/daytona.provider';
 
 // -----------------------------------------------------------------------------
 // Dependencies (injected at startup)
 // -----------------------------------------------------------------------------
 
 let scheduleService: ScheduleService | null = null;
+let _provider: DaytonaProvider | null = null;
 
 export function setScheduleRoutesDeps(deps: { sandboxService: SandboxService }): void {
-    scheduleService = new ScheduleService(deps.sandboxService.getDaytonaProvider());
+    _provider = deps.sandboxService.getDaytonaProvider();
+    scheduleService = new ScheduleService(_provider);
 }
 
 function getScheduleService(): ScheduleService {
@@ -38,6 +43,19 @@ async function requireSandboxId(userId: string): Promise<string> {
         throw new BadRequestError('Sandbox not running — start a session first');
     }
     return result.rows[0].sandbox_id;
+}
+
+async function syncWakeSchedule(sandboxId: string, userId: string): Promise<void> {
+    if (!_provider) return;
+    try {
+        const rows = await executeWorkspaceJsonQuery<{ min_next: number | null }>(
+            _provider, sandboxId,
+            `SELECT MIN(next_run_at) as min_next FROM schedules WHERE status = 'active' AND next_run_at IS NOT NULL`,
+        );
+        await recomputeWakeSchedule(sandboxId, userId, rows[0]?.min_next ?? null);
+    } catch {
+        // Non-blocking — wake schedule is a best-effort optimization
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -67,6 +85,8 @@ router.post('/create_schedule', async (req: InternalMcpRequest, res: Response, n
             agent_slug, name, prompt, rrule, adapter_type, model,
             max_budget_usd, allowed_tools, system_prompt,
         });
+
+        void syncWakeSchedule(sandboxId, userId);
 
         const mcpResult: McpToolResult = { success: true, data: result };
         res.json(mcpResult);
@@ -107,6 +127,8 @@ router.post('/update_schedule', async (req: InternalMcpRequest, res: Response, n
             max_budget_usd, allowed_tools, system_prompt,
         });
 
+        void syncWakeSchedule(sandboxId, userId);
+
         const mcpResult: McpToolResult = { success: true, data: result };
         res.json(mcpResult);
     } catch (error) {
@@ -126,6 +148,8 @@ router.post('/delete_schedule', async (req: InternalMcpRequest, res: Response, n
 
         const sandboxId = await requireSandboxId(userId);
         const result = await getScheduleService().deleteSchedule(sandboxId, { schedule_id });
+
+        void syncWakeSchedule(sandboxId, userId);
 
         const mcpResult: McpToolResult = { success: true, data: result };
         res.json(mcpResult);

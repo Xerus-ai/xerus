@@ -47,6 +47,8 @@ export interface ChannelMessageRow {
 
 export interface ChannelWithCount extends ChannelRow {
     agent_count: number;
+    message_count: number;
+    last_message_at: string | null;
 }
 
 export interface DomainWithChannels extends DomainRow {
@@ -70,7 +72,9 @@ export async function listDomainsWithChannels(
 
     const channelsSql = `
         SELECT c.slug, c.name, c.domain_slug, c.lead_agent_slug, c.description, c.goals, c.config, c.created_at, c.updated_at,
-               (SELECT COUNT(*) FROM channel_members cm WHERE cm.channel_slug = c.slug) AS agent_count
+               (SELECT COUNT(*) FROM channel_members cm WHERE cm.channel_slug = c.slug) AS agent_count,
+               (SELECT COUNT(*) FROM channel_messages m WHERE m.channel_slug = c.slug) AS message_count,
+               (SELECT MAX(posted_at) FROM channel_messages m WHERE m.channel_slug = c.slug) AS last_message_at
         FROM channels c
         ORDER BY c.name
     `;
@@ -490,9 +494,11 @@ export async function syncDeliverablesFromFilesystem(
 ): Promise<{ synced: number }> {
     const wp = SANDBOX_CONFIG.workspacePath;
 
+    // Scan both write locations documented in xerus-workspace/CLAUDE.md: the per-channel
+    // path (preferred) and the top-level output/deliverables/ path.
     const { result: findResult } = await provider.executeCommand(
         sandboxId,
-        `find ${wp}/projects -path '*/output/deliverables/*' -type f 2>/dev/null; echo ""`,
+        `find ${wp}/projects -path '*/output/deliverables/*' -type f 2>/dev/null; find ${wp}/output/deliverables -type f 2>/dev/null; echo ""`,
     );
 
     const filePaths = findResult.trim().split('\n').filter(p => p.trim());
@@ -501,11 +507,13 @@ export async function syncDeliverablesFromFilesystem(
     const inserts: string[] = [];
 
     for (const filePath of filePaths) {
-        // Extract agent info from path: projects/{domain}/channels/{channel}/output/deliverables/{filename}
-        const pathMatch = filePath.match(/projects\/([^/]+)\/channels\/([^/]+)\/output\/deliverables\/(.+)$/);
-        if (!pathMatch) continue;
-        const channelSlug = pathMatch[2];
-        const filename = pathMatch[3];
+        // Per-channel: projects/{domain}/channels/{channel}/output/deliverables/{filename}
+        // Top-level:   output/deliverables/{filename} — no channel to attribute the file to.
+        const perChannel = filePath.match(/projects\/([^/]+)\/channels\/([^/]+)\/output\/deliverables\/(.+)$/);
+        const topLevel = perChannel ? null : filePath.match(/(?:^|\/)output\/deliverables\/(.+)$/);
+        if (!perChannel && !topLevel) continue;
+        const channelSlug = perChannel ? perChannel[2] : null;
+        const filename = perChannel ? perChannel[3] : topLevel![1];
 
         // Get file info
         const { result: stat } = await provider.executeCommand(
@@ -530,14 +538,18 @@ export async function syncDeliverablesFromFilesystem(
             : ['json', 'csv', 'jsonl'].includes(ext) ? 'data'
             : 'file';
 
-        // Get channel lead as the likely author
-        const agentSql = `
-            SELECT cm.agent_slug FROM channel_members cm
-            WHERE cm.channel_slug = '${escapeSQL(channelSlug)}'
-            ORDER BY cm.role ASC LIMIT 1
-        `;
-        const agentRows = await executeWorkspaceJsonQuery<{ agent_slug: string }>(provider, sandboxId, agentSql);
-        const agentSlug = agentRows[0]?.agent_slug ?? 'unknown';
+        // Get channel lead as the likely author. Top-level deliverables have no channel,
+        // so they are attributed to 'unknown'.
+        let agentSlug = 'unknown';
+        if (channelSlug) {
+            const agentSql = `
+                SELECT cm.agent_slug FROM channel_members cm
+                WHERE cm.channel_slug = '${escapeSQL(channelSlug)}'
+                ORDER BY cm.role ASC LIMIT 1
+            `;
+            const agentRows = await executeWorkspaceJsonQuery<{ agent_slug: string }>(provider, sandboxId, agentSql);
+            agentSlug = agentRows[0]?.agent_slug ?? 'unknown';
+        }
 
         const relPath = filePath.replace(wp + '/', '');
 

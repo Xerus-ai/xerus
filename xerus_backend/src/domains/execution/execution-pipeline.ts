@@ -299,9 +299,10 @@ async function processEventStream(
     // events belonging to its agent — prevents identity leakage across streams.
     const expectedSlug = requireAgent(ctx).slug;
     let eventsProcessed = 0;
-    // Resilience: routeEventWithResilience tracks consecutive non-fatal handler
-    // failures across iterations. Fatal invariants re-throw; non-fatal errors are
-    // logged + degraded into a 'notification' until MAX_CONSECUTIVE_HANDLER_ERRORS.
+    // Resilience: routeEventWithResilience tracks consecutive transient handler
+    // failures across iterations. Fatal invariants and programmer errors re-throw
+    // (fail-fast); transient errors are logged + surfaced as a visible
+    // 'notification' until MAX_CONSECUTIVE_HANDLER_ERRORS escalates to fatal.
     const resilience = createResilienceState();
 
     // Safety: abort if no events arrive within FIRST_EVENT_TIMEOUT_MS.

@@ -34,6 +34,7 @@ import {
     updateChannel,
     getProjectOverview,
 } from './company-workspace-db.service';
+import { getCompanyBusinessData, DEFAULT_BUSINESS_LIMIT, MAX_BUSINESS_LIMIT } from './company-business-db.service';
 import { addSystemAgentsToChannel } from './system-agent-assignment.service';
 import { logger } from '../../utils/logger';
 
@@ -105,11 +106,44 @@ router.get('/domains', auth, async (req: AuthenticatedRequest, res: Response, ne
                     name: c.name,
                     description: c.description,
                     agent_count: c.agent_count ?? 0,
+                    message_count: c.message_count ?? 0,
+                    last_message_at: c.last_message_at ?? null,
                 })),
             };
         });
 
         sendResponse(res, 200, { workspace, domains }, startTime);
+    } catch (err) {
+        next(err);
+    }
+});
+
+// -------------------------------------------------------------------------
+// GET /api/v1/company/business - Business data from company.db
+// Returns topics, research reports, and prospects agents have produced.
+// Query params: limit (default 50, max 200), offset (default 0)
+// -------------------------------------------------------------------------
+
+router.get('/business', auth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const startTime = res.locals.startTime || Date.now();
+    try {
+        const userId = req.user?.uid;
+        if (!userId) {
+            throw new UnauthorizedError();
+        }
+        if (!companyDeps) {
+            throw new Error('Company routes dependencies not initialized');
+        }
+        const { sandboxService } = companyDeps;
+        const sandboxId = await requireRunningSandbox(sandboxService, userId);
+        const provider = getDaytonaProvider(sandboxService);
+
+        const limit = Math.min(parseInt(req.query.limit as string, 10) || DEFAULT_BUSINESS_LIMIT, MAX_BUSINESS_LIMIT);
+        const offset = parseInt(req.query.offset as string, 10) || 0;
+
+        const business = await getCompanyBusinessData(provider, sandboxId, limit, offset);
+
+        sendResponse(res, 200, business, startTime);
     } catch (err) {
         next(err);
     }

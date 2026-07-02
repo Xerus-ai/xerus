@@ -105,7 +105,16 @@ function buildSessionCommand(
     const cliArgs = adapter.buildCommand('', agentConfig);
 
     // Inject per-agent env vars that hooks need (XERUS_AGENT_SLUG identifies the agent
-    // to session-start.sh, task-context generation, and all other hook scripts)
+    // to session-start.sh, task-context generation, and all other hook scripts).
+    // Fail-fast: a blank slug would make every hook refuse to log activity (see
+    // _lib.sh resolve_activity_agent) — surface the launch-path bug here instead of
+    // spawning a CLI session with no identity.
+    if (!agentOpts.agentSlug) {
+        throw new Error(
+            'buildSessionCommand: agentOpts.agentSlug is empty — refusing to launch a CLI ' +
+            'session without an agent identity (hooks require XERUS_AGENT_SLUG).',
+        );
+    }
     const fullEnv: Record<string, string> = {
         ...envVars,
         XERUS_AGENT_SLUG: agentOpts.agentSlug,

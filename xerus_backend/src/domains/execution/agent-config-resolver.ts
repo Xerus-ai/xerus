@@ -6,6 +6,10 @@ import type { AdapterType } from './types';
 import type { ResolvedExecutionDeps } from './execution-pipeline.types';
 import { parseAgentYamlFields } from '../../shared/agent-yaml-parser';
 import { buildWorkspaceStateSummary } from './workspace-state-builder';
+import {
+    COMMON_PLATFORM_TOOLS,
+    ALL_ORCHESTRATOR_PLATFORM_TOOLS,
+} from '../platform-tools/orchestrator/tool-access.constants';
 
 // -----------------------------------------------------------------------------
 // Agent Config Resolution
@@ -86,32 +90,13 @@ export async function resolveAdapterType(
 
 const XERUS_MASTER_SLUG = 'xerus-master';
 
-const ORCHESTRATOR_TOOLS = [
-    'create_agent', 'clone_agent', 'update_agent', 'delete_agent',
-    'create_channel', 'add_to_channel',
-    'upload_kb', 'assign_kb',
-    'create_skill', 'install_skill', 'uninstall_skill',
-    'connect_tool', 'register_trigger', 'deregister_trigger',
-    'create_schedule', 'update_schedule', 'delete_schedule',
-].map(t => `mcp__platform__${t}`);
-
-const COMMON_TOOLS = [
-    'create_task', 'update_task',
-    'search_agents', 'list_agents', 'search_kb',
-    'query_memory', 'write_memory', 'analyze_memory_patterns',
-    'search_outputs', 'send_notification',
-    'get_status', 'get_billing_status',
-    'search_skills', 'search_tools', 'list_domains',
-    'list_triggers', 'list_schedules',
-    'pause_execution', 'resume_execution', 'get_session_state',
-    'complete_session', 'cancel_execution',
-].map(t => `mcp__platform__${t}`);
+// Tool lists imported from tool-access.constants.ts — single source of truth
 
 export function buildPlatformRules(agentSlug: string, connectorTools?: string[]): string {
     const isOrchestrator = agentSlug === XERUS_MASTER_SLUG;
     const tools = isOrchestrator
-        ? [...ORCHESTRATOR_TOOLS, ...COMMON_TOOLS]
-        : COMMON_TOOLS;
+        ? ALL_ORCHESTRATOR_PLATFORM_TOOLS
+        : COMMON_PLATFORM_TOOLS;
 
     const lines = [
         '== Platform Rules ==',
@@ -183,6 +168,11 @@ export function buildPlatformRules(agentSlug: string, connectorTools?: string[])
             '- If the task description is long, write it to a markdown file in the channel first,',
             '  then reference the file path in the description',
             '',
+            'DELEGATION (critical):',
+            '- Delegate execution work to specialists via tasks — never do the work yourself.',
+            '- Follow up on task events. If a task stalls, reassign or escalate.',
+            '- Never poll for completion — react to events.',
+            '',
         );
     } else {
         lines.push(
@@ -192,6 +182,17 @@ export function buildPlatformRules(agentSlug: string, connectorTools?: string[])
             '',
         );
     }
+
+    lines.push(
+        '== Execution Contract ==',
+        '',
+        'START: Begin actionable work immediately. Do not stop at a plan unless the task explicitly asks for one.',
+        'WORK: Produce deliverables, not just commentary. Write files to output/deliverables/ and create/update tasks via MCP.',
+        'EXIT: Before ending, state what was produced, where it lives, and what remains. This is your exit disposition — it must be falsifiable.',
+        'COMMENTS: Updates and comments are evidence of work, not substitutes for work products.',
+        'AUTONOMY: Never ask a human to do what you could do with your tools. Attempt it first.',
+        '',
+    );
 
     return lines.join('\n');
 }

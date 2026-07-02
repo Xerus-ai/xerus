@@ -2,9 +2,21 @@ import path from 'path'
 
 const BACKEND_DIR = path.resolve(__dirname, '../../xerus_backend')
 
+const API_URL = process.env.E2E_API_URL || 'http://localhost:5001/api/v1'
+
 export const CONFIG = {
   baseURL: process.env.E2E_BASE_URL || 'http://localhost:3002',
-  apiURL: process.env.E2E_API_URL || 'http://localhost:5001/api/v1',
+  apiURL: API_URL,
+
+  // Internal (sandbox-to-backend) API. The 9to5 schedule daemon POSTs
+  // /internal/v1/schedules/fire here with the shared internal token.
+  // Derived from apiURL by stripping the /api/v1 suffix unless overridden.
+  internal: {
+    url:
+      process.env.E2E_INTERNAL_URL ||
+      API_URL.replace(/\/api\/v1\/?$/, '') + '/internal/v1',
+    token: process.env.XERUS_INTERNAL_API_TOKEN || '',
+  },
 
   testUser: {
     email: process.env.E2E_TEST_USER_EMAIL || '',

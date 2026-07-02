@@ -425,82 +425,92 @@ describe('routeEventToBackend', () => {
     // --- Category B: DB write handlers ---
 
     describe('create_inbox_item', () => {
-        it('should insert inbox item with correct fields', async () => {
-            const ctx = createTestContext();
+        function createDepsWithWorkspaceDb() {
             const { deps, db } = createTestDeps();
+            const executedCommands: string[] = [];
+            deps.sandboxService = {
+                getDaytonaProvider: () => ({
+                    executeCommand: async (_sandboxId: string, command: string) => {
+                        executedCommands.push(command);
+                        return { code: 0, result: '[]' };
+                    },
+                }),
+                invalidateRegistryCache: () => {},
+            } as unknown as ResolvedExecutionDeps['sandboxService'];
+            return { deps, db, executedCommands };
+        }
+
+        it('should insert inbox item into workspace.db with correct fields', async () => {
+            const ctx = createTestContext();
+            const { deps, executedCommands } = createDepsWithWorkspaceDb();
 
             await routeEventToBackend('create_inbox_item', {
                 data: { channel: 'ch-001', content: 'Task completed', priority: 'high' },
             }, ctx, deps);
 
-            expect(db.queries).toHaveLength(1);
-            const q = db.getLastQuery()!;
-            expect(q.sql).toContain('INSERT INTO inbox_items');
-            expect(q.params[0]).toBe('user-123'); // userId
-            expect(q.params[1]).toBe('ch-001');   // channel_id
-            expect(q.params[2]).toBe('test-agent'); // agent_slug
-            expect(q.params[5]).toBe('Task completed'); // content
-            expect(q.params[6]).toBe('high');       // priority
+            expect(executedCommands).toHaveLength(1);
+            const sql = executedCommands[0];
+            expect(sql).toContain('INSERT INTO inbox_items');
+            expect(sql).toContain('test-agent');
+            expect(sql).toContain('Task completed');
+            expect(sql).toContain('high');
         });
 
         it('should default priority to normal', async () => {
             const ctx = createTestContext();
-            const { deps, db } = createTestDeps();
+            const { deps, executedCommands } = createDepsWithWorkspaceDb();
 
             await routeEventToBackend('create_inbox_item', {
                 data: { content: 'No priority specified' },
             }, ctx, deps);
 
-            const q = db.getLastQuery()!;
-            expect(q.params[6]).toBe('normal');
+            const sql = executedCommands[0];
+            expect(sql).toContain("'normal'");
         });
 
-        it('should truncate long content for title', async () => {
+        it('should truncate long content for subject', async () => {
             const ctx = createTestContext();
-            const { deps, db } = createTestDeps();
+            const { deps, executedCommands } = createDepsWithWorkspaceDb();
             const longContent = 'A'.repeat(100);
 
             await routeEventToBackend('create_inbox_item', {
                 data: { content: longContent },
             }, ctx, deps);
 
-            const q = db.getLastQuery()!;
-            const title = q.params[3] as string;
-            expect(title.length).toBe(80);
-            expect(title.endsWith('...')).toBe(true);
+            const sql = executedCommands[0];
+            expect(sql).toContain('...');
         });
 
-        it('should not truncate short content for title', async () => {
-            const ctx = createTestContext();
-            const { deps, db } = createTestDeps();
+        it('should throw when sandboxId is not set', async () => {
+            const ctx = createTestContext({ sandboxId: null });
+            const { deps } = createDepsWithWorkspaceDb();
 
-            await routeEventToBackend('create_inbox_item', {
-                data: { content: 'Short' },
-            }, ctx, deps);
-
-            const q = db.getLastQuery()!;
-            expect(q.params[3]).toBe('Short');
+            await expect(routeEventToBackend('create_inbox_item', {
+                data: { content: 'test' },
+            }, ctx, deps)).rejects.toThrow('sandboxId not set');
         });
 
         it('should throw when content is missing', async () => {
             const ctx = createTestContext();
-            const { deps } = createTestDeps();
+            const { deps } = createDepsWithWorkspaceDb();
 
             await expect(routeEventToBackend('create_inbox_item', {
                 data: { channel: 'ch-001' },
             }, ctx, deps)).rejects.toThrow('create_inbox_item');
         });
 
-        it('should use null for missing channel', async () => {
+        it('should write to workspace.db even without channel', async () => {
             const ctx = createTestContext();
-            const { deps, db } = createTestDeps();
+            const { deps, executedCommands } = createDepsWithWorkspaceDb();
 
             await routeEventToBackend('create_inbox_item', {
                 data: { content: 'No channel' },
             }, ctx, deps);
 
-            const q = db.getLastQuery()!;
-            expect(q.params[1]).toBeNull();
+            expect(executedCommands).toHaveLength(1);
+            const sql = executedCommands[0];
+            expect(sql).toContain('INSERT INTO inbox_items');
+            expect(sql).toContain('No channel');
         });
     });
 

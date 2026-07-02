@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import useSWR from 'swr'
 import { toast } from '@/lib/toast'
 import { getAssistants, getUserAgents } from '@/lib/api/agents'
@@ -125,54 +125,73 @@ interface UseCompanyTasksReturn {
   refetch: () => void
 }
 
+const COMPANY_TASK_POLL_INTERVAL_MS = 10_000
+const POLL_MAX_BACKOFF_MS = 60_000
+
+interface CompanyBoardData {
+  tasks: KanbanTask[]
+  agents: KanbanAgent[]
+}
+
+const fetchCompanyBoard = async (): Promise<CompanyBoardData> => {
+  const result = await getAssistants({ limit: 100 })
+  const agents: KanbanAgent[] = result.agents.map(a => ({
+    id: String(a.id),
+    name: a.name,
+    slug: a.name.toLowerCase().replace(/\s+/g, '-'),
+    status: a.status === 'active' ? 'active' as const : 'idle' as const,
+  }))
+  let tasks: KanbanTask[] = []
+  try {
+    const tasksRaw = await apiGet<unknown>('/tasks')
+    const tasksData = unwrap<{ tasks?: KanbanTask[] }>(tasksRaw)
+    tasks = tasksData.tasks ?? []
+  } catch {
+    // API not available yet — show empty state, not dummy data
+    tasks = []
+  }
+  return { tasks, agents }
+}
+
 export function useCompanyTasks(): UseCompanyTasksReturn {
-  const [tasks, setTasks] = useState<KanbanTask[]>([])
-  const [agents, setAgents] = useState<KanbanAgent[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { data, isLoading, error: swrError, mutate } = useSWR<CompanyBoardData>(
+    'company-board',
+    fetchCompanyBoard,
+    {
+      refreshInterval: COMPANY_TASK_POLL_INTERVAL_MS,
+      refreshWhenHidden: false,
+      onErrorRetry: (_err, _key, _config, revalidate, { retryCount }) => {
+        const delay = Math.min(POLL_MAX_BACKOFF_MS, COMPANY_TASK_POLL_INTERVAL_MS * 2 ** retryCount)
+        setTimeout(() => revalidate({ retryCount }), delay)
+      },
+    },
+  )
 
-  const fetchData = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const result = await getAssistants({ limit: 100 })
-      const agentPool = result.agents.map(a => ({
-        id: String(a.id),
-        name: a.name,
-        slug: a.name.toLowerCase().replace(/\s+/g, '-'),
-        status: a.status === 'active' ? 'active' as const : 'idle' as const,
-      }))
-      setAgents(agentPool)
-      try {
-        const tasksRaw = await apiGet<unknown>('/tasks')
-        const tasksData = unwrap<{ tasks?: KanbanTask[] }>(tasksRaw)
-        setTasks(tasksData.tasks ?? [])
-      } catch {
-        // API not available yet — show empty state, not dummy data
-        setTasks([])
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load board data')
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
-  // Use SWR-style: fetch on mount
-  const { mutate } = useSWR('company-tasks-trigger', () => {
-    fetchData()
-    return null
-  })
+  const tasks = data?.tasks ?? []
+  const agents = data?.agents ?? []
+  const error = swrError instanceof Error ? swrError.message : (swrError ? 'Failed to load board data' : null)
 
   const updateTaskStatus = useCallback(async (taskId: string, newStatus: string) => {
-    setTasks(prev => prev.map(t => (t.id === taskId ? { ...t, status: newStatus } : t)))
-    try {
-      await apiPost(`/tasks/${taskId}/status`, { status: newStatus })
-    } catch {
-      toast.error("Couldn't move that task — reverting", { description: 'The task has been moved back to its original position.' })
-      fetchData()
+    const applyStatus = (current: CompanyBoardData | undefined): CompanyBoardData => {
+      const base = current ?? { tasks: [], agents: [] }
+      return { ...base, tasks: base.tasks.map(t => (t.id === taskId ? { ...t, status: newStatus } : t)) }
     }
-  }, [fetchData])
+    await mutate(
+      async (current) => {
+        await apiPost(`/tasks/${taskId}/status`, { status: newStatus })
+        return applyStatus(current)
+      },
+      {
+        optimisticData: applyStatus,
+        rollbackOnError: true,
+        revalidate: false,
+      },
+    ).catch(() => {
+      toast.error("Couldn't move that task — reverting", { description: 'The task has been moved back to its original position.' })
+    })
+  }, [mutate])
 
-  return { tasks, agents, isLoading, error, updateTaskStatus, refetch: fetchData }
+  const refetch = useCallback(() => { mutate() }, [mutate])
+
+  return { tasks, agents, isLoading, error, updateTaskStatus, refetch }
 }

@@ -1,196 +1,93 @@
 // Deliverables Projection
 // Surface agent deliverables inside the user's drive view without moving them on disk.
 //
-// Real layout (unchanged — agents still write here, organized per channel):
-//   projects/<domain-slug>/channels/<channel-slug>/output/deliverables/<file>
+// Real layout (unchanged — agents still write here):
+//   projects/<domain-slug>/channels/<channel-slug>/output/deliverables/<file>   (per-channel, preferred)
+//   output/deliverables/<file>                                                  (top-level)
 //
 // Virtual projection exposed in the tree:
 //   drive/<Project Display Name>/<file>                           (project has 1 channel — collapsed)
 //   drive/<Project Display Name>/<Channel Display Name>/<file>    (project has 2+ channels)
+//   drive/Deliverables/<file>                                     (top-level output/deliverables/)
 //
-// Display names come from workspace.db (domains.name, channels.name). Slugs stay on disk;
-// users see the names they picked. Projection is read-only — writes to virtual paths
-// aren't routed back to the real filesystem; reads translate the virtual path on the way in.
+// Display names come from workspace.db (domains.name, channels.name), falling back to the
+// slug for on-disk projects not yet registered. Slugs stay on disk; users see friendly names.
+// Projection is read-only — reads/writes translate the virtual path back to the real path.
+//
+// Filesystem/DB scanning lives in deliverables-scan.ts and is re-exported here so callers
+// have a single entry point.
 
-import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
-import type { DaytonaProvider } from '../sandbox-infra/sandbox/providers/daytona.provider';
-import { executeWorkspaceJsonQuery } from '../conversations/workspace-db.helpers';
 import type { FileNode } from './types';
 import { logger } from '../../utils/logger';
+import {
+    TOP_LEVEL_DELIVERABLES_PATH,
+    type DeliverableFile,
+    type ProjectMap,
+    type ProjectMapEntry,
+} from './deliverables-scan';
+
+export {
+    loadProjectMap,
+    loadDeliverablesDeep,
+    collectDeliverablesFromTree,
+} from './deliverables-scan';
+export type { DeliverableFile, ProjectMap, ProjectMapEntry } from './deliverables-scan';
 
 const log = logger('DeliverablesProjection');
 
-const DELIVERABLES_ROOT = 'projects';
-const DELIVERABLES_LIST_DEPTH = 6; // <domain>/channels/<channel>/output/deliverables/<file> = 6 levels under projects/
-
-// -----------------------------------------------------------------------------
-// Types
-// -----------------------------------------------------------------------------
-
-interface DomainRow { slug: string; name: string }
-interface ChannelRow { slug: string; name: string; domain_slug: string }
-
-export interface ProjectMapEntry {
-    /** Display name (e.g., "Marketing") */
-    name: string;
-    /** Domain slug on disk (e.g., "marketing-dept") */
-    slug: string;
-    /** channel slug -> display name */
-    channels: Map<string, string>;
-}
-
-/** Map of domain slug -> project entry. Built once per tree request. */
-export type ProjectMap = Map<string, ProjectMapEntry>;
-
-// -----------------------------------------------------------------------------
-// Loading display names from workspace.db
-// -----------------------------------------------------------------------------
-
-export async function loadProjectMap(
-    provider: DaytonaProvider,
-    sandboxId: string,
-): Promise<ProjectMap> {
-    const map: ProjectMap = new Map();
-
-    try {
-        const domains = await executeWorkspaceJsonQuery<DomainRow>(
-            provider, sandboxId,
-            `SELECT slug, name FROM domains ORDER BY slug;`,
-        );
-        for (const d of domains) {
-            map.set(d.slug, { slug: d.slug, name: d.name, channels: new Map() });
-        }
-
-        const channels = await executeWorkspaceJsonQuery<ChannelRow>(
-            provider, sandboxId,
-            `SELECT slug, name, domain_slug FROM channels ORDER BY slug;`,
-        );
-        for (const c of channels) {
-            const project = map.get(c.domain_slug);
-            if (project) project.channels.set(c.slug, c.name);
-        }
-    } catch (err) {
-        // workspace.db may not exist yet on a brand-new sandbox — return empty map, projection is skipped.
-        log.warn('Failed to load project map', {
-            error: err instanceof Error ? err.message : String(err),
-        });
-    }
-
-    return map;
-}
-
-// -----------------------------------------------------------------------------
-// Listing real deliverable files
-// -----------------------------------------------------------------------------
-
-export interface DeliverableFile {
-    /** Real workspace-relative path: projects/<domain>/channels/<channel>/output/deliverables/<name> */
-    realPath: string;
-    domainSlug: string;
-    channelSlug: string;
-    fileName: string;
-    size?: number;
-    modified?: string;
-}
-
-/**
- * Walks the tree to collect every file living under
- * projects/<x>/channels/<y>/output/deliverables/. We scan the already-built tree
- * instead of a second listFilesRecursive call when possible.
- */
-export function collectDeliverablesFromTree(root: FileNode): DeliverableFile[] {
-    const files: DeliverableFile[] = [];
-
-    const visit = (node: FileNode) => {
-        if (node.type === 'file') {
-            const match = node.path.match(
-                /^projects\/([^/]+)\/channels\/([^/]+)\/output\/deliverables\/(.+)$/,
-            );
-            if (match) {
-                files.push({
-                    realPath: node.path,
-                    domainSlug: match[1],
-                    channelSlug: match[2],
-                    fileName: match[3],
-                    size: node.size,
-                    modified: node.modified,
-                });
-            }
-        }
-        node.children?.forEach(visit);
-    };
-
-    visit(root);
-    return files;
-}
-
-/**
- * Fallback: load deliverable files directly via a deeper listing on the projects/ subtree.
- * Used when the tree's maxDepth cut off deliverables (they live 6 levels deep under workspace root).
- */
-export async function loadDeliverablesDeep(
-    provider: DaytonaProvider,
-    sandboxId: string,
-): Promise<DeliverableFile[]> {
-    const projectsRoot = `${SANDBOX_CONFIG.workspacePath}/${DELIVERABLES_ROOT}`;
-    let files: string[];
-    try {
-        files = await provider.listFilesRecursive(sandboxId, projectsRoot, DELIVERABLES_LIST_DEPTH);
-    } catch (err) {
-        log.warn('Failed to list deliverables', {
-            error: err instanceof Error ? err.message : String(err),
-        });
-        return [];
-    }
-
-    const prefixLen = projectsRoot.endsWith('/') ? projectsRoot.length : projectsRoot.length + 1;
-    const results: DeliverableFile[] = [];
-    for (const absolute of files) {
-        const relativeToProjects = absolute.startsWith(projectsRoot) ? absolute.slice(prefixLen) : absolute;
-        const match = relativeToProjects.match(
-            /^([^/]+)\/channels\/([^/]+)\/output\/deliverables\/(.+)$/,
-        );
-        if (!match) continue;
-        results.push({
-            realPath: `${DELIVERABLES_ROOT}/${relativeToProjects}`,
-            domainSlug: match[1],
-            channelSlug: match[2],
-            fileName: match[3],
-        });
-    }
-    return results;
-}
+/** Virtual drive folder that top-level output/deliverables/ files project into. */
+const TOP_LEVEL_DELIVERABLES_FOLDER = 'Deliverables';
 
 // -----------------------------------------------------------------------------
 // Injecting virtual nodes into the tree
 // -----------------------------------------------------------------------------
 
 /**
- * Mutates root by adding virtual project folders under drive/.
- * Safe to call with an empty ProjectMap (no-op).
+ * Mutates root by adding virtual deliverable folders under drive/. Handles both
+ * per-channel deliverables (grouped by project) and top-level output/deliverables/
+ * (grouped under a single "Deliverables" folder). Safe to call with an empty map.
  */
 export function injectDeliverablesProjection(
     root: FileNode,
     deliverables: DeliverableFile[],
     projectMap: ProjectMap,
 ): void {
-    if (projectMap.size === 0 || deliverables.length === 0) return;
+    if (deliverables.length === 0) return;
 
     // Ensure drive/ exists in the tree
     const drive = getOrCreateChild(root, 'drive', 'drive');
 
-    // Group deliverables by project (domain slug)
+    injectPerChannelDeliverables(drive, deliverables.filter(f => f.domainSlug), projectMap);
+    injectTopLevelDeliverables(drive, deliverables.filter(f => !f.domainSlug));
+
+    // Keep drive children sorted: directories first, then alphabetical — matches how the
+    // rest of the tree sorts.
+    drive.children!.sort((a, b) => {
+        if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
+        return a.name.localeCompare(b.name);
+    });
+}
+
+/**
+ * Project per-channel deliverables into drive/<Project>/[<Channel>/]<file>. Missing
+ * project/channel display names fall back to the slug so unregistered (file-created)
+ * projects still surface rather than being silently dropped.
+ */
+function injectPerChannelDeliverables(
+    drive: FileNode,
+    files: DeliverableFile[],
+    projectMap: ProjectMap,
+): void {
     const byProject = new Map<string, DeliverableFile[]>();
-    for (const file of deliverables) {
-        if (!projectMap.has(file.domainSlug)) continue; // orphan project — skip silently
-        const list = byProject.get(file.domainSlug) ?? [];
+    for (const file of files) {
+        const list = byProject.get(file.domainSlug!) ?? [];
         list.push(file);
-        byProject.set(file.domainSlug, list);
+        byProject.set(file.domainSlug!, list);
     }
 
-    for (const [domainSlug, files] of byProject) {
-        const project = projectMap.get(domainSlug)!;
-        const projectFolderName = sanitizeDisplayName(project.name, domainSlug);
+    for (const [domainSlug, projectFiles] of byProject) {
+        const project = projectMap.get(domainSlug);
+        const projectFolderName = sanitizeDisplayName(project?.name ?? domainSlug, domainSlug);
 
         // Skip if the user has a real drive folder with the same name — real wins.
         if (drive.children?.some(c => c.name === projectFolderName)) {
@@ -201,7 +98,7 @@ export function injectDeliverablesProjection(
         }
 
         // Count distinct channels with deliverables so we know whether to collapse
-        const channelsWithFiles = new Set(files.map(f => f.channelSlug));
+        const channelsWithFiles = new Set(projectFiles.map(f => f.channelSlug));
         const collapse = channelsWithFiles.size === 1;
 
         const projectNode: FileNode = {
@@ -211,13 +108,12 @@ export function injectDeliverablesProjection(
             children: [],
         };
 
-        for (const file of files) {
-            const channelName = project.channels.get(file.channelSlug);
-            if (!channelName) continue; // unknown channel — skip
+        for (const file of projectFiles) {
+            const channelName = project?.channels.get(file.channelSlug!) ?? file.channelSlug!;
 
             let parent = projectNode;
             if (!collapse) {
-                const channelFolderName = sanitizeDisplayName(channelName, file.channelSlug);
+                const channelFolderName = sanitizeDisplayName(channelName, file.channelSlug!);
                 parent = getOrCreateChild(
                     projectNode,
                     channelFolderName,
@@ -238,13 +134,41 @@ export function injectDeliverablesProjection(
             drive.children!.push(projectNode);
         }
     }
+}
 
-    // Keep drive children sorted: user files first (alphabetical), then projected project folders (alphabetical).
-    // Simpler rule: sort all alphabetically, directories first — matches how the rest of the tree sorts.
-    drive.children!.sort((a, b) => {
-        if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
-        return a.name.localeCompare(b.name);
-    });
+/**
+ * Project top-level output/deliverables/ files into a single drive/Deliverables/ folder.
+ * Skips if a real drive folder of the same name already exists — real wins.
+ */
+function injectTopLevelDeliverables(drive: FileNode, files: DeliverableFile[]): void {
+    if (files.length === 0) return;
+    if (drive.children?.some(c => c.name === TOP_LEVEL_DELIVERABLES_FOLDER)) {
+        log.debug('Skipping top-level deliverables projection — real drive entry exists', {
+            name: TOP_LEVEL_DELIVERABLES_FOLDER,
+        });
+        return;
+    }
+
+    const folder: FileNode = {
+        name: TOP_LEVEL_DELIVERABLES_FOLDER,
+        type: 'directory',
+        path: `drive/${TOP_LEVEL_DELIVERABLES_FOLDER}`,
+        children: [],
+    };
+
+    for (const file of files) {
+        folder.children!.push({
+            name: file.fileName,
+            type: 'file',
+            path: `${folder.path}/${file.fileName}`,
+            size: file.size,
+            modified: file.modified,
+        });
+    }
+
+    if (folder.children!.length > 0) {
+        drive.children!.push(folder);
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -266,9 +190,16 @@ export function resolveVirtualDeliverablePath(
     const projectFolderName = match[1];
     const tail = match[2];
 
-    // Match project by sanitized display name
+    // Match project by sanitized display name. A real project takes priority over the
+    // top-level Deliverables alias, mirroring the "real wins" rule in the forward projection.
     const project = findProjectByFolderName(projectMap, projectFolderName);
-    if (!project) return null;
+    if (!project) {
+        // Top-level deliverables alias: drive/Deliverables/<tail> -> output/deliverables/<tail>
+        if (projectFolderName === TOP_LEVEL_DELIVERABLES_FOLDER) {
+            return `${TOP_LEVEL_DELIVERABLES_PATH}/${tail}`;
+        }
+        return null;
+    }
 
     // Case 1: collapsed layout — tail is just a filename
     // Case 2: expanded layout — tail is "<ChannelName>/<file>"

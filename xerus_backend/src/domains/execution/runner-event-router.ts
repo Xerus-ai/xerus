@@ -9,6 +9,7 @@ import { STREAM_EVENT_TYPES, type RunnerEventType, type StreamEventType } from '
 import type { HITLRequest } from './hitl/hitl.types';
 import { handleMetadataSync } from './metadata-sync-router';
 import { handleTriggerIndexing } from './indexing-event-handler';
+import { runPostSessionMemoryIndexing } from './post-session-memory-indexer';
 import { handleCliStreamEvent } from './cli-stream-router';
 import { dispatchCrossChannelCoordination, dispatchMentionToAgent } from './coordination-router';
 import { handleSseForward, handleAgentOutput } from './sse-forward-handler';
@@ -17,6 +18,7 @@ import { scheduleIncrementalPersist } from './session-record';
 import { FILE_WRITE_TOOLS, syncFileChangeToNeon, emitFileChangedFromToolCall } from './file-change-handler';
 import { ChannelNotFoundError, MentionParser } from '../inbox';
 import { updateSdkSessionId } from '../conversations/workspace-db.service';
+import { escapeSQL, executeWorkspaceJsonQuery } from '../conversations/workspace-db.helpers';
 import {
     assertToolCallData,
     assertToolResultData,
@@ -38,6 +40,7 @@ const mentionParser = new MentionParser();
 
 export const EVENT_ROUTER_LOG_PREFIX = '[EventRouter]';
 const log = logger('EventRouter');
+const XERUS_MASTER_SLUG = 'xerus-master';
 
 // Canonical allowlist: only events the frontend knows how to handle (from STREAM_EVENT_TYPES)
 export const VALID_SSE_FORWARD_EVENTS: ReadonlySet<string> = new Set(STREAM_EVENT_TYPES);
@@ -282,9 +285,11 @@ async function handleSessionCompleted(
             `UPDATE agents SET status = 'idle', updated_at = '${new Date().toISOString()}' WHERE slug = '${escapeSQL(agentSlug)}'`,
         ).catch(err => log.warn('Failed to update agent status to idle', { error: (err as Error).message }));
 
-        // Trigger memory indexing for files changed during this session
-        handleTriggerIndexing({ agent_slug: agentSlug, scope: 'session' }, ctx, deps)
-            .catch(err => log.warn('Post-session memory indexing failed (non-critical)', { error: (err as Error).message }));
+        // Index the agent's .memory/agents/{slug}/*.md files into pgvector so the
+        // agent detail page surfaces them (closes the git-memory -> memory_search_index
+        // pipeline). Failures are logged loudly, not silently skipped.
+        runPostSessionMemoryIndexing(ctx, deps)
+            .catch(err => log.error('Post-session memory indexing failed', { agent_slug: agentSlug, error: (err as Error).message }));
     }
 }
 
@@ -299,13 +304,23 @@ async function handleCreateInboxItem(
     d: Record<string, unknown>, ctx: PipelineContext, deps: ResolvedExecutionDeps,
 ): Promise<void> {
     const data = assertCreateInboxItemData(d);
-    const title = (data.content.length > 80 ? data.content.slice(0, 77) + '...' : data.content);
-    const summary = data.content.slice(0, 200);
-    await deps.db.query(
-        `INSERT INTO inbox_items (user_id, channel_id, agent_slug, title, summary, content, status, priority, metadata)
-         VALUES ($1, $2, $3, $4, $5, $6, 'delivered', $7, $8)`,
-        [ctx.request.userId, data.channel || null, requireAgent(ctx).slug, title, summary, data.content, data.priority, JSON.stringify({})],
-    );
+    const subject = (data.content.length > 80 ? data.content.slice(0, 77) + '...' : data.content);
+    const senderSlug = requireAgent(ctx).slug;
+
+    if (!ctx.sandboxId) {
+        throw new PipelineInvariantError(`${EVENT_ROUTER_LOG_PREFIX} create_inbox_item: sandboxId not set`);
+    }
+
+    const provider = deps.sandboxService.getDaytonaProvider();
+    const now = new Date().toISOString();
+    const metadata = JSON.stringify({ channel_id: data.channel || null, priority: data.priority });
+
+    const sql = `
+        INSERT INTO inbox_items (agent_slug, sender_slug, message_type, subject, content, metadata, priority, status, received_at)
+        VALUES ('${escapeSQL(XERUS_MASTER_SLUG)}', '${escapeSQL(senderSlug)}', 'coordination', '${escapeSQL(subject)}', '${escapeSQL(data.content)}', '${escapeSQL(metadata)}', '${escapeSQL(data.priority || 'normal')}', 'unread', '${now}');
+    `;
+
+    await executeWorkspaceJsonQuery(provider, ctx.sandboxId, sql);
 }
 
 async function handleAgentMessage(

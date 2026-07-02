@@ -8,6 +8,7 @@ import { cloneWorkspaceTemplate } from './workspace-clone';
 import { installRunnerBundle } from './runner-installer';
 import { personalizeWorkspace } from '../workspace/workspace-personalizer.service';
 import { syncPipedreamMcpConfig } from '../workspace/mcp-config.service';
+import { toolsService } from '../../tools/service';
 import { ensureWorkspaceIntegrity, syncAgentsToWorkspace } from './workspace-health';
 import { syncWorkspaceTemplate } from './workspace-template-sync';
 import { GIT_MEMORY_CONFIG } from '../../memory/git-memory/git-memory.types';
@@ -74,6 +75,31 @@ export async function runMcpConfigSync(
     userId: string,
     deps: SetupDeps,
 ): Promise<void> {
+    // Reconcile connected_accounts against Pipedream (source of truth) BEFORE building
+    // the MCP config, so the .mcp.json we write reflects the converged set. This backfills
+    // connections dropped by fire-and-forget webhooks (and repairs every user broken by the
+    // old parse bug) with no manual intervention. Non-blocking: a Pipedream outage must not
+    // stop a user's sandbox from coming up — mirrors the syncWorkspaceTemplate resilience
+    // boundary below. The reconcile itself fail-fasts internally (no partial DB writes).
+    try {
+        const reconcile = await toolsService.reconcileConnectedAccounts({ user_id: userId });
+        if (reconcile.added > 0 || reconcile.removed > 0) {
+            log.info('Reconciled connected accounts from Pipedream', {
+                sandbox_id: sandboxId,
+                user_id: userId,
+                added: reconcile.added,
+                removed: reconcile.removed,
+                total: reconcile.total,
+            });
+        }
+    } catch (reconcileErr) {
+        log.warn('Connected-accounts reconciliation failed (non-blocking)', {
+            sandbox_id: sandboxId,
+            user_id: userId,
+            error: (reconcileErr as Error).message,
+        });
+    }
+
     const sandboxFs = await deps.getSandboxFs(sandboxId);
     const mcpJsonPath = `${SANDBOX_CONFIG.workspacePath}/.mcp.json`;
     const result = await syncPipedreamMcpConfig(sandboxFs, mcpJsonPath, userId, deps.db);
