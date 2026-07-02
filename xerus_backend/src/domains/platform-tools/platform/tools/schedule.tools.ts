@@ -114,7 +114,7 @@ function cronToRrule(expr: string): string {
     return trimmed;
 }
 
-function computeNextRunAt(rruleStr: string): number | null {
+export function computeNextRunAt(rruleStr: string): number | null {
     try {
         const normalized = cronToRrule(rruleStr);
         const bare = normalized.startsWith('RRULE:') ? normalized.slice(6) : normalized;
