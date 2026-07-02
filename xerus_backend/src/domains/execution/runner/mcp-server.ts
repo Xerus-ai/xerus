@@ -80,8 +80,10 @@ class BackendNetworkError extends Error {
     }
 }
 
-// Backend API URL — platform routes that handle the actual operations
-const BACKEND_URL = process.env.XERUS_BACKEND_URL || 'http://localhost:5001';
+// Backend API URL — platform routes that handle the actual operations.
+// CONTRACT: bare origin, no path — callBackendApi appends /api/v1/internal/mcp/<tool>.
+// buildSDKEnvironment (sdk.config.ts) normalizes API_BASE_URL to this form.
+const BACKEND_URL = (process.env.XERUS_BACKEND_URL || 'http://localhost:5001').replace(/\/+$/, '');
 
 // Fail-fast: require XERUS_BACKEND_TOKEN in production
 const BACKEND_TOKEN = process.env.XERUS_BACKEND_TOKEN;
@@ -624,10 +626,33 @@ export const TOOLS = [
 ];
 
 // -----------------------------------------------------------------------------
-// Backend API Proxy (fail-fast pattern)
+// Backend API Proxy (fail-fast pattern, with bounded retry)
 // -----------------------------------------------------------------------------
 
-async function callBackendApi(
+// One initial attempt plus one retry. Transient backend unavailability (network
+// drop, backend restart mid-execution, 5xx) is the confirmed cause of MCP tool
+// failures that push agents to raw sqlite3. A single retry absorbs those blips
+// without masking real client errors (4xx are NOT retried — fail-fast).
+const MAX_ATTEMPTS = 2;
+const RETRY_DELAY_MS = 1_000;
+
+function delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Retry only on transient failures: network errors and 5xx/timeout responses.
+// Never retry 4xx (auth failures, bad requests) — those will not self-heal.
+function isRetryableBackendError(err: unknown): boolean {
+    if (err instanceof BackendNetworkError) {
+        return true;
+    }
+    if (err instanceof BackendApiError) {
+        return err.statusCode >= 500;
+    }
+    return false;
+}
+
+async function callBackendApiOnce(
     path: string,
     body: Record<string, unknown>,
 ): Promise<unknown> {
@@ -663,6 +688,33 @@ async function callBackendApi(
     }
 
     return response.json();
+}
+
+async function callBackendApi(
+    path: string,
+    body: Record<string, unknown>,
+): Promise<unknown> {
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        try {
+            return await callBackendApiOnce(path, body);
+        } catch (err) {
+            lastError = err;
+            if (attempt < MAX_ATTEMPTS && isRetryableBackendError(err)) {
+                const message = err instanceof Error ? err.message : String(err);
+                console.error(
+                    `[mcp-server] Backend call ${path} failed (attempt ${attempt}/${MAX_ATTEMPTS}), ` +
+                    `retrying in ${RETRY_DELAY_MS}ms: ${message}`,
+                );
+                await delay(RETRY_DELAY_MS);
+                continue;
+            }
+            throw err;
+        }
+    }
+
+    throw lastError;
 }
 
 // -----------------------------------------------------------------------------
@@ -704,6 +756,45 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 });
 
 // -----------------------------------------------------------------------------
+// Startup Diagnostics
+// -----------------------------------------------------------------------------
+
+// Surface the backend wiring at boot so silent tool failures are diagnosable
+// from execution logs. Never log the token value itself — only whether it is set.
+function logStartupDiagnostics(): void {
+    console.error('[mcp-server] Startup diagnostics:');
+    console.error(`[mcp-server]   XERUS_BACKEND_URL: ${BACKEND_URL}`);
+    console.error(`[mcp-server]   XERUS_BACKEND_TOKEN set: ${Boolean(BACKEND_TOKEN)}`);
+    console.error(`[mcp-server]   XERUS_USER_ID: ${USER_ID ?? '(unset)'}`);
+    console.error(`[mcp-server]   XERUS_AGENT_SLUG: ${AGENT_SLUG || '(unset)'}`);
+}
+
+// Probe backend connectivity once at boot. Log outcome only — a failed probe
+// must not stop the server (the backend may come up shortly after).
+async function runStartupHealthCheck(): Promise<void> {
+    const url = `${BACKEND_URL}/api/v1/internal/mcp/get_status`;
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(BACKEND_TOKEN ? { Authorization: `Bearer ${BACKEND_TOKEN}` } : {}),
+            },
+            body: JSON.stringify({ user_id: USER_ID, _agent_slug: AGENT_SLUG }),
+            signal: AbortSignal.timeout(10_000),
+        });
+        if (response.ok) {
+            console.error(`[mcp-server] Health check OK — backend reachable (HTTP ${response.status})`);
+        } else {
+            console.error(`[mcp-server] Health check FAILED — backend returned HTTP ${response.status}`);
+        }
+    } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`[mcp-server] Health check FAILED — cannot reach backend at ${url}: ${message}`);
+    }
+}
+
+// -----------------------------------------------------------------------------
 // Start Server
 // -----------------------------------------------------------------------------
 
@@ -711,6 +802,9 @@ async function main(): Promise<void> {
     const transport = new StdioServerTransport();
     await server.connect(transport);
     process.stderr.write('[mcp-server] Running with 39 backend-coupled tools\n');
+
+    logStartupDiagnostics();
+    await runStartupHealthCheck();
 }
 
 main().catch((err) => {

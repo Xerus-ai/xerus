@@ -85,6 +85,15 @@ export function buildSDKEnvironment(
         }
     }
 
+    // CONTRACT: XERUS_BACKEND_URL is the bare backend origin (no path) —
+    // mcp-server.ts appends /api/v1/internal/mcp/<tool> to it. API_BASE_URL
+    // carries the /api/v1 prefix, so strip it here. Passing it through verbatim
+    // double-prefixes the URL (/api/v1/api/v1/internal/...), which 404s every
+    // platform MCP tool call and silently degrades agents to sqlite3 fallbacks.
+    const backendOrigin = (process.env.API_BASE_URL || 'https://api.xerus.ai')
+        .replace(/\/+$/, '')
+        .replace(/\/api\/v1$/, '');
+
     const env: Record<string, string> = {
         ...filtered,
         ANTHROPIC_BASE_URL: SDK_CONFIG.openRouterBaseUrl,
@@ -93,7 +102,7 @@ export function buildSDKEnvironment(
         ANTHROPIC_API_KEY: apiKey,
         XERUS_WORKSPACE_ROOT: process.env.XERUS_WORKSPACE_ROOT || '/home/daytona',
         // Platform MCP server needs these to reach the backend from inside the sandbox
-        XERUS_BACKEND_URL: process.env.API_BASE_URL || 'https://api.xerus.ai/api/v1',
+        XERUS_BACKEND_URL: backendOrigin,
         XERUS_BACKEND_TOKEN: process.env.XERUS_INTERNAL_API_TOKEN || '',
     };
 
