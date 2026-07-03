@@ -3,7 +3,6 @@
 // See: docs/planning/execution/EXECUTION_ARCHITECTURE_v2.md Section 10
 
 import { randomUUID } from 'crypto';
-import type { StreamSink } from './streaming/stream.handler';
 import {
     loadAgent,
     acquireExecutionLane,
@@ -38,19 +37,20 @@ import type {
 } from './execution-pipeline';
 
 import { logger } from '../../utils/logger';
-import { sendCommand } from '../sandbox-infra/sandbox';
 import { resolveApiKey, type ResolvedKey } from './key-resolver.service';
 import { handleExecutionError, cleanupExecution } from './execution-lifecycle';
 import { buildSDKEnvironment, type UserCliKeys } from './sdk/sdk.config';
-import type { SessionHandle } from '../sandbox-infra/sandbox/providers/daytona-runner';
 import { skillSecretsService } from '../skills/secrets.service';
 import { createAnnounceQueueService } from './queue/announce-queue.service';
 import { createWorkspaceInboxWriter } from './queue/database-inbox-writer';
 import { checkHookHealth } from '../sandbox-infra/sandbox/hook-health';
 import { SANDBOX_CONFIG } from '../sandbox-infra/sandbox/sandbox.config';
-import { createChannelMessage } from '../company/company-workspace-db.service';
-import { syncMessageToSandbox } from '../company/channel-execution.service';
-import { escapeSQL, executeWorkspaceJsonQuery } from '../conversations/workspace-db.helpers';
+import { routeAgentResponseToChannel } from './execution-channel-router';
+import {
+    type ActiveExecution,
+    respondToHitl as respondToHitlImpl,
+    cancelExecution as cancelExecutionImpl,
+} from './execution-controls';
 
 const log = logger('ExecutionService');
 // -----------------------------------------------------------------------------
@@ -70,14 +70,6 @@ export function setExecutionApiKeyLookup(lookup: UserApiKeyLookup): void {
 function getApiKeyLookup(): UserApiKeyLookup {
     if (!apiKeyLookup) throw new Error('Execution API key lookup not initialized');
     return apiKeyLookup;
-}
-
-interface ActiveExecution {
-    handle: SessionHandle;
-    agentSlug: string;
-    stream: StreamSink;
-    sandboxId: string;
-    userId: string;
 }
 
 export class ExecutionService {
@@ -318,64 +310,7 @@ export class ExecutionService {
             await streamRunnerEvents(handle, ctx, resolved);
             log.info('Stream completed', { execution_id: executionId });
 
-            // Channel message routing: write agent response to channel_messages
-            // so it appears in the /inbox activity feed (not just /chat).
-            // Supports: channel_message (explicit channel), schedule/task_assigned (resolve from membership).
-            const responseText = ctx.responseText || ctx.responseChunks.join('');
-            if (responseText && ctx.sandboxId) {
-                const agentSlug = ctx.agent?.slug || ctx.request.agentSlug;
-                let targetChannel = ctx.request.context?.channel_slug as string | undefined;
-
-                // For non-channel triggers, resolve the agent's primary channel from workspace.db
-                if (!targetChannel && (ctx.triggerType === 'schedule' || ctx.triggerType === 'task_assigned')) {
-                    try {
-                        const rows = await executeWorkspaceJsonQuery<{ channel_slug: string }>(
-                            daytonaProvider, ctx.sandboxId,
-                            `SELECT channel_slug FROM channel_members WHERE agent_slug = '${escapeSQL(agentSlug)}' LIMIT 1`,
-                        );
-                        targetChannel = rows[0]?.channel_slug;
-                    } catch (err) {
-                        log.warn('Failed to resolve agent channel for autonomous post', {
-                            agent: agentSlug, error: err instanceof Error ? err.message : String(err),
-                        });
-                    }
-                }
-
-                const shouldWriteChannel = targetChannel && (
-                    ctx.triggerType === 'channel_message' ||
-                    ctx.triggerType === 'schedule' ||
-                    ctx.triggerType === 'task_assigned'
-                );
-
-                if (shouldWriteChannel && targetChannel) {
-                    log.info('Writing agent response to channel_messages', {
-                        channel: targetChannel, agent: agentSlug, trigger: ctx.triggerType,
-                        length: responseText.length,
-                    });
-
-                    await createChannelMessage(
-                        daytonaProvider, ctx.sandboxId,
-                        targetChannel, 'agent', agentSlug,
-                        responseText, 'post', {},
-                    ).catch(err => log.warn('Failed to write agent response to channel_messages', {
-                        error: err instanceof Error ? err.message : String(err),
-                    }));
-
-                    const parts = targetChannel.split('--');
-                    if (parts.length === 2) {
-                        const channelTag = `${parts[0]}/${parts[1]}`;
-                        syncMessageToSandbox(resolved.sandboxService, request.userId, channelTag, {
-                            sender_type: 'agent',
-                            sender_slug: agentSlug,
-                            content: responseText,
-                            message_type: 'post',
-                            posted_at: new Date().toISOString(),
-                        }).catch(err => log.warn('Failed to sync agent response to posts.jsonl', {
-                            error: err instanceof Error ? err.message : String(err),
-                        }));
-                    }
-                }
-            }
+            await routeAgentResponseToChannel(ctx, daytonaProvider, resolved.sandboxService);
 
             // Drain any queued subagent announcements before finalizing
             if (ctx.announceQueue && ctx.announceQueue.getQueueSize() > 0) {
@@ -451,62 +386,19 @@ export class ExecutionService {
         };
     }
 
-    /**
-     * Send HITL response to runner for a paused execution.
-     * Called by POST /:id/respond route after DB state is updated.
-     *
-     * For AskUserQuestion: also writes a response file to /tmp/xerus-hitl/{pauseId}.response
-     * in the sandbox. The PreToolUse hook is blocking on this file and will unblock
-     * when it appears, allowing the tool execution to proceed.
-     */
     async respondToHitl(executionId: string, pauseId: string, approved: boolean, feedback?: string): Promise<boolean> {
         const active = this.activeExecutions.get(executionId);
-        if (!active) {
-            return false;
-        }
-
-        await sendCommand(active.handle, {
-            type: 'hitl_response',
-            pause_id: pauseId,
-            approved,
-            feedback,
-        });
-
-        // Write response file for AskUserQuestion PreToolUse hook (which blocks on this file)
-        const resolved = this.resolveDeps();
-        const provider = resolved.sandboxService.getDaytonaProvider();
-        const responseContent = JSON.stringify({ approved, feedback: feedback || '', timestamp: new Date().toISOString() });
-        provider.getSandboxInstance(active.sandboxId)
-            .then(sandbox => sandbox.fs.uploadFile(
-                Buffer.from(responseContent, 'utf-8'),
-                `/tmp/xerus-hitl/${pauseId}.response`,
-            ))
-            .catch(err => log.warn('Failed to write HITL response file', { error: (err as Error).message }));
-
+        if (!active) return false;
+        const provider = this.resolveDeps().sandboxService.getDaytonaProvider();
+        await respondToHitlImpl(active, provider, pauseId, approved, feedback);
         return true;
     }
 
     cancelExecution(executionId: string): boolean {
         const active = this.activeExecutions.get(executionId);
-        if (!active) {
-            return false;
-        }
-
-        // Kill the Daytona session to terminate the CLI process.
-        // stdin-based interrupts don't work — Claude Code's stream-json input
-        // only handles 'user' and 'control_request' types, ignoring 'interrupt'.
-        const resolved = this.resolveDeps();
-        const provider = resolved.sandboxService.getDaytonaProvider();
-        provider.getSandboxInstance(active.sandboxId)
-            .then(sandbox => sandbox.process.deleteSession(active.handle.sessionId))
-            .then(() => log.info('Cancelled: deleted runner session', { execution_id: executionId, session: active.handle.sessionId }))
-            .catch(err => log.error('Failed to delete runner session', { execution_id: executionId, error: (err as Error).message }));
-
-        // Send stop event — do NOT close the stream (it belongs to the conversation, not the execution)
-        if (!active.stream.isClosed()) {
-            active.stream.send('stop', { reason: 'user_cancel' });
-        }
-
+        if (!active) return false;
+        const provider = this.resolveDeps().sandboxService.getDaytonaProvider();
+        cancelExecutionImpl(active, provider, executionId);
         return true;
     }
 

@@ -1,15 +1,13 @@
 'use client'
 
-import { TrendingUp, TrendingDown, Minus, FlaskConical, Users, Building2, User } from 'lucide-react'
+import { useState } from 'react'
+import { TrendingUp, TrendingDown, Minus, FlaskConical, Users, Building2, User, ChevronDown } from 'lucide-react'
 import {
   useCompanyBusinessData,
   type Topic,
   type ResearchReport,
   type Prospect,
 } from '@/hooks/useCompanyBusinessData'
-
-// Business data agents produce in company.db — surfaced read-only on the project hub.
-// company.db is workspace-wide, so this reflects company knowledge across all projects.
 
 function SectionLabel({ children, count }: { children: React.ReactNode; count: number }) {
   return (
@@ -46,40 +44,113 @@ function TrendBadge({ direction }: { direction: Topic['trend_direction'] }) {
 }
 
 function TopicCard({ topic }: { topic: Topic }) {
+  const [expanded, setExpanded] = useState(false)
+
   return (
-    <div className="px-3 py-2.5 rounded-lg bg-surface hover:bg-surface-hover transition-colors">
+    <button
+      onClick={() => setExpanded(prev => !prev)}
+      className="w-full text-left px-3 py-2.5 rounded-lg bg-surface hover:bg-surface-hover transition-colors cursor-pointer"
+    >
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-medium text-text truncate">{topic.name}</span>
         <div className="flex items-center gap-2 shrink-0">
           <TrendBadge direction={topic.trend_direction} />
           <RelevancePill score={topic.relevance_score} />
+          <ChevronDown className={`w-3.5 h-3.5 text-text-muted transition-transform ${expanded ? 'rotate-180' : ''}`} />
         </div>
       </div>
-      {topic.description && (
+      {!expanded && topic.description && (
         <p className="text-xs text-text-secondary line-clamp-2 mt-1">{topic.description}</p>
+      )}
+      {expanded && (
+        <div className="mt-2 space-y-2 border-t border-border-secondary pt-2">
+          {topic.description && (
+            <p className="text-xs text-text-secondary">{topic.description}</p>
+          )}
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+            <div>
+              <span className="text-text-muted">Relevance: </span>
+              <span className="text-text-secondary">{topic.relevance_score ?? 'N/A'}/10</span>
+            </div>
+            <div>
+              <span className="text-text-muted">Trend: </span>
+              <span className="text-text-secondary">{topic.trend_direction ?? 'N/A'}</span>
+            </div>
+            <div>
+              <span className="text-text-muted">Research runs: </span>
+              <span className="text-text-secondary">{topic.research_count}</span>
+            </div>
+            {topic.last_researched_at && (
+              <div>
+                <span className="text-text-muted">Last researched: </span>
+                <span className="text-text-secondary">
+                  {new Date(topic.last_researched_at).toLocaleDateString()}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
       )}
       <div className="flex items-center gap-2 mt-1.5">
         <span className="text-[10px] text-text-muted">{topic.source_agent}</span>
-        {topic.research_count > 0 && (
+        {!expanded && topic.research_count > 0 && (
           <span className="text-[10px] text-text-muted">
             {topic.research_count} research run{topic.research_count !== 1 ? 's' : ''}
           </span>
         )}
       </div>
-    </div>
+    </button>
   )
 }
 
 function ResearchReportCard({ report }: { report: ResearchReport }) {
+  const [expanded, setExpanded] = useState(false)
   const preview = report.summary || report.key_findings
+
   return (
-    <div className="px-3 py-2.5 rounded-lg bg-surface hover:bg-surface-hover transition-colors">
+    <button
+      onClick={() => setExpanded(prev => !prev)}
+      className="w-full text-left px-3 py-2.5 rounded-lg bg-surface hover:bg-surface-hover transition-colors cursor-pointer"
+    >
       <div className="flex items-start gap-2">
         <FlaskConical className="w-4 h-4 text-text-muted shrink-0 mt-0.5" />
         <div className="min-w-0 flex-1">
-          <span className="text-sm font-medium text-text block truncate">{report.topic}</span>
-          {preview && (
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-medium text-text block truncate">{report.topic}</span>
+            <ChevronDown className={`w-3.5 h-3.5 text-text-muted shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+          </div>
+          {!expanded && preview && (
             <p className="text-xs text-text-secondary line-clamp-2 mt-0.5">{preview}</p>
+          )}
+          {expanded && (
+            <div className="mt-2 space-y-2 border-t border-border-secondary pt-2">
+              {report.summary && (
+                <div>
+                  <span className="text-[11px] font-medium text-text-muted uppercase tracking-wider">Summary</span>
+                  <p className="text-xs text-text-secondary mt-0.5 whitespace-pre-line">{report.summary}</p>
+                </div>
+              )}
+              {report.key_findings && report.key_findings !== report.summary && (
+                <div>
+                  <span className="text-[11px] font-medium text-text-muted uppercase tracking-wider">Key Findings</span>
+                  <p className="text-xs text-text-secondary mt-0.5 whitespace-pre-line">{report.key_findings}</p>
+                </div>
+              )}
+              {report.sheet_url && (
+                <div>
+                  <span className="text-[11px] font-medium text-text-muted uppercase tracking-wider">Source</span>
+                  <a
+                    href={report.sheet_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={e => e.stopPropagation()}
+                    className="text-xs text-accent-primary hover:underline mt-0.5 block truncate"
+                  >
+                    {report.sheet_url}
+                  </a>
+                </div>
+              )}
+            </div>
           )}
           <div className="flex items-center gap-2 mt-1.5">
             <span className="text-[10px] text-text-muted">{report.source_agent}</span>
@@ -90,7 +161,7 @@ function ResearchReportCard({ report }: { report: ResearchReport }) {
           </div>
         </div>
       </div>
-    </div>
+    </button>
   )
 }
 
@@ -103,24 +174,68 @@ function StatusPill({ status }: { status: string }) {
 }
 
 function ProspectCard({ prospect }: { prospect: Prospect }) {
+  const [expanded, setExpanded] = useState(false)
   const Icon = prospect.type === 'person' ? User : Building2
+
   return (
-    <div className="px-3 py-2.5 rounded-lg bg-surface hover:bg-surface-hover transition-colors">
+    <button
+      onClick={() => setExpanded(prev => !prev)}
+      className="w-full text-left px-3 py-2.5 rounded-lg bg-surface hover:bg-surface-hover transition-colors cursor-pointer"
+    >
       <div className="flex items-center gap-2">
         <Icon className="w-4 h-4 text-text-muted shrink-0" />
         <span className="text-sm font-medium text-text truncate flex-1">{prospect.name}</span>
         <div className="flex items-center gap-2 shrink-0">
           <StatusPill status={prospect.status} />
           <RelevancePill score={prospect.relevance_score} />
+          <ChevronDown className={`w-3.5 h-3.5 text-text-muted transition-transform ${expanded ? 'rotate-180' : ''}`} />
         </div>
       </div>
-      {prospect.notes && (
+      {!expanded && prospect.notes && (
         <p className="text-xs text-text-secondary line-clamp-2 mt-1 pl-6">{prospect.notes}</p>
+      )}
+      {expanded && (
+        <div className="mt-2 space-y-2 border-t border-border-secondary pt-2 pl-6">
+          {prospect.notes && (
+            <p className="text-xs text-text-secondary whitespace-pre-line">{prospect.notes}</p>
+          )}
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+            <div>
+              <span className="text-text-muted">Type: </span>
+              <span className="text-text-secondary capitalize">{prospect.type}</span>
+            </div>
+            <div>
+              <span className="text-text-muted">Status: </span>
+              <span className="text-text-secondary capitalize">{prospect.status}</span>
+            </div>
+            <div>
+              <span className="text-text-muted">Relevance: </span>
+              <span className="text-text-secondary">{prospect.relevance_score ?? 'N/A'}/10</span>
+            </div>
+            <div>
+              <span className="text-text-muted">Added: </span>
+              <span className="text-text-secondary">
+                {new Date(prospect.created_at).toLocaleDateString()}
+              </span>
+            </div>
+          </div>
+          {prospect.source_url && (
+            <a
+              href={prospect.source_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={e => e.stopPropagation()}
+              className="text-xs text-accent-primary hover:underline block truncate"
+            >
+              {prospect.source_url}
+            </a>
+          )}
+        </div>
       )}
       <div className="flex items-center gap-2 mt-1.5 pl-6">
         <span className="text-[10px] text-text-muted">{prospect.source_agent}</span>
       </div>
-    </div>
+    </button>
   )
 }
 
@@ -129,7 +244,6 @@ export function BusinessDataSection() {
   const { topics, research_reports, prospects } = data
   const total = topics.length + research_reports.length + prospects.length
 
-  // Nothing to show yet — keep the hub uncluttered on projects without data.
   if (isLoading || total === 0) return null
 
   return (
