@@ -51,8 +51,11 @@ export const SANDBOX_CONFIG = {
     // Git repository URL for workspace template (cloned on new sandbox creation)
     workspaceTemplateUrl: process.env.XERUS_WORKSPACE_TEMPLATE_URL || 'https://github.com/xerus-ai/xerus-workspace.git',
 
-    // Git branch for workspace template (optional — uses repo default if not set)
-    workspaceTemplateBranch: process.env.XERUS_WORKSPACE_TEMPLATE_BRANCH || '',
+    // Git branch for workspace template. Pinned to 'main' — never rely on the
+    // repo's default branch: when the GitHub default pointed at a stale branch,
+    // every sandbox was scaffolded from months-old prompts (fictional tool names)
+    // and template sync "converged" to the same stale content forever.
+    workspaceTemplateBranch: process.env.XERUS_WORKSPACE_TEMPLATE_BRANCH || 'main',
 
     // Streaming queue limits (backpressure)
     queueSoftLimit: 500,   // Emit warning when exceeded
