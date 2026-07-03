@@ -48,6 +48,7 @@ const EDITABLE_PATTERNS: RegExp[] = [
     /^agents\/[^/]+\/HEARTBEAT\.md$/,
     /^agents\/[^/]+\/knowledge\/.+/,
     /^drive\/.+/,
+    /^projects\/[^/]+\/CLAUDE\.md$/,
     /^projects\/[^/]+\/knowledge\/.+/,
 ];
 
