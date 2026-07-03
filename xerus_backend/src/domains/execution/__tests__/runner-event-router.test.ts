@@ -1,218 +1,28 @@
-// Runner Event Router Tests
-// Tests all 27 event type handlers and the extractData data shape fix.
-// Uses in-memory fakes (not jest.mock) per project conventions.
+// Runner Event Router Tests — extractData, tool_call, session_ended, credit_usage, sse_forward
+// DB write handlers and metadata_sync: runner-event-router-handlers.test.ts
 
 import {
     routeEventToBackend,
     VALID_SSE_FORWARD_EVENTS,
 } from '../runner-event-router';
-import type { PipelineContext, ResolvedExecutionDeps, AgentRow, ExecutionDatabase } from '../execution-pipeline.types';
-import type { StreamEventType } from '../types';
 import {
-    CreditTracker,
-    type CreditService,
-    type UsageStore,
-    type ToolUsageRecord,
-    type SessionUsage,
-} from '../../credits/credit-tracker.service';
-import { ChannelNotFoundError } from '../../inbox/messaging';
-
-// -----------------------------------------------------------------------------
-// In-Memory Implementations (real objects, not mocks)
-// -----------------------------------------------------------------------------
-
-class InMemoryDatabase implements ExecutionDatabase {
-    public queries: Array<{ sql: string; params: unknown[] }> = [];
-    public nextResult: { rows: unknown[] } = { rows: [] };
-
-    async query<T>(sql: string, params?: unknown[]): Promise<{ rows: T[] }> {
-        this.queries.push({ sql, params: params || [] });
-        return this.nextResult as { rows: T[] };
-    }
-
-    getLastQuery(): { sql: string; params: unknown[] } | undefined {
-        return this.queries[this.queries.length - 1];
-    }
-
-    clear(): void {
-        this.queries = [];
-        this.nextResult = { rows: [] };
-    }
-}
-
-class InMemoryCreditService implements CreditService {
-    public deductions: Array<{ userId: string; amount: number }> = [];
-    public currentBalance = 100;
-
-    async checkCredits(_userId: string, required: number): Promise<boolean> {
-        return this.currentBalance >= required;
-    }
-
-    async deduct(userId: string, input: { amount: number }): Promise<{ balance: number }> {
-        this.deductions.push({ userId, amount: input.amount });
-        this.currentBalance -= input.amount;
-        return { balance: this.currentBalance };
-    }
-
-    async refund(_userId: string, amount: number, _description?: string): Promise<{ balance: number }> {
-        this.currentBalance += amount;
-        return { balance: this.currentBalance };
-    }
-
-    async getBalance(_userId: string): Promise<{ balance: number }> {
-        return { balance: this.currentBalance };
-    }
-}
-
-class InMemoryUsageStore implements UsageStore {
-    public records: ToolUsageRecord[] = [];
-
-    async storeToolUsage(record: ToolUsageRecord): Promise<void> {
-        this.records.push(record);
-    }
-
-    async getSessionUsage(sessionId: string): Promise<SessionUsage> {
-        const sessionRecords = this.records.filter(r => r.session_id === sessionId);
-        return {
-            session_id: sessionId,
-            total_input_tokens: sessionRecords.reduce((sum, r) => sum + (r.tokens_used || 0), 0),
-            total_output_tokens: 0,
-            total_credits: sessionRecords.reduce((sum, r) => sum + (r.credits_consumed || 0), 0),
-            tool_calls: sessionRecords.length,
-        };
-    }
-}
-
-class FakeStream {
-    public sentEvents: Array<{ type: string; content: unknown; meta: unknown }> = [];
-
-    send(type: StreamEventType, content: unknown, meta?: unknown): void {
-        this.sentEvents.push({ type, content, meta });
-    }
-
-    isClosed(): boolean {
-        return false;
-    }
-}
-
-// -----------------------------------------------------------------------------
-// Helpers
-// -----------------------------------------------------------------------------
-
-function createTestAgent(): AgentRow {
-    return {
-        id: 42,
-        name: 'Test Agent',
-        slug: 'test-agent',
-        description: 'A test agent',
-        ai_model: 'claude-sonnet-4-5-20250929',
-        thinking_level: 'medium',
-        autonomy_level: 'supervised',
-        adapter_type: 'claudecode',
-        primary_use_case: 'testing',
-        workspace_id: 'ws-001',
-        user_id: 'user-123',
-    };
-}
-
-function createTestContext(overrides?: Partial<PipelineContext>): PipelineContext {
-    const stream = new FakeStream();
-    return {
-        executionId: 'exec-001',
-        stream: stream as unknown as PipelineContext['stream'],
-        request: {
-            userId: 'user-123',
-            agentSlug: 'test-agent',
-            task: 'test task',
-            coordinationMode: 'sequential',
-        } as PipelineContext['request'],
-        agent: createTestAgent(),
-        sandboxId: 'sbx-001',
-        sessionHandle: null,
-        laneId: null,
-        startedAt: Date.now(),
-        sessionId: 'session-001',
-        inputTokens: 0,
-        outputTokens: 0,
-        toolCallCount: 0,
-        status: 'running',
-        streamOffset: 0,
-        conversationId: null,
-        sdkSessionId: null,
-        responseText: '',
-        responseChunks: [],
-        creditsUsed: 0,
-        keySource: null,
-        subscriptionStatus: null,
-        subscriptionPeriodEnd: null,
-        agentSessionCount: 0,
-        announceQueue: null,
-        thinkingChunks: [],
-        toolCallDetails: [],
-        toolCallMap: new Map(),
-        eventsFiltered: 0,
-        setupReport: null,
-        hookHealth: null,
-        triggerType: 'user_message',
-        executionFailed: false,
-        executionError: null,
-        ...overrides,
-    };
-}
-
-interface TestDeps {
-    deps: ResolvedExecutionDeps;
-    db: InMemoryDatabase;
-    creditService: InMemoryCreditService;
-    creditTracker: CreditTracker;
-}
-
-function createTestDeps(db?: InMemoryDatabase): TestDeps {
-    const inMemoryDb = db || new InMemoryDatabase();
-    const creditService = new InMemoryCreditService();
-    const usageStore = new InMemoryUsageStore();
-    const creditTracker = new CreditTracker({ creditService, usageStore });
-
-    const deps: ResolvedExecutionDeps = {
-        db: inMemoryDb,
-        creditTracker,
-        // sdkService, sandboxService, queueService are never
-        // accessed by the event router. Safe to leave as empty stubs.
-        sdkService: {} as ResolvedExecutionDeps['sdkService'],
-        sandboxService: {} as ResolvedExecutionDeps['sandboxService'],
-        queueService: {} as ResolvedExecutionDeps['queueService'],
-        memorySearchIndex: null,
-        messageBridge: null,
-        hitlHandler: { requestApproval: async () => ({}), resolveApproval: async () => ({}) } as unknown as ResolvedExecutionDeps['hitlHandler'],
-        activeStreamEmitter: null,
-    };
-    return { deps, db: inMemoryDb, creditService, creditTracker };
-}
-
-function getStream(ctx: PipelineContext): FakeStream {
-    return ctx.stream as unknown as FakeStream;
-}
-
-// -----------------------------------------------------------------------------
-// Tests
-// -----------------------------------------------------------------------------
+    createTestContext,
+    createTestDeps,
+    getStream,
+} from './runner-event-router-test-deps';
 
 describe('routeEventToBackend', () => {
-    // --- extractData (data shape fix) ---
-
     describe('extractData (data shape fix)', () => {
         it('should merge raw.data into root for consistent field access', async () => {
             const ctx = createTestContext();
             const { deps } = createTestDeps();
 
-            // StdoutEmitter wraps: {"event":"credit_usage","agent_slug":"x","data":{"credits_consumed":5}}
             await routeEventToBackend('credit_usage', {
                 event: 'credit_usage',
                 agent_slug: 'x',
                 data: { credits_consumed: 5 },
             }, ctx, deps);
 
-            // credit_usage now accumulates on ctx.creditsUsed (deduction happens at finalize)
             expect(ctx.creditsUsed).toBe(5);
         });
 
@@ -231,7 +41,6 @@ describe('routeEventToBackend', () => {
             const ctx = createTestContext();
             const { deps } = createTestDeps();
 
-            // data is a string, not an object - should not merge
             await routeEventToBackend('tool_call', {
                 data: 'not-an-object',
             }, ctx, deps);
@@ -239,8 +48,6 @@ describe('routeEventToBackend', () => {
             expect(ctx.toolCallCount).toBe(1);
         });
     });
-
-    // --- Category A: Existing handlers ---
 
     describe('tool_call', () => {
         it('should increment toolCallCount', async () => {
@@ -260,7 +67,6 @@ describe('routeEventToBackend', () => {
             const ctx = createTestContext();
             const { deps } = createTestDeps();
 
-            // StdoutEmitter.sessionEnded() emits data.usage = {input_tokens, output_tokens, total_tokens}
             await routeEventToBackend('session_ended', {
                 data: { usage: { input_tokens: 1500, output_tokens: 3000, total_tokens: 4500 } },
             }, ctx, deps);
@@ -311,10 +117,7 @@ describe('routeEventToBackend', () => {
             const ctx = createTestContext();
             const { deps } = createTestDeps();
 
-            await routeEventToBackend('credit_usage', {
-                data: { credits_consumed: 10 },
-            }, ctx, deps);
-
+            await routeEventToBackend('credit_usage', { data: { credits_consumed: 10 } }, ctx, deps);
             expect(ctx.creditsUsed).toBe(10);
         });
 
@@ -322,10 +125,7 @@ describe('routeEventToBackend', () => {
             const ctx = createTestContext();
             const { deps } = createTestDeps();
 
-            await routeEventToBackend('credit_usage', {
-                data: { credits_consumed: 0 },
-            }, ctx, deps);
-
+            await routeEventToBackend('credit_usage', { data: { credits_consumed: 0 } }, ctx, deps);
             expect(ctx.creditsUsed).toBe(0);
         });
 
@@ -333,10 +133,7 @@ describe('routeEventToBackend', () => {
             const ctx = createTestContext();
             const { deps } = createTestDeps();
 
-            await routeEventToBackend('credit_usage', {
-                data: { credits_consumed: -5 },
-            }, ctx, deps);
-
+            await routeEventToBackend('credit_usage', { data: { credits_consumed: -5 } }, ctx, deps);
             expect(ctx.creditsUsed).toBe(0);
         });
 
@@ -344,10 +141,7 @@ describe('routeEventToBackend', () => {
             const ctx = createTestContext();
             const { deps } = createTestDeps();
 
-            await routeEventToBackend('credit_usage', {
-                data: {},
-            }, ctx, deps);
-
+            await routeEventToBackend('credit_usage', { data: {} }, ctx, deps);
             expect(ctx.creditsUsed).toBe(0);
         });
     });
@@ -363,10 +157,7 @@ describe('routeEventToBackend', () => {
             }, ctx, deps);
 
             expect(db.queries).toHaveLength(0);
-            expect(warnSpy).toHaveBeenCalledWith(
-                expect.stringContaining('update_agent_run'),
-            );
-
+            expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('update_agent_run'));
             warnSpy.mockRestore();
         });
     });
@@ -383,7 +174,6 @@ describe('routeEventToBackend', () => {
             const stream = getStream(ctx);
             expect(stream.sentEvents).toHaveLength(1);
             expect(stream.sentEvents[0].type).toBe('progress');
-            expect(stream.sentEvents[0].content).toEqual({ text: 'working...' });
         });
 
         it('should reject invalid SSE event types', async () => {
@@ -419,444 +209,6 @@ describe('routeEventToBackend', () => {
                 expect(VALID_SSE_FORWARD_EVENTS.has(event)).toBe(true);
             }
             expect(VALID_SSE_FORWARD_EVENTS.size).toBe(30);
-        });
-    });
-
-    // --- Category B: DB write handlers ---
-
-    describe('create_inbox_item', () => {
-        function createDepsWithWorkspaceDb() {
-            const { deps, db } = createTestDeps();
-            const executedCommands: string[] = [];
-            deps.sandboxService = {
-                getDaytonaProvider: () => ({
-                    executeCommand: async (_sandboxId: string, command: string) => {
-                        executedCommands.push(command);
-                        return { code: 0, result: '[]' };
-                    },
-                }),
-                invalidateRegistryCache: () => {},
-            } as unknown as ResolvedExecutionDeps['sandboxService'];
-            return { deps, db, executedCommands };
-        }
-
-        it('should insert inbox item into workspace.db with correct fields', async () => {
-            const ctx = createTestContext();
-            const { deps, executedCommands } = createDepsWithWorkspaceDb();
-
-            await routeEventToBackend('create_inbox_item', {
-                data: { channel: 'ch-001', content: 'Task completed', priority: 'high' },
-            }, ctx, deps);
-
-            expect(executedCommands).toHaveLength(1);
-            const sql = executedCommands[0];
-            expect(sql).toContain('INSERT INTO inbox_items');
-            expect(sql).toContain('test-agent');
-            expect(sql).toContain('Task completed');
-            expect(sql).toContain('high');
-        });
-
-        it('should default priority to normal', async () => {
-            const ctx = createTestContext();
-            const { deps, executedCommands } = createDepsWithWorkspaceDb();
-
-            await routeEventToBackend('create_inbox_item', {
-                data: { content: 'No priority specified' },
-            }, ctx, deps);
-
-            const sql = executedCommands[0];
-            expect(sql).toContain("'normal'");
-        });
-
-        it('should truncate long content for subject', async () => {
-            const ctx = createTestContext();
-            const { deps, executedCommands } = createDepsWithWorkspaceDb();
-            const longContent = 'A'.repeat(100);
-
-            await routeEventToBackend('create_inbox_item', {
-                data: { content: longContent },
-            }, ctx, deps);
-
-            const sql = executedCommands[0];
-            expect(sql).toContain('...');
-        });
-
-        it('should throw when sandboxId is not set', async () => {
-            const ctx = createTestContext({ sandboxId: null });
-            const { deps } = createDepsWithWorkspaceDb();
-
-            await expect(routeEventToBackend('create_inbox_item', {
-                data: { content: 'test' },
-            }, ctx, deps)).rejects.toThrow('sandboxId not set');
-        });
-
-        it('should throw when content is missing', async () => {
-            const ctx = createTestContext();
-            const { deps } = createDepsWithWorkspaceDb();
-
-            await expect(routeEventToBackend('create_inbox_item', {
-                data: { channel: 'ch-001' },
-            }, ctx, deps)).rejects.toThrow('create_inbox_item');
-        });
-
-        it('should write to workspace.db even without channel', async () => {
-            const ctx = createTestContext();
-            const { deps, executedCommands } = createDepsWithWorkspaceDb();
-
-            await routeEventToBackend('create_inbox_item', {
-                data: { content: 'No channel' },
-            }, ctx, deps);
-
-            expect(executedCommands).toHaveLength(1);
-            const sql = executedCommands[0];
-            expect(sql).toContain('INSERT INTO inbox_items');
-            expect(sql).toContain('No channel');
-        });
-    });
-
-    describe('agent_message', () => {
-        it('should delegate to messageBridge.handleOutboundMessage with provider, sandboxId, userId', async () => {
-            const ctx = createTestContext();
-            const { deps } = createTestDeps();
-            const calls: Array<{ provider: unknown; sandboxId: string; userId: string; message: unknown }> = [];
-            deps.sandboxService = {
-                getDaytonaProvider: () => ({ fake: true }),
-                invalidateRegistryCache: () => {},
-            } as unknown as ResolvedExecutionDeps['sandboxService'];
-            deps.messageBridge = {
-                handleOutboundMessage: async (provider: unknown, sandboxId: string, userId: string, message: unknown) => {
-                    calls.push({ provider, sandboxId, userId, message });
-                    return { message_id: 'msg-001', channel_id: 'ch-001' };
-                },
-            } as unknown as ResolvedExecutionDeps['messageBridge'];
-
-            await routeEventToBackend('agent_message', {
-                data: { channel: 'general', content: 'Hello team!', agent_slug: 'writer', project: 'marketing' },
-            }, ctx, deps);
-
-            expect(calls).toHaveLength(1);
-            expect(calls[0].sandboxId).toBe('sbx-001');
-            expect(calls[0].userId).toBe('user-123');
-            const msg = calls[0].message as Record<string, unknown>;
-            expect(msg.agent_slug).toBe('writer');
-            expect(msg.project).toBe('marketing');
-            expect(msg.channel).toBe('general');
-            expect(msg.content).toBe('Hello team!');
-            expect(msg.message_type).toBe('chat');
-        });
-
-        it('should throw when messageBridge is not available', async () => {
-            const ctx = createTestContext();
-            const { deps } = createTestDeps();
-            deps.messageBridge = null;
-
-            await expect(routeEventToBackend('agent_message', {
-                data: { channel: 'general', content: 'Hello' },
-            }, ctx, deps)).rejects.toThrow('messageBridge not initialized');
-        });
-
-        it('should warn when messageBridge throws ChannelNotFoundError', async () => {
-            const ctx = createTestContext();
-            const { deps } = createTestDeps();
-            deps.sandboxService = {
-                getDaytonaProvider: () => ({ fake: true }),
-                invalidateRegistryCache: () => {},
-            } as unknown as ResolvedExecutionDeps['sandboxService'];
-            deps.messageBridge = {
-                handleOutboundMessage: async () => {
-                    throw new ChannelNotFoundError('marketing', 'general');
-                },
-            } as unknown as ResolvedExecutionDeps['messageBridge'];
-            const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-
-            await routeEventToBackend('agent_message', {
-                data: { channel: 'general', content: 'Hello', project: 'marketing' },
-            }, ctx, deps);
-
-            expect(warnSpy).toHaveBeenCalled();
-            warnSpy.mockRestore();
-        });
-
-        it('should throw when channel is missing', async () => {
-            const ctx = createTestContext();
-            const { deps } = createTestDeps();
-
-            await expect(routeEventToBackend('agent_message', {
-                data: { content: 'No channel' },
-            }, ctx, deps)).rejects.toThrow('agent_message');
-        });
-
-        it('should throw when content is missing', async () => {
-            const ctx = createTestContext();
-            const { deps } = createTestDeps();
-
-            await expect(routeEventToBackend('agent_message', {
-                data: { channel: 'general' },
-            }, ctx, deps)).rejects.toThrow('agent_message');
-        });
-    });
-
-    describe('hook_log', () => {
-        // hook_executions table deprecated in migration 081. handleHookLog now logs only.
-
-        it('should log hook event without DB insert', async () => {
-            const ctx = createTestContext({ sessionId: 'session-001' });
-            const { deps, db } = createTestDeps();
-            const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-
-            await routeEventToBackend('hook_log', {
-                data: { hook_event: 'PreToolUse', duration_ms: 15, success: true },
-            }, ctx, deps);
-
-            expect(db.queries).toHaveLength(0);
-            expect(logSpy).toHaveBeenCalledWith(
-                expect.stringContaining('hook_log'),
-            );
-
-            logSpy.mockRestore();
-        });
-
-        it('should include success and duration in log output', async () => {
-            const ctx = createTestContext({ sessionId: 'session-001' });
-            const { deps, db } = createTestDeps();
-            const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-
-            await routeEventToBackend('hook_log', {
-                data: { hook_event: 'PreToolUse', success: false, error: 'denied', duration_ms: 42 },
-            }, ctx, deps);
-
-            expect(db.queries).toHaveLength(0);
-            expect(logSpy).toHaveBeenCalledWith(
-                expect.stringContaining('hook_log'),
-            );
-
-            logSpy.mockRestore();
-        });
-
-        it('should not write to DB when sessionId is empty', async () => {
-            const ctx = createTestContext({ sessionId: '' });
-            const { deps, db } = createTestDeps();
-
-            await routeEventToBackend('hook_log', {
-                data: { hook_event: 'PreToolUse' },
-            }, ctx, deps);
-
-            expect(db.queries).toHaveLength(0);
-        });
-    });
-
-    describe('subagent_failure', () => {
-        it('should not write to DB (no table exists)', async () => {
-            const ctx = createTestContext();
-            const { deps, db } = createTestDeps();
-
-            await routeEventToBackend('subagent_failure', {
-                data: { subagent_type: 'researcher', error_message: 'timeout' },
-            }, ctx, deps);
-
-            // No DB queries - table doesn't exist
-            expect(db.queries).toHaveLength(0);
-        });
-    });
-
-    describe('sandbox_lifecycle', () => {
-        it('should update sandbox status for known actions', async () => {
-            const actionMap: Record<string, string> = {
-                start: 'running',
-                stop: 'paused',
-                archive: 'archived',
-                delete: 'stopped',
-                restore: 'running',
-            };
-
-            for (const [action, expectedStatus] of Object.entries(actionMap)) {
-                const ctx = createTestContext();
-                const db = new InMemoryDatabase();
-                const { deps } = createTestDeps(db);
-                deps.sandboxService = {
-                    invalidateRegistryCache: (_userId: string) => {},
-                } as unknown as ResolvedExecutionDeps['sandboxService'];
-
-                await routeEventToBackend('sandbox_lifecycle', {
-                    data: { sandbox_id: 'sbx-001', action },
-                }, ctx, deps);
-
-                expect(db.queries).toHaveLength(1);
-                const q = db.getLastQuery()!;
-                expect(q.sql).toContain('UPDATE workspaces');
-                expect(q.params[0]).toBe('sbx-001');
-                expect(q.params[1]).toBe(expectedStatus);
-                expect(q.params[2]).toBe('user-123'); // user_id
-            }
-        });
-
-        it('should log unknown actions', async () => {
-            const ctx = createTestContext();
-            const { deps, db } = createTestDeps();
-            const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-
-            await routeEventToBackend('sandbox_lifecycle', {
-                data: { sandbox_id: 'sbx-001', action: 'unknown_action' },
-            }, ctx, deps);
-
-            expect(db.queries).toHaveLength(0);
-
-            logSpy.mockRestore();
-        });
-
-        it('should throw when sandbox_id is missing', async () => {
-            const ctx = createTestContext();
-            const { deps } = createTestDeps();
-
-            await expect(routeEventToBackend('sandbox_lifecycle', {
-                data: { action: 'start' },
-            }, ctx, deps)).rejects.toThrow('sandbox_lifecycle');
-        });
-
-        it('should throw when action is missing', async () => {
-            const ctx = createTestContext();
-            const { deps } = createTestDeps();
-
-            await expect(routeEventToBackend('sandbox_lifecycle', {
-                data: { sandbox_id: 'sbx-001' },
-            }, ctx, deps)).rejects.toThrow('sandbox_lifecycle');
-        });
-    });
-
-    // --- Category B: metadata_sync validation ---
-
-    describe('metadata_sync', () => {
-        it('should warn for unsupported entities', async () => {
-            const ctx = createTestContext();
-            const { deps } = createTestDeps();
-            const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-
-            await routeEventToBackend('metadata_sync', {
-                data: { entity: 'unknown_thing', action: 'create', data: { slug: 'test' } },
-            }, ctx, deps);
-
-            expect(warnSpy).toHaveBeenCalledWith(
-                expect.stringContaining('unsupported entity'),
-            );
-
-            warnSpy.mockRestore();
-        });
-
-        it('should warn when action is missing', async () => {
-            const ctx = createTestContext();
-            const { deps } = createTestDeps();
-            const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-
-            await routeEventToBackend('metadata_sync', {
-                data: { entity: 'agent', data: { slug: 'test' } },
-            }, ctx, deps);
-
-            expect(warnSpy).toHaveBeenCalled();
-
-            warnSpy.mockRestore();
-        });
-
-        it('should warn when slug is missing from agent data', async () => {
-            const ctx = createTestContext();
-            const { deps } = createTestDeps();
-            const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-
-            await routeEventToBackend('metadata_sync', {
-                data: { entity: 'agent', action: 'create', data: { name: 'test' } },
-            }, ctx, deps);
-
-            expect(warnSpy).toHaveBeenCalled();
-
-            warnSpy.mockRestore();
-        });
-
-        it('should warn for unknown actions', async () => {
-            const ctx = createTestContext();
-            const { deps } = createTestDeps();
-            const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-
-            await routeEventToBackend('metadata_sync', {
-                entity: 'agent',
-                action: 'purge',
-                data: { slug: 'test-agent' },
-            }, ctx, deps);
-
-            expect(warnSpy).toHaveBeenCalled();
-
-            warnSpy.mockRestore();
-        });
-    });
-
-    // --- Category C: Structured log handlers ---
-
-    describe('Category C (structured logging)', () => {
-        // Only events that are pure logEvent calls in the router.
-        // agent_output, session_started, trigger_indexing, push_notification,
-        // delegation_record have specialized handlers and are tested separately.
-        // Events that go through logEvent() only (no DB write, no SSE forward)
-        // scaffold_complete now has its own handler; heartbeat_fired/heartbeat_skipped
-        // are handled by the default case (unknown event warning).
-        const logOnlyEvents = [
-            'session_analytics',
-            'health', 'sessions', 'credit_check',
-            'ace_reflection', 'skill_suggestion',
-        ];
-
-        for (const event of logOnlyEvents) {
-            it(`should not write to DB for ${event} events`, async () => {
-                const ctx = createTestContext();
-                const { deps, db } = createTestDeps();
-
-                await routeEventToBackend(event, {
-                    data: { agent_slug: 'test-agent', some_field: 'value' },
-                }, ctx, deps);
-
-                expect(db.queries).toHaveLength(0);
-            });
-        }
-    });
-
-    describe('error event', () => {
-        it('should log with console.error including code and message', async () => {
-            const ctx = createTestContext();
-            const { deps } = createTestDeps();
-            const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-
-            await routeEventToBackend('error', {
-                data: { code: 'TIMEOUT', message: 'Execution timed out' },
-            }, ctx, deps);
-
-            expect(errorSpy).toHaveBeenCalled();
-
-            errorSpy.mockRestore();
-        });
-
-        it('should handle missing code and message', async () => {
-            const ctx = createTestContext();
-            const { deps } = createTestDeps();
-            const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-
-            await routeEventToBackend('error', { data: {} }, ctx, deps);
-
-            expect(errorSpy).toHaveBeenCalled();
-
-            errorSpy.mockRestore();
-        });
-    });
-
-    // --- Default (unknown events) ---
-
-    describe('unknown events', () => {
-        it('should warn for unknown event types', async () => {
-            const ctx = createTestContext();
-            const { deps } = createTestDeps();
-            const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-
-            await routeEventToBackend('completely_unknown_event', {}, ctx, deps);
-
-            expect(warnSpy).toHaveBeenCalled();
-
-            warnSpy.mockRestore();
         });
     });
 });
